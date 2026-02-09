@@ -1,15 +1,13 @@
-// js/main.js
-
+/* === MAIN INITIALIZATION === */
 window.onload = async () => { 
-    loadData(); // Está en auth.js
-    await initDB(); // Está en auth.js
-    initOnline(); // Está en online.js
+    loadData(); 
+    await initDB();
+    initOnline(); 
+    document.addEventListener('click', unlockAudio); 
+    renderMenu(); 
+    checkUpdate();
     
-    document.addEventListener('click', unlockAudio); // Está en game.js
-    renderMenu(); // Está en ui.js
-    checkUpdate(); // Está en auth.js
-    
-    // Sistema de presencia
+    // PRESENCE SYSTEM (HEARTBEAT)
     setInterval(() => {
         if(user.name !== "Guest" && db) {
             db.collection("users").doc(user.name).update({
@@ -18,10 +16,8 @@ window.onload = async () => {
             });
         }
     }, 10000); 
-    
-    setupNotificationsListener(); // Está en ui.js
+    setupNotificationsListener();
 };
 
-// Listeners globales de teclado
 window.addEventListener('keydown', onKd); 
 window.addEventListener('keyup', onKu);
