@@ -42,9 +42,17 @@ function playSong(name) {
     unlockAudio(); const s = ramSongs.find(x=>x.id===name); if(!s) return notify("Error RAM", "error"); curIdx = name;
     document.getElementById('track').innerHTML = ''; 
     st.notes = JSON.parse(JSON.stringify(s.map)); st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
-    isMultiplayer = (conn && conn.open); opponentScore = 0; songFinished = false; 
+    // isMultiplayer ahora es global manejado por online.js
+    opponentScore = 0; songFinished = false; 
     
-    if(isMultiplayer) { document.getElementById('vs-hud').style.display = 'flex'; document.getElementById('p1-name').innerText = user.name; document.getElementById('p1-score').innerText = "0"; document.getElementById('p2-score').innerText = "0"; } else { document.getElementById('vs-hud').style.display = 'none'; }
+    // UI Ajustes
+    if(isMultiplayer) { 
+        document.getElementById('vs-hud').style.display = 'flex'; 
+        // El hud de jugadores se maneja en online.js
+    } else { 
+        document.getElementById('vs-hud').style.display = 'none'; 
+    }
+
     document.getElementById('menu-container').classList.add('hidden'); document.getElementById('game-layer').style.display='block'; document.getElementById('hud').style.display='flex';
     
     initReceptors(keys); updHUD();
@@ -106,11 +114,9 @@ function loop(){
 // FIXED KEYBOARD LISTENER
 function onKd(e) { 
     if(e.key==="Escape"){togglePause();return;} 
-    // PREVENT DEFAULT KEYS
     if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
 
     if(remapMode!==null){ 
-        // ASSIGN KEY
         cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
         renderLaneConfig(remapMode); 
         remapMode=null; 
@@ -148,7 +154,15 @@ function showJudge(t,c){ if(!cfg.judgeVis) return; const j=document.createElemen
 
 function updHUD(){
     document.getElementById('g-score').innerText=st.sc.toLocaleString();
-    if(isMultiplayer) { document.getElementById('p1-score').innerText = st.sc.toLocaleString(); conn.send({ type: 'score', val: st.sc }); }
+    
+    // Si es lobby de 4 jugadores, enviar score a Firestore
+    if(isMultiplayer && typeof sendLobbyScore === 'function') {
+        sendLobbyScore(st.sc);
+    } else if (conn && conn.open) {
+        // Fallback 1v1 legacy
+        conn.send({ type: 'score', val: st.sc });
+    }
+
     document.getElementById('g-combo').innerText=st.cmb;
     const acc=st.maxScorePossible>0?Math.round((st.sc/st.maxScorePossible)*100):100;
     document.getElementById('g-acc').innerText=acc+"%";
@@ -167,26 +181,59 @@ function end(died){
     if(!died){ 
         if(acc===100){r="SS";c="cyan"} else if(acc>=95){r="S";c="gold"} else if(acc>=90){r="A";c="lime"} else if(acc>=80){r="B";c="yellow"} else if(acc>=70){r="C";c="orange"} else {r="D";c="red"}
     }
+    
+    // Mostrar solo "Ganaste" si es legacy 1v1. Lobby 4P muestra scores en vivo.
     if(isMultiplayer) {
-        const wMsg = document.getElementById('winner-msg'); wMsg.style.display = 'block';
-        if(st.sc > opponentScore) { wMsg.innerText = "¡GANASTE EL 1v1!"; wMsg.style.color = "var(--sick)"; }
-        else if (st.sc < opponentScore) { wMsg.innerText = "PERDISTE..."; wMsg.style.color = "var(--miss)"; }
-        else { wMsg.innerText = "EMPATE"; wMsg.style.color = "white"; }
+         // Logica de lobby: Ya no mostramos winner msg simple
+         document.getElementById('winner-msg').innerText = "PARTIDA FINALIZADA";
+         document.getElementById('winner-msg').style.display = 'block';
+         document.getElementById('winner-msg').style.color = 'white';
+         if(typeof leaveLobby === 'function') leaveLobby(); // Salir del lobby al terminar
     } else { document.getElementById('winner-msg').style.display = 'none'; }
 
     document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
     document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
     
     if(!died && songFinished && user.name!=="Guest"){ 
-        const xp = Math.floor(st.sc/500); user.xp+=xp; user.score+=st.sc; user.plays++; 
-        if(user.xp >= user.lvl*1000) { user.xp -= user.lvl*1000; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!"); }
+        // === NUEVA FORMULA XP ===
+        // Antes: score/500 (muy lento). Ahora: score/250 para duplicar velocidad base.
+        const xpGain = Math.floor(st.sc / 250); 
+        user.xp += xpGain; 
+        
+        // === SCORE POINTS (SP) ===
+        // Ganas 1 SP por cada 1000 puntos de Score.
+        const spGain = Math.floor(st.sc / 1000);
+        if(!user.sp) user.sp = 0;
+        user.sp += spGain;
+
+        user.score += st.sc; 
+        user.plays++; 
+        
+        // === LEVEL UP SCALING ===
+        // Base 1000. Incrementa 5% por nivel hasta nivel 10, luego 2%
+        let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
+        if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1); // Soft cap
+        xpReq = Math.floor(xpReq);
+
+        if(user.xp >= xpReq) { 
+            user.xp -= xpReq; 
+            user.lvl++; 
+            notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success", 5000); 
+        }
+
         if(st.ranked) { 
             if(acc < 50) { user.pp = Math.max(0, user.pp - 15); document.getElementById('pp-gain-loss').innerText = "-15 PP"; document.getElementById('pp-gain-loss').style.color = "var(--miss)"; }
             else { const ppG = Math.floor(st.sc/5000); user.pp += ppG; document.getElementById('pp-gain-loss').innerText = `+${ppG} PP`; document.getElementById('pp-gain-loss').style.color = "var(--gold)"; }
         } else { document.getElementById('pp-gain-loss').innerText = "0 PP"; document.getElementById('pp-gain-loss').style.color = "white"; }
+        
         save(); updateFirebaseScore(); 
-        document.getElementById('res-xp').innerText = xp;
-    } else { document.getElementById('res-xp').innerText = 0; }
+        
+        document.getElementById('res-xp').innerText = xpGain;
+        document.getElementById('res-sp').innerText = spGain;
+    } else { 
+        document.getElementById('res-xp').innerText = 0; 
+        document.getElementById('res-sp').innerText = 0;
+    }
 }
 function toMenu() { location.reload(); }
 function startGame(k) { keys = k; const s = ramSongs.find(x=>x.id===curSongId); if(!s) return notify("Error RAM.", "error"); s.map = genMap(s.buf, k); closeModal('diff'); playSong(curSongId); }
