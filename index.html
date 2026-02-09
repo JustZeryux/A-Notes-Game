@@ -21,19 +21,13 @@
             --gold: #FFD700;
             --sick: #00FFFF; --good: #12FA05; --bad: #FFD700; --miss: #F9393F;
             --lane-width: 25%;
-            
-            /* VARIABLES DINAMICAS */
             --track-alpha: 0.1;
-            --judge-y: 40%;
-            --judge-x: 50%;
-            --judge-s: 1;
-            --judge-op: 1;
+            --judge-y: 40%; --judge-x: 50%; --judge-s: 1; --judge-op: 1;
         }
 
         * { box-sizing: border-box; user-select: none; outline: none; }
         body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakra Petch', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
 
-        /* === ANIMACIONES === */
         @keyframes slideIn { 0% { transform: translateX(-50px); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes pulse-btn { 0% { box-shadow: 0 0 0 0 rgba(255, 102, 170, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 102, 170, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 102, 170, 0); } }
@@ -41,18 +35,15 @@
         @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(3px, 3px); } 50% { transform: translate(-3px, -3px); } 75% { transform: translate(3px, -3px); } 100% { transform: translate(0,0); } }
         .shaking { animation: shake 0.15s ease-in-out; }
 
-        /* === NOTIFICACIONES === */
         #notification-area { position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .notify-msg { background: rgba(20, 20, 30, 0.95); border-left: 4px solid var(--accent); padding: 15px 25px; border-radius: 5px; color: white; font-weight: bold; box-shadow: 0 5px 20px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; pointer-events: auto; min-width: 250px; }
 
-        /* === CAPAS === */
         #bg-layer { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 0; pointer-events: none; background: #000; overflow: hidden; }
         #bg-video, #bg-image { width: 100%; height: 100%; object-fit: cover; opacity: 0.3; position: absolute; top:0; left:0; transition: opacity 0.5s; filter: brightness(0.5); }
         
         #menu-container { display: flex; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 100; background: rgba(5, 5, 5, 0.95); backdrop-filter: blur(10px); transition: 0.4s; }
         #menu-container.hidden { opacity: 0; pointer-events: none; transform: scale(1.1); filter: blur(20px); }
 
-        /* SIDEBAR */
         .sidebar { width: 340px; background: #0b0c10; border-right: 1px solid #222; display: flex; flex-direction: column; padding: 30px; gap: 25px; z-index: 101; box-shadow: 10px 0 60px rgba(0,0,0,0.6); animation: slideIn 0.4s ease-out; }
         .brand { font-size: 2.2rem; font-weight: 900; letter-spacing: 1px; color: white; text-shadow: 0 0 20px var(--accent); display: flex; align-items: center; gap: 10px; margin-bottom: 10px; line-height: 1.1; }
         .brand-icon { width: 45px; height: 45px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 30px var(--accent); flex-shrink: 0; }
@@ -73,7 +64,6 @@
         .news-btn { background: #1a1a1a; border: 1px solid #333; color: #aaa; margin-top: 10px; padding: 10px; font-size: 0.9rem; text-align: center; border-radius: 8px; cursor: pointer; transition: 0.2s; }
         .news-btn:hover { background: #222; color: white; border-color: #555; }
 
-        /* CONTENT */
         .content-area { flex: 1; display: flex; flex-direction: column; position: relative; animation: fadeIn 0.5s ease-out; }
         .top-bar { height: 100px; border-bottom: 1px solid #222; display: flex; align-items: center; padding: 0 60px; background: rgba(11, 12, 16, 0.95); justify-content: space-between; }
         .search-inp { width: 450px; background: #080808; border: 2px solid #333; padding: 18px 25px; color: white; border-radius: 12px; font-weight: bold; font-size: 1.1rem; transition: 0.2s; }
@@ -86,57 +76,30 @@
         .beatmap-card:hover .bc-bg { transform: scale(1.1); filter: brightness(1); }
         .bc-info { flex: 1; padding: 25px; display: flex; flex-direction: column; justify-content: flex-end; z-index: 2; position: relative; background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, transparent); }
         .bc-title { font-weight: 900; font-size: 1.6rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 10px black; }
-        
         .bc-meta { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
         .tag { padding: 4px 10px; border-radius: 6px; background: #222; font-size: 0.8rem; font-weight: 900; border: 1px solid #444; color: #ccc; }
         .tag.warn { background: rgba(249, 57, 63, 0.2); border-color: #F9393F; color: #F9393F; }
         .tag.keys { background: rgba(68, 204, 255, 0.1); border-color: var(--blue); color: var(--blue); }
 
-        /* === JUEGO === */
         #game-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; display: none; }
-        
         #ig-profile { position: absolute; top: 40px; left: 40px; display: flex; align-items: center; gap: 20px; opacity: 0.9; z-index: 200; }
         #ig-av { width: 80px; height: 80px; border-radius: 50%; background: #333; background-size: cover; border: 3px solid white; box-shadow: 0 0 20px black; }
         #ig-name { font-weight: 900; font-size: 1.8rem; text-shadow: 0 2px 5px black; color: white; }
 
-        /* 1V1 HUD */
-        #vs-hud {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            display: none; align-items: center; gap: 40px; z-index: 300;
-        }
+        #vs-hud { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 40px; z-index: 300; }
         .vs-panel { text-align: center; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 10px; border: 1px solid #444; min-width: 150px; }
         .vs-name { font-weight: 900; font-size: 1.2rem; color: var(--blue); margin-bottom: 5px; }
         .vs-score { font-size: 2rem; font-weight: 900; line-height: 1; }
-        .vs-badge { background: var(--miss); color:white; font-weight:bold; padding:2px 8px; border-radius:4px; font-size:0.8rem; }
 
-        #track { 
-            position: relative; width: 100%; max-width: 800px; height: 100%; margin: 0 auto; 
-            background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); 
-            border-left: 2px solid rgba(255,255,255,0.1); border-right: 2px solid rgba(255,255,255,0.1); 
-            transition: width 0.3s; 
-        }
+        #track { position: relative; width: 100%; max-width: 800px; height: 100%; margin: 0 auto; background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); border-left: 2px solid rgba(255,255,255,0.1); border-right: 2px solid rgba(255,255,255,0.1); transition: width 0.3s; }
         
         .arrow-wrapper { position: absolute; width: var(--lane-width); height: 120px; display: flex; align-items: center; justify-content: center; z-index: 150; will-change: top; }
         .arrow-svg { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); position:relative; z-index:2; }
         .arrow-path { stroke: white; stroke-width: 5; fill-opacity: 1; paint-order: stroke; transition: filter 0.1s; }
         
-        /* FIX HOLD NOTES VISUALS */
-        .sustain-trail { 
-            position: absolute; width: 40%; opacity: 0.7; z-index: 1; 
-            background: currentColor; 
-            box-shadow: 0 0 15px currentColor; 
-            border-radius: 6px;
-            left: 50%; transform: translateX(-50%);
-        }
-        .hold-down .sustain-trail { 
-            bottom: 50%; 
-            transform-origin: bottom center; 
-        }
-        .hold-up .sustain-trail { 
-            top: 50%; 
-            transform-origin: top center; 
-        }
-
+        .sustain-trail { position: absolute; width: 40%; opacity: 0.7; z-index: 1; background: currentColor; box-shadow: 0 0 15px currentColor; border-radius: 6px; left: 50%; transform: translateX(-50%); }
+        .hold-down .sustain-trail { bottom: 50%; transform-origin: bottom center; }
+        .hold-up .sustain-trail { top: 50%; transform-origin: top center; }
         .hold-note .arrow-path { stroke-width: 8px; stroke: #fff; }
 
         .receptor { z-index: 200; opacity: 0.9; }
@@ -148,51 +111,27 @@
         .lane-flash.active { opacity: 0.6; }
 
         .splash { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--c); z-index: 300; pointer-events: none; animation: splash 0.3s ease-out forwards; top: -30px; opacity: 0; box-shadow: 0 0 30px var(--c); }
-        .particle { position: fixed; width: 15px; height: 15px; border-radius: 50%; z-index: 400; animation: burst 0.5s ease-out forwards; pointer-events: none; }
-        @keyframes burst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--vx), var(--vy)) scale(0); opacity: 0; } }
-
-        /* === HUD === */
-        #hud { 
-            position: absolute; right: 50px; top: 50%; transform: translateY(-50%); 
-            text-align: right; pointer-events: none; z-index: 300; 
-            display: flex; flex-direction: row; align-items: center; gap: 20px; 
-        }
         
+        #hud { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); text-align: right; pointer-events: none; z-index: 300; display: flex; flex-direction: row; align-items: center; gap: 20px; }
         .stats-col { display: flex; flex-direction: column; gap: 10px; text-shadow: 0 2px 10px black; align-items: flex-end; }
         .stat-item { font-weight: 900; font-size: 1.5rem; opacity: 0.9; font-family: 'Chakra Petch'; }
-        
         .score-val { font-size: 4rem; font-weight: 900; line-height: 1; text-shadow: 0 0 20px rgba(255,255,255,0.1); margin-top: 5px; }
         .score-label { font-size:0.8rem; color:#888; font-weight:bold; margin-top: 15px; }
-
         .acc-block { margin-top: 20px; text-align: right; }
         .acc-label { color: #888; font-weight: bold; font-size: 1rem; }
         .acc-val { font-size: 2.5rem; color: var(--blue); font-weight: 900; }
-
-        .combo-val { 
-            position: absolute; top: var(--combo-y); right: 450px; 
-            font-size: 7rem; font-weight: 900; line-height: 1; 
-            text-shadow: 0 0 30px black;
-        }
+        .combo-val { position: absolute; top: var(--combo-y); right: 450px; font-size: 7rem; font-weight: 900; line-height: 1; text-shadow: 0 0 30px black; }
         
         .health-bar { width: 16px; height: 600px; background: #222; border: 3px solid white; border-radius: 8px; position: relative; overflow: hidden; box-shadow: 0 0 30px black; }
         .health-fill { width: 100%; height: 50%; position: absolute; bottom: 0; background: linear-gradient(to top, #F00, #FF0, #0F0); transition: height 0.1s linear; box-shadow: 0 0 20px white; }
 
-        /* JUEZ MOVIBLE */
-        .judge-pop { 
-            position: absolute; left: var(--judge-x); top: var(--judge-y); 
-            transform: translate(-50%, -50%) scale(var(--judge-s)); 
-            opacity: var(--judge-op);
-            font-size: 7rem; font-weight: 900; z-index: 400; 
-            animation: fadeUp 0.4s forwards; text-shadow: 0 5px 30px black; -webkit-text-stroke: 3px black; 
-        }
+        .judge-pop { position: absolute; left: var(--judge-x); top: var(--judge-y); transform: translate(-50%, -50%) scale(var(--judge-s)); opacity: var(--judge-op); font-size: 7rem; font-weight: 900; z-index: 400; animation: fadeUp 0.4s forwards; text-shadow: 0 5px 30px black; -webkit-text-stroke: 3px black; }
         @keyframes fadeUp { 0% { opacity: var(--judge-op); transform: translate(-50%, 0) scale(1.3); } 100% { opacity: 0; transform: translate(-50%, -60px) scale(1); } }
 
-        /* === MODALES === */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.96); z-index: 5000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
         .modal-panel { background: #0a0a0a; border: 1px solid #333; padding: 50px; border-radius: 25px; width: 900px; max-width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 0 150px black; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .m-title { font-size: 2.5rem; font-weight: 900; text-align: center; text-transform: uppercase; margin-bottom: 40px; letter-spacing: 3px; border-bottom: 2px solid #222; padding-bottom: 10px; color:white; }
 
-        /* CONFIG */
         .set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; text-align: left; }
         .set-head { color: var(--blue); font-weight: 900; font-size: 1.2rem; border-bottom: 2px solid #222; margin-bottom: 25px; padding-bottom: 5px; text-transform: uppercase; }
         .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: #ddd; font-weight: 700; font-family: 'Nunito'; font-size: 1.1rem; }
@@ -220,7 +159,6 @@
         
         .col-pk { width: 60px; height: 20px; border: 2px solid white; background: none; cursor: pointer; padding: 0; border-radius: 4px; }
 
-        /* XP BAR & FRIENDS */
         .xp-container { width: 100%; background: #000; height: 10px; border-radius: 5px; margin-top: 5px; overflow: hidden; border: 1px solid #333; position:relative; }
         .xp-fill { height: 100%; background: var(--blue); width: 0%; transition: width 0.5s; box-shadow: 0 0 10px var(--blue); }
         .xp-text { font-size: 0.8rem; color: #888; text-align: right; margin-top: 3px; font-weight: bold; }
@@ -239,12 +177,10 @@
         .slot-status { font-size: 0.8rem; color: #666; font-style: italic; }
         .ready-green { color: #12FA05 !important; }
 
-        /* CHAT */
         #chat-box { height: 150px; background: #050505; border: 1px solid #333; border-radius: 8px; overflow-y: auto; margin-bottom: 10px; padding: 10px; text-align: left; font-size: 0.9rem; }
         .chat-msg { margin-bottom: 5px; }
         .chat-msg b { color: var(--blue); margin-right: 5px; }
 
-        /* PERFIL */
         .login-box { width: 500px; text-align: center; border: 1px solid #333; }
         .prof-av-big { display:block; width: 150px; height: 150px; border-radius: 50%; border: 5px solid var(--accent); margin: 0 auto 30px; background: #222; background-size: cover; box-shadow: 0 0 50px rgba(255, 102, 170, 0.4); cursor: pointer; position: relative; overflow: hidden; }
         .prof-av-big:hover::after { content:'CAMBIAR'; position:absolute; bottom:0; left:0; width:100%; height:30px; background:rgba(255,255,255,0.8); color:black; font-weight:900; display:flex; align-items:center; justify-content:center; font-size:0.8rem; }
@@ -368,11 +304,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.75 (SOCIAL UPDATE)</div>
+                <div class="patch-ver">VERSION 0.75 (SOCIAL FIXED)</div>
                 <ul>
-                    <li><b>LISTA DE AMIGOS:</b> Agrega amigos usando sus nombres de usuario reales.</li>
-                    <li><b>DESAFÍOS DIRECTOS:</b> Reta a tus amigos desde la lista.</li>
-                    <li><b>CHAT INTEGRADO:</b> Habla con tu rival en la sala de espera (con censura).</li>
+                    <li><b>SOCIAL FIX:</b> Los usuarios del ranking ahora aparecen automáticamente en la búsqueda de amigos.</li>
+                    <li><b>LOBBY 1V1:</b> Al desafiar a un amigo, se abre el lobby con selección de canción y ruleta.</li>
+                    <li><b>CHAT:</b> Chat integrado en la sala de espera.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -398,30 +334,44 @@
         <div class="modal-panel" style="width:700px;">
             <div class="m-title">ONLINE 1v1 LOBBY</div>
             
-            <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
-            
-            <div class="lobby-box">
-                <div class="lobby-slot">
-                    <div class="slot-title">TU ELECCIÓN</div>
-                    <div class="slot-song" id="my-pick-name">...</div>
-                    <div class="slot-status" id="my-pick-status">Esperando selección...</div>
-                    <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
-                    <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
+            <div id="online-connect-view">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <div style="color:#aaa; margin-bottom:5px;">TU CÓDIGO DE AMIGO:</div>
+                    <div id="my-peer-id" style="font-size:1.5rem; font-weight:900; color:var(--blue); user-select:text; background:#222; padding:10px; border-radius:8px; cursor:pointer;" onclick="copyID()">CARGANDO...</div>
                 </div>
-                <div class="lobby-slot">
-                    <div class="slot-title">ELECCIÓN RIVAL</div>
-                    <div class="slot-song" id="opp-pick-name">...</div>
-                    <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="friend-id-inp" class="log-inp" placeholder="Pega el código de tu amigo aquí" style="margin:0;">
+                    <button class="btn-small btn-add" style="font-size:1rem;" onclick="connectToPeer()">CONECTAR</button>
                 </div>
             </div>
 
-            <div id="chat-box"></div>
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
-                <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
+            <div id="online-lobby-view" style="display:none; margin-top:20px;">
+                <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
+                
+                <div class="lobby-box">
+                    <div class="lobby-slot">
+                        <div class="slot-title">TU ELECCIÓN</div>
+                        <div class="slot-song" id="my-pick-name">...</div>
+                        <div class="slot-status" id="my-pick-status">Esperando selección...</div>
+                        <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
+                        <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
+                    </div>
+                    <div class="lobby-slot">
+                        <div class="slot-title">ELECCIÓN RIVAL</div>
+                        <div class="slot-song" id="opp-pick-name">...</div>
+                        <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
+                    </div>
+                </div>
+
+                <div id="chat-box"></div>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
+                    <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
+                </div>
+
+                <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
             </div>
 
-            <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
             <button class="action secondary" onclick="closeModal('online')" style="margin-top:20px;">SALIR</button>
         </div>
     </div>
@@ -567,7 +517,6 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN DE FIREBASE (NO TOCAR) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
             authDomain: "a-notes-game.firebaseapp.com",
@@ -576,9 +525,7 @@
             messagingSenderId: "149492857447",
             appId: "1:149492857447:web:584610d0958419fea7f2c2"
         };
-        // ----------------------------------------------
 
-        // INIT FIREBASE
         let db = null;
         try {
             firebase.initializeApp(firebaseConfig);
@@ -596,7 +543,7 @@
         let user = { name:"Guest", pass:"", avatar:null, bg:null, songs:[], pp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
         let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
         let ctx=null, hitBuf=null, idb=null;
-        let songFinished = false; // FLAG DE SEGURIDAD
+        let songFinished = false; 
         
         // ONLINE VARIABLES
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
@@ -625,23 +572,29 @@
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
         };
-        // KEY LISTENERS OUTSIDE ASYNC TO GUARANTEE LOAD
         window.addEventListener('keydown', onKd); 
         window.addEventListener('keyup', onKu);
 
-        /* === ONLINE SYSTEM (PEERJS) === */
+        /* === ONLINE SYSTEM (PEERJS + FIREBASE) === */
         function initOnline() {
             peer = new Peer(null, { secure: true }); 
             
             peer.on('open', (id) => {
                 myPeerId = id;
-                // SUBIR ID A FIREBASE AL CONECTAR
+                const el = document.getElementById('my-peer-id');
+                if(el) el.innerText = id;
+                // UPDATE FIREBASE USER ONLINE STATUS
                 if(db && user.name !== "Guest") {
                     db.collection("users").doc(user.name).set({
                         peerId: id,
-                        online: true
+                        online: true,
+                        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
                 }
+            });
+            peer.on('error', (err) => {
+                console.error(err);
+                notify("Error Online: " + err.type, "error");
             });
             peer.on('connection', (c) => {
                 conn = c;
@@ -652,23 +605,22 @@
         }
 
         function openOnline() {
-            // FIX: OPEN DIRECTLY LOBBY IF CONNECTED
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             openModal('online');
+            if(myPeerId) document.getElementById('my-peer-id').innerText = myPeerId;
         }
 
         function openFriends() {
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             if(!db) return notify("Error de conexión", "error");
             
-            const reqL = document.getElementById('req-list'); reqL.innerHTML = '';
-            const friL = document.getElementById('friend-list'); friL.innerHTML = '';
+            const reqL = document.getElementById('req-list');
+            const friL = document.getElementById('friend-list');
 
-            // LISTENER FOR REQUESTS
+            // LISTENER PARA ESTE USUARIO
             db.collection("users").doc(user.name).onSnapshot(doc => {
                 const data = doc.data();
                 if(data) {
-                    // REQUESTS
                     reqL.innerHTML = '';
                     if(data.requests && data.requests.length > 0) {
                         data.requests.forEach(req => {
@@ -678,7 +630,6 @@
                         });
                     } else { reqL.innerHTML = '<div style="color:#666;">No hay solicitudes</div>'; }
 
-                    // FRIENDS
                     friL.innerHTML = '';
                     if(data.friends && data.friends.length > 0) {
                         data.friends.forEach(f => {
@@ -697,14 +648,28 @@
             const target = document.getElementById('friend-inp').value.trim();
             if(!target || target === user.name) return;
             
+            // BUSCAR EN USERS, SI NO ESTA, BUSCAR EN LEADERBOARD Y CREARLO
             db.collection("users").doc(target).get().then(doc => {
                 if(doc.exists) {
+                    // YA EXISTE EN USERS, MANDAR SOLICITUD
                     db.collection("users").doc(target).update({
                         requests: firebase.firestore.FieldValue.arrayUnion(user.name)
                     });
                     notify("Solicitud enviada a " + target);
                 } else {
-                    notify("Usuario no encontrado", "error");
+                    // NO ESTA EN USERS, REVISAR LEADERBOARD
+                    db.collection("leaderboard").doc(target).get().then(ldoc => {
+                        if(ldoc.exists) {
+                            // ESTA EN RANKING PERO NO EN SOCIAL -> CREAR PERFIL SOCIAL
+                            db.collection("users").doc(target).set({
+                                requests: [user.name],
+                                friends: []
+                            });
+                            notify("Solicitud enviada a " + target);
+                        } else {
+                            notify("Usuario no encontrado", "error");
+                        }
+                    });
                 }
             });
         }
@@ -718,26 +683,41 @@
                 friends: firebase.firestore.FieldValue.arrayUnion(target),
                 requests: firebase.firestore.FieldValue.arrayRemove(target)
             });
-            batch.update(theirRef, {
+            // ASEGURAR QUE EL OTRO TAMBIEN TENGA DOCUMENTO
+            batch.set(theirRef, {
                 friends: firebase.firestore.FieldValue.arrayUnion(user.name)
-            });
+            }, { merge: true });
 
             batch.commit().then(() => notify("¡Ahora eres amigo de " + target + "!"));
         }
 
         function challengeFriend(target) {
-            // GET PEER ID FROM FIREBASE
             db.collection("users").doc(target).get().then(doc => {
-                if(doc.exists && doc.data().peerId) {
+                if(doc.exists && doc.data().peerId && doc.data().online) {
                     const pid = doc.data().peerId;
                     conn = peer.connect(pid);
                     setupConnection();
-                    notify("Conectando con " + target + "...");
+                    notify("Desafiando a " + target + "...");
                     closeModal('friends');
                 } else {
-                    notify("El usuario no está conectado", "error");
+                    notify(target + " no está conectado ahora", "error");
                 }
             });
+        }
+
+        function copyID() {
+            if(myPeerId) {
+                navigator.clipboard.writeText(myPeerId);
+                notify("ID copiado al portapapeles");
+            }
+        }
+
+        function connectToPeer() {
+            const id = document.getElementById('friend-id-inp').value.trim();
+            if(!id) return;
+            conn = peer.connect(id);
+            setupConnection();
+            notify("Conectando...", "info");
         }
 
         function setupConnection() {
@@ -775,11 +755,10 @@
 
         function enterLobby() {
             openModal('online');
-            document.getElementById('online-connect-view').style.display = 'none'; // OLD VIEW
+            document.getElementById('online-connect-view').style.display = 'none';
             document.getElementById('online-lobby-view').style.display = 'block';
         }
 
-        /* === CHAT SYSTEM === */
         function sendChat() {
             const inp = document.getElementById('chat-inp');
             const txt = filterBadWords(inp.value);
@@ -798,7 +777,7 @@
         }
 
         function filterBadWords(text) {
-            const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto"];
+            const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto", "mierda"];
             let clean = text;
             bad.forEach(w => {
                 const reg = new RegExp(w, "gi");
@@ -946,11 +925,17 @@
 
         function updateFirebaseScore() {
             if(db && user.name !== "Guest") {
+                // UPDATE LEADERBOARD
                 db.collection("leaderboard").doc(user.name).set({
                     name: user.name,
                     pp: user.pp,
                     score: user.score,
                     lvl: user.lvl
+                }, { merge: true });
+                
+                // UPDATE SOCIAL PROFILE (ENSURES DISCOVERABILITY)
+                db.collection("users").doc(user.name).set({
+                    name: user.name
                 }, { merge: true });
             }
         }
@@ -968,7 +953,7 @@
             const pct = Math.min(100, (user.xp / targetXP) * 100);
             document.getElementById('p-xp-bar').style.width = pct + "%";
             document.getElementById('p-xp-txt').innerText = `${user.xp} / ${targetXP} XP`;
-            // Global rank updated via Listener
+            document.getElementById('p-global-rank').innerText = "#--";
             
             if(user.avatar) { document.getElementById('m-av').style.backgroundImage=`url(${user.avatar})`; document.getElementById('m-av').innerText=""; document.getElementById('p-av-big').style.backgroundImage=`url(${user.avatar})`; document.getElementById('ig-av').style.backgroundImage=`url(${user.avatar})`; }
             if(user.bg) { document.getElementById('bg-image').src=user.bg; document.getElementById('bg-image').style.opacity=0.3; }
