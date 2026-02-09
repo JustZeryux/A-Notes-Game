@@ -239,6 +239,11 @@
         .slot-status { font-size: 0.8rem; color: #666; font-style: italic; }
         .ready-green { color: #12FA05 !important; }
 
+        /* CHAT */
+        #chat-box { height: 150px; background: #050505; border: 1px solid #333; border-radius: 8px; overflow-y: auto; margin-bottom: 10px; padding: 10px; text-align: left; font-size: 0.9rem; }
+        .chat-msg { margin-bottom: 5px; }
+        .chat-msg b { color: var(--blue); margin-right: 5px; }
+
         /* PERFIL */
         .login-box { width: 500px; text-align: center; border: 1px solid #333; }
         .prof-av-big { display:block; width: 150px; height: 150px; border-radius: 50%; border: 5px solid var(--accent); margin: 0 auto 30px; background: #222; background-size: cover; box-shadow: 0 0 50px rgba(255, 102, 170, 0.4); cursor: pointer; position: relative; overflow: hidden; }
@@ -296,7 +301,7 @@
                 <button class="nav-btn active" onmouseenter="playHover()">🎵 CANCIONES</button>
                 <button class="nav-btn" onmouseenter="playHover()" onclick="openModal('settings')">⚙️ AJUSTES</button>
                 <button class="nav-btn" onmouseenter="playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
-                <button class="nav-btn" onmouseenter="playHover()" onclick="openOnline()">👥 ONLINE 1v1</button>
+                <button class="nav-btn" onmouseenter="playHover()" onclick="openFriends()">👥 AMIGOS / 1v1</button>
             </div>
 
             <label class="import-btn" id="imp-btn" onmouseenter="playHover()">
@@ -363,14 +368,29 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.74 (NETLIFY FIX)</div>
+                <div class="patch-ver">VERSION 0.75 (SOCIAL UPDATE)</div>
                 <ul>
-                    <li><b>ONLINE ARREGLADO:</b> Ahora el código de amigo se genera correctamente en la web.</li>
-                    <li><b>RANKING REAL:</b> Tu perfil muestra tu rango global real de la base de datos.</li>
-                    <li><b>ANTI-FARM:</b> Si te sales de la canción, no sumas puntos.</li>
+                    <li><b>LISTA DE AMIGOS:</b> Agrega amigos usando sus nombres de usuario reales.</li>
+                    <li><b>DESAFÍOS DIRECTOS:</b> Reta a tus amigos desde la lista.</li>
+                    <li><b>CHAT INTEGRADO:</b> Habla con tu rival en la sala de espera (con censura).</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-friends" class="modal-overlay">
+        <div class="modal-panel" style="width:600px;">
+            <div class="m-title">SOCIAL HUB</div>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <input type="text" id="friend-inp" class="log-inp" placeholder="Nombre de usuario..." style="margin:0;">
+                <button class="btn-small btn-add" style="font-size:1rem;" onclick="sendFriendRequest()">AGREGAR</button>
+            </div>
+            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">SOLICITUDES</div>
+            <div id="req-list" class="friend-list" style="margin-bottom:20px;"></div>
+            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS (ONLINE)</div>
+            <div id="friend-list" class="friend-list"></div>
+            <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
         </div>
     </div>
 
@@ -378,40 +398,31 @@
         <div class="modal-panel" style="width:700px;">
             <div class="m-title">ONLINE 1v1 LOBBY</div>
             
-            <div id="online-connect-view">
-                <div style="text-align:center; margin-bottom:20px;">
-                    <div style="color:#aaa; margin-bottom:5px;">TU CÓDIGO DE AMIGO:</div>
-                    <div id="my-peer-id" style="font-size:1.5rem; font-weight:900; color:var(--blue); user-select:text; background:#222; padding:10px; border-radius:8px; cursor:pointer;" onclick="copyID()">CARGANDO...</div>
+            <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
+            
+            <div class="lobby-box">
+                <div class="lobby-slot">
+                    <div class="slot-title">TU ELECCIÓN</div>
+                    <div class="slot-song" id="my-pick-name">...</div>
+                    <div class="slot-status" id="my-pick-status">Esperando selección...</div>
+                    <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
+                    <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
                 </div>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="friend-id-inp" class="log-inp" placeholder="Pega el código de tu amigo aquí" style="margin:0;">
-                    <button class="btn-small btn-add" style="font-size:1rem;" onclick="connectToPeer()">CONECTAR</button>
+                <div class="lobby-slot">
+                    <div class="slot-title">ELECCIÓN RIVAL</div>
+                    <div class="slot-song" id="opp-pick-name">...</div>
+                    <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
                 </div>
             </div>
 
-            <div id="online-lobby-view" style="display:none; margin-top:20px;">
-                <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON RIVAL</div>
-                
-                <div class="lobby-box">
-                    <div class="lobby-slot">
-                        <div class="slot-title">TU ELECCIÓN</div>
-                        <div class="slot-song" id="my-pick-name">...</div>
-                        <div class="slot-status" id="my-pick-status">Esperando selección...</div>
-                        <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
-                        <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
-                    </div>
-                    <div style="font-size:2rem; font-weight:900; color:#444;">VS</div>
-                    <div class="lobby-slot">
-                        <div class="slot-title">ELECCIÓN RIVAL</div>
-                        <div class="slot-song" id="opp-pick-name">...</div>
-                        <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
-                    </div>
-                </div>
-
-                <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px;"></div>
+            <div id="chat-box"></div>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
+                <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
             </div>
 
-            <button class="action secondary" onclick="closeModal('online')" style="margin-top:20px;">CERRAR</button>
+            <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
+            <button class="action secondary" onclick="closeModal('online')" style="margin-top:20px;">SALIR</button>
         </div>
     </div>
 
@@ -620,17 +631,17 @@
 
         /* === ONLINE SYSTEM (PEERJS) === */
         function initOnline() {
-            // FIX NETLIFY: FORCE SECURE CONNECTION
             peer = new Peer(null, { secure: true }); 
             
             peer.on('open', (id) => {
                 myPeerId = id;
-                const el = document.getElementById('my-peer-id');
-                if(el) el.innerText = id;
-            });
-            peer.on('error', (err) => {
-                console.error(err);
-                notify("Error Online: " + err.type, "error");
+                // SUBIR ID A FIREBASE AL CONECTAR
+                if(db && user.name !== "Guest") {
+                    db.collection("users").doc(user.name).set({
+                        peerId: id,
+                        online: true
+                    }, { merge: true });
+                }
             });
             peer.on('connection', (c) => {
                 conn = c;
@@ -641,24 +652,92 @@
         }
 
         function openOnline() {
+            // FIX: OPEN DIRECTLY LOBBY IF CONNECTED
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             openModal('online');
-            if(myPeerId) document.getElementById('my-peer-id').innerText = myPeerId;
         }
 
-        function copyID() {
-            if(myPeerId) {
-                navigator.clipboard.writeText(myPeerId);
-                notify("ID copiado al portapapeles");
-            }
+        function openFriends() {
+            if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
+            if(!db) return notify("Error de conexión", "error");
+            
+            const reqL = document.getElementById('req-list'); reqL.innerHTML = '';
+            const friL = document.getElementById('friend-list'); friL.innerHTML = '';
+
+            // LISTENER FOR REQUESTS
+            db.collection("users").doc(user.name).onSnapshot(doc => {
+                const data = doc.data();
+                if(data) {
+                    // REQUESTS
+                    reqL.innerHTML = '';
+                    if(data.requests && data.requests.length > 0) {
+                        data.requests.forEach(req => {
+                            const d = document.createElement('div'); d.className='friend-row';
+                            d.innerHTML = `<span>${req}</span> <button class="btn-small btn-acc" onclick="acceptFriend('${req}')">ACEPTAR</button>`;
+                            reqL.appendChild(d);
+                        });
+                    } else { reqL.innerHTML = '<div style="color:#666;">No hay solicitudes</div>'; }
+
+                    // FRIENDS
+                    friL.innerHTML = '';
+                    if(data.friends && data.friends.length > 0) {
+                        data.friends.forEach(f => {
+                            const d = document.createElement('div'); d.className='friend-row';
+                            d.innerHTML = `<span style="color:var(--blue); font-weight:bold;">${f}</span> 
+                                           <button class="btn-small btn-add" onclick="challengeFriend('${f}')">DESAFIAR</button>`;
+                            friL.appendChild(d);
+                        });
+                    } else { friL.innerHTML = '<div style="color:#666;">No tienes amigos aún</div>'; }
+                }
+            });
+            openModal('friends');
         }
 
-        function connectToPeer() {
-            const id = document.getElementById('friend-id-inp').value.trim();
-            if(!id) return;
-            conn = peer.connect(id);
-            setupConnection();
-            notify("Conectando...", "info");
+        function sendFriendRequest() {
+            const target = document.getElementById('friend-inp').value.trim();
+            if(!target || target === user.name) return;
+            
+            db.collection("users").doc(target).get().then(doc => {
+                if(doc.exists) {
+                    db.collection("users").doc(target).update({
+                        requests: firebase.firestore.FieldValue.arrayUnion(user.name)
+                    });
+                    notify("Solicitud enviada a " + target);
+                } else {
+                    notify("Usuario no encontrado", "error");
+                }
+            });
+        }
+
+        function acceptFriend(target) {
+            const batch = db.batch();
+            const myRef = db.collection("users").doc(user.name);
+            const theirRef = db.collection("users").doc(target);
+
+            batch.update(myRef, {
+                friends: firebase.firestore.FieldValue.arrayUnion(target),
+                requests: firebase.firestore.FieldValue.arrayRemove(target)
+            });
+            batch.update(theirRef, {
+                friends: firebase.firestore.FieldValue.arrayUnion(user.name)
+            });
+
+            batch.commit().then(() => notify("¡Ahora eres amigo de " + target + "!"));
+        }
+
+        function challengeFriend(target) {
+            // GET PEER ID FROM FIREBASE
+            db.collection("users").doc(target).get().then(doc => {
+                if(doc.exists && doc.data().peerId) {
+                    const pid = doc.data().peerId;
+                    conn = peer.connect(pid);
+                    setupConnection();
+                    notify("Conectando con " + target + "...");
+                    closeModal('friends');
+                } else {
+                    notify("El usuario no está conectado", "error");
+                }
+            });
         }
 
         function setupConnection() {
@@ -670,11 +749,15 @@
                 if(data.type === 'hello') {
                     notify("Conectado con: " + data.name);
                     document.getElementById('p2-name').innerText = data.name;
+                    document.getElementById('lobby-opp-name').innerText = data.name;
+                }
+                if(data.type === 'chat') {
+                    addChatMsg(data.name, data.msg);
                 }
                 if(data.type === 'song_data') {
-                    notify("Recibiendo canción: " + data.name);
+                    notify("Recibiendo canción...");
                     document.getElementById('opp-pick-name').innerText = data.name;
-                    document.getElementById('opp-pick-status').innerText = "¡Recibida y Lista!";
+                    document.getElementById('opp-pick-status').innerText = "¡Recibida!";
                     document.getElementById('opp-pick-status').classList.add('ready-green');
                     onlineState.oppPick = data.name;
                     await saveReceivedSong(data.name, data.buffer);
@@ -691,8 +774,37 @@
         }
 
         function enterLobby() {
-            document.getElementById('online-connect-view').style.display = 'none';
+            openModal('online');
+            document.getElementById('online-connect-view').style.display = 'none'; // OLD VIEW
             document.getElementById('online-lobby-view').style.display = 'block';
+        }
+
+        /* === CHAT SYSTEM === */
+        function sendChat() {
+            const inp = document.getElementById('chat-inp');
+            const txt = filterBadWords(inp.value);
+            if(!txt) return;
+            addChatMsg(user.name, txt);
+            conn.send({ type: 'chat', name: user.name, msg: txt });
+            inp.value = "";
+        }
+
+        function addChatMsg(name, msg) {
+            const box = document.getElementById('chat-box');
+            const d = document.createElement('div'); d.className = 'chat-msg';
+            d.innerHTML = `<b>${name}:</b> ${msg}`;
+            box.appendChild(d);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function filterBadWords(text) {
+            const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto"];
+            let clean = text;
+            bad.forEach(w => {
+                const reg = new RegExp(w, "gi");
+                clean = clean.replace(reg, "****");
+            });
+            return clean;
         }
 
         async function handleOnlineFile(i) {
@@ -701,11 +813,11 @@
                 const name = f.name.replace(/\.[^/.]+$/, "");
                 const ab = await f.arrayBuffer();
                 document.getElementById('my-pick-name').innerText = name;
-                document.getElementById('my-pick-status').innerText = "Enviando al rival...";
+                document.getElementById('my-pick-status').innerText = "Enviando...";
                 onlineState.myPick = name;
                 await saveReceivedSong(name, ab.slice(0)); 
                 conn.send({ type: 'song_data', name: name, buffer: ab });
-                document.getElementById('my-pick-status').innerText = "¡Enviado!";
+                document.getElementById('my-pick-status').innerText = "¡Listo!";
                 document.getElementById('my-pick-status').classList.add('ready-green');
                 checkBothReady();
             }
@@ -809,9 +921,7 @@
                         const tr = document.createElement('tr');
                         if(d.name===user.name) {
                             tr.className='rank-row-me';
-                            // FIX: UPDATE LOCAL USER RANK FROM DB
                             document.getElementById('p-global-rank').innerText = "#" + i;
-                            // SYNC BACK PP IF NEEDED
                             if(d.pp > user.pp) { user.pp = d.pp; save(); }
                         }
                         tr.innerHTML = `<td>#${i++}</td><td>${d.name}</td><td style="color:var(--blue)">${d.pp}pp</td>`;
