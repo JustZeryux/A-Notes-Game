@@ -1,5 +1,6 @@
 /* === ONLINE SYSTEM === */
 function initOnline() {
+    // PeerJS solo se usa para la vieja sincronización 1v1 directa, los lobbies usarán Firestore para sync.
     peer = new Peer(null, { secure: true }); 
     peer.on('open', (id) => {
         myPeerId = id;
@@ -7,38 +8,19 @@ function initOnline() {
             db.collection("users").doc(user.name).set({ peerId: id, online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
         }
     });
-    peer.on('error', (err) => { console.error(err); });
-    peer.on('connection', (c) => { 
-        conn = c; 
-        setupConnection(); 
-    });
 }
 
 function sendFriendRequest() {
     const target = document.getElementById('friend-inp').value.trim();
     if(!target || target === user.name) return;
+    
+    // Verificar si existe el usuario
     db.collection("users").doc(target).get().then(doc => {
         if(doc.exists) {
+            // Se envía a Firestore, no importa si está desconectado
             sendNotification(target, 'friend_req', 'Solicitud de Amistad', user.name + ' quiere ser tu amigo.');
             notify("Solicitud enviada a " + target);
         } else notify("Usuario no encontrado", "error");
-    });
-}
-
-function openChatWithFriend() {
-     if(selectedFriend) {
-         closeModal('friend-profile');
-         openOnline(true, selectedFriend); 
-     }
-}
-
-function challengeFriend(target) {
-    db.collection("users").doc(target).get().then(doc => {
-        const data = doc.data();
-        if(doc.exists && data.peerId) {
-            sendNotification(target, 'challenge', '¡Desafío 1v1!', user.name + ' te desafía a un duelo.');
-            notify("Desafío enviado a " + target + ". Esperando respuesta...");
-        } else notify(target + " no está disponible", "error");
     });
 }
 
@@ -58,150 +40,235 @@ function respondFriend(target, accept, notifId) {
     }
 }
 
+function challengeFriend(target) {
+    // OLD 1v1 Logic (Direct P2P) - Se mantiene como legado o desafío rápido
+    db.collection("users").doc(target).get().then(doc => {
+        const data = doc.data();
+        // Check online status via timestamp
+        const now = Math.floor(Date.now()/1000);
+        const last = data.lastSeen ? data.lastSeen.seconds : 0;
+        if(now - last < 120) {
+             sendNotification(target, 'challenge', '¡Desafío 1v1!', user.name + ' te desafía a un duelo.');
+             notify("Desafío enviado. Esperando...");
+        } else {
+            notify("El usuario parece desconectado.", "error");
+        }
+    });
+}
+
 function acceptChallenge(target, notifId) {
     closeNotification(notifId);
      db.collection("users").doc(target).get().then(doc => {
         if(doc.exists && doc.data().peerId) {
             conn = peer.connect(doc.data().peerId);
-            setupConnection();
-        } else notify("El retador ya no está disponible.", "error");
+            setupConnection(); // Reusa la lógica vieja
+        } else notify("Error de conexión.", "error");
     });
 }
 
-/* === ONLINE LOBBY === */
-function openOnline(chatMode = false, chatPartner = null) {
-    if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
+/* === LOBBY SYSTEM (4 PLAYERS) === */
+function openLobbyBrowser() {
+    if(user.name === 'Guest') return notify("Inicia sesión para jugar online", "error");
+    openModal('lobbies');
+    refreshLobbies();
+}
+
+function refreshLobbies() {
+    const list = document.getElementById('lobby-list');
+    list.innerHTML = 'Cargando...';
     
-    const lobbyUi = document.getElementById('lobby-game-ui');
-    const chatTitle = document.getElementById('chat-with-title');
-    
-    if(chatMode && chatPartner) {
-        lobbyUi.style.display = 'none';
-        chatTitle.innerText = "CHAT CON " + chatPartner.toUpperCase();
-        initChatListener(chatPartner);
-    } else {
-        lobbyUi.style.display = 'block';
-        chatTitle.innerText = "CHAT DE SALA";
-    }
-    openModal('online'); 
-}
-
-function setupConnection() {
-    conn.on('open', () => { conn.send({ type: 'hello', name: user.name }); openOnline(); });
-    conn.on('data', async (data) => {
-        if(data.type === 'hello') {
-            notify("Conectado con: " + data.name);
-            document.getElementById('p2-name').innerText = data.name;
-            document.getElementById('lobby-opp-name').innerText = data.name;
-            initChatListener(data.name); 
-        }
-        if(data.type === 'chat') { addChatMsg(data.name, data.msg); }
-        if(data.type === 'song_data') {
-            notify("Recibiendo canción...");
-            document.getElementById('opp-pick-name').innerText = data.name;
-            document.getElementById('opp-pick-status').innerText = "¡Recibida!";
-            document.getElementById('opp-pick-status').classList.add('ready-green');
-            onlineState.oppPick = data.name;
-            await saveReceivedSong(data.name, data.buffer);
-            checkBothReady();
-        }
-        if(data.type === 'match_start') { startMatch(data.song); }
-        if(data.type === 'score') {
-            opponentScore = data.val;
-            document.getElementById('p2-score').innerText = opponentScore.toLocaleString();
-        }
-    });
-    conn.on('close', () => { notify("Conexión perdida.", "error"); closeLobby(); });
-}
-
-function closeLobby() {
-    if(conn) conn.close();
-    if(chatListener) chatListener();
-    closeModal('online');
-}
-
-function initChatListener(oppName) {
-    const users = [user.name, oppName].sort();
-    currentChatRoom = users.join("_");
-    document.getElementById('chat-box').innerHTML = ''; 
-    if(chatListener) chatListener(); 
-    chatListener = db.collection("chats").doc(currentChatRoom).collection("messages")
-        .orderBy("timestamp").limit(30)
-        .onSnapshot(snapshot => {
-            snapshot.docChanges().forEach(change => {
-                if(change.type === "added") { addChatMsgUI(change.doc.data().user, change.doc.data().text); }
-            });
+    db.collection("lobbies").where("status", "==", "waiting").limit(20).get().then(snap => {
+        list.innerHTML = '';
+        if(snap.empty) { list.innerHTML = '<div style="padding:20px;">No hay salas disponibles. ¡Crea una!</div>'; return; }
+        
+        snap.forEach(doc => {
+            const d = doc.data();
+            const row = document.createElement('div');
+            row.className = 'lobby-row';
+            row.innerHTML = `
+                <div class="lobby-info">
+                    <div class="lobby-host">${d.host}</div>
+                    <div class="lobby-details">${d.song} [${d.diff}K] - ${d.players.length}/4 Jugadores</div>
+                </div>
+                <button class="btn-small btn-acc" onclick="joinLobby('${doc.id}')">UNIRSE</button>
+            `;
+            list.appendChild(row);
         });
-}
-
-function sendChat() {
-    const inp = document.getElementById('chat-inp');
-    const txt = filterBadWords(inp.value);
-    if(!txt || !currentChatRoom) return;
-    db.collection("chats").doc(currentChatRoom).collection("messages").add({
-        user: user.name, text: txt, timestamp: firebase.firestore.FieldValue.serverTimestamp()
     });
-    inp.value = "";
 }
 
-function addChatMsgUI(name, msg) {
-    const box = document.getElementById('chat-box');
-    const d = document.createElement('div'); d.className = 'chat-msg';
-    d.innerHTML = `<b>${name}:</b> ${msg}`;
-    box.appendChild(d);
-    box.scrollTop = box.scrollHeight;
+// Paso 1: Abrir selector de dificultad con opción de Crear Sala
+function createLobbyUI() {
+    closeModal('lobbies');
+    // Forzamos selección de canción primero
+    if(!curSongId) { notify("Primero selecciona una canción en el menú principal", "error"); return; }
+    // Abrimos el modal de dificultad pero mostramos el botón de crear
+    openModal('diff');
+    document.getElementById('create-lobby-opts').style.display = 'block';
 }
 
-function addChatMsg(name, msg) {} 
-
-function filterBadWords(text) {
-    const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto", "mierda"];
-    let clean = text;
-    bad.forEach(w => { const reg = new RegExp(w, "gi"); clean = clean.replace(reg, "****"); });
-    return clean;
+// Paso 2: Crear el documento en Firestore
+function confirmCreateLobby() {
+    const k = keys; // Keys seleccionadas en startGame o default
+    const lobbyData = {
+        host: user.name,
+        song: curSongId,
+        diff: k,
+        status: 'waiting',
+        players: [{name: user.name, ready: false, score: 0, isHost: true}],
+        created: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    db.collection("lobbies").add(lobbyData).then(docRef => {
+        currentLobbyId = docRef.id;
+        isLobbyHost = true;
+        closeModal('diff');
+        document.getElementById('create-lobby-opts').style.display = 'none';
+        enterLobbyRoom();
+    });
 }
 
-async function handleOnlineFile(i) {
-    if(i.files[0]) {
-        const f = i.files[0];
-        const name = f.name.replace(/\.[^/.]+$/, "");
-        const ab = await f.arrayBuffer();
-        document.getElementById('my-pick-name').innerText = name;
-        document.getElementById('my-pick-status').innerText = "Enviando...";
-        onlineState.myPick = name;
-        await saveReceivedSong(name, ab.slice(0)); 
-        conn.send({ type: 'song_data', name: name, buffer: ab });
-        document.getElementById('my-pick-status').innerText = "¡Listo!";
-        document.getElementById('my-pick-status').classList.add('ready-green');
-        checkBothReady();
-    }
+function joinLobby(id) {
+    const lobbyRef = db.collection("lobbies").doc(id);
+    db.runTransaction(transaction => {
+        return transaction.get(lobbyRef).then(doc => {
+            if(!doc.exists) throw "Sala no existe";
+            const d = doc.data();
+            if(d.status !== "waiting") throw "Partida ya iniciada";
+            if(d.players.length >= 4) throw "Sala llena";
+            
+            const newPlayers = [...d.players, {name: user.name, ready: false, score: 0, isHost: false}];
+            transaction.update(lobbyRef, { players: newPlayers });
+            return d; // Return data for local use
+        });
+    }).then((data) => {
+        currentLobbyId = id;
+        isLobbyHost = false;
+        // Cargar canción si no la tenemos (Mock up: asumimos que la tiene o es local)
+        // En una vers. completa aquí se descargaría la canción del host.
+        curSongId = data.song; 
+        keys = data.diff;
+        closeModal('lobbies');
+        enterLobbyRoom();
+    }).catch(e => notify("Error al unirse: " + e, "error"));
 }
 
-async function saveReceivedSong(name, buffer) {
-    if(!user.songs.find(s=>s.id===name)){ user.songs.push({id:name}); save(); }
-    saveSongToDB(name, buffer); 
-    const audioCtxBuffer = await st.ctx.decodeAudioData(buffer.slice(0)); 
-    const map = genMap(audioCtxBuffer, 4); 
-    ramSongs = ramSongs.filter(s=>s.id!==name);
-    ramSongs.push({id:name, buf:audioCtxBuffer, map:map});
+function enterLobbyRoom() {
+    openModal('lobby-room');
+    isMultiplayer = true;
+    
+    // Listener de cambios en la sala
+    lobbyListener = db.collection("lobbies").doc(currentLobbyId).onSnapshot(doc => {
+        if(!doc.exists) { leaveLobby(); notify("La sala se cerró."); return; }
+        const d = doc.data();
+        
+        document.getElementById('room-host-name').innerText = "SALA DE " + d.host;
+        document.getElementById('room-song').innerText = d.song + " [" + d.diff + "K]";
+        
+        const pCont = document.getElementById('room-players');
+        pCont.innerHTML = '';
+        
+        let allReady = true;
+        d.players.forEach(p => {
+            const pDiv = document.createElement('div');
+            pDiv.innerHTML = `
+                <div style="background:#222; width:60px; height:60px; border-radius:50%; margin:0 auto; border:2px solid ${p.ready?'#12FA05':'#555'}"></div>
+                <div style="font-weight:bold; margin-top:5px;">${p.name}</div>
+                <div style="color:${p.ready?'#12FA05':'#888'}; font-size:0.8rem;">${p.ready?'LISTO':'ESPERANDO'}</div>
+            `;
+            pCont.appendChild(pDiv);
+            if(!p.ready) allReady = false;
+        });
+
+        // Inicio automático si todos listos y host
+        if(isLobbyHost && d.players.length > 0 && allReady && d.status === 'waiting') {
+            startLobbyGame();
+        }
+        
+        // Si el estado cambia a playing, iniciar juego
+        if(d.status === 'playing') {
+            if(document.getElementById('modal-lobby-room').style.display !== 'none') {
+                closeModal('lobby-room');
+                startGame(d.diff); // Iniciar motor local
+            }
+            // Update scores in real time
+            updateMultiHud(d.players);
+        }
+    });
 }
 
-function checkBothReady() {
-    if(onlineState.myPick && onlineState.oppPick) {
-        const msg = document.getElementById('roulette-msg');
-        msg.innerText = "¡AMBOS LISTOS! GIRA LA RULETA...";
-        if(myPeerId > conn.peer) {
-            setTimeout(() => {
-                const picks = [onlineState.myPick, onlineState.oppPick];
-                const winner = picks[Math.floor(Math.random() * picks.length)];
-                conn.send({ type: 'match_start', song: winner });
-                startMatch(winner);
-            }, 2000);
+function toggleReady() {
+    if(!currentLobbyId) return;
+    const ref = db.collection("lobbies").doc(currentLobbyId);
+    // Necesitamos leer y escribir
+    db.runTransaction(t => {
+        return t.get(ref).then(doc => {
+            const d = doc.data();
+            const players = d.players.map(p => {
+                if(p.name === user.name) p.ready = !p.ready;
+                return p;
+            });
+            t.update(ref, { players: players });
+        });
+    });
+}
+
+function startLobbyGame() {
+    db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
+}
+
+function leaveLobby() {
+    if(lobbyListener) lobbyListener(); // Detener listener
+    if(currentLobbyId) {
+        // Quitarnos de la lista
+        if(isLobbyHost) {
+             db.collection("lobbies").doc(currentLobbyId).delete(); // Host cierra sala
+        } else {
+             // Solo salir
+             const ref = db.collection("lobbies").doc(currentLobbyId);
+             ref.get().then(doc => {
+                 if(doc.exists) {
+                     const pl = doc.data().players.filter(p => p.name !== user.name);
+                     ref.update({players: pl});
+                 }
+             });
         }
     }
+    currentLobbyId = null;
+    isMultiplayer = false;
+    isLobbyHost = false;
+    closeModal('lobby-room');
 }
 
-function startMatch(songName) {
-    document.getElementById('roulette-msg').innerText = "JUGANDO: " + songName;
-    setTimeout(() => { closeModal('online'); curSongId = songName; startGame(4); }, 1000);
+function updateMultiHud(players) {
+    const c = document.getElementById('multi-players-container');
+    c.innerHTML = '';
+    players.forEach(p => {
+        const div = document.createElement('div');
+        div.className = `multi-p-card ${p.name===user.name?'is-me':''}`;
+        div.innerHTML = `<div class="multi-p-name">${p.name}</div><div class="multi-p-score">${p.score.toLocaleString()}</div>`;
+        c.appendChild(div);
+    });
+}
+
+// In Game Score Update
+function sendLobbyScore(score) {
+    if(!currentLobbyId) return;
+    // Esto es pesado hacerlo en cada hit, mejor hacerlo cada X ms o throttle
+    // Simplificación: Lo enviamos pero el backend debe manejar concurrencia.
+    // Para evitar sobrecarga de escritura, solo actualizamos DB cada 1 segundo
+    const now = Date.now();
+    if(!window.lastScoreUpdate || now - window.lastScoreUpdate > 2000) {
+        window.lastScoreUpdate = now;
+         const ref = db.collection("lobbies").doc(currentLobbyId);
+         ref.get().then(doc => {
+             if(doc.exists) {
+                 const players = doc.data().players.map(p => {
+                     if(p.name === user.name) p.score = score;
+                     return p;
+                 });
+                 ref.update({players: players});
+             }
+         });
+    }
 }
