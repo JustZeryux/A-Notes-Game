@@ -128,8 +128,14 @@
             border-radius: 6px;
             left: 50%; transform: translateX(-50%);
         }
-        .hold-down .sustain-trail { top: 50%; transform-origin: top center; }
-        .hold-up .sustain-trail { bottom: 50%; transform-origin: bottom center; }
+        .hold-down .sustain-trail { 
+            bottom: 50%; 
+            transform-origin: bottom center; 
+        }
+        .hold-up .sustain-trail { 
+            top: 50%; 
+            transform-origin: top center; 
+        }
 
         .hold-note .arrow-path { stroke-width: 8px; stroke: #fff; }
 
@@ -357,11 +363,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.72 (CONFIG FIX)</div>
+                <div class="patch-ver">VERSION 0.74 (NETLIFY FIX)</div>
                 <ul>
-                    <li><b>CONFIGURACIÓN ARREGLADA:</b> Ahora puedes cambiar las teclas sin problemas.</li>
-                    <li><b>FOCO MEJORADO:</b> El juego detecta mejor el teclado al remapear.</li>
-                    <li><b>UPSCROLL FIX:</b> Mantenido el arreglo de notas largas.</li>
+                    <li><b>ONLINE ARREGLADO:</b> Ahora el código de amigo se genera correctamente en la web.</li>
+                    <li><b>RANKING REAL:</b> Tu perfil muestra tu rango global real de la base de datos.</li>
+                    <li><b>ANTI-FARM:</b> Si te sales de la canción, no sumas puntos.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -550,7 +556,7 @@
     </div>
 
     <script>
-        // --- PEGA TU CONFIGURACIÓN DE FIREBASE AQUÍ ---
+        // --- CONFIGURACIÓN DE FIREBASE (NO TOCAR) ---
         const firebaseConfig = {
             apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
             authDomain: "a-notes-game.firebaseapp.com",
@@ -564,11 +570,9 @@
         // INIT FIREBASE
         let db = null;
         try {
-            if(firebaseConfig.apiKey !== "TU_API_KEY") {
-                firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                console.log("Firebase Conectado");
-            }
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            console.log("Firebase Conectado");
         } catch(e) { console.error("Error Firebase:", e); }
 
         const DB_KEY="omega_u_"; const LAST_KEY="omega_last"; const DB_NAME = "OmegaDB"; const DB_STORE = "songs";
@@ -581,6 +585,7 @@
         let user = { name:"Guest", pass:"", avatar:null, bg:null, songs:[], pp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
         let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
         let ctx=null, hitBuf=null, idb=null;
+        let songFinished = false; // FLAG DE SEGURIDAD
         
         // ONLINE VARIABLES
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
@@ -615,11 +620,17 @@
 
         /* === ONLINE SYSTEM (PEERJS) === */
         function initOnline() {
-            peer = new Peer(); 
+            // FIX NETLIFY: FORCE SECURE CONNECTION
+            peer = new Peer(null, { secure: true }); 
+            
             peer.on('open', (id) => {
                 myPeerId = id;
                 const el = document.getElementById('my-peer-id');
                 if(el) el.innerText = id;
+            });
+            peer.on('error', (err) => {
+                console.error(err);
+                notify("Error Online: " + err.type, "error");
             });
             peer.on('connection', (c) => {
                 conn = c;
@@ -796,7 +807,13 @@
                     querySnapshot.forEach((doc) => {
                         const d = doc.data();
                         const tr = document.createElement('tr');
-                        if(d.name===user.name) tr.className='rank-row-me';
+                        if(d.name===user.name) {
+                            tr.className='rank-row-me';
+                            // FIX: UPDATE LOCAL USER RANK FROM DB
+                            document.getElementById('p-global-rank').innerText = "#" + i;
+                            // SYNC BACK PP IF NEEDED
+                            if(d.pp > user.pp) { user.pp = d.pp; save(); }
+                        }
                         tr.innerHTML = `<td>#${i++}</td><td>${d.name}</td><td style="color:var(--blue)">${d.pp}pp</td>`;
                         l.appendChild(tr);
                     });
@@ -841,7 +858,7 @@
             const pct = Math.min(100, (user.xp / targetXP) * 100);
             document.getElementById('p-xp-bar').style.width = pct + "%";
             document.getElementById('p-xp-txt').innerText = `${user.xp} / ${targetXP} XP`;
-            document.getElementById('p-global-rank').innerText = "#--";
+            // Global rank updated via Listener
             
             if(user.avatar) { document.getElementById('m-av').style.backgroundImage=`url(${user.avatar})`; document.getElementById('m-av').innerText=""; document.getElementById('p-av-big').style.backgroundImage=`url(${user.avatar})`; document.getElementById('ig-av').style.backgroundImage=`url(${user.avatar})`; }
             if(user.bg) { document.getElementById('bg-image').src=user.bg; document.getElementById('bg-image').style.opacity=0.3; }
@@ -908,14 +925,20 @@
             document.getElementById('track').innerHTML = ''; 
             
             st.notes = JSON.parse(JSON.stringify(s.map)); st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
-            isMultiplayer = (conn && conn.open); opponentScore = 0;
+            isMultiplayer = (conn && conn.open); opponentScore = 0; songFinished = false; // RESET FLAG
+            
             if(isMultiplayer) { document.getElementById('vs-hud').style.display = 'flex'; document.getElementById('p1-name').innerText = user.name; document.getElementById('p1-score').innerText = "0"; document.getElementById('p2-score').innerText = "0"; } else { document.getElementById('vs-hud').style.display = 'none'; }
             document.getElementById('menu-container').classList.add('hidden'); document.getElementById('game-layer').style.display='block'; document.getElementById('hud').style.display='flex';
             
             initReceptors(keys); updHUD();
             
             const cd=document.getElementById('countdown'); let c=3; cd.innerHTML=c;
-            const iv=setInterval(async()=>{ if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume(); c--; if(c>0)cd.innerHTML=c; else { clearInterval(iv); cd.innerHTML=""; st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf; const gain = st.ctx.createGain(); gain.gain.value=cfg.vol; st.src.connect(gain); gain.connect(st.ctx.destination); st.startTime = performance.now() + 50; st.t0 = st.ctx.currentTime + 0.05; st.src.start(st.t0); st.src.onended=()=>end(false); st.act=true; st.paused=false; loop(); } },600);
+            const iv=setInterval(async()=>{ if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume(); c--; if(c>0)cd.innerHTML=c; else { clearInterval(iv); cd.innerHTML=""; st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf; const gain = st.ctx.createGain(); gain.gain.value=cfg.vol; st.src.connect(gain); gain.connect(st.ctx.destination); st.startTime = performance.now() + 50; st.t0 = st.ctx.currentTime + 0.05; st.src.start(st.t0); 
+            
+            // FIX ANTI-FARM
+            st.src.onended=()=>{ songFinished = true; end(false); };
+            
+            st.act=true; st.paused=false; loop(); } },600);
         }
 
         function loop(){
@@ -1041,7 +1064,8 @@
             document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
             document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
             
-            if(!died && user.name!=="Guest"){ 
+            // ANTI-FARM CHECK: ONLY SAVE IF SONG FINISHED
+            if(!died && songFinished && user.name!=="Guest"){ 
                 const xp = Math.floor(st.sc/500); user.xp+=xp; user.score+=st.sc; user.plays++; 
                 if(user.xp >= user.lvl*1000) { user.xp -= user.lvl*1000; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!"); }
                 if(st.ranked) { user.pp += Math.floor(st.sc/5000); }
