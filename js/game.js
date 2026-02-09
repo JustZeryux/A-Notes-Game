@@ -42,13 +42,12 @@ function playSong(name) {
     unlockAudio(); const s = ramSongs.find(x=>x.id===name); if(!s) return notify("Error RAM", "error"); curIdx = name;
     document.getElementById('track').innerHTML = ''; 
     st.notes = JSON.parse(JSON.stringify(s.map)); st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
-    // isMultiplayer ahora es global manejado por online.js
+    st.lastPause = 0; // Inicializar variable de pausa
     opponentScore = 0; songFinished = false; 
     
     // UI Ajustes
     if(isMultiplayer) { 
         document.getElementById('vs-hud').style.display = 'flex'; 
-        // El hud de jugadores se maneja en online.js
     } else { 
         document.getElementById('vs-hud').style.display = 'none'; 
     }
@@ -159,7 +158,6 @@ function updHUD(){
     if(isMultiplayer && typeof sendLobbyScore === 'function') {
         sendLobbyScore(st.sc);
     } else if (conn && conn.open) {
-        // Fallback 1v1 legacy
         conn.send({ type: 'score', val: st.sc });
     }
 
@@ -170,8 +168,37 @@ function updHUD(){
     document.getElementById('h-sick').innerText=st.stats.s; document.getElementById('h-good').innerText=st.stats.g; document.getElementById('h-bad').innerText=st.stats.b; document.getElementById('h-miss').innerText=st.stats.m;
 }
 
-function togglePause(){ if(!st.act)return; st.paused=!st.paused; if(st.paused){ if(st.ctx)st.ctx.suspend(); document.getElementById('modal-pause').style.display='flex'; document.getElementById('p-sick').innerText=st.stats.s; document.getElementById('p-good').innerText=st.stats.g; document.getElementById('p-bad').innerText=st.stats.b; document.getElementById('p-miss').innerText=st.stats.m; } else resumeGame(); }
-function resumeGame(){ document.getElementById('modal-pause').style.display='none'; if(st.ctx)st.ctx.resume(); st.paused=false; }
+function togglePause(){ 
+    if(!st.act) return; 
+    st.paused = !st.paused; 
+    
+    if(st.paused){ 
+        st.lastPause = performance.now(); // Guardar timestamp
+        if(st.ctx) st.ctx.suspend(); 
+        document.getElementById('modal-pause').style.display='flex'; 
+        document.getElementById('p-sick').innerText=st.stats.s; 
+        document.getElementById('p-good').innerText=st.stats.g; 
+        document.getElementById('p-bad').innerText=st.stats.b; 
+        document.getElementById('p-miss').innerText=st.stats.m; 
+    } else {
+        resumeGame(); 
+    }
+}
+
+function resumeGame(){ 
+    document.getElementById('modal-pause').style.display='none'; 
+    if(st.ctx) st.ctx.resume(); 
+    
+    // Ajustar tiempo para evitar saltos en fallback visual
+    if(st.lastPause) {
+        const dur = performance.now() - st.lastPause;
+        st.startTime += dur; 
+        st.lastPause = 0;
+    }
+
+    st.paused = false; 
+    loop(); // <--- REINICIA EL BUCLE (SOLUCIÓN)
+}
 
 function end(died){
     st.act=false; if(st.src)try{st.src.stop()}catch(e){}
@@ -182,26 +209,22 @@ function end(died){
         if(acc===100){r="SS";c="cyan"} else if(acc>=95){r="S";c="gold"} else if(acc>=90){r="A";c="lime"} else if(acc>=80){r="B";c="yellow"} else if(acc>=70){r="C";c="orange"} else {r="D";c="red"}
     }
     
-    // Mostrar solo "Ganaste" si es legacy 1v1. Lobby 4P muestra scores en vivo.
     if(isMultiplayer) {
-         // Logica de lobby: Ya no mostramos winner msg simple
          document.getElementById('winner-msg').innerText = "PARTIDA FINALIZADA";
          document.getElementById('winner-msg').style.display = 'block';
          document.getElementById('winner-msg').style.color = 'white';
-         if(typeof leaveLobby === 'function') leaveLobby(); // Salir del lobby al terminar
+         if(typeof leaveLobby === 'function') leaveLobby(); 
     } else { document.getElementById('winner-msg').style.display = 'none'; }
 
     document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
     document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
     
     if(!died && songFinished && user.name!=="Guest"){ 
-        // === NUEVA FORMULA XP ===
-        // Antes: score/500 (muy lento). Ahora: score/250 para duplicar velocidad base.
+        // XP FORMULA V2 (Faster)
         const xpGain = Math.floor(st.sc / 250); 
         user.xp += xpGain; 
         
-        // === SCORE POINTS (SP) ===
-        // Ganas 1 SP por cada 1000 puntos de Score.
+        // SCORE POINTS (SP)
         const spGain = Math.floor(st.sc / 1000);
         if(!user.sp) user.sp = 0;
         user.sp += spGain;
@@ -209,10 +232,9 @@ function end(died){
         user.score += st.sc; 
         user.plays++; 
         
-        // === LEVEL UP SCALING ===
-        // Base 1000. Incrementa 5% por nivel hasta nivel 10, luego 2%
+        // Level Up Scaling
         let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
-        if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1); // Soft cap
+        if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1); 
         xpReq = Math.floor(xpReq);
 
         if(user.xp >= xpReq) { 
