@@ -90,6 +90,7 @@
         .vs-panel { text-align: center; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 10px; border: 1px solid #444; min-width: 150px; }
         .vs-name { font-weight: 900; font-size: 1.2rem; color: var(--blue); margin-bottom: 5px; }
         .vs-score { font-size: 2rem; font-weight: 900; line-height: 1; }
+        .vs-badge { background: var(--miss); color:white; font-weight:bold; padding:2px 8px; border-radius:4px; font-size:0.8rem; }
 
         #track { position: relative; width: 100%; max-width: 800px; height: 100%; margin: 0 auto; background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); border-left: 2px solid rgba(255,255,255,0.1); border-right: 2px solid rgba(255,255,255,0.1); transition: width 0.3s; }
         
@@ -111,7 +112,9 @@
         .lane-flash.active { opacity: 0.6; }
 
         .splash { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--c); z-index: 300; pointer-events: none; animation: splash 0.3s ease-out forwards; top: -30px; opacity: 0; box-shadow: 0 0 30px var(--c); }
-        
+        .particle { position: fixed; width: 15px; height: 15px; border-radius: 50%; z-index: 400; animation: burst 0.5s ease-out forwards; pointer-events: none; }
+        @keyframes burst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--vx), var(--vy)) scale(0); opacity: 0; } }
+
         #hud { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); text-align: right; pointer-events: none; z-index: 300; display: flex; flex-direction: row; align-items: center; gap: 20px; }
         .stats-col { display: flex; flex-direction: column; gap: 10px; text-shadow: 0 2px 10px black; align-items: flex-end; }
         .stat-item { font-weight: 900; font-size: 1.5rem; opacity: 0.9; font-family: 'Chakra Petch'; }
@@ -177,6 +180,7 @@
         .slot-status { font-size: 0.8rem; color: #666; font-style: italic; }
         .ready-green { color: #12FA05 !important; }
 
+        /* CHAT */
         #chat-box { height: 150px; background: #050505; border: 1px solid #333; border-radius: 8px; overflow-y: auto; margin-bottom: 10px; padding: 10px; text-align: left; font-size: 0.9rem; }
         .chat-msg { margin-bottom: 5px; }
         .chat-msg b { color: var(--blue); margin-right: 5px; }
@@ -304,11 +308,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.75 (SOCIAL FIXED)</div>
+                <div class="patch-ver">VERSION 0.76 (PERSISTENT CHAT)</div>
                 <ul>
-                    <li><b>SOCIAL FIX:</b> Los usuarios del ranking ahora aparecen automáticamente en la búsqueda de amigos.</li>
-                    <li><b>LOBBY 1V1:</b> Al desafiar a un amigo, se abre el lobby con selección de canción y ruleta.</li>
-                    <li><b>CHAT:</b> Chat integrado en la sala de espera.</li>
+                    <li><b>CHAT GLOBAL:</b> El chat ahora es permanente en la sala de espera.</li>
+                    <li><b>SOCIAL FIX:</b> Arreglado el problema de usuarios desconectados.</li>
+                    <li><b>ESTABILIDAD:</b> Mejorada la sincronización online.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -324,7 +328,7 @@
             </div>
             <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">SOLICITUDES</div>
             <div id="req-list" class="friend-list" style="margin-bottom:20px;"></div>
-            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS (ONLINE)</div>
+            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS</div>
             <div id="friend-list" class="friend-list"></div>
             <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
         </div>
@@ -548,6 +552,7 @@
         // ONLINE VARIABLES
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
         let onlineState = { myPick: null, oppPick: null };
+        let currentChatRoom = null;
 
         let st = { 
             act:false, paused:false, ctx:null, src:null, t0:0, 
@@ -571,6 +576,16 @@
             initOnline(); 
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
+            
+            // HEARTBEAT TO KEEP ONLINE STATUS ACTIVE
+            setInterval(() => {
+                if(user.name !== "Guest" && db) {
+                    db.collection("users").doc(user.name).update({
+                        lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                        online: true
+                    });
+                }
+            }, 30000); // 30 seconds
         };
         window.addEventListener('keydown', onKd); 
         window.addEventListener('keyup', onKu);
@@ -583,7 +598,6 @@
                 myPeerId = id;
                 const el = document.getElementById('my-peer-id');
                 if(el) el.innerText = id;
-                // UPDATE FIREBASE USER ONLINE STATUS
                 if(db && user.name !== "Guest") {
                     db.collection("users").doc(user.name).set({
                         peerId: id,
@@ -617,7 +631,6 @@
             const reqL = document.getElementById('req-list');
             const friL = document.getElementById('friend-list');
 
-            // LISTENER PARA ESTE USUARIO
             db.collection("users").doc(user.name).onSnapshot(doc => {
                 const data = doc.data();
                 if(data) {
@@ -648,19 +661,15 @@
             const target = document.getElementById('friend-inp').value.trim();
             if(!target || target === user.name) return;
             
-            // BUSCAR EN USERS, SI NO ESTA, BUSCAR EN LEADERBOARD Y CREARLO
             db.collection("users").doc(target).get().then(doc => {
                 if(doc.exists) {
-                    // YA EXISTE EN USERS, MANDAR SOLICITUD
                     db.collection("users").doc(target).update({
                         requests: firebase.firestore.FieldValue.arrayUnion(user.name)
                     });
                     notify("Solicitud enviada a " + target);
                 } else {
-                    // NO ESTA EN USERS, REVISAR LEADERBOARD
                     db.collection("leaderboard").doc(target).get().then(ldoc => {
                         if(ldoc.exists) {
-                            // ESTA EN RANKING PERO NO EN SOCIAL -> CREAR PERFIL SOCIAL
                             db.collection("users").doc(target).set({
                                 requests: [user.name],
                                 friends: []
@@ -683,7 +692,6 @@
                 friends: firebase.firestore.FieldValue.arrayUnion(target),
                 requests: firebase.firestore.FieldValue.arrayRemove(target)
             });
-            // ASEGURAR QUE EL OTRO TAMBIEN TENGA DOCUMENTO
             batch.set(theirRef, {
                 friends: firebase.firestore.FieldValue.arrayUnion(user.name)
             }, { merge: true });
@@ -693,14 +701,25 @@
 
         function challengeFriend(target) {
             db.collection("users").doc(target).get().then(doc => {
-                if(doc.exists && doc.data().peerId && doc.data().online) {
-                    const pid = doc.data().peerId;
-                    conn = peer.connect(pid);
-                    setupConnection();
-                    notify("Desafiando a " + target + "...");
-                    closeModal('friends');
+                const data = doc.data();
+                // CHECK IF ONLINE (SIMPLE CHECK OR TIMESTAMP CHECK)
+                if(doc.exists && data.peerId) {
+                    // TIMESTAMP CHECK (2 MIN TIMEOUT)
+                    const lastSeen = data.lastSeen ? data.lastSeen.toDate() : new Date(0);
+                    const now = new Date();
+                    const diff = (now - lastSeen) / 1000;
+                    
+                    if(diff < 120) { // Active in last 2 mins
+                        const pid = data.peerId;
+                        conn = peer.connect(pid);
+                        setupConnection();
+                        notify("Desafiando a " + target + "...");
+                        closeModal('friends');
+                    } else {
+                        notify(target + " parece estar desconectado (Inactivo)", "error");
+                    }
                 } else {
-                    notify(target + " no está conectado ahora", "error");
+                    notify(target + " no está conectado", "error");
                 }
             });
         }
@@ -730,9 +749,7 @@
                     notify("Conectado con: " + data.name);
                     document.getElementById('p2-name').innerText = data.name;
                     document.getElementById('lobby-opp-name').innerText = data.name;
-                }
-                if(data.type === 'chat') {
-                    addChatMsg(data.name, data.msg);
+                    initChatListener(data.name); // INIT CHAT
                 }
                 if(data.type === 'song_data') {
                     notify("Recibiendo canción...");
@@ -759,16 +776,39 @@
             document.getElementById('online-lobby-view').style.display = 'block';
         }
 
+        /* === CHAT SYSTEM (FIREBASE) === */
+        function initChatListener(oppName) {
+            // GENERATE UNIQUE ROOM ID
+            const users = [user.name, oppName].sort();
+            currentChatRoom = users.join("_");
+            
+            document.getElementById('chat-box').innerHTML = ''; // CLEAR
+            
+            db.collection("chats").doc(currentChatRoom).collection("messages")
+                .orderBy("timestamp")
+                .onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        if(change.type === "added") {
+                            addChatMsgUI(change.doc.data().user, change.doc.data().text);
+                        }
+                    });
+                });
+        }
+
         function sendChat() {
             const inp = document.getElementById('chat-inp');
             const txt = filterBadWords(inp.value);
-            if(!txt) return;
-            addChatMsg(user.name, txt);
-            conn.send({ type: 'chat', name: user.name, msg: txt });
+            if(!txt || !currentChatRoom) return;
+            
+            db.collection("chats").doc(currentChatRoom).collection("messages").add({
+                user: user.name,
+                text: txt,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
             inp.value = "";
         }
 
-        function addChatMsg(name, msg) {
+        function addChatMsgUI(name, msg) {
             const box = document.getElementById('chat-box');
             const d = document.createElement('div'); d.className = 'chat-msg';
             d.innerHTML = `<b>${name}:</b> ${msg}`;
@@ -925,7 +965,6 @@
 
         function updateFirebaseScore() {
             if(db && user.name !== "Guest") {
-                // UPDATE LEADERBOARD
                 db.collection("leaderboard").doc(user.name).set({
                     name: user.name,
                     pp: user.pp,
@@ -933,7 +972,6 @@
                     lvl: user.lvl
                 }, { merge: true });
                 
-                // UPDATE SOCIAL PROFILE (ENSURES DISCOVERABILITY)
                 db.collection("users").doc(user.name).set({
                     name: user.name
                 }, { merge: true });
@@ -1015,12 +1053,9 @@
 
         function playSong(name) {
             unlockAudio(); const s = ramSongs.find(x=>x.id===name); if(!s) return notify("Error RAM", "error"); curIdx = name;
-            
-            // CLEAN PREVIOUS STATE
             document.getElementById('track').innerHTML = ''; 
-            
             st.notes = JSON.parse(JSON.stringify(s.map)); st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
-            isMultiplayer = (conn && conn.open); opponentScore = 0; songFinished = false; // RESET FLAG
+            isMultiplayer = (conn && conn.open); opponentScore = 0; songFinished = false; 
             
             if(isMultiplayer) { document.getElementById('vs-hud').style.display = 'flex'; document.getElementById('p1-name').innerText = user.name; document.getElementById('p1-score').innerText = "0"; document.getElementById('p2-score').innerText = "0"; } else { document.getElementById('vs-hud').style.display = 'none'; }
             document.getElementById('menu-container').classList.add('hidden'); document.getElementById('game-layer').style.display='block'; document.getElementById('hud').style.display='flex';
@@ -1029,10 +1064,7 @@
             
             const cd=document.getElementById('countdown'); let c=3; cd.innerHTML=c;
             const iv=setInterval(async()=>{ if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume(); c--; if(c>0)cd.innerHTML=c; else { clearInterval(iv); cd.innerHTML=""; st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf; const gain = st.ctx.createGain(); gain.gain.value=cfg.vol; st.src.connect(gain); gain.connect(st.ctx.destination); st.startTime = performance.now() + 50; st.t0 = st.ctx.currentTime + 0.05; st.src.start(st.t0); 
-            
-            // FIX ANTI-FARM
             st.src.onended=()=>{ songFinished = true; end(false); };
-            
             st.act=true; st.paused=false; loop(); } },600);
         }
 
@@ -1042,7 +1074,6 @@
             if (st.ctx.state === 'running' && audioTime > 0) now = audioTime; else now = visTime;
             const yReceptor = cfg.down ? window.innerHeight - 140 : 80; const w = 100/keys;
             
-            // SPAWN
             for(let i=0; i<st.notes.length; i++) {
                 const n = st.notes[i]; if(n.s) continue; if(n.t < now-200) { n.s=true; continue; }
                 if(n.t - now < 1500) {
@@ -1054,22 +1085,16 @@
                     const conf = cfg.modes[keys][n.l]; const shapePath = PATHS[conf.s] || PATHS['circle'];
                     let svg = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shapePath}" fill="${conf.c}" stroke="white" stroke-width="2"/></svg>`;
                     
-                    if(n.type==='hold') { 
-                        const h = (n.len/1000)*cfg.spd*60; 
-                        svg += `<div class="sustain-trail" style="height:${h}px; background:${conf.c};"></div>`; 
-                    }
+                    if(n.type==='hold') { const h = (n.len/1000)*cfg.spd*60; svg += `<div class="sustain-trail" style="height:${h}px; background:${conf.c};"></div>`; }
                     el.innerHTML = svg; if(cfg.vivid) el.querySelector('.arrow-path').style.filter=`drop-shadow(0 0 8px ${conf.c})`;
                     document.getElementById('track').appendChild(el); n.el = el; st.spawned.push(n); n.s = true;
                 } else break;
             }
 
-            // MOVE
             for(let i=st.spawned.length-1; i>=0; i--) {
                 const n = st.spawned[i]; 
                 if(!n.el) { st.spawned.splice(i,1); continue; } 
-
-                const diff = n.t - now + cfg.off; 
-                const dist = (diff / 1000) * cfg.spd * 60; 
+                const diff = n.t - now + cfg.off; const dist = (diff / 1000) * cfg.spd * 60; 
                 let finalY = cfg.down ? (yReceptor - dist) : (yReceptor + dist);
                 
                 if(n.h && n.type==='hold') {
@@ -1085,24 +1110,9 @@
             requestAnimationFrame(loop);
         }
 
-        // FIXED KEYBOARD LISTENER
-        function onKd(e) { 
-            if(e.key==="Escape"){togglePause();return;} 
-            // PREVENT DEFAULT KEYS
-            if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
-
-            if(remapMode!==null){ 
-                // ASSIGN KEY
-                cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
-                renderLaneConfig(remapMode); 
-                remapMode=null; 
-                return; 
-            } 
-            if(!e.repeat) { 
-                const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); 
-                if(idx !== -1) hit(idx, true); 
-            } 
-        }
+        function onKd(e) { if(e.key==="Escape"){togglePause();return;} if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
+            if(remapMode!==null){ cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); renderLaneConfig(remapMode); remapMode=null; return; } 
+            if(!e.repeat) { const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); if(idx !== -1) hit(idx, true); } }
         function onKu(e) { const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); if(idx !== -1) hit(idx, false); }
 
         function hit(l, p) {
@@ -1159,12 +1169,11 @@
             document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
             document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
             
-            // ANTI-FARM CHECK: ONLY SAVE IF SONG FINISHED
             if(!died && songFinished && user.name!=="Guest"){ 
                 const xp = Math.floor(st.sc/500); user.xp+=xp; user.score+=st.sc; user.plays++; 
                 if(user.xp >= user.lvl*1000) { user.xp -= user.lvl*1000; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!"); }
                 if(st.ranked) { user.pp += Math.floor(st.sc/5000); }
-                save(); updateFirebaseScore(); // SYNC TO FIREBASE
+                save(); updateFirebaseScore(); 
                 document.getElementById('res-xp').innerText = xp;
             } else { document.getElementById('res-xp').innerText = 0; }
         }
@@ -1183,7 +1192,7 @@
         function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;save(); updUI();}; r.readAsDataURL(i.files[0]); i.value=""; }}
         function renderLaneConfig(k){ document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); document.getElementById('tab-'+k).classList.add('active'); const c=document.getElementById('lanes-container'); c.innerHTML=''; for(let i=0; i<k; i++){ const l = cfg.modes[k][i]; const d=document.createElement('div'); d.className='l-col'; const shapePath = PATHS[l.s] || PATHS['circle']; d.innerHTML=`<div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; c.appendChild(d); } }
         function remapKey(k,i){ 
-            if(document.activeElement) document.activeElement.blur(); // FORCE FOCUS LOSS FROM INPUTS
+            if(document.activeElement) document.activeElement.blur(); 
             remapMode=k; 
             remapIdx=i; 
             renderLaneConfig(k); 
