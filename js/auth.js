@@ -25,12 +25,15 @@ function loginGoogle() {
 function handleAuthUser(name, isGoogle) {
     db.collection("users").doc(name).get().then(doc => {
         if(doc.exists) {
-            user = {...user, ...doc.data()};
+            let data = doc.data();
+            // Asegurar que SP exista si es cuenta vieja
+            if(data.sp === undefined) data.sp = 0;
+            user = {...user, ...data};
             finishLogin(name);
         } else {
             // NEW USER
             const newUser = {
-                name: name, pass: isGoogle ? "google-auth" : null, xp:0, lvl:1, pp:0, plays:0, score:0, 
+                name: name, pass: isGoogle ? "google-auth" : null, xp:0, lvl:1, pp:0, sp:0, plays:0, score:0, 
                 friends:[], avatarData:null, online:true, lastSeen: firebase.firestore.FieldValue.serverTimestamp()
             };
             db.collection("users").doc(name).set(newUser);
@@ -56,6 +59,8 @@ function login() {
             const data = doc.data();
             if(data.pass === p && data.pass !== "google-auth") {
                 user = {...user, ...data};
+                // Retrocompatibilidad local
+                if(user.sp === undefined) user.sp = 0;
                 finishLogin(u);
             } else notify("Contraseña incorrecta o usa Google", "error");
         } else notify("Usuario no encontrado", "error");
@@ -179,6 +184,6 @@ function updateFirebaseScore() {
         db.collection("leaderboard").doc(user.name).set({
             name: user.name, pp: user.pp, score: user.score, lvl: user.lvl, avatarData: user.avatarData
         }, { merge: true });
-        db.collection("users").doc(user.name).set({ name: user.name, score:user.score, pp:user.pp, lvl:user.lvl }, { merge: true });
+        db.collection("users").doc(user.name).set({ name: user.name, score:user.score, pp:user.pp, lvl:user.lvl, sp:user.sp }, { merge: true });
     }
 }
