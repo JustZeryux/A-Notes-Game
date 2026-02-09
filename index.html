@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>A NOTES GAME</title>
-    <link rel="icon" type="image/png" href="icon.png"
+    
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+
     <style>
         /* === ESTILOS BASE === */
         @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700;900&family=Nunito:wght@700;900&display=swap');
@@ -113,15 +116,20 @@
         }
         
         .arrow-wrapper { position: absolute; width: var(--lane-width); height: 120px; display: flex; align-items: center; justify-content: center; z-index: 150; will-change: top; }
-        .arrow-svg { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); }
+        .arrow-svg { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); position:relative; z-index:2; }
         .arrow-path { stroke: white; stroke-width: 5; fill-opacity: 1; paint-order: stroke; transition: filter 0.1s; }
         
+        /* FIX HOLD NOTES VISUALS */
         .sustain-trail { 
-            position: absolute; width: 40%; opacity: 0.7; z-index: -1; 
+            position: absolute; width: 40%; opacity: 0.7; z-index: 1; 
             background: currentColor; 
             box-shadow: 0 0 15px currentColor; 
             border-radius: 6px;
+            left: 50%; transform: translateX(-50%);
         }
+        .hold-down .sustain-trail { top: 50%; transform-origin: top center; }
+        .hold-up .sustain-trail { bottom: 50%; transform-origin: bottom center; }
+
         .hold-note .arrow-path { stroke-width: 8px; stroke: #fff; }
 
         .receptor { z-index: 200; opacity: 0.9; }
@@ -348,11 +356,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.69 (ONLINE TRANSFER)</div>
+                <div class="patch-ver">VERSION 0.72 (CONFIG FIX)</div>
                 <ul>
-                    <li><b>TRANSFERENCIA P2P:</b> Al elegir canción, se envía a tu rival.</li>
-                    <li><b>RULETA:</b> Si ambos eligen, el juego selecciona una al azar.</li>
-                    <li><b>SYNC:</b> Inicio de partida sincronizado automáticamente.</li>
+                    <li><b>CONFIGURACIÓN ARREGLADA:</b> Ahora puedes cambiar las teclas sin problemas.</li>
+                    <li><b>FOCO MEJORADO:</b> El juego detecta mejor el teclado al remapear.</li>
+                    <li><b>UPSCROLL FIX:</b> Mantenido el arreglo de notas largas.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -402,7 +410,7 @@
 
     <div id="modal-rank" class="modal-overlay">
         <div class="modal-panel">
-            <div class="m-title">RANKING GLOBAL</div>
+            <div class="m-title">RANKING GLOBAL (LIVE)</div>
             <table class="rank-table">
                 <thead><tr><th>#</th><th>JUGADOR</th><th>PP</th></tr></thead>
                 <tbody id="rank-list"></tbody>
@@ -541,6 +549,27 @@
     </div>
 
     <script>
+        // --- PEGA TU CONFIGURACIÓN DE FIREBASE AQUÍ ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
+            authDomain: "a-notes-game.firebaseapp.com",
+            projectId: "a-notes-game",
+            storageBucket: "a-notes-game.firebasestorage.app",
+            messagingSenderId: "149492857447",
+            appId: "1:149492857447:web:584610d0958419fea7f2c2"
+        };
+        // ----------------------------------------------
+
+        // INIT FIREBASE
+        let db = null;
+        try {
+            if(firebaseConfig.apiKey !== "TU_API_KEY") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                console.log("Firebase Conectado");
+            }
+        } catch(e) { console.error("Error Firebase:", e); }
+
         const DB_KEY="omega_u_"; const LAST_KEY="omega_last"; const DB_NAME = "OmegaDB"; const DB_STORE = "songs";
         
         let cfg = { 
@@ -550,7 +579,7 @@
         
         let user = { name:"Guest", pass:"", avatar:null, bg:null, songs:[], pp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
         let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
-        let ctx=null, hitBuf=null, db=null;
+        let ctx=null, hitBuf=null, idb=null;
         
         // ONLINE VARIABLES
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
@@ -578,16 +607,18 @@
             initOnline(); 
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
-            window.addEventListener('keydown', onKd); 
-            window.addEventListener('keyup', onKu); 
         };
+        // KEY LISTENERS OUTSIDE ASYNC TO GUARANTEE LOAD
+        window.addEventListener('keydown', onKd); 
+        window.addEventListener('keyup', onKu);
 
         /* === ONLINE SYSTEM (PEERJS) === */
         function initOnline() {
             peer = new Peer(); 
             peer.on('open', (id) => {
                 myPeerId = id;
-                document.getElementById('my-peer-id').innerText = id;
+                const el = document.getElementById('my-peer-id');
+                if(el) el.innerText = id;
             });
             peer.on('connection', (c) => {
                 conn = c;
@@ -600,11 +631,14 @@
         function openOnline() {
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             openModal('online');
+            if(myPeerId) document.getElementById('my-peer-id').innerText = myPeerId;
         }
 
         function copyID() {
-            navigator.clipboard.writeText(myPeerId);
-            notify("ID copiado al portapapeles");
+            if(myPeerId) {
+                navigator.clipboard.writeText(myPeerId);
+                notify("ID copiado al portapapeles");
+            }
         }
 
         function connectToPeer() {
@@ -625,17 +659,13 @@
                     notify("Conectado con: " + data.name);
                     document.getElementById('p2-name').innerText = data.name;
                 }
-                // RECIBIR CANCION DEL RIVAL
                 if(data.type === 'song_data') {
                     notify("Recibiendo canción: " + data.name);
                     document.getElementById('opp-pick-name').innerText = data.name;
                     document.getElementById('opp-pick-status').innerText = "¡Recibida y Lista!";
                     document.getElementById('opp-pick-status').classList.add('ready-green');
                     onlineState.oppPick = data.name;
-                    
-                    // GUARDAR EN RAM Y DB
-                    const buf = data.buffer; // PeerJS reconstruye el buffer
-                    await saveReceivedSong(data.name, buf);
+                    await saveReceivedSong(data.name, data.buffer);
                     checkBothReady();
                 }
                 if(data.type === 'match_start') {
@@ -658,22 +688,11 @@
                 const f = i.files[0];
                 const name = f.name.replace(/\.[^/.]+$/, "");
                 const ab = await f.arrayBuffer();
-                
-                // ACTUALIZAR MI UI
                 document.getElementById('my-pick-name').innerText = name;
                 document.getElementById('my-pick-status').innerText = "Enviando al rival...";
                 onlineState.myPick = name;
-
-                // GUARDAR LOCAL
-                await saveReceivedSong(name, ab.slice(0)); // Save copy
-
-                // ENVIAR AL RIVAL
-                conn.send({
-                    type: 'song_data',
-                    name: name,
-                    buffer: ab
-                });
-                
+                await saveReceivedSong(name, ab.slice(0)); 
+                conn.send({ type: 'song_data', name: name, buffer: ab });
                 document.getElementById('my-pick-status').innerText = "¡Enviado!";
                 document.getElementById('my-pick-status').classList.add('ready-green');
                 checkBothReady();
@@ -682,21 +701,17 @@
 
         async function saveReceivedSong(name, buffer) {
             if(!user.songs.find(s=>s.id===name)){ user.songs.push({id:name}); save(); }
-            saveSongToDB(name, buffer); // DB
-            const audioCtxBuffer = await st.ctx.decodeAudioData(buffer.slice(0)); // Decode for RAM
-            const map = genMap(audioCtxBuffer, 4); // Pre-gen map
-            // Update RAM
+            saveSongToDB(name, buffer); 
+            const audioCtxBuffer = await st.ctx.decodeAudioData(buffer.slice(0)); 
+            const map = genMap(audioCtxBuffer, 4); 
             ramSongs = ramSongs.filter(s=>s.id!==name);
             ramSongs.push({id:name, buf:audioCtxBuffer, map:map});
         }
 
         function checkBothReady() {
             if(onlineState.myPick && onlineState.oppPick) {
-                // AMBOS LISTOS - RULETA
                 const msg = document.getElementById('roulette-msg');
                 msg.innerText = "¡AMBOS LISTOS! GIRA LA RULETA...";
-                
-                // Solo el host (quien tenga ID "mayor" alfanuméricamente para evitar conflictos) decide
                 if(myPeerId > conn.peer) {
                     setTimeout(() => {
                         const picks = [onlineState.myPick, onlineState.oppPick];
@@ -713,8 +728,6 @@
             setTimeout(() => {
                 closeModal('online');
                 curSongId = songName;
-                openModal('diff'); // Preguntar dificultad o forzar 4K? Forcemos 4K para 1v1 simple
-                // O mejor, saltar diff y jugar directo
                 startGame(4); 
             }, 1000);
         }
@@ -723,43 +736,30 @@
         function initDB() {
             return new Promise((resolve) => {
                 const req = indexedDB.open(DB_NAME, 1);
-                req.onupgradeneeded = e => {
-                    if (!e.target.result.objectStoreNames.contains(DB_STORE)) {
-                        e.target.result.createObjectStore(DB_STORE, { keyPath: "id" });
-                    }
-                };
-                req.onsuccess = e => {
-                    db = e.target.result;
-                    loadAllSongs(); 
-                    resolve();
-                };
+                req.onupgradeneeded = e => { if (!e.target.result.objectStoreNames.contains(DB_STORE)) e.target.result.createObjectStore(DB_STORE, { keyPath: "id" }); };
+                req.onsuccess = e => { idb = e.target.result; loadAllSongs(); resolve(); };
             });
         }
         function saveSongToDB(id, buf) {
-            if(!db) return;
-            const tx = db.transaction(DB_STORE, "readwrite");
+            if(!idb) return;
+            const tx = idb.transaction(DB_STORE, "readwrite");
             tx.objectStore(DB_STORE).put({ id: id, buffer: buf });
         }
         function loadAllSongs() {
-            if(!db) return;
-            const tx = db.transaction(DB_STORE, "readonly");
+            if(!idb) return;
+            const tx = idb.transaction(DB_STORE, "readonly");
             const req = tx.objectStore(DB_STORE).getAll();
             req.onsuccess = async () => {
                 const results = req.result;
                 if(!st.ctx) st.ctx = new (window.AudioContext||window.webkitAudioContext)();
-                
                 for(const item of results) {
                     try {
                         if(item.buffer.byteLength === 0) continue;
                         const decoded = await st.ctx.decodeAudioData(item.buffer.slice(0)); 
                         const map = genMap(decoded, 4);
-                        if(!ramSongs.find(s => s.id === item.id)) {
-                            ramSongs.push({ id: item.id, buf: decoded, map: map });
-                        }
-                        if(!user.songs.find(s => s.id === item.id)) {
-                            user.songs.push({ id: item.id });
-                        }
-                    } catch(e) { console.error("Error cargando cancion DB:", e); }
+                        if(!ramSongs.find(s => s.id === item.id)) ramSongs.push({ id: item.id, buf: decoded, map: map });
+                        if(!user.songs.find(s => s.id === item.id)) user.songs.push({ id: item.id });
+                    } catch(e) { console.error("Error DB:", e); }
                 }
                 renderMenu(); 
             };
@@ -781,24 +781,51 @@
             updUI();
         }
         function save(){ if(user.name!=="Guest") localStorage.setItem(DB_KEY+user.name, JSON.stringify({user,cfg})); updUI(); }
-        
-        function login(){
-            const u=document.getElementById('l-user').value, p=document.getElementById('l-pass').value;
-            const d=localStorage.getItem(DB_KEY+u);
-            if(d){
-                const o=JSON.parse(d).user;
-                if(o.pass===p){ user=o; if(JSON.parse(d).cfg)cfg={...cfg,...JSON.parse(d).cfg}; localStorage.setItem(LAST_KEY,u); location.reload(); }
-                else notify("Contraseña incorrecta", "error");
-            } else notify("Usuario no encontrado", "error");
-        }
-        function register(){
-            const u=document.getElementById('l-user').value, p=document.getElementById('l-pass').value;
-            if(!u||!p)return notify("Datos incompletos", "error");
-            if(localStorage.getItem(DB_KEY+u)) return notify("Usuario ya existe", "error");
-            user={name:u, pass:p, xp:0, lvl:1, songs:[], scores:{}, pp:0, plays:0, score:0, avatar:null, bg:null};
-            localStorage.setItem(LAST_KEY,u); save(); location.reload();
-        }
+        function login(){ const u=document.getElementById('l-user').value,p=document.getElementById('l-pass').value; const d=localStorage.getItem(DB_KEY+u); if(d){const o=JSON.parse(d).user;if(o.pass===p){user=o;if(JSON.parse(d).cfg)cfg={...cfg,...JSON.parse(d).cfg};localStorage.setItem(LAST_KEY,u);location.reload();}else notify("Pass Error","error");}else notify("User 404","error"); }
+        function register(){ const u=document.getElementById('l-user').value,p=document.getElementById('l-pass').value; if(!u||!p)return notify("Datos?","error"); if(localStorage.getItem(DB_KEY+u))return notify("Existe","error"); user={name:u,pass:p,xp:0,lvl:1,songs:[],scores:{},pp:0,plays:0,score:0,avatar:null,bg:null}; localStorage.setItem(LAST_KEY,u); save(); location.reload(); }
         function logout(){ localStorage.removeItem(LAST_KEY); location.reload(); }
+
+        /* === FIREBASE RANKING === */
+        function openLeaderboard() {
+            if(db) {
+                db.collection("leaderboard").orderBy("pp", "desc").limit(50)
+                .onSnapshot((querySnapshot) => {
+                    const l = document.getElementById('rank-list'); l.innerHTML=''; 
+                    let i = 1;
+                    querySnapshot.forEach((doc) => {
+                        const d = doc.data();
+                        const tr = document.createElement('tr');
+                        if(d.name===user.name) tr.className='rank-row-me';
+                        tr.innerHTML = `<td>#${i++}</td><td>${d.name}</td><td style="color:var(--blue)">${d.pp}pp</td>`;
+                        l.appendChild(tr);
+                    });
+                });
+                openModal('rank');
+            } else {
+                notify("Firebase no configurado. Mostrando local.", "error");
+                const l = document.getElementById('rank-list'); l.innerHTML=''; 
+                const all = [...BOTS, {n:user.name, p:user.pp}];
+                all.sort((a,b)=>b.p - a.p);
+                all.forEach((p,i)=>{
+                    const tr = document.createElement('tr');
+                    if(p.n===user.name) tr.className='rank-row-me';
+                    tr.innerHTML = `<td>#${i+1}</td><td>${p.n}</td><td style="color:var(--blue)">${p.p}pp</td>`;
+                    l.appendChild(tr);
+                });
+                openModal('rank');
+            }
+        }
+
+        function updateFirebaseScore() {
+            if(db && user.name !== "Guest") {
+                db.collection("leaderboard").doc(user.name).set({
+                    name: user.name,
+                    pp: user.pp,
+                    score: user.score,
+                    lvl: user.lvl
+                }, { merge: true });
+            }
+        }
 
         function updUI(){
             document.getElementById('m-name').innerText=user.name;
@@ -807,26 +834,16 @@
             document.getElementById('h-pp').innerText=user.pp;
             document.getElementById('p-score').innerText=user.score.toLocaleString();
             document.getElementById('p-plays').innerText=user.plays;
-            
-            // XP LOGIC
             document.getElementById('m-rank').innerText = "LVL " + user.lvl;
             document.getElementById('p-lvl-txt').innerText = "LVL " + user.lvl;
             const targetXP = user.lvl * 1000;
             const pct = Math.min(100, (user.xp / targetXP) * 100);
             document.getElementById('p-xp-bar').style.width = pct + "%";
             document.getElementById('p-xp-txt').innerText = `${user.xp} / ${targetXP} XP`;
-
-            const list = [...BOTS, {n:user.name, p:user.pp}].sort((a,b)=>b.p-a.p);
-            const rank = list.findIndex(x=>x.n===user.name) + 1;
-            document.getElementById('p-global-rank').innerText = "#" + rank;
-
-            if(user.avatar){
-                const u=`url(${user.avatar})`;
-                document.getElementById('m-av').style.backgroundImage=u; document.getElementById('m-av').innerText="";
-                document.getElementById('p-av-big').style.backgroundImage=u;
-                document.getElementById('ig-av').style.backgroundImage=u;
-            }
-            if(user.bg){ document.getElementById('bg-image').src=user.bg; document.getElementById('bg-image').style.opacity=0.3; }
+            document.getElementById('p-global-rank').innerText = "#--";
+            
+            if(user.avatar) { document.getElementById('m-av').style.backgroundImage=`url(${user.avatar})`; document.getElementById('m-av').innerText=""; document.getElementById('p-av-big').style.backgroundImage=`url(${user.avatar})`; document.getElementById('ig-av').style.backgroundImage=`url(${user.avatar})`; }
+            if(user.bg) { document.getElementById('bg-image').src=user.bg; document.getElementById('bg-image').style.opacity=0.3; }
 
             document.getElementById('set-spd').value=cfg.spd;
             document.getElementById('set-den').value=cfg.den;
@@ -834,10 +851,7 @@
             document.getElementById('set-hvol').value=cfg.hvol*100;
             document.getElementById('set-down').checked=cfg.down;
             document.getElementById('set-vivid').checked=cfg.vivid;
-            
-            const shakeEl = document.getElementById('set-shake');
-            if(shakeEl) shakeEl.checked=cfg.shake;
-            
+            const shakeEl = document.getElementById('set-shake'); if(shakeEl) shakeEl.checked=cfg.shake;
             document.getElementById('set-off').value=cfg.off;
             document.getElementById('set-track-op').value=cfg.trackOp;
             document.getElementById('set-judge-y').value=cfg.judgeY;
@@ -846,512 +860,216 @@
             document.getElementById('set-judge-vis').checked=cfg.judgeVis;
         }
 
-        /* === AUDIO === */
-        function unlockAudio(){
-            if(!st.ctx){ st.ctx=new(window.AudioContext||window.webkitAudioContext)(); genHit(); }
-            if(st.ctx.state==='suspended') st.ctx.resume();
-        }
-        function genHit(){ 
-            const b=st.ctx.createBuffer(1,2000,44100),d=b.getChannelData(0); 
-            for(let i=0;i<d.length;i++)d[i]=Math.sin(i*0.5)*Math.exp(-i/300); 
-            hitBuf=b; 
-        }
-        function playHit(){ 
-            if(hitBuf&&cfg.hvol>0&&st.ctx){ 
-                const s=st.ctx.createBufferSource(); s.buffer=hitBuf; const g=st.ctx.createGain(); g.gain.value=cfg.hvol; s.connect(g); g.connect(st.ctx.destination); s.start(0); 
-            } 
-        }
-        function playHover(){ 
-            if(st.ctx && cfg.hvol>0 && st.ctx.state==='running') {
-                const o=st.ctx.createOscillator(); const g=st.ctx.createGain();
-                o.frequency.value=600; g.gain.value=0.05;
-                o.connect(g); g.connect(st.ctx.destination);
-                o.start(); o.stop(st.ctx.currentTime+0.05);
-            }
-        }
+        /* === AUDIO & ENGINE === */
+        function unlockAudio(){ if(!st.ctx){ st.ctx=new(window.AudioContext||window.webkitAudioContext)(); genHit(); } if(st.ctx.state==='suspended') st.ctx.resume(); }
+        function genHit(){ const b=st.ctx.createBuffer(1,2000,44100),d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.sin(i*0.5)*Math.exp(-i/300); hitBuf=b; }
+        function playHit(){ if(hitBuf&&cfg.hvol>0&&st.ctx){ const s=st.ctx.createBufferSource(); s.buffer=hitBuf; const g=st.ctx.createGain(); g.gain.value=cfg.hvol; s.connect(g); g.connect(st.ctx.destination); s.start(0); } }
+        function playHover(){ if(st.ctx && cfg.hvol>0 && st.ctx.state==='running') { const o=st.ctx.createOscillator(); const g=st.ctx.createGain(); o.frequency.value=600; g.gain.value=0.05; o.connect(g); g.connect(st.ctx.destination); o.start(); o.stop(st.ctx.currentTime+0.05); } }
 
-        /* === MAP GEN === */
         function genMap(buf, k) {
             const d = buf.getChannelData(0); const map=[]; const step = Math.floor(buf.sampleRate/60);
             let sumVol=0; let count=0; for(let i=0;i<d.length;i+=step){ sumVol+=Math.abs(d[i]); count++; }
-            const avgVol = sumVol/count; 
-            const th = avgVol * (2.8 - (cfg.den * 0.15)); 
-            const minGap = 600 - (cfg.den * 50);
+            const avgVol = sumVol/count; const th = avgVol * (2.8 - (cfg.den * 0.15)); const minGap = 600 - (cfg.den * 50);
             let lastT=-1000; let lastL=0; let stair=0;
-
             for(let i=0; i<d.length; i+=step) {
                 let s=0; for(let j=0; j<step && i+j<d.length; j++) s+=d[i+j]**2;
                 const rms = Math.sqrt(s/step);
-
                 if(rms > th && rms > 0.01) {
                     const t = (i/buf.sampleRate)*1000;
                     if(t-lastT > minGap) {
                         let l=0, type='tap', len=0;
                         if(cfg.den>=4 && rms>avgVol*1.5) { if(stair<=0) stair=4; } else stair=0;
-                        if(stair>0) { l=(lastL+1)%k; stair--; } 
-                        else { l=Math.floor(Math.random()*k); if(l===lastL && Math.random()>0.3) l=(l+1)%k; }
+                        if(stair>0) { l=(lastL+1)%k; stair--; } else { l=Math.floor(Math.random()*k); if(l===lastL && Math.random()>0.3) l=(l+1)%k; }
                         if(rms > th*1.3 && Math.random()>0.5) { type='hold'; len=Math.random()*300+100; }
                         map.push({t:t, l:l, type:type, len:len, h:false});
                         if(cfg.den>=7 && rms>avgVol*3.0 && stair===0) { map.push({t:t, l:(l+2)%k, type:'tap', len:0, h:false}); }
                         lastT=t; lastL=l;
                     }
                 }
-            }
-            return map;
+            } return map;
         }
 
-        /* === GAMEPLAY === */
         function initReceptors(k) {
-            const t = document.getElementById('track'); t.innerHTML = '';
-            document.documentElement.style.setProperty('--lane-width', (100/k)+'%');
-            for(let i=0; i<k; i++){ 
-                const l = document.createElement('div'); l.className = 'lane-flash'; l.id=`flash-${i}`; l.style.left = (i*(100/k))+'%'; 
-                l.style.setProperty('--c', cfg.modes[k][i].c);
-                t.appendChild(l); 
-            }
+            const t = document.getElementById('track'); t.innerHTML = ''; document.documentElement.style.setProperty('--lane-width', (100/k)+'%');
+            for(let i=0; i<k; i++){ const l = document.createElement('div'); l.className = 'lane-flash'; l.id=`flash-${i}`; l.style.left = (i*(100/k))+'%'; l.style.setProperty('--c', cfg.modes[k][i].c); t.appendChild(l); }
             const y = cfg.down ? window.innerHeight - 140 : 80;
-            
             for(let i=0;i<k;i++){
-                const conf = cfg.modes[k][i]; 
-                const r=document.createElement('div'); r.className=`arrow-wrapper receptor`; r.id=`rec-${i}`;
-                r.style.left=(i*(100/k))+'%'; r.style.top=y+'px';
-                r.style.setProperty('--active-c', conf.c);
-                
-                const shapePath = PATHS[conf.s] || PATHS['circle'];
-                r.innerHTML=`<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shapePath}"/></svg>`;
-                t.appendChild(r);
+                const conf = cfg.modes[k][i]; const r=document.createElement('div'); r.className=`arrow-wrapper receptor`; r.id=`rec-${i}`;
+                r.style.left=(i*(100/k))+'%'; r.style.top=y+'px'; r.style.setProperty('--active-c', conf.c);
+                const shapePath = PATHS[conf.s] || PATHS['circle']; r.innerHTML=`<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shapePath}"/></svg>`; t.appendChild(r);
             }
         }
 
         function playSong(name) {
-            unlockAudio();
-            const s = ramSongs.find(x=>x.id===name);
-            if(!s) return notify("Error: Canción no encontrada en RAM", "error");
-            curIdx = name;
+            unlockAudio(); const s = ramSongs.find(x=>x.id===name); if(!s) return notify("Error RAM", "error"); curIdx = name;
             
-            st.notes = JSON.parse(JSON.stringify(s.map));
-            st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; 
-            st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0;
-            st.ranked = document.getElementById('chk-ranked').checked;
-
-            // MULTIPLAYER CHECK
-            isMultiplayer = (conn && conn.open);
-            opponentScore = 0;
-            if(isMultiplayer) {
-                // RESET UI
-                document.getElementById('vs-hud').style.display = 'flex';
-                document.getElementById('p1-name').innerText = user.name;
-                document.getElementById('p1-score').innerText = "0";
-                document.getElementById('p2-score').innerText = "0";
-            } else {
-                document.getElementById('vs-hud').style.display = 'none';
-            }
-
-            document.getElementById('menu-container').classList.add('hidden');
-            document.getElementById('game-layer').style.display='block';
-            document.getElementById('hud').style.display='flex';
+            // CLEAN PREVIOUS STATE
+            document.getElementById('track').innerHTML = ''; 
+            
+            st.notes = JSON.parse(JSON.stringify(s.map)); st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
+            isMultiplayer = (conn && conn.open); opponentScore = 0;
+            if(isMultiplayer) { document.getElementById('vs-hud').style.display = 'flex'; document.getElementById('p1-name').innerText = user.name; document.getElementById('p1-score').innerText = "0"; document.getElementById('p2-score').innerText = "0"; } else { document.getElementById('vs-hud').style.display = 'none'; }
+            document.getElementById('menu-container').classList.add('hidden'); document.getElementById('game-layer').style.display='block'; document.getElementById('hud').style.display='flex';
             
             initReceptors(keys); updHUD();
-
+            
             const cd=document.getElementById('countdown'); let c=3; cd.innerHTML=c;
-            const iv=setInterval(async()=>{
-                if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
-                
-                c--; if(c>0)cd.innerHTML=c;
-                else {
-                    clearInterval(iv); cd.innerHTML="";
-                    
-                    st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf;
-                    const gain = st.ctx.createGain(); gain.gain.value=cfg.vol;
-                    st.src.connect(gain); gain.connect(st.ctx.destination);
-                    
-                    st.startTime = performance.now() + 50; 
-                    st.t0 = st.ctx.currentTime + 0.05; 
-                    
-                    st.src.start(st.t0); 
-                    st.src.onended=()=>end(false);
-                    st.act=true; st.paused=false;
-                    loop();
-                }
-            },600);
+            const iv=setInterval(async()=>{ if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume(); c--; if(c>0)cd.innerHTML=c; else { clearInterval(iv); cd.innerHTML=""; st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf; const gain = st.ctx.createGain(); gain.gain.value=cfg.vol; st.src.connect(gain); gain.connect(st.ctx.destination); st.startTime = performance.now() + 50; st.t0 = st.ctx.currentTime + 0.05; st.src.start(st.t0); st.src.onended=()=>end(false); st.act=true; st.paused=false; loop(); } },600);
         }
 
         function loop(){
             if(!st.act || st.paused) return;
+            let now; const audioTime = (st.ctx.currentTime - st.t0) * 1000; const visTime = performance.now() - st.startTime;
+            if (st.ctx.state === 'running' && audioTime > 0) now = audioTime; else now = visTime;
+            const yReceptor = cfg.down ? window.innerHeight - 140 : 80; const w = 100/keys;
             
-            let now;
-            const audioTime = (st.ctx.currentTime - st.t0) * 1000;
-            const visTime = performance.now() - st.startTime;
-
-            if (st.ctx.state === 'running' && audioTime > 0) {
-                now = audioTime;
-            } else {
-                now = visTime;
-            }
-
-            const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
-            const w = 100/keys;
-
+            // SPAWN
             for(let i=0; i<st.notes.length; i++) {
-                const n = st.notes[i]; if(n.s) continue;
-                if(n.t < now-200) { n.s=true; continue; } 
-                
+                const n = st.notes[i]; if(n.s) continue; if(n.t < now-200) { n.s=true; continue; }
                 if(n.t - now < 1500) {
-                    const el = document.createElement('div'); el.className = `arrow-wrapper ${n.type==='hold'?'hold-note':''}`;
+                    const el = document.createElement('div');
+                    const dirClass = cfg.down ? 'hold-down' : 'hold-up';
+                    el.className = `arrow-wrapper ${n.type==='hold'?'hold-note '+dirClass:''}`; 
                     el.style.left = (n.l*w)+'%'; el.style.width = w+'%'; el.style.zIndex = 150;
-                    const conf = cfg.modes[keys][n.l];
                     
-                    const shapePath = PATHS[conf.s] || PATHS['circle'];
+                    const conf = cfg.modes[keys][n.l]; const shapePath = PATHS[conf.s] || PATHS['circle'];
                     let svg = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shapePath}" fill="${conf.c}" stroke="white" stroke-width="2"/></svg>`;
                     
                     if(n.type==='hold') { 
                         const h = (n.len/1000)*cfg.spd*60; 
-                        let sty = `height:${h}px; background:${conf.c};`;
-                        if(cfg.down) { sty += `bottom:50%; transform-origin:bottom center;`; }
-                        else { sty += `top:50%; transform-origin:top center;`; }
-                        svg += `<div class="sustain-trail" style="${sty}"></div>`;
+                        svg += `<div class="sustain-trail" style="height:${h}px; background:${conf.c};"></div>`; 
                     }
-                    el.innerHTML = svg;
-                    if(cfg.vivid) el.querySelector('.arrow-path').style.filter=`drop-shadow(0 0 8px ${conf.c})`;
-                    document.getElementById('track').appendChild(el); 
-                    n.el = el; st.spawned.push(n); n.s = true;
-                } else break; 
+                    el.innerHTML = svg; if(cfg.vivid) el.querySelector('.arrow-path').style.filter=`drop-shadow(0 0 8px ${conf.c})`;
+                    document.getElementById('track').appendChild(el); n.el = el; st.spawned.push(n); n.s = true;
+                } else break;
             }
 
+            // MOVE
             for(let i=st.spawned.length-1; i>=0; i--) {
                 const n = st.spawned[i]; 
-                const diff = n.t - now + cfg.off;
+                if(!n.el) { st.spawned.splice(i,1); continue; } 
+
+                const diff = n.t - now + cfg.off; 
                 const dist = (diff / 1000) * cfg.spd * 60; 
                 let finalY = cfg.down ? (yReceptor - dist) : (yReceptor + dist);
-
+                
                 if(n.h && n.type==='hold') {
-                    n.el.style.top = yReceptor+'px'; n.el.style.opacity=0.8;
-                    const rem = (n.t + n.len) - now;
-                    if(rem <= 0) { if(n.el) n.el.remove(); st.spawned.splice(i,1); continue; }
-                    const tr = n.el.querySelector('.sustain-trail');
-                    if(tr) tr.style.height = Math.max(0, (rem/1000)*cfg.spd*60)+'px';
+                    n.el.style.top = yReceptor+'px'; n.el.style.opacity=0.8; const rem = (n.t + n.len) - now;
+                    if(rem <= 0) { n.el.remove(); st.spawned.splice(i,1); continue; }
+                    const tr = n.el.querySelector('.sustain-trail'); if(tr) tr.style.height = Math.max(0, (rem/1000)*cfg.spd*60)+'px';
                     if(st.keys[n.l]) { st.hp = Math.min(100, st.hp+0.1); updHUD(); } else n.el.style.opacity=0.3;
-                } 
-                else if(!n.h) {
-                    n.el.style.top = finalY + 'px';
+                } else if(!n.h) {
+                    n.el.style.top = finalY + 'px'; 
                     if(diff < -160) { miss(n); n.h=true; n.el.style.opacity=0.4; setTimeout(()=>{if(n.el)n.el.remove()},200); st.spawned.splice(i,1); }
-                } else { if(n.el) n.el.remove(); st.spawned.splice(i,1); }
-            }
+                } else { n.el.remove(); st.spawned.splice(i,1); }
+            } 
             requestAnimationFrame(loop);
         }
 
-        /* === INPUT === */
+        // FIXED KEYBOARD LISTENER
         function onKd(e) { 
-            if(e.key==="Escape"){togglePause();return;}
-            if(remapMode!==null){ cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); renderLaneConfig(remapMode); remapMode=null; return; }
-            if(!e.repeat) {
-                const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-                if(idx !== -1) hit(idx, true);
-            }
+            if(e.key==="Escape"){togglePause();return;} 
+            // PREVENT DEFAULT KEYS
+            if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
+
+            if(remapMode!==null){ 
+                // ASSIGN KEY
+                cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
+                renderLaneConfig(remapMode); 
+                remapMode=null; 
+                return; 
+            } 
+            if(!e.repeat) { 
+                const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); 
+                if(idx !== -1) hit(idx, true); 
+            } 
         }
-        function onKu(e) { 
-            const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-            if(idx !== -1) hit(idx, false); 
-        }
+        function onKu(e) { const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); if(idx !== -1) hit(idx, false); }
 
         function hit(l, p) {
             if(!st.act || st.paused) return;
-            const r = document.getElementById(`rec-${l}`); 
-            const flash = document.getElementById(`flash-${l}`);
+            const r = document.getElementById(`rec-${l}`); const flash = document.getElementById(`flash-${l}`);
             if(p) {
-                st.keys[l] = 1; 
-                if(r) r.classList.add('pressed'); 
-                if(flash) { flash.style.opacity = 0.6; setTimeout(() => flash.style.opacity = 0, 100); }
-                
-                const audioTime = (st.ctx.currentTime - st.t0) * 1000;
-                const visTime = performance.now() - st.startTime;
-                const now = (st.ctx.state === 'running' && audioTime > 0) ? audioTime : visTime;
-
+                st.keys[l] = 1; if(r) r.classList.add('pressed'); if(flash) { flash.style.opacity = 0.6; setTimeout(() => flash.style.opacity = 0, 100); }
+                const audioTime = (st.ctx.currentTime - st.t0) * 1000; const visTime = performance.now() - st.startTime; const now = (st.ctx.state === 'running' && audioTime > 0) ? audioTime : visTime;
                 const n = st.spawned.find(x => x.l===l && !x.h && Math.abs(x.t-(now+cfg.off))<160);
                 if(n) {
-                    const d = Math.abs(n.t-(now+cfg.off)); 
-                    let t="BAD", c="yellow", pts=50;
+                    const d = Math.abs(n.t-(now+cfg.off)); let t="BAD", c="yellow", pts=50;
                     if(d<45) { t="SICK"; c="var(--sick)"; pts=350; st.stats.s++; if(cfg.shake) triggerShake(); if(cfg.vivid) createSplash(l); playHit(); }
                     else if(d<90) { t="GOOD"; c="var(--good)"; pts=200; st.stats.g++; playHit(); }
                     else { st.stats.b++; st.cmb=0; st.hp-=5; }
-                    
                     if(pts>50) st.cmb++; st.sc+=pts; st.maxScorePossible+=350; st.hp = Math.min(100, st.hp+2);
-                    showJudge(t, c); updHUD();
-                    
-                    n.h = true; 
-                    if(n.len<=0 && n.el) n.el.style.display='none'; 
+                    showJudge(t, c); updHUD(); n.h = true; if(n.len<=0 && n.el) n.el.style.display='none'; 
                 } else if(!cfg.down) { st.sc-=10; st.cmb=0; st.hp-=2; updHUD(); }
-            } else { 
-                st.keys[l] = 0; if(r) r.classList.remove('pressed'); 
-            }
+            } else { st.keys[l] = 0; if(r) r.classList.remove('pressed'); }
         }
 
         function miss(n) { showJudge("MISS", "var(--miss)"); st.stats.m++; st.cmb=0; st.hp-=10; st.maxScorePossible+=350; updHUD(); if(st.hp<=0)end(true); }
-
-        function triggerShake() {
-            const w = document.getElementById('game-layer'); 
-            w.classList.remove('shaking'); void w.offsetWidth; w.classList.add('shaking');
-        }
-
-        function createSplash(l) {
-            const r=document.getElementById(`rec-${l}`).getBoundingClientRect();
-            const s=document.createElement('div'); s.className='splash'; 
-            s.style.color = cfg.modes[keys][l].c;
-            s.style.left=(r.left + r.width/2 - 80)+'px'; s.style.top=(r.top + r.height/2 - 80)+'px';
-            document.body.appendChild(s); setTimeout(()=>s.remove(),300);
-        }
-        function showJudge(t,c){
-            if(!cfg.judgeVis) return;
-            const j=document.createElement('div'); j.className='judge-pop'; j.innerText=t; j.style.color=c;
-            document.body.appendChild(j); setTimeout(()=>j.remove(),400);
-        }
+        function triggerShake() { const w = document.getElementById('game-layer'); w.classList.remove('shaking'); void w.offsetWidth; w.classList.add('shaking'); }
+        function createSplash(l) { const r=document.getElementById(`rec-${l}`).getBoundingClientRect(); const s=document.createElement('div'); s.className='splash'; s.style.color = cfg.modes[keys][l].c; s.style.left=(r.left + r.width/2 - 80)+'px'; s.style.top=(r.top + r.height/2 - 80)+'px'; document.body.appendChild(s); setTimeout(()=>s.remove(),300); }
+        function showJudge(t,c){ if(!cfg.judgeVis) return; const j=document.createElement('div'); j.className='judge-pop'; j.innerText=t; j.style.color=c; document.body.appendChild(j); setTimeout(()=>j.remove(),400); }
 
         function updHUD(){
             document.getElementById('g-score').innerText=st.sc.toLocaleString();
-            if(isMultiplayer) {
-                document.getElementById('p1-score').innerText = st.sc.toLocaleString();
-                // Send score to opponent
-                conn.send({ type: 'score', val: st.sc });
-            }
+            if(isMultiplayer) { document.getElementById('p1-score').innerText = st.sc.toLocaleString(); conn.send({ type: 'score', val: st.sc }); }
             document.getElementById('g-combo').innerText=st.cmb;
             const acc=st.maxScorePossible>0?Math.round((st.sc/st.maxScorePossible)*100):100;
             document.getElementById('g-acc').innerText=acc+"%";
             document.getElementById('health-fill').style.height=st.hp+"%";
-            document.getElementById('h-sick').innerText=st.stats.s;
-            document.getElementById('h-good').innerText=st.stats.g;
-            document.getElementById('h-bad').innerText=st.stats.b;
-            document.getElementById('h-miss').innerText=st.stats.m;
+            document.getElementById('h-sick').innerText=st.stats.s; document.getElementById('h-good').innerText=st.stats.g; document.getElementById('h-bad').innerText=st.stats.b; document.getElementById('h-miss').innerText=st.stats.m;
         }
 
-        function togglePause(){
-            if(!st.act)return;
-            st.paused=!st.paused;
-            if(st.paused){
-                if(st.ctx)st.ctx.suspend();
-                document.getElementById('modal-pause').style.display='flex';
-                document.getElementById('p-sick').innerText=st.stats.s;
-                document.getElementById('p-good').innerText=st.stats.g;
-                document.getElementById('p-bad').innerText=st.stats.b;
-                document.getElementById('p-miss').innerText=st.stats.m;
-            } else resumeGame();
-        }
+        function togglePause(){ if(!st.act)return; st.paused=!st.paused; if(st.paused){ if(st.ctx)st.ctx.suspend(); document.getElementById('modal-pause').style.display='flex'; document.getElementById('p-sick').innerText=st.stats.s; document.getElementById('p-good').innerText=st.stats.g; document.getElementById('p-bad').innerText=st.stats.b; document.getElementById('p-miss').innerText=st.stats.m; } else resumeGame(); }
         function resumeGame(){ document.getElementById('modal-pause').style.display='none'; if(st.ctx)st.ctx.resume(); st.paused=false; }
         
         function end(died){
             st.act=false; if(st.src)try{st.src.stop()}catch(e){}
             document.getElementById('game-layer').style.display='none'; document.getElementById('modal-res').style.display='flex';
             const acc=st.maxScorePossible>0?Math.round((st.sc/st.maxScorePossible)*100):0;
-            
             let r="F"; let c="red";
             if(!died){ 
-                if(acc===100){r="SS";c="cyan"}
-                else if(acc>=99){r="S+";c="cyan"} 
-                else if(acc>=98){r="S";c="gold"} 
-                else if(acc>=95){r="S-";c="gold"}
-                else if(acc>=90){r="A+";c="lime"}
-                else if(acc>=85){r="A";c="lime"}
-                else if(acc>=80){r="A-";c="lime"}
-                else if(acc>=75){r="B+";c="yellow"}
-                else if(acc>=70){r="B";c="yellow"}
-                else if(acc>=65){r="B-";c="yellow"}
-                else if(acc>=60){r="C+";c="orange"}
-                else if(acc>=50){r="C";c="orange"}
-                else if(acc>=40){r="C-";c="orange"}
-                else if(acc>=30){r="D+";c="red"}
-                else if(acc>=20){r="D";c="red"}
-                else if(acc>=10){r="D-";c="red"}
-                else {r="F";c="red"}
-            } else { r="F"; c="red"; }
-
-            if(st.sc === 0) { r="F"; c="red"; }
-
-            // 1v1 WINNER CHECK
-            if(isMultiplayer) {
-                const wMsg = document.getElementById('winner-msg');
-                wMsg.style.display = 'block';
-                if(st.sc > opponentScore) {
-                    wMsg.innerText = "¡GANASTE EL 1v1!";
-                    wMsg.style.color = "var(--sick)";
-                } else if (st.sc < opponentScore) {
-                    wMsg.innerText = "PERDISTE...";
-                    wMsg.style.color = "var(--miss)";
-                } else {
-                    wMsg.innerText = "EMPATE";
-                    wMsg.style.color = "white";
-                }
-            } else {
-                document.getElementById('winner-msg').style.display = 'none';
+                if(acc===100){r="SS";c="cyan"} else if(acc>=95){r="S";c="gold"} else if(acc>=90){r="A";c="lime"} else if(acc>=80){r="B";c="yellow"} else if(acc>=70){r="C";c="orange"} else {r="D";c="red"}
             }
+            if(isMultiplayer) {
+                const wMsg = document.getElementById('winner-msg'); wMsg.style.display = 'block';
+                if(st.sc > opponentScore) { wMsg.innerText = "¡GANASTE EL 1v1!"; wMsg.style.color = "var(--sick)"; }
+                else if (st.sc < opponentScore) { wMsg.innerText = "PERDISTE..."; wMsg.style.color = "var(--miss)"; }
+                else { wMsg.innerText = "EMPATE"; wMsg.style.color = "white"; }
+            } else { document.getElementById('winner-msg').style.display = 'none'; }
 
             document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
             document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
             
             if(!died && user.name!=="Guest"){ 
-                const xp = Math.floor(st.sc/500);
-                user.xp+=xp; user.score+=st.sc; user.plays++; 
+                const xp = Math.floor(st.sc/500); user.xp+=xp; user.score+=st.sc; user.plays++; 
                 if(user.xp >= user.lvl*1000) { user.xp -= user.lvl*1000; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!"); }
                 if(st.ranked) { user.pp += Math.floor(st.sc/5000); }
-                save();
+                save(); updateFirebaseScore(); // SYNC TO FIREBASE
                 document.getElementById('res-xp').innerText = xp;
             } else { document.getElementById('res-xp').innerText = 0; }
         }
         function toMenu() { location.reload(); }
-
-        /* === UTILS === */
-        function notify(msg, type="info") {
-            const area = document.getElementById('notification-area');
-            const n = document.createElement('div'); n.className = 'notify-msg'; n.innerText = msg;
-            n.style.borderLeftColor = type==="error" ? "#F9393F" : "#ff66aa";
-            if(type==="success") n.style.borderLeftColor = "#12FA05";
-            area.appendChild(n); setTimeout(()=>n.remove(), 3000);
-        }
-
-        async function handleAudio(i){
-            const b=document.getElementById('imp-txt'); 
-            b.innerText="PROCESANDO...";
-            if(i.files[0]){
-                unlockAudio(); const r=new FileReader();
-                r.onload=async e=>{
-                    try{
-                        const rawData = e.target.result;
-                        const bufferCopy = rawData.slice(0); 
-                        const buf=await st.ctx.decodeAudioData(rawData); 
-                        const n=i.files[0].name.replace(/\.[^/.]+$/,"");
-                        
-                        if(!user.songs.find(s=>s.id===n)){user.songs.push({id:n});save();}
-                        
-                        saveSongToDB(n, bufferCopy);
-                        
-                        const map = genMap(buf, 4);
-                        ramSongs=ramSongs.filter(s=>s.id!==n); ramSongs.push({id:n, buf:buf, map:map});
-                        renderMenu(); notify("Canción importada: "+n);
-                    }catch(e){notify("Error audio: " + e, "error"); console.log(e);}finally{
-                        b.innerText='📂 IMPORTAR MP3'; 
-                        i.value=""; 
-                    }
-                }; r.readAsArrayBuffer(i.files[0]);
-            } else {
-                b.innerText='📂 IMPORTAR MP3';
-            }
-        }
-        
-        async function loadHitSound(i){
-            if(i.files[0]){
-                const buf = await i.files[0].arrayBuffer();
-                hitBuf = await st.ctx.decodeAudioData(buf);
-                notify("Hit Sound Actualizado!");
-                i.value = ""; 
-            }
-        }
-
-        function renderMenu(f=""){
-            const g=document.getElementById('song-grid'); g.innerHTML='';
-            user.songs.forEach(s=>{
-                const id = s.id || s;
-                if(f&&!id.toLowerCase().includes(f.toLowerCase()))return;
-                const c=document.createElement('div'); c.className='beatmap-card';
-                const isLoaded = ramSongs.find(r=>r.id===id);
-                
-                c.innerHTML=`
-                    <div class="bc-bg" style="background-image:linear-gradient(135deg,hsl(${(id.length*40)%360},60%,20%),black)"></div>
-                    <div class="bc-info">
-                        <div class="bc-title">${id}</div>
-                        <div class="bc-meta">
-                            ${isLoaded ? '<span class="tag">READY</span>' : '<span class="tag warn">⚠️ CARGANDO DB...</span>'}
-                            <span class="tag keys">4K | 6K | 7K | 9K</span>
-                        </div>
-                    </div>`;
-                c.onclick=()=>{ 
-                    curSongId=id; 
-                    if(isLoaded) openModal('diff'); 
-                    else notify("Espera a que cargue la base de datos...", "error"); 
-                }; 
-                g.appendChild(c);
-            });
-        }
-        
+        function notify(msg, type="info") { const area = document.getElementById('notification-area'); const n = document.createElement('div'); n.className = 'notify-msg'; n.innerText = msg; n.style.borderLeftColor = type==="error" ? "#F9393F" : "#ff66aa"; if(type==="success") n.style.borderLeftColor = "#12FA05"; area.appendChild(n); setTimeout(()=>n.remove(), 3000); }
+        async function handleAudio(i){ const b=document.getElementById('imp-txt'); b.innerText="PROCESANDO..."; if(i.files[0]){ unlockAudio(); const r=new FileReader(); r.onload=async e=>{ try{ const rawData = e.target.result; const bufferCopy = rawData.slice(0); const buf=await st.ctx.decodeAudioData(rawData); const n=i.files[0].name.replace(/\.[^/.]+$/,""); if(!user.songs.find(s=>s.id===n)){user.songs.push({id:n});save();} saveSongToDB(n, bufferCopy); const map = genMap(buf, 4); ramSongs=ramSongs.filter(s=>s.id!==n); ramSongs.push({id:n, buf:buf, map:map}); renderMenu(); notify("Canción importada: "+n); }catch(e){notify("Error audio: " + e, "error"); console.log(e);}finally{ b.innerText='📂 IMPORTAR MP3'; i.value=""; } }; r.readAsArrayBuffer(i.files[0]); } else { b.innerText='📂 IMPORTAR MP3'; } }
+        async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound Actualizado!"); i.value = ""; } }
+        function renderMenu(f=""){ const g=document.getElementById('song-grid'); g.innerHTML=''; user.songs.forEach(s=>{ const id = s.id || s; if(f&&!id.toLowerCase().includes(f.toLowerCase()))return; const c=document.createElement('div'); c.className='beatmap-card'; const isLoaded = ramSongs.find(r=>r.id===id); c.innerHTML=`<div class="bc-bg" style="background-image:linear-gradient(135deg,hsl(${(id.length*40)%360},60%,20%),black)"></div><div class="bc-info"><div class="bc-title">${id}</div><div class="bc-meta">${isLoaded ? '<span class="tag">READY</span>' : '<span class="tag warn">⚠️ CARGANDO DB...</span>'}<span class="tag keys">4K | 6K | 7K | 9K</span></div></div>`; c.onclick=()=>{ curSongId=id; if(isLoaded) openModal('diff'); else notify("Espera a que cargue la base de datos...", "error"); }; g.appendChild(c); }); }
         function openModal(id){ document.getElementById('modal-'+id).style.display='flex'; if(id==='settings')renderLaneConfig(4); if(id==='profile'){document.getElementById('login-view').style.display=user.name==='Guest'?'block':'none';document.getElementById('profile-view').style.display=user.name==='Guest'?'none':'block';} }
         function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
-        
-        function startGame(k) {
-            keys = k; 
-            const s = ramSongs.find(x=>x.id===curSongId);
-            if(!s) return notify("Error RAM.", "error");
-            s.map = genMap(s.buf, k);
-            closeModal('diff');
-            playSong(curSongId);
-        }
-
-        function openLeaderboard() {
-            const l = document.getElementById('rank-list'); l.innerHTML=''; 
-            const all = [...BOTS, {n:user.name, p:user.pp}];
-            all.sort((a,b)=>b.p - a.p);
-            all.forEach((p,i)=>{
-                const tr = document.createElement('tr');
-                if(p.n===user.name) tr.className='rank-row-me';
-                tr.innerHTML = `<td>#${i+1}</td><td>${p.n}</td><td style="color:var(--blue)">${p.p}pp</td>`;
-                l.appendChild(tr);
-            });
-            openModal('rank');
-        }
-
-        function saveSettings(){
-            cfg.spd=document.getElementById('set-spd').value; cfg.den=document.getElementById('set-den').value;
-            cfg.vol=document.getElementById('set-vol').value/100; cfg.hvol=document.getElementById('set-hvol').value/100;
-            cfg.down=document.getElementById('set-down').checked; cfg.vivid=document.getElementById('set-vivid').checked;
-            
-            const shakeEl = document.getElementById('set-shake');
-            if(shakeEl) cfg.shake=shakeEl.checked;
-            
-            cfg.off=parseInt(document.getElementById('set-off').value);
-            cfg.trackOp=document.getElementById('set-track-op').value;
-            cfg.judgeY=document.getElementById('set-judge-y').value;
-            cfg.judgeX=document.getElementById('set-judge-x').value;
-            cfg.judgeS=document.getElementById('set-judge-s').value;
-            cfg.judgeVis=document.getElementById('set-judge-vis').checked;
-            applyCfg();
-            save(); 
-            document.getElementById('modal-settings').style.display='none';
-            notify("Ajustes guardados");
-        }
-        function applyCfg() {
-            document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100);
-            document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%');
-            document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%');
-            document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10);
-            document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0);
-        }
-
+        function startGame(k) { keys = k; const s = ramSongs.find(x=>x.id===curSongId); if(!s) return notify("Error RAM.", "error"); s.map = genMap(s.buf, k); closeModal('diff'); playSong(curSongId); }
+        function saveSettings(){ cfg.spd=document.getElementById('set-spd').value; cfg.den=document.getElementById('set-den').value; cfg.vol=document.getElementById('set-vol').value/100; cfg.hvol=document.getElementById('set-hvol').value/100; cfg.down=document.getElementById('set-down').checked; cfg.vivid=document.getElementById('set-vivid').checked; const shakeEl = document.getElementById('set-shake'); if(shakeEl) cfg.shake=shakeEl.checked; cfg.off=parseInt(document.getElementById('set-off').value); cfg.trackOp=document.getElementById('set-track-op').value; cfg.judgeY=document.getElementById('set-judge-y').value; cfg.judgeX=document.getElementById('set-judge-x').value; cfg.judgeS=document.getElementById('set-judge-s').value; cfg.judgeVis=document.getElementById('set-judge-vis').checked; applyCfg(); save(); document.getElementById('modal-settings').style.display='none'; notify("Ajustes guardados"); }
+        function applyCfg() { document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100); document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%'); document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%'); document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10); document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0); }
         function saveProfile(){ user.name=document.getElementById('l-user').value||"Guest"; save(); closeModal('profile'); }
         function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
         function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;save(); updUI();}; r.readAsDataURL(i.files[0]); i.value=""; }}
-
-        function renderLaneConfig(k){
-            document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); document.getElementById('tab-'+k).classList.add('active');
-            const c=document.getElementById('lanes-container'); c.innerHTML='';
-            for(let i=0; i<k; i++){
-                const l = cfg.modes[k][i];
-                const d=document.createElement('div'); d.className='l-col';
-                // AQUI CAMBIAMOS LA VISUALIZACION A SVG REAL
-                const shapePath = PATHS[l.s] || PATHS['circle'];
-                d.innerHTML=`
-                    <div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div>
-                    <div class="shape-indicator" onclick="cycleShape(${k},${i})">
-                        <svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg>
-                    </div>
-                    <input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">
-                `;
-                c.appendChild(d);
-            }
+        function renderLaneConfig(k){ document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); document.getElementById('tab-'+k).classList.add('active'); const c=document.getElementById('lanes-container'); c.innerHTML=''; for(let i=0; i<k; i++){ const l = cfg.modes[k][i]; const d=document.createElement('div'); d.className='l-col'; const shapePath = PATHS[l.s] || PATHS['circle']; d.innerHTML=`<div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; c.appendChild(d); } }
+        function remapKey(k,i){ 
+            if(document.activeElement) document.activeElement.blur(); // FORCE FOCUS LOSS FROM INPUTS
+            remapMode=k; 
+            remapIdx=i; 
+            renderLaneConfig(k); 
         }
-        function remapKey(k,i){ remapMode=k; remapIdx=i; renderLaneConfig(k); }
         function updateLaneColor(k,i,v){ cfg.modes[k][i].c=v; }
-        function cycleShape(k,i){ 
-            const shapes=['circle','arrow','square','diamond']; 
-            const cur=shapes.indexOf(cfg.modes[k][i].s);
-            cfg.modes[k][i].s = shapes[(cur+1)%4];
-            renderLaneConfig(k);
-        }
+        function cycleShape(k,i){ const shapes=['circle','arrow','square','diamond']; const cur=shapes.indexOf(cfg.modes[k][i].s); cfg.modes[k][i].s = shapes[(cur+1)%4]; renderLaneConfig(k); }
     </script>
 </body>
 </html>
