@@ -168,9 +168,12 @@
 
         .friend-list { max-height: 400px; overflow-y: auto; text-align: left; }
         .friend-row { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: #151515; margin-bottom: 10px; border-radius: 10px; border: 1px solid #333; }
-        .btn-small { padding: 8px 15px; border-radius: 6px; border: none; font-weight: 900; cursor: pointer; font-size: 0.8rem; }
+        .btn-small { padding: 8px 15px; border-radius: 6px; border: none; font-weight: 900; cursor: pointer; font-size: 0.8rem; margin-left:5px; }
         .btn-acc { background: var(--good); color: black; }
         .btn-add { background: var(--blue); color: black; }
+        .btn-chat { background: var(--gold); color: black; }
+        .friend-status { width:10px; height:10px; border-radius:50%; background:#444; margin-right:8px; display:inline-block; }
+        .friend-status.online { background:#12FA05; box-shadow:0 0 5px #12FA05; }
         
         /* LOBBY UI */
         .lobby-box { background: #111; padding: 20px; border-radius: 10px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -308,11 +311,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.76 (PERSISTENT CHAT)</div>
+                <div class="patch-ver">VERSION 0.77 (ULTIMATE SOCIAL)</div>
                 <ul>
-                    <li><b>CHAT GLOBAL:</b> El chat ahora es permanente en la sala de espera.</li>
-                    <li><b>SOCIAL FIX:</b> Arreglado el problema de usuarios desconectados.</li>
-                    <li><b>ESTABILIDAD:</b> Mejorada la sincronización online.</li>
+                    <li><b>ESTADO ONLINE REAL:</b> Indicadores verdes/grises en la lista de amigos.</li>
+                    <li><b>CHAT DIRECTO:</b> Botón de chat dedicado en la lista de amigos.</li>
+                    <li><b>RANKED PENALTY:</b> Si sacas menos del 50% en ranked, pierdes 15pp.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -320,7 +323,7 @@
     </div>
 
     <div id="modal-friends" class="modal-overlay">
-        <div class="modal-panel" style="width:600px;">
+        <div class="modal-panel" style="width:650px;">
             <div class="m-title">SOCIAL HUB</div>
             <div style="display:flex; gap:10px; margin-bottom:20px;">
                 <input type="text" id="friend-inp" class="log-inp" placeholder="Nombre de usuario..." style="margin:0;">
@@ -336,46 +339,32 @@
 
     <div id="modal-online" class="modal-overlay">
         <div class="modal-panel" style="width:700px;">
-            <div class="m-title">ONLINE 1v1 LOBBY</div>
+            <div class="m-title">ONLINE LOBBY</div>
             
-            <div id="online-connect-view">
-                <div style="text-align:center; margin-bottom:20px;">
-                    <div style="color:#aaa; margin-bottom:5px;">TU CÓDIGO DE AMIGO:</div>
-                    <div id="my-peer-id" style="font-size:1.5rem; font-weight:900; color:var(--blue); user-select:text; background:#222; padding:10px; border-radius:8px; cursor:pointer;" onclick="copyID()">CARGANDO...</div>
+            <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
+            
+            <div class="lobby-box">
+                <div class="lobby-slot">
+                    <div class="slot-title">TU ELECCIÓN</div>
+                    <div class="slot-song" id="my-pick-name">...</div>
+                    <div class="slot-status" id="my-pick-status">Esperando selección...</div>
+                    <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
+                    <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
                 </div>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="friend-id-inp" class="log-inp" placeholder="Pega el código de tu amigo aquí" style="margin:0;">
-                    <button class="btn-small btn-add" style="font-size:1rem;" onclick="connectToPeer()">CONECTAR</button>
+                <div class="lobby-slot">
+                    <div class="slot-title">ELECCIÓN RIVAL</div>
+                    <div class="slot-song" id="opp-pick-name">...</div>
+                    <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
                 </div>
             </div>
 
-            <div id="online-lobby-view" style="display:none; margin-top:20px;">
-                <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
-                
-                <div class="lobby-box">
-                    <div class="lobby-slot">
-                        <div class="slot-title">TU ELECCIÓN</div>
-                        <div class="slot-song" id="my-pick-name">...</div>
-                        <div class="slot-status" id="my-pick-status">Esperando selección...</div>
-                        <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
-                        <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
-                    </div>
-                    <div class="lobby-slot">
-                        <div class="slot-title">ELECCIÓN RIVAL</div>
-                        <div class="slot-song" id="opp-pick-name">...</div>
-                        <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
-                    </div>
-                </div>
-
-                <div id="chat-box"></div>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
-                    <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
-                </div>
-
-                <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
+            <div id="chat-box"></div>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
+                <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
             </div>
 
+            <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
             <button class="action secondary" onclick="closeModal('online')" style="margin-top:20px;">SALIR</button>
         </div>
     </div>
@@ -515,26 +504,32 @@
             <div id="winner-msg" style="font-size:2rem; font-weight:900; color:var(--sick); margin-bottom:20px; display:none;">¡GANASTE EL 1v1!</div>
             <div style="font-size:4rem; font-weight:900;" id="res-score">0</div>
             <div style="color:#aaa; font-size:1.5rem;">ACCURACY: <span id="res-acc" style="color:white; font-weight:bold;">100%</span></div>
-            <div style="color:var(--gold); font-weight:bold; margin-top:15px; font-size:1.2rem;">+<span id="res-xp">0</span> XP</div>
+            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px; font-size:1.2rem;">+0 PP</div>
+            <div style="color:var(--blue); font-weight:bold; font-size:1rem; margin-top:5px;">+<span id="res-xp">0</span> XP</div>
             <button class="action" onclick="toMenu()">VOLVER</button>
         </div>
     </div>
 
     <script>
+        // --- PEGA TU CONFIGURACIÓN DE FIREBASE AQUÍ ---
         const firebaseConfig = {
-            apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
-            authDomain: "a-notes-game.firebaseapp.com",
-            projectId: "a-notes-game",
-            storageBucket: "a-notes-game.firebasestorage.app",
-            messagingSenderId: "149492857447",
-            appId: "1:149492857447:web:584610d0958419fea7f2c2"
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROYECTO.firebaseapp.com",
+            projectId: "TU_PROYECTO",
+            storageBucket: "TU_PROYECTO.appspot.com",
+            messagingSenderId: "NUMERO",
+            appId: "TU_APP_ID"
         };
+        // ----------------------------------------------
 
+        // INIT FIREBASE
         let db = null;
         try {
-            firebase.initializeApp(firebaseConfig);
-            db = firebase.firestore();
-            console.log("Firebase Conectado");
+            if(firebaseConfig.apiKey !== "TU_API_KEY") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                console.log("Firebase Conectado");
+            }
         } catch(e) { console.error("Error Firebase:", e); }
 
         const DB_KEY="omega_u_"; const LAST_KEY="omega_last"; const DB_NAME = "OmegaDB"; const DB_STORE = "songs";
@@ -577,7 +572,7 @@
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
             
-            // HEARTBEAT TO KEEP ONLINE STATUS ACTIVE
+            // PRESENCE SYSTEM (HEARTBEAT)
             setInterval(() => {
                 if(user.name !== "Guest" && db) {
                     db.collection("users").doc(user.name).update({
@@ -585,12 +580,23 @@
                         online: true
                     });
                 }
-            }, 30000); // 30 seconds
+            }, 30000); 
         };
+
+        // OFFLINE TRIGGER
+        window.addEventListener('beforeunload', () => {
+            if(user.name !== "Guest" && db) {
+                // Best effort update
+                navigator.sendBeacon && console.log("Closing..."); 
+                // Note: Firestore doesn't support sync disconnect hook like Realtime DB, but this helps on clean exit
+                db.collection("users").doc(user.name).update({ online: false });
+            }
+        });
+
         window.addEventListener('keydown', onKd); 
         window.addEventListener('keyup', onKu);
 
-        /* === ONLINE SYSTEM (PEERJS + FIREBASE) === */
+        /* === ONLINE SYSTEM === */
         function initOnline() {
             peer = new Peer(null, { secure: true }); 
             
@@ -606,22 +612,13 @@
                     }, { merge: true });
                 }
             });
-            peer.on('error', (err) => {
-                console.error(err);
-                notify("Error Online: " + err.type, "error");
-            });
-            peer.on('connection', (c) => {
-                conn = c;
-                setupConnection();
-                notify("¡Jugador conectado!", "success");
-                enterLobby();
-            });
+            peer.on('error', (err) => { console.error(err); notify("Error Online: " + err.type, "error"); });
+            peer.on('connection', (c) => { conn = c; setupConnection(); notify("¡Jugador conectado!", "success"); enterLobby(); });
         }
 
         function openOnline() {
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
-            openModal('online');
-            if(myPeerId) document.getElementById('my-peer-id').innerText = myPeerId;
+            openModal('online'); // Open lobby manually
         }
 
         function openFriends() {
@@ -646,10 +643,23 @@
                     friL.innerHTML = '';
                     if(data.friends && data.friends.length > 0) {
                         data.friends.forEach(f => {
-                            const d = document.createElement('div'); d.className='friend-row';
-                            d.innerHTML = `<span style="color:var(--blue); font-weight:bold;">${f}</span> 
-                                           <button class="btn-small btn-add" onclick="challengeFriend('${f}')">DESAFIAR</button>`;
-                            friL.appendChild(d);
+                            // FETCH FRIEND ONLINE STATUS
+                            db.collection("users").doc(f).get().then(fDoc => {
+                                const fData = fDoc.data();
+                                const isOnline = fData && fData.online; // Check DB flag
+                                const statusClass = isOnline ? 'online' : '';
+                                
+                                const d = document.createElement('div'); d.className='friend-row';
+                                let html = `<div style="display:flex;align-items:center;"><div class="friend-status ${statusClass}"></div><span style="color:var(--blue); font-weight:bold;">${f}</span></div>`;
+                                html += `<div style="display:flex;">
+                                            <button class="btn-small btn-chat" onclick="openDirectChat('${f}')">CHATEAR</button>`;
+                                if(isOnline) {
+                                    html += `<button class="btn-small btn-add" onclick="challengeFriend('${f}')">DESAFIAR</button>`;
+                                }
+                                html += `</div>`;
+                                d.innerHTML = html;
+                                friL.appendChild(d);
+                            });
                         });
                     } else { friL.innerHTML = '<div style="color:#666;">No tienes amigos aún</div>'; }
                 }
@@ -663,22 +673,10 @@
             
             db.collection("users").doc(target).get().then(doc => {
                 if(doc.exists) {
-                    db.collection("users").doc(target).update({
-                        requests: firebase.firestore.FieldValue.arrayUnion(user.name)
-                    });
+                    db.collection("users").doc(target).update({ requests: firebase.firestore.FieldValue.arrayUnion(user.name) });
                     notify("Solicitud enviada a " + target);
                 } else {
-                    db.collection("leaderboard").doc(target).get().then(ldoc => {
-                        if(ldoc.exists) {
-                            db.collection("users").doc(target).set({
-                                requests: [user.name],
-                                friends: []
-                            });
-                            notify("Solicitud enviada a " + target);
-                        } else {
-                            notify("Usuario no encontrado", "error");
-                        }
-                    });
+                    notify("Usuario no encontrado", "error");
                 }
             });
         }
@@ -688,47 +686,34 @@
             const myRef = db.collection("users").doc(user.name);
             const theirRef = db.collection("users").doc(target);
 
-            batch.update(myRef, {
-                friends: firebase.firestore.FieldValue.arrayUnion(target),
-                requests: firebase.firestore.FieldValue.arrayRemove(target)
-            });
-            batch.set(theirRef, {
-                friends: firebase.firestore.FieldValue.arrayUnion(user.name)
-            }, { merge: true });
+            batch.update(myRef, { friends: firebase.firestore.FieldValue.arrayUnion(target), requests: firebase.firestore.FieldValue.arrayRemove(target) });
+            batch.set(theirRef, { friends: firebase.firestore.FieldValue.arrayUnion(user.name) }, { merge: true });
 
             batch.commit().then(() => notify("¡Ahora eres amigo de " + target + "!"));
+        }
+
+        function openDirectChat(target) {
+            // JUST OPEN LOBBY TO CHAT, TRY CONNECT IF ONLINE
+            challengeFriend(target); 
         }
 
         function challengeFriend(target) {
             db.collection("users").doc(target).get().then(doc => {
                 const data = doc.data();
-                // CHECK IF ONLINE (SIMPLE CHECK OR TIMESTAMP CHECK)
                 if(doc.exists && data.peerId) {
-                    // TIMESTAMP CHECK (2 MIN TIMEOUT)
-                    const lastSeen = data.lastSeen ? data.lastSeen.toDate() : new Date(0);
-                    const now = new Date();
-                    const diff = (now - lastSeen) / 1000;
-                    
-                    if(diff < 120) { // Active in last 2 mins
-                        const pid = data.peerId;
-                        conn = peer.connect(pid);
-                        setupConnection();
-                        notify("Desafiando a " + target + "...");
-                        closeModal('friends');
-                    } else {
-                        notify(target + " parece estar desconectado (Inactivo)", "error");
-                    }
+                    const pid = data.peerId;
+                    conn = peer.connect(pid);
+                    setupConnection();
+                    notify("Conectando con " + target + "...");
+                    closeModal('friends');
                 } else {
-                    notify(target + " no está conectado", "error");
+                    notify(target + " no está disponible", "error");
                 }
             });
         }
 
         function copyID() {
-            if(myPeerId) {
-                navigator.clipboard.writeText(myPeerId);
-                notify("ID copiado al portapapeles");
-            }
+            if(myPeerId) { navigator.clipboard.writeText(myPeerId); notify("ID copiado"); }
         }
 
         function connectToPeer() {
@@ -740,17 +725,15 @@
         }
 
         function setupConnection() {
-            conn.on('open', () => {
-                conn.send({ type: 'hello', name: user.name });
-                enterLobby();
-            });
+            conn.on('open', () => { conn.send({ type: 'hello', name: user.name }); enterLobby(); });
             conn.on('data', async (data) => {
                 if(data.type === 'hello') {
                     notify("Conectado con: " + data.name);
                     document.getElementById('p2-name').innerText = data.name;
                     document.getElementById('lobby-opp-name').innerText = data.name;
-                    initChatListener(data.name); // INIT CHAT
+                    initChatListener(data.name); 
                 }
+                if(data.type === 'chat') { addChatMsg(data.name, data.msg); }
                 if(data.type === 'song_data') {
                     notify("Recibiendo canción...");
                     document.getElementById('opp-pick-name').innerText = data.name;
@@ -760,9 +743,7 @@
                     await saveReceivedSong(data.name, data.buffer);
                     checkBothReady();
                 }
-                if(data.type === 'match_start') {
-                    startMatch(data.song);
-                }
+                if(data.type === 'match_start') { startMatch(data.song); }
                 if(data.type === 'score') {
                     opponentScore = data.val;
                     document.getElementById('p2-score').innerText = opponentScore.toLocaleString();
@@ -776,21 +757,17 @@
             document.getElementById('online-lobby-view').style.display = 'block';
         }
 
-        /* === CHAT SYSTEM (FIREBASE) === */
         function initChatListener(oppName) {
-            // GENERATE UNIQUE ROOM ID
             const users = [user.name, oppName].sort();
             currentChatRoom = users.join("_");
-            
-            document.getElementById('chat-box').innerHTML = ''; // CLEAR
+            document.getElementById('chat-box').innerHTML = ''; 
             
             db.collection("chats").doc(currentChatRoom).collection("messages")
                 .orderBy("timestamp")
+                .limit(20)
                 .onSnapshot(snapshot => {
                     snapshot.docChanges().forEach(change => {
-                        if(change.type === "added") {
-                            addChatMsgUI(change.doc.data().user, change.doc.data().text);
-                        }
+                        if(change.type === "added") { addChatMsgUI(change.doc.data().user, change.doc.data().text); }
                     });
                 });
         }
@@ -799,12 +776,12 @@
             const inp = document.getElementById('chat-inp');
             const txt = filterBadWords(inp.value);
             if(!txt || !currentChatRoom) return;
-            
+            // Send to DB (Listener updates UI)
             db.collection("chats").doc(currentChatRoom).collection("messages").add({
-                user: user.name,
-                text: txt,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                user: user.name, text: txt, timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
+            // Send P2P backup
+            conn.send({ type: 'chat', name: user.name, msg: txt });
             inp.value = "";
         }
 
@@ -816,13 +793,12 @@
             box.scrollTop = box.scrollHeight;
         }
 
+        function addChatMsg(name, msg) { /* P2P Handler */ }
+
         function filterBadWords(text) {
             const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto", "mierda"];
             let clean = text;
-            bad.forEach(w => {
-                const reg = new RegExp(w, "gi");
-                clean = clean.replace(reg, "****");
-            });
+            bad.forEach(w => { const reg = new RegExp(w, "gi"); clean = clean.replace(reg, "****"); });
             return clean;
         }
 
@@ -868,11 +844,7 @@
 
         function startMatch(songName) {
             document.getElementById('roulette-msg').innerText = "JUGANDO: " + songName;
-            setTimeout(() => {
-                closeModal('online');
-                curSongId = songName;
-                startGame(4); 
-            }, 1000);
+            setTimeout(() => { closeModal('online'); curSongId = songName; startGame(4); }, 1000);
         }
 
         /* === PERSISTENCIA INDEXEDDB === */
@@ -883,11 +855,7 @@
                 req.onsuccess = e => { idb = e.target.result; loadAllSongs(); resolve(); };
             });
         }
-        function saveSongToDB(id, buf) {
-            if(!idb) return;
-            const tx = idb.transaction(DB_STORE, "readwrite");
-            tx.objectStore(DB_STORE).put({ id: id, buffer: buf });
-        }
+        function saveSongToDB(id, buf) { if(!idb) return; const tx = idb.transaction(DB_STORE, "readwrite"); tx.objectStore(DB_STORE).put({ id: id, buffer: buf }); }
         function loadAllSongs() {
             if(!idb) return;
             const tx = idb.transaction(DB_STORE, "readonly");
@@ -926,7 +894,11 @@
         function save(){ if(user.name!=="Guest") localStorage.setItem(DB_KEY+user.name, JSON.stringify({user,cfg})); updUI(); }
         function login(){ const u=document.getElementById('l-user').value,p=document.getElementById('l-pass').value; const d=localStorage.getItem(DB_KEY+u); if(d){const o=JSON.parse(d).user;if(o.pass===p){user=o;if(JSON.parse(d).cfg)cfg={...cfg,...JSON.parse(d).cfg};localStorage.setItem(LAST_KEY,u);location.reload();}else notify("Pass Error","error");}else notify("User 404","error"); }
         function register(){ const u=document.getElementById('l-user').value,p=document.getElementById('l-pass').value; if(!u||!p)return notify("Datos?","error"); if(localStorage.getItem(DB_KEY+u))return notify("Existe","error"); user={name:u,pass:p,xp:0,lvl:1,songs:[],scores:{},pp:0,plays:0,score:0,avatar:null,bg:null}; localStorage.setItem(LAST_KEY,u); save(); location.reload(); }
-        function logout(){ localStorage.removeItem(LAST_KEY); location.reload(); }
+        function logout(){ 
+            if(db && user.name !== "Guest") db.collection("users").doc(user.name).update({ online: false }); // SET OFFLINE
+            localStorage.removeItem(LAST_KEY); 
+            location.reload(); 
+        }
 
         /* === FIREBASE RANKING === */
         function openLeaderboard() {
@@ -966,15 +938,9 @@
         function updateFirebaseScore() {
             if(db && user.name !== "Guest") {
                 db.collection("leaderboard").doc(user.name).set({
-                    name: user.name,
-                    pp: user.pp,
-                    score: user.score,
-                    lvl: user.lvl
+                    name: user.name, pp: user.pp, score: user.score, lvl: user.lvl
                 }, { merge: true });
-                
-                db.collection("users").doc(user.name).set({
-                    name: user.name
-                }, { merge: true });
+                db.collection("users").doc(user.name).set({ name: user.name }, { merge: true });
             }
         }
 
@@ -1081,10 +1047,8 @@
                     const dirClass = cfg.down ? 'hold-down' : 'hold-up';
                     el.className = `arrow-wrapper ${n.type==='hold'?'hold-note '+dirClass:''}`; 
                     el.style.left = (n.l*w)+'%'; el.style.width = w+'%'; el.style.zIndex = 150;
-                    
                     const conf = cfg.modes[keys][n.l]; const shapePath = PATHS[conf.s] || PATHS['circle'];
                     let svg = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shapePath}" fill="${conf.c}" stroke="white" stroke-width="2"/></svg>`;
-                    
                     if(n.type==='hold') { const h = (n.len/1000)*cfg.spd*60; svg += `<div class="sustain-trail" style="height:${h}px; background:${conf.c};"></div>`; }
                     el.innerHTML = svg; if(cfg.vivid) el.querySelector('.arrow-path').style.filter=`drop-shadow(0 0 8px ${conf.c})`;
                     document.getElementById('track').appendChild(el); n.el = el; st.spawned.push(n); n.s = true;
@@ -1096,7 +1060,6 @@
                 if(!n.el) { st.spawned.splice(i,1); continue; } 
                 const diff = n.t - now + cfg.off; const dist = (diff / 1000) * cfg.spd * 60; 
                 let finalY = cfg.down ? (yReceptor - dist) : (yReceptor + dist);
-                
                 if(n.h && n.type==='hold') {
                     n.el.style.top = yReceptor+'px'; n.el.style.opacity=0.8; const rem = (n.t + n.len) - now;
                     if(rem <= 0) { n.el.remove(); st.spawned.splice(i,1); continue; }
@@ -1106,8 +1069,7 @@
                     n.el.style.top = finalY + 'px'; 
                     if(diff < -160) { miss(n); n.h=true; n.el.style.opacity=0.4; setTimeout(()=>{if(n.el)n.el.remove()},200); st.spawned.splice(i,1); }
                 } else { n.el.remove(); st.spawned.splice(i,1); }
-            } 
-            requestAnimationFrame(loop);
+            } requestAnimationFrame(loop);
         }
 
         function onKd(e) { if(e.key==="Escape"){togglePause();return;} if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
@@ -1169,13 +1131,30 @@
             document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
             document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
             
+            // PP CALCULATION WITH PENALTY
+            let ppChange = 0;
             if(!died && songFinished && user.name!=="Guest"){ 
                 const xp = Math.floor(st.sc/500); user.xp+=xp; user.score+=st.sc; user.plays++; 
                 if(user.xp >= user.lvl*1000) { user.xp -= user.lvl*1000; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!"); }
-                if(st.ranked) { user.pp += Math.floor(st.sc/5000); }
+                
+                if(st.ranked) { 
+                    if(acc < 50) {
+                        ppChange = -15; // PENALTY
+                        user.pp = Math.max(0, user.pp - 15);
+                    } else {
+                        ppChange = Math.floor(st.sc/5000);
+                        user.pp += ppChange;
+                    }
+                }
                 save(); updateFirebaseScore(); 
                 document.getElementById('res-xp').innerText = xp;
             } else { document.getElementById('res-xp').innerText = 0; }
+
+            // SHOW PP CHANGE
+            const ppEl = document.getElementById('pp-gain-loss');
+            if(ppChange > 0) { ppEl.innerText = `+${ppChange} PP`; ppEl.style.color = "var(--gold)"; }
+            else if(ppChange < 0) { ppEl.innerText = `${ppChange} PP`; ppEl.style.color = "var(--miss)"; }
+            else { ppEl.innerText = "0 PP"; ppEl.style.color = "white"; }
         }
         function toMenu() { location.reload(); }
         function notify(msg, type="info") { const area = document.getElementById('notification-area'); const n = document.createElement('div'); n.className = 'notify-msg'; n.innerText = msg; n.style.borderLeftColor = type==="error" ? "#F9393F" : "#ff66aa"; if(type==="success") n.style.borderLeftColor = "#12FA05"; area.appendChild(n); setTimeout(()=>n.remove(), 3000); }
