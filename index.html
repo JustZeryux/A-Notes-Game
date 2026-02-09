@@ -15,6 +15,338 @@
 </head>
 <body>
 
+    <div id="notification-area"></div>
+    <div id="bg-layer">
+        <video id="bg-video" loop muted playsinline style="display:none;"></video>
+        <img id="bg-image">
+    </div>
+
+    <div id="menu-container">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon"></div>
+                <div>A NOTES<br>GAME</div>
+            </div>
+            
+            <div class="user-card" onclick="openModal('profile')" onmouseenter="playHover()">
+                <div class="u-avatar" id="m-av">G</div>
+                <div class="u-info">
+                    <div id="m-name">Guest</div>
+                    <div id="m-rank">LVL 1</div>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <button class="nav-btn active" onmouseenter="playHover()">🎵 CANCIONES</button>
+                <button class="nav-btn" onmouseenter="playHover()" onclick="openModal('settings')">⚙️ AJUSTES</button>
+                <button class="nav-btn" onmouseenter="playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
+                <button class="nav-btn" onmouseenter="playHover()" onclick="openFriends()">👥 AMIGOS / 1v1</button>
+            </div>
+
+            <label class="import-btn" id="imp-btn" onmouseenter="playHover()">
+                <span id="imp-txt">📂 IMPORTAR MP3</span>
+                <input type="file" id="imp-input" accept="audio/*" style="display:none" onchange="handleAudio(this)" onclick="this.value=null">
+            </label>
+            <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
+        </aside>
+
+        <main class="content-area">
+            <div class="top-bar">
+                <input type="text" class="search-inp" placeholder="Buscar canción..." oninput="renderMenu(this.value)">
+                <div style="font-weight:900; color:#aaa;">GLOBAL PP: <span id="h-pp" style="color:white; font-size:1.5rem;">0</span></div>
+            </div>
+            <div class="song-grid" id="song-grid"></div>
+        </main>
+    </div>
+
+    <div id="game-layer">
+        <div id="vs-hud">
+            <div class="vs-panel">
+                <div class="vs-name" id="p1-name">YOU</div>
+                <div class="vs-score" id="p1-score">0</div>
+            </div>
+            <div style="font-size:2rem; font-weight:900; font-style:italic; color:var(--accent)">VS</div>
+            <div class="vs-panel" style="border-color:var(--miss)">
+                <div class="vs-name" id="p2-name" style="color:var(--miss)">OPPONENT</div>
+                <div class="vs-score" id="p2-score">0</div>
+            </div>
+        </div>
+
+        <div id="ig-profile">
+            <div id="ig-av"></div>
+            <div id="ig-name" style="color:white;">User</div>
+        </div>
+
+        <div id="track"></div>
+
+        <div id="hud">
+            <div class="stats-col">
+                <div style="color:var(--sick)" class="stat-item">SICK <span id="h-sick">0</span></div>
+                <div style="color:var(--good)" class="stat-item">GOOD <span id="h-good">0</span></div>
+                <div style="color:var(--bad)" class="stat-item">BAD <span id="h-bad">0</span></div>
+                <div style="color:var(--miss)" class="stat-item">MISS <span id="h-miss">0</span></div>
+                
+                <div class="acc-block">
+                    <div class="acc-label">ACCURACY</div>
+                    <div class="acc-val" id="g-acc">100%</div>
+                </div>
+
+                <div class="score-label">SCORE</div>
+                <div class="score-val" id="g-score">0</div>
+            </div>
+            
+            <div class="health-bar"><div class="health-fill" id="health-fill"></div></div>
+        </div>
+        
+        <div class="combo-val" id="g-combo">0</div>
+        <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
+    </div>
+
+    <div id="modal-news" class="modal-overlay">
+        <div class="modal-panel" style="width:600px;">
+            <div class="m-title">NOVEDADES</div>
+            <div class="patch-text">
+                <div class="patch-ver">VERSION 0.81 (VISUAL RESTORE)</div>
+                <ul>
+                    <li><b>NOTIFICACIONES PRO:</b> Vuelven las tarjetas con animación y barra de tiempo.</li>
+                    <li><b>SOCIAL MEJORADO:</b> Interactúa mejor con solicitudes y desafíos.</li>
+                    <li><b>GOOGLE LOGIN FIX:</b> Creación de cuenta automática corregida.</li>
+                </ul>
+            </div>
+            <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-friends" class="modal-overlay">
+        <div class="modal-panel" style="width:650px;">
+            <div class="m-title">SOCIAL HUB</div>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <input type="text" id="friend-inp" class="log-inp" placeholder="Nombre de usuario..." style="margin:0;">
+                <button class="btn-small btn-add" style="font-size:1rem;" onclick="sendFriendRequest()">AGREGAR</button>
+            </div>
+            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">SOLICITUDES</div>
+            <div id="req-list" class="friend-list" style="margin-bottom:20px;"></div>
+            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS</div>
+            <div id="friend-list" class="friend-list"></div>
+            <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-friend-profile" class="modal-overlay">
+        <div class="modal-panel login-box" style="text-align:center;">
+            <div id="fp-av"></div>
+            <div id="fp-name">...</div>
+            <div id="fp-lvl" style="color:var(--accent); font-weight:900;">LVL ...</div>
+            <div id="fp-stats">
+                <div class="fp-stat-box">SCORE<br><span id="fp-score" style="font-size:1.5rem; color:white;">0</span></div>
+                <div class="fp-stat-box">PP<br><span id="fp-pp" style="font-size:1.5rem; color:var(--blue);">0</span></div>
+            </div>
+            <div id="fp-status-text" style="color:#888; font-style:italic; margin-bottom:15px;">Desconectado</div>
+            <div class="fp-actions">
+                <button class="btn-chat" onclick="openChatWithFriend()">💬 CHATEAR</button>
+                <button id="btn-challenge" class="btn-add" disabled>⚔️ DESAFIAR</button>
+            </div>
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('friend-profile')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-online" class="modal-overlay">
+        <div class="modal-panel" style="width:700px;">
+            <div class="m-title" id="lobby-title">ONLINE LOBBY</div>
+            
+            <div id="lobby-game-ui">
+                <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
+                <div class="lobby-box">
+                    <div class="lobby-slot">
+                        <div class="slot-title">TU ELECCIÓN</div>
+                        <div class="slot-song" id="my-pick-name">...</div>
+                        <div class="slot-status" id="my-pick-status">Esperando selección...</div>
+                        <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
+                        <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
+                    </div>
+                    <div class="lobby-slot">
+                        <div class="slot-title">ELECCIÓN RIVAL</div>
+                        <div class="slot-song" id="opp-pick-name">...</div>
+                        <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
+                    </div>
+                </div>
+                 <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
+            </div>
+
+            <div id="chat-ui-container">
+                <div style="color:var(--blue); font-weight:bold; margin-bottom:5px;" id="chat-with-title">CHAT</div>
+                <div id="chat-box"></div>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
+                    <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
+                </div>
+            </div>
+
+            <button class="action secondary" onclick="closeLobby()" style="margin-top:20px;">SALIR</button>
+        </div>
+    </div>
+
+    <div id="modal-rank" class="modal-overlay">
+        <div class="modal-panel">
+            <div class="m-title">RANKING GLOBAL (LIVE)</div>
+            <table class="rank-table">
+                <thead><tr><th>#</th><th>JUGADOR</th><th>PP</th></tr></thead>
+                <tbody id="rank-list"></tbody>
+            </table>
+            <button class="action secondary" style="margin-top:30px;" onclick="closeModal('rank')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-profile" class="modal-overlay">
+        <div class="modal-panel login-box">
+            <div id="login-view">
+                <div class="m-title">ACCESO</div>
+                <button class="btn-google" onclick="loginGoogle()">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
+                    CONTINUAR CON GOOGLE
+                </button>
+                <div style="margin: 15px 0; color:#666;">--- O USA CUENTA LOCAL ---</div>
+                <input type="text" id="l-user" class="log-inp" placeholder="Usuario">
+                <input type="password" id="l-pass" class="log-inp" placeholder="Contraseña">
+                <button class="action" onclick="login()">ENTRAR</button>
+                <button class="action secondary" onclick="register()">REGISTRAR</button>
+            </div>
+            <div id="profile-view" style="display:none;">
+                <div class="m-title">TU PERFIL</div>
+                
+                <div class="settings-tabs">
+                    <div class="kb-tab active" id="ptab-resumen" onclick="switchProfileTab('resumen')">RESUMEN</div>
+                    <div class="kb-tab" id="ptab-cuenta" onclick="switchProfileTab('cuenta')">CUENTA</div>
+                </div>
+
+                <div id="p-tab-content-resumen">
+                    <label class="prof-av-big" id="p-av-big" style="z-index: 20;">
+                        <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" onclick="this.value=null">
+                    </label>
+                    <h2 id="p-name" style="margin:0;">User</h2>
+                    <div id="p-lvl-txt" style="color:var(--accent); font-weight:900; font-size:1.4rem;">LVL 1</div>
+                    
+                    <div class="xp-container"><div class="xp-fill" id="p-xp-bar"></div></div>
+                    <div class="xp-text" id="p-xp-txt">0 / 1000 XP</div>
+
+                    <div style="color:var(--blue); font-weight:bold; margin:20px 0; font-size:1.2rem;">GLOBAL RANK: <span id="p-global-rank">#--</span></div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;">
+                        <div style="background:#151515; padding:20px; border-radius:12px;">SCORE<br><span id="p-score" style="font-size:1.5rem; color:white;">0</span></div>
+                        <div style="background:#151515; padding:20px; border-radius:12px;">JUGADAS<br><span id="p-plays" style="font-size:1.5rem; color:white;">0</span></div>
+                    </div>
+                </div>
+
+                <div id="p-tab-content-cuenta" style="display:none;">
+                    <div id="local-acc-settings">
+                        <div style="color:#aaa; margin-bottom:15px;">Cambiar Contraseña (Solo Cuentas Locales)</div>
+                        <input type="password" id="new-pass" class="log-inp" placeholder="Nueva contraseña">
+                        <button class="action secondary" onclick="changePassword()">ACTUALIZAR CONTRASEÑA</button>
+                    </div>
+                    <div id="google-acc-settings" style="display:none; color:#aaa; margin-top:20px;">
+                        Tu cuenta está vinculada con Google. Gestiona tu seguridad desde tu cuenta de Google.
+                    </div>
+                     <button class="action secondary" style="border-color:#F9393F; color:#F9393F; margin-top:30px;" onclick="logout()">CERRAR SESIÓN</button>
+                </div>
+            </div>
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('profile')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-panel">
+            <div class="m-title">CONFIGURACIÓN</div>
+            <div class="set-grid">
+                <div>
+                    <div class="set-head">GENERAL</div>
+                    <div class="set-row"><span>Velocidad (Scroll)</span><input type="range" id="set-spd" min="10" max="40"></div>
+                    <div class="set-row"><span>Dificultad (Mapas)</span><input type="range" id="set-den" min="1" max="10"></div>
+                    <div class="set-row"><span>Volumen Música</span><input type="range" id="set-vol" min="0" max="100"></div>
+                    <div class="set-row"><span>Volumen Hits</span><input type="range" id="set-hvol" min="0" max="100"></div>
+                    <div class="set-row"><span>Downscroll</span><input type="checkbox" id="set-down"></div>
+                    <div class="set-row"><span>Efectos (Vivid)</span><input type="checkbox" id="set-vivid"></div>
+                    <div class="set-row"><span>Shake (Impacto)</span><input type="checkbox" id="set-shake"></div>
+                    
+                    <div class="set-row"><span>Offset (ms)</span><input type="number" id="set-off" style="width:70px; background:#111; border:1px solid #444; color:white; padding:5px; text-align:center;"></div>
+                    
+                    <div class="set-head" style="margin-top:30px;">HUD PERSONALIZADO</div>
+                    <div class="set-row"><span>Opacidad Carril</span><input type="range" id="set-track-op" min="0" max="100"></div>
+                    <div class="set-row"><span>Posición Juez (Y)</span><input type="range" id="set-judge-y" min="10" max="90"></div>
+                    <div class="set-row"><span>Posición Juez (X)</span><input type="range" id="set-judge-x" min="10" max="90"></div>
+                    <div class="set-row"><span>Tamaño Juez</span><input type="range" id="set-judge-s" min="5" max="20"></div>
+                    <div class="set-row"><span>Mostrar Juez</span><input type="checkbox" id="set-judge-vis" checked></div>
+
+                    <button class="action secondary" style="margin-top:15px; font-size:1rem;" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button>
+                    <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)" onclick="this.value=null">
+                </div>
+                <div>
+                    <div class="set-head">CONTROLES & COLORES</div>
+                    <div class="kb-tabs">
+                        <div class="kb-tab active" id="tab-4" onclick="renderLaneConfig(4)">4K</div>
+                        <div class="kb-tab" id="tab-6" onclick="renderLaneConfig(6)">6K</div>
+                        <div class="kb-tab" id="tab-7" onclick="renderLaneConfig(7)">7K</div>
+                        <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
+                    </div>
+                    <div class="lane-cfg-box">
+                        <div id="lanes-container" class="lanes-view"></div>
+                        <div style="font-size:0.9rem; color:#666; margin-top:25px;">
+                            Click en tecla para cambiar | Click en forma para rotar
+                        </div>
+                    </div>
+                    
+                    <button class="action secondary" style="margin-top:30px; font-size:1rem;" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT SOUND</button>
+                    <input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)" onclick="this.value=null">
+                </div>
+            </div>
+            <button class="action" onclick="saveSettings()">GUARDAR</button>
+        </div>
+    </div>
+
+    <div id="modal-diff" class="modal-overlay">
+        <div class="modal-panel" style="width:850px;">
+            <div class="m-title">SELECCIONA MODO</div>
+            <div class="diff-grid">
+                <div class="diff-card" onclick="startGame(4)" style="color:#00FFFF"><div style="font-size:3rem;font-weight:900">4K</div>NORMAL</div>
+                <div class="diff-card" onclick="startGame(6)" style="color:#12FA05"><div style="font-size:3rem;font-weight:900">6K</div>HARD</div>
+                <div class="diff-card" onclick="startGame(7)" style="color:#FFD700"><div style="font-size:3rem;font-weight:900">7K</div>INSANE</div>
+                <div class="diff-card" onclick="startGame(9)" style="color:#F9393F"><div style="font-size:3rem;font-weight:900">9K</div>DEMON</div>
+            </div>
+            
+            <div class="ranked-toggle">
+                <input type="checkbox" id="chk-ranked">
+                <label for="chk-ranked" style="margin-left:10px; color:var(--accent);">RANKED MODE (GANA PP)</label>
+            </div>
+
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('diff')">CANCELAR</button>
+        </div>
+    </div>
+
+    <div id="modal-pause" class="modal-overlay">
+        <div class="modal-panel login-box">
+            <div class="m-title">PAUSA</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px; font-size:1.3rem;">
+                <div style="color:var(--sick)">SICK: <span id="p-sick">0</span></div>
+                <div style="color:var(--good)">GOOD: <span id="p-good">0</span></div>
+                <div style="color:var(--bad)">BAD: <span id="p-bad">0</span></div>
+                <div style="color:var(--miss)">MISS: <span id="p-miss">0</span></div>
+            </div>
+            <button class="action" onclick="resumeGame()">CONTINUAR</button>
+            <button class="action secondary" onclick="toMenu()">SALIR AL MENU</button>
+        </div>
+    </div>
+
+    <div id="modal-res" class="modal-overlay">
+        <div class="modal-panel login-box" style="width:600px;">
+            <div class="m-title">RESULTADOS</div>
+            <div class="res-rank" id="res-rank">S</div>
+            <div id="winner-msg" style="font-size:2rem; font-weight:900; color:var(--sick); margin-bottom:20px; display:none;">¡GANASTE EL 1v1!</div>
+            <div style="font-size:4rem; font-weight:900;" id="res-score">0</div>
+            <div style="color:#aaa; font-size:1.5rem;">ACCURACY: <span id="res-acc" style="color:white; font-weight:bold;">100%</span></div>
+            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px; font-size:1.2rem;">+0 PP</div>
+            <div style="color:var(--blue); font-weight:bold; font-size:1rem; margin-top:5px;">+<span id="res-xp">0</span> XP</div>
+            <button class="action" onclick="toMenu()">VOLVER</button>
+        </div>
+    </div>
+
     <script src="js/globals.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/ui.js"></script>
