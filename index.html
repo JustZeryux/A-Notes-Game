@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>A NOTES GAME: V68 (ONLINE 1v1)</title>
+    <title>A NOTES GAME</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         /* === ESTILOS BASE === */
@@ -215,8 +215,13 @@
         .btn-acc { background: var(--good); color: black; }
         .btn-add { background: var(--blue); color: black; }
         
-        .online-status { width: 10px; height: 10px; background: #333; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .online-status.on { background: #12FA05; box-shadow: 0 0 10px #12FA05; }
+        /* LOBBY UI */
+        .lobby-box { background: #111; padding: 20px; border-radius: 10px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .lobby-slot { width: 48%; text-align: center; }
+        .slot-title { color: #888; font-weight: bold; margin-bottom: 10px; font-size: 0.9rem; }
+        .slot-song { font-size: 1.2rem; font-weight: 900; color: white; min-height: 40px; display: flex; align-items: center; justify-content: center; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; margin-bottom: 10px; word-break: break-all; padding: 10px; }
+        .slot-status { font-size: 0.8rem; color: #666; font-style: italic; }
+        .ready-green { color: #12FA05 !important; }
 
         /* PERFIL */
         .login-box { width: 500px; text-align: center; border: 1px solid #333; }
@@ -342,11 +347,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.68 (ONLINE P2P)</div>
+                <div class="patch-ver">VERSION 0.69 (ONLINE TRANSFER)</div>
                 <ul>
-                    <li><b>ONLINE REAL:</b> Juega 1v1 con amigos usando un Código de Conexión.</li>
-                    <li><b>VISUALES:</b> En ajustes ahora ves las figuras reales (Flecha, etc).</li>
-                    <li><b>PERFIL:</b> Barra de XP y Nivel funcionando.</li>
+                    <li><b>TRANSFERENCIA P2P:</b> Al elegir canción, se envía a tu rival.</li>
+                    <li><b>RULETA:</b> Si ambos eligen, el juego selecciona una al azar.</li>
+                    <li><b>SYNC:</b> Inicio de partida sincronizado automáticamente.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -354,25 +359,43 @@
     </div>
 
     <div id="modal-online" class="modal-overlay">
-        <div class="modal-panel" style="width:600px;">
-            <div class="m-title">ONLINE 1v1</div>
-            <div style="text-align:center; margin-bottom:20px;">
-                <div style="color:#aaa; margin-bottom:5px;">TU CÓDIGO DE AMIGO:</div>
-                <div id="my-peer-id" style="font-size:1.5rem; font-weight:900; color:var(--blue); user-select:text; background:#222; padding:10px; border-radius:8px; cursor:pointer;" onclick="copyID()">CARGANDO...</div>
-                <div style="font-size:0.8rem; color:#666;">(Haz click para copiar y manda esto a tu amigo)</div>
-            </div>
-
-            <div style="border-top:1px solid #333; padding-top:20px; margin-top:20px;">
-                <div style="color:#aaa; margin-bottom:5px;">CONECTAR CON AMIGO:</div>
+        <div class="modal-panel" style="width:700px;">
+            <div class="m-title">ONLINE 1v1 LOBBY</div>
+            
+            <div id="online-connect-view">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <div style="color:#aaa; margin-bottom:5px;">TU CÓDIGO DE AMIGO:</div>
+                    <div id="my-peer-id" style="font-size:1.5rem; font-weight:900; color:var(--blue); user-select:text; background:#222; padding:10px; border-radius:8px; cursor:pointer;" onclick="copyID()">CARGANDO...</div>
+                </div>
                 <div style="display:flex; gap:10px;">
                     <input type="text" id="friend-id-inp" class="log-inp" placeholder="Pega el código de tu amigo aquí" style="margin:0;">
                     <button class="btn-small btn-add" style="font-size:1rem;" onclick="connectToPeer()">CONECTAR</button>
                 </div>
             </div>
 
-            <div id="online-status-msg" style="margin-top:20px; font-weight:bold; color:var(--accent);"></div>
+            <div id="online-lobby-view" style="display:none; margin-top:20px;">
+                <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON RIVAL</div>
+                
+                <div class="lobby-box">
+                    <div class="lobby-slot">
+                        <div class="slot-title">TU ELECCIÓN</div>
+                        <div class="slot-song" id="my-pick-name">...</div>
+                        <div class="slot-status" id="my-pick-status">Esperando selección...</div>
+                        <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
+                        <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
+                    </div>
+                    <div style="font-size:2rem; font-weight:900; color:#444;">VS</div>
+                    <div class="lobby-slot">
+                        <div class="slot-title">ELECCIÓN RIVAL</div>
+                        <div class="slot-song" id="opp-pick-name">...</div>
+                        <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
+                    </div>
+                </div>
 
-            <button class="action secondary" onclick="closeModal('online')">CERRAR</button>
+                <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px;"></div>
+            </div>
+
+            <button class="action secondary" onclick="closeModal('online')" style="margin-top:20px;">CERRAR</button>
         </div>
     </div>
 
@@ -530,6 +553,7 @@
         
         // ONLINE VARIABLES
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
+        let onlineState = { myPick: null, oppPick: null };
 
         let st = { 
             act:false, paused:false, ctx:null, src:null, t0:0, 
@@ -550,7 +574,7 @@
         window.onload = async () => { 
             loadData(); 
             await initDB();
-            initOnline(); // INICIA PEERJS
+            initOnline(); 
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
             window.addEventListener('keydown', onKd); 
@@ -559,7 +583,7 @@
 
         /* === ONLINE SYSTEM (PEERJS) === */
         function initOnline() {
-            peer = new Peer(); // Genera ID aleatorio
+            peer = new Peer(); 
             peer.on('open', (id) => {
                 myPeerId = id;
                 document.getElementById('my-peer-id').innerText = id;
@@ -568,7 +592,7 @@
                 conn = c;
                 setupConnection();
                 notify("¡Jugador conectado!", "success");
-                document.getElementById('online-status-msg').innerText = "CONECTADO CON: " + conn.peer;
+                enterLobby();
             });
         }
 
@@ -593,25 +617,105 @@
         function setupConnection() {
             conn.on('open', () => {
                 conn.send({ type: 'hello', name: user.name });
+                enterLobby();
             });
-            conn.on('data', (data) => {
+            conn.on('data', async (data) => {
                 if(data.type === 'hello') {
                     notify("Conectado con: " + data.name);
-                    document.getElementById('online-status-msg').innerText = "CONECTADO CON: " + data.name;
                     document.getElementById('p2-name').innerText = data.name;
                 }
-                if(data.type === 'start') {
-                    // Start game sync (simplified: assumes both have song)
-                    notify("Tu oponente inició una canción");
+                // RECIBIR CANCION DEL RIVAL
+                if(data.type === 'song_data') {
+                    notify("Recibiendo canción: " + data.name);
+                    document.getElementById('opp-pick-name').innerText = data.name;
+                    document.getElementById('opp-pick-status').innerText = "¡Recibida y Lista!";
+                    document.getElementById('opp-pick-status').classList.add('ready-green');
+                    onlineState.oppPick = data.name;
+                    
+                    // GUARDAR EN RAM Y DB
+                    const buf = data.buffer; // PeerJS reconstruye el buffer
+                    await saveReceivedSong(data.name, buf);
+                    checkBothReady();
+                }
+                if(data.type === 'match_start') {
+                    startMatch(data.song);
                 }
                 if(data.type === 'score') {
                     opponentScore = data.val;
                     document.getElementById('p2-score').innerText = opponentScore.toLocaleString();
                 }
-                if(data.type === 'finish') {
-                    // Logic when opponent finishes
-                }
             });
+        }
+
+        function enterLobby() {
+            document.getElementById('online-connect-view').style.display = 'none';
+            document.getElementById('online-lobby-view').style.display = 'block';
+        }
+
+        async function handleOnlineFile(i) {
+            if(i.files[0]) {
+                const f = i.files[0];
+                const name = f.name.replace(/\.[^/.]+$/, "");
+                const ab = await f.arrayBuffer();
+                
+                // ACTUALIZAR MI UI
+                document.getElementById('my-pick-name').innerText = name;
+                document.getElementById('my-pick-status').innerText = "Enviando al rival...";
+                onlineState.myPick = name;
+
+                // GUARDAR LOCAL
+                await saveReceivedSong(name, ab.slice(0)); // Save copy
+
+                // ENVIAR AL RIVAL
+                conn.send({
+                    type: 'song_data',
+                    name: name,
+                    buffer: ab
+                });
+                
+                document.getElementById('my-pick-status').innerText = "¡Enviado!";
+                document.getElementById('my-pick-status').classList.add('ready-green');
+                checkBothReady();
+            }
+        }
+
+        async function saveReceivedSong(name, buffer) {
+            if(!user.songs.find(s=>s.id===name)){ user.songs.push({id:name}); save(); }
+            saveSongToDB(name, buffer); // DB
+            const audioCtxBuffer = await st.ctx.decodeAudioData(buffer.slice(0)); // Decode for RAM
+            const map = genMap(audioCtxBuffer, 4); // Pre-gen map
+            // Update RAM
+            ramSongs = ramSongs.filter(s=>s.id!==name);
+            ramSongs.push({id:name, buf:audioCtxBuffer, map:map});
+        }
+
+        function checkBothReady() {
+            if(onlineState.myPick && onlineState.oppPick) {
+                // AMBOS LISTOS - RULETA
+                const msg = document.getElementById('roulette-msg');
+                msg.innerText = "¡AMBOS LISTOS! GIRA LA RULETA...";
+                
+                // Solo el host (quien tenga ID "mayor" alfanuméricamente para evitar conflictos) decide
+                if(myPeerId > conn.peer) {
+                    setTimeout(() => {
+                        const picks = [onlineState.myPick, onlineState.oppPick];
+                        const winner = picks[Math.floor(Math.random() * picks.length)];
+                        conn.send({ type: 'match_start', song: winner });
+                        startMatch(winner);
+                    }, 2000);
+                }
+            }
+        }
+
+        function startMatch(songName) {
+            document.getElementById('roulette-msg').innerText = "JUGANDO: " + songName;
+            setTimeout(() => {
+                closeModal('online');
+                curSongId = songName;
+                openModal('diff'); // Preguntar dificultad o forzar 4K? Forcemos 4K para 1v1 simple
+                // O mejor, saltar diff y jugar directo
+                startGame(4); 
+            }, 1000);
         }
 
         /* === PERSISTENCIA INDEXEDDB === */
@@ -833,7 +937,7 @@
             isMultiplayer = (conn && conn.open);
             opponentScore = 0;
             if(isMultiplayer) {
-                conn.send({ type: 'start', song: name });
+                // RESET UI
                 document.getElementById('vs-hud').style.display = 'flex';
                 document.getElementById('p1-name').innerText = user.name;
                 document.getElementById('p1-score').innerText = "0";
