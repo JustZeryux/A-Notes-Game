@@ -21,9 +21,8 @@ const DB_KEY="omega_u_";
 const LAST_KEY="omega_last"; 
 const DB_NAME = "OmegaDB"; 
 const DB_STORE = "songs";
-const CURRENT_VERSION = 81; 
+const CURRENT_VERSION = 90; // Actualizado a 0.9
 
-// Función Helper necesaria para CFG
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
     const cols = ['#00FFFF','#12FA05','#F9393F','#FFD700','#BD00FF','#0055FF','#FF8800','#FFFFFF','#AAAAAA'];
@@ -37,16 +36,23 @@ let cfg = {
     modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
 };
 
-let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
+// Se agrega 'sp' (ScorePoints)
+let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
 let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
 let ctx=null, hitBuf=null, idb=null;
 let songFinished = false; 
 
-// ONLINE VARIABLES
+// ONLINE VARIABLES (Updated)
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
 let onlineState = { myPick: null, oppPick: null };
 let currentChatRoom = null, chatListener = null;
 let selectedFriend = null; 
+
+// Lobby System
+let currentLobbyId = null;
+let isLobbyHost = false;
+let lobbyPlayers = []; // [{name: 'X', ready: false, score: 0}]
+let lobbyListener = null;
 
 let st = { 
     act:false, paused:false, ctx:null, src:null, t0:0, 
