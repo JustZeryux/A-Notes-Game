@@ -8,10 +8,11 @@
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script> <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
     <style>
-        /* === ESTILOS BASE === */
+        /* === ESTILOS BASE V80 === */
         @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700;900&family=Nunito:wght@700;900&display=swap');
 
         :root {
@@ -24,14 +25,25 @@
         * { box-sizing: border-box; user-select: none; outline: none; }
         body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakra Petch', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
 
-        @keyframes slideIn { 0% { transform: translateX(-50px); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+        @keyframes slideIn { 0% { transform: translateX(100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes pulse-btn { 0% { box-shadow: 0 0 0 0 rgba(255, 102, 170, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 102, 170, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 102, 170, 0); } }
         @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(3px, 3px); } 50% { transform: translate(-3px, -3px); } 75% { transform: translate(3px, -3px); } 100% { transform: translate(0,0); } }
         .shaking { animation: shake 0.15s ease-in-out; }
 
-        #notification-area { position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-        .notify-msg { background: rgba(20, 20, 30, 0.95); border-left: 4px solid var(--accent); padding: 15px 25px; border-radius: 5px; color: white; font-weight: bold; box-shadow: 0 5px 20px rgba(0,0,0,0.5); animation: slideIn 0.3s ease-out; pointer-events: auto; min-width: 250px; }
+        /* --- NUEVO SISTEMA DE NOTIFICACIONES V80 --- */
+        #notification-area { position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 350px; }
+        .notify-card { background: rgba(20, 20, 30, 0.98); border-left: 5px solid var(--accent); border-radius: 8px; box-shadow: 0 5px 25px rgba(0,0,0,0.7); pointer-events: auto; overflow: hidden; position: relative; animation: slideIn 0.3s ease-out; transition: 0.3s; }
+        .notify-card.closing { animation: slideOut 0.3s ease-in forwards; }
+        .notify-content { padding: 15px; }
+        .notify-title { font-weight: 900; font-size: 1.1rem; margin-bottom: 5px; color: var(--blue); display: flex; align-items: center; gap: 10px; }
+        .notify-body { font-family: 'Nunito'; font-size: 0.95rem; color: #ddd; line-height: 1.4; }
+        .notify-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .notify-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: 900; cursor: pointer; font-family: 'Chakra Petch'; transition: 0.2s; }
+        .btn-accept { background: var(--good); color: black; } .btn-deny { background: var(--miss); color: white; }
+        .notify-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
+        .notify-progress { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--accent); width: 100%; transition: width linear; }
 
         #bg-layer { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 0; pointer-events: none; background: #000; overflow: hidden; }
         #bg-video, #bg-image { width: 100%; height: 100%; object-fit: cover; opacity: 0.3; position: absolute; top:0; left:0; transition: opacity 0.5s; filter: brightness(0.5); }
@@ -162,7 +174,9 @@
         .xp-text { font-size: 0.8rem; color: #888; text-align: right; margin-top: 3px; font-weight: bold; }
 
         .friend-list { max-height: 400px; overflow-y: auto; text-align: left; }
-        .friend-row { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: #151515; margin-bottom: 10px; border-radius: 10px; border: 1px solid #333; }
+        .friend-row { display: flex; justify-content: space-between; align-items: center; padding: 15px; background: #151515; margin-bottom: 10px; border-radius: 10px; border: 1px solid #333; transition:0.2s; cursor:pointer; }
+        .friend-row:hover { background: #222; border-color:#555; }
+        .friend-row-name { color:var(--blue); font-weight:bold; flex:1; margin-left:10px; }
         .btn-small { padding: 8px 15px; border-radius: 6px; border: none; font-weight: 900; cursor: pointer; font-size: 0.8rem; margin-left:5px; }
         .btn-acc { background: var(--good); color: black; }
         .btn-add { background: var(--blue); color: black; }
@@ -170,8 +184,9 @@
         .btn-google { width: 100%; padding: 15px; background: white; color: #333; border: none; border-radius: 8px; font-weight: 900; font-family: 'Nunito'; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; transition: 0.2s; }
         .btn-google:hover { filter: brightness(0.9); }
         
-        .friend-status { width:10px; height:10px; border-radius:50%; background:#444; margin-right:8px; display:inline-block; }
-        .friend-status.online { background:#12FA05; box-shadow:0 0 5px #12FA05; }
+        .friend-status { width:12px; height:12px; border-radius:50%; background:#444; display:inline-block; flex-shrink:0; }
+        .friend-status.online { background:#12FA05; box-shadow:0 0 8px #12FA05; }
+        .f-row-av { width:30px; height:30px; border-radius:50%; background-size:cover; background-color:#333; border:1px solid #555; }
 
         /* LOBBY UI */
         .lobby-box { background: #111; padding: 20px; border-radius: 10px; border: 1px solid #333; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -210,8 +225,18 @@
         
         .rank-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 1.2rem; }
         .rank-table th { text-align: left; padding: 15px; border-bottom: 2px solid #333; color: var(--blue); }
-        .rank-table td { padding: 15px; border-bottom: 1px solid #222; font-weight: bold; }
+        .rank-table td { padding: 15px; border-bottom: 1px solid #222; font-weight: bold; vertical-align: middle; }
         .rank-row-me { background: rgba(255, 102, 170, 0.1); border-left: 4px solid var(--accent); }
+        .rank-av { width:40px; height:40px; border-radius:50%; background-size:cover; background-color:#222; border:2px solid #444; display:inline-block; margin-right:10px; vertical-align:middle; }
+
+        /* V80 NEW MODALS */
+        #fp-av { width:120px; height:120px; border-radius:50%; background-color:#333; background-size:cover; border:4px solid var(--accent); margin:0 auto 20px; }
+        #fp-name { font-size:2rem; font-weight:900; margin-bottom:5px; }
+        #fp-stats { display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:20px 0; }
+        .fp-stat-box { background:#151515; padding:15px; border-radius:10px; }
+        .fp-actions { display:flex; gap:10px; margin-top:20px; }
+        .fp-actions button { flex:1; padding:15px; font-size:1.1rem; }
+        .settings-tabs { display:flex; gap:10px; margin-bottom:20px; justify-content:center; }
     </style>
 </head>
 <body>
@@ -246,7 +271,7 @@
             </div>
 
             <label class="import-btn" id="imp-btn" onmouseenter="playHover()">
-                <span id="imp-txt">📂 IMPORTAR MP3</span>
+                <span id="imp-txt">📂 IMPORTAR CANCION</span>
                 <input type="file" id="imp-input" accept="audio/*" style="display:none" onchange="handleAudio(this)" onclick="this.value=null">
             </label>
             <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
@@ -309,11 +334,13 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.79 (GOOGLE AUTH)</div>
+                <div class="patch-ver">VERSION 0.80 (SOCIAL OVERHAUL)</div>
                 <ul>
-                    <li><b>GOOGLE SIGN-IN:</b> Inicia sesión de forma segura con tu cuenta Google.</li>
-                    <li><b>ESTADO ONLINE REAL:</b> Detección precisa de actividad en amigos.</li>
-                    <li><b>PENALIZACIÓN RANKED:</b> -15pp si fallas en Ranked (<50% Acc).</li>
+                    <li><b>NOTIFICACIONES INTERACTIVAS:</b> Acepta solicitudes y desafíos directamente desde la alerta.</li>
+                    <li><b>PERFILES DE AMIGOS:</b> Haz clic en un amigo para ver su perfil completo y opciones.</li>
+                    <li><b>CHAT HÍBRIDO:</b> Chatea con amigos aunque estén desconectados.</li>
+                    <li><b>RANKING CON AVATARES:</b> Ahora puedes ver la foto de los mejores jugadores.</li>
+                    <li><b>MEJORAS DE CUENTA:</b> Registro automático y nueva pestaña de gestión en Ajustes.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -327,43 +354,63 @@
                 <input type="text" id="friend-inp" class="log-inp" placeholder="Nombre de usuario..." style="margin:0;">
                 <button class="btn-small btn-add" style="font-size:1rem;" onclick="sendFriendRequest()">AGREGAR</button>
             </div>
-            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">SOLICITUDES</div>
-            <div id="req-list" class="friend-list" style="margin-bottom:20px;"></div>
             <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS</div>
             <div id="friend-list" class="friend-list"></div>
             <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
         </div>
     </div>
 
+    <div id="modal-friend-profile" class="modal-overlay">
+        <div class="modal-panel login-box" style="text-align:center;">
+            <div id="fp-av"></div>
+            <div id="fp-name">...</div>
+            <div id="fp-lvl" style="color:var(--accent); font-weight:900;">LVL ...</div>
+            <div id="fp-stats">
+                <div class="fp-stat-box">SCORE<br><span id="fp-score" style="font-size:1.5rem; color:white;">0</span></div>
+                <div class="fp-stat-box">PP<br><span id="fp-pp" style="font-size:1.5rem; color:var(--blue);">0</span></div>
+            </div>
+            <div id="fp-status-text" style="color:#888; font-style:italic; margin-bottom:15px;">Desconectado</div>
+            <div class="fp-actions">
+                <button class="btn-chat" onclick="openChatWithFriend()">💬 CHATEAR</button>
+                <button id="btn-challenge" class="btn-add" disabled>⚔️ DESAFIAR</button>
+            </div>
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('friend-profile')">CERRAR</button>
+        </div>
+    </div>
+
     <div id="modal-online" class="modal-overlay">
         <div class="modal-panel" style="width:700px;">
-            <div class="m-title">ONLINE LOBBY</div>
+            <div class="m-title" id="lobby-title">ONLINE LOBBY</div>
             
-            <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
-            
-            <div class="lobby-box">
-                <div class="lobby-slot">
-                    <div class="slot-title">TU ELECCIÓN</div>
-                    <div class="slot-song" id="my-pick-name">...</div>
-                    <div class="slot-status" id="my-pick-status">Esperando selección...</div>
-                    <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
-                    <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
+            <div id="lobby-game-ui">
+                <div style="color:var(--accent); font-weight:900; margin-bottom:15px; text-align:center;">CONECTADO CON: <span id="lobby-opp-name">...</span></div>
+                <div class="lobby-box">
+                    <div class="lobby-slot">
+                        <div class="slot-title">TU ELECCIÓN</div>
+                        <div class="slot-song" id="my-pick-name">...</div>
+                        <div class="slot-status" id="my-pick-status">Esperando selección...</div>
+                        <button class="btn-small btn-add" style="margin-top:10px; width:100%;" onclick="document.getElementById('online-file').click()">ELEGIR CANCIÓN</button>
+                        <input type="file" id="online-file" accept="audio/*" style="display:none" onchange="handleOnlineFile(this)">
+                    </div>
+                    <div class="lobby-slot">
+                        <div class="slot-title">ELECCIÓN RIVAL</div>
+                        <div class="slot-song" id="opp-pick-name">...</div>
+                        <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
+                    </div>
                 </div>
-                <div class="lobby-slot">
-                    <div class="slot-title">ELECCIÓN RIVAL</div>
-                    <div class="slot-song" id="opp-pick-name">...</div>
-                    <div class="slot-status" id="opp-pick-status">Esperando al rival...</div>
+                 <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
+            </div>
+
+            <div id="chat-ui-container">
+                <div style="color:var(--blue); font-weight:bold; margin-bottom:5px;" id="chat-with-title">CHAT</div>
+                <div id="chat-box"></div>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
+                    <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
                 </div>
             </div>
 
-            <div id="chat-box"></div>
-            <div style="display:flex; gap:10px;">
-                <input type="text" id="chat-inp" class="log-inp" placeholder="Escribe algo..." style="margin:0; font-size:0.9rem; padding:10px;">
-                <button class="btn-small btn-add" onclick="sendChat()">ENVIAR</button>
-            </div>
-
-            <div id="roulette-msg" style="text-align:center; font-size:1.5rem; font-weight:900; color:var(--gold); min-height:40px; margin-top:15px;"></div>
-            <button class="action secondary" onclick="closeModal('online')" style="margin-top:20px;">SALIR</button>
+            <button class="action secondary" onclick="closeLobby()" style="margin-top:20px;">SALIR</button>
         </div>
     </div>
 
@@ -394,25 +441,40 @@
             </div>
             <div id="profile-view" style="display:none;">
                 <div class="m-title">TU PERFIL</div>
-                <label class="prof-av-big" id="p-av-big" style="z-index: 20;">
-                    <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" onclick="this.value=null">
-                </label>
-                <h2 id="p-name" style="margin:0;">User</h2>
-                <div id="p-lvl-txt" style="color:var(--accent); font-weight:900; font-size:1.4rem;">LVL 1</div>
                 
-                <div class="xp-container">
-                    <div class="xp-fill" id="p-xp-bar"></div>
-                </div>
-                <div class="xp-text" id="p-xp-txt">0 / 1000 XP</div>
-
-                <div style="color:var(--blue); font-weight:bold; margin:20px 0; font-size:1.2rem;">GLOBAL RANK: <span id="p-global-rank">#--</span></div>
-                
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;">
-                    <div style="background:#151515; padding:20px; border-radius:12px;">SCORE<br><span id="p-score" style="font-size:1.5rem; color:white;">0</span></div>
-                    <div style="background:#151515; padding:20px; border-radius:12px;">JUGADAS<br><span id="p-plays" style="font-size:1.5rem; color:white;">0</span></div>
+                <div class="settings-tabs">
+                    <div class="kb-tab active" id="ptab-resumen" onclick="switchProfileTab('resumen')">RESUMEN</div>
+                    <div class="kb-tab" id="ptab-cuenta" onclick="switchProfileTab('cuenta')">CUENTA</div>
                 </div>
 
-                <button class="action secondary" style="border-color:#F9393F; color:#F9393F;" onclick="logout()">CERRAR SESIÓN</button>
+                <div id="p-tab-content-resumen">
+                    <label class="prof-av-big" id="p-av-big" style="z-index: 20;">
+                        <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" onclick="this.value=null">
+                    </label>
+                    <h2 id="p-name" style="margin:0;">User</h2>
+                    <div id="p-lvl-txt" style="color:var(--accent); font-weight:900; font-size:1.4rem;">LVL 1</div>
+                    
+                    <div class="xp-container"><div class="xp-fill" id="p-xp-bar"></div></div>
+                    <div class="xp-text" id="p-xp-txt">0 / 1000 XP</div>
+
+                    <div style="color:var(--blue); font-weight:bold; margin:20px 0; font-size:1.2rem;">GLOBAL RANK: <span id="p-global-rank">#--</span></div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;">
+                        <div style="background:#151515; padding:20px; border-radius:12px;">SCORE<br><span id="p-score" style="font-size:1.5rem; color:white;">0</span></div>
+                        <div style="background:#151515; padding:20px; border-radius:12px;">JUGADAS<br><span id="p-plays" style="font-size:1.5rem; color:white;">0</span></div>
+                    </div>
+                </div>
+
+                <div id="p-tab-content-cuenta" style="display:none;">
+                    <div id="local-acc-settings">
+                        <div style="color:#aaa; margin-bottom:15px;">Cambiar Contraseña (Solo Cuentas Locales)</div>
+                        <input type="password" id="new-pass" class="log-inp" placeholder="Nueva contraseña">
+                        <button class="action secondary" onclick="changePassword()">ACTUALIZAR CONTRASEÑA</button>
+                    </div>
+                    <div id="google-acc-settings" style="display:none; color:#aaa; margin-top:20px;">
+                        Tu cuenta está vinculada con Google. Gestiona tu seguridad desde tu cuenta de Google.
+                    </div>
+                     <button class="action secondary" style="border-color:#F9393F; color:#F9393F; margin-top:30px;" onclick="logout()">CERRAR SESIÓN</button>
+                </div>
             </div>
             <button class="action secondary" style="margin-top:20px;" onclick="closeModal('profile')">CERRAR</button>
         </div>
@@ -535,13 +597,14 @@ const firebaseConfig = {
         } catch(e) { console.error("Error Firebase:", e); }
 
         const DB_KEY="omega_u_"; const LAST_KEY="omega_last"; const DB_NAME = "OmegaDB"; const DB_STORE = "songs";
-        
+        const CURRENT_VERSION = 80; // V80 FLAG
+
         let cfg = { 
             spd:22, den:5, vol:0.5, hvol:0.6, down:false, vivid:true, shake:true, off:0, trackOp:10, judgeY:40, judgeX:50, judgeS:7, judgeVis:true,
             modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
         };
         
-        let user = { name:"Guest", pass:"", avatar:null, bg:null, songs:[], pp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
+        let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
         let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
         let ctx=null, hitBuf=null, idb=null;
         let songFinished = false; 
@@ -549,7 +612,8 @@ const firebaseConfig = {
         // ONLINE VARIABLES
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
         let onlineState = { myPick: null, oppPick: null };
-        let currentChatRoom = null;
+        let currentChatRoom = null, chatListener = null;
+        let selectedFriend = null; // For friend profile modal
 
         let st = { 
             act:false, paused:false, ctx:null, src:null, t0:0, 
@@ -573,8 +637,9 @@ const firebaseConfig = {
             initOnline(); 
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
+            checkUpdate(); // V80 Check for updates
             
-            // PRESENCE SYSTEM (HEARTBEAT) - AGGRESSIVE (10s)
+            // PRESENCE SYSTEM (HEARTBEAT)
             setInterval(() => {
                 if(user.name !== "Guest" && db) {
                     db.collection("users").doc(user.name).update({
@@ -583,58 +648,78 @@ const firebaseConfig = {
                     });
                 }
             }, 10000); 
+            setupNotificationsListener();
         };
 
         window.addEventListener('keydown', onKd); 
         window.addEventListener('keyup', onKu);
 
+        /* === V80 UPDATE CHECKER === */
+        function checkUpdate() {
+            if(!db) return;
+            db.collection("system").doc("status").get().then(doc => {
+                if(doc.exists) {
+                    const data = doc.data();
+                    if(data.latestVersion > CURRENT_VERSION) {
+                        // Update available, show permanent blocking notification or redirect
+                        document.body.innerHTML = "<div style='display:flex;height:100vh;align-items:center;justify-content:center;flex-direction:column;'><h1 style='color:var(--accent);font-size:3rem;'>ACTUALIZACIÓN NECESARIA</h1><p>Hay una nueva versión del juego. Por favor, recarga la página.</p></div>";
+                    } else {
+                        // Check if we just updated
+                        const lastSeenVersion = localStorage.getItem("last_version");
+                        if(lastSeenVersion && parseInt(lastSeenVersion) < CURRENT_VERSION) {
+                             notifyInteractive("update_note", "¡JUEGO ACTUALIZADO!", "Bienvenido a la V80. Revisa las novedades en el menú principal.", 10000);
+                        }
+                        localStorage.setItem("last_version", CURRENT_VERSION);
+                    }
+                }
+            });
+        }
+
         /* === ONLINE SYSTEM === */
         function initOnline() {
             peer = new Peer(null, { secure: true }); 
-            
             peer.on('open', (id) => {
                 myPeerId = id;
-                const el = document.getElementById('my-peer-id');
-                if(el) el.innerText = id;
                 if(db && user.name !== "Guest") {
-                    db.collection("users").doc(user.name).set({
-                        peerId: id,
-                        online: true,
-                        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
+                    db.collection("users").doc(user.name).set({ peerId: id, online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
                 }
             });
             peer.on('error', (err) => { console.error(err); notify("Error Online: " + err.type, "error"); });
-            peer.on('connection', (c) => { conn = c; setupConnection(); notify("¡Jugador conectado!", "success"); enterLobby(); });
+            peer.on('connection', (c) => { 
+                conn = c; 
+                setupConnection(); 
+            });
         }
 
-        /* === AUTH === */
+        /* === AUTH (V80 IMPROVED FLOW) === */
         function loginGoogle() {
             if(!db) return notify("Error: Firebase no conectado", "error");
             const provider = new firebase.auth.GoogleAuthProvider();
             firebase.auth().signInWithPopup(provider).then(result => {
                 const u = result.user;
-                const name = u.displayName || u.email.split('@')[0];
-                handleAuthUser(name);
+                // Use a sanitized email prefix if display name is missing
+                const name = (u.displayName ? u.displayName.replace(/\s/g, '') : u.email.split('@')[0]).substring(0,15);
+                handleAuthUser(name, true);
             }).catch(e => notify("Error Google: " + e.message, "error"));
         }
 
-        function handleAuthUser(name) {
+        function handleAuthUser(name, isGoogle) {
             db.collection("users").doc(name).get().then(doc => {
                 if(doc.exists) {
                     user = {...user, ...doc.data()};
+                    finishLogin(name);
                 } else {
-                    // NEW GOOGLE USER
+                    // NEW USER -> REGISTER AUTOMATICALLY
                     const newUser = {
-                        name: name, pass: "google-auth", xp:0, lvl:1, pp:0, plays:0, score:0, 
-                        friends:[], requests:[], online:true, lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+                        name: name, pass: isGoogle ? "google-auth" : null, xp:0, lvl:1, pp:0, plays:0, score:0, 
+                        friends:[], avatarData:null, online:true, lastSeen: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     db.collection("users").doc(name).set(newUser);
                     db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
                     user = newUser;
+                    finishLogin(name);
+                    notify("¡Bienvenido, " + name + "!", "success");
                 }
-                localStorage.setItem(LAST_KEY, name);
-                location.reload();
             });
         }
 
@@ -642,18 +727,18 @@ const firebaseConfig = {
             const u = document.getElementById('l-user').value;
             const p = document.getElementById('l-pass').value;
             if(!db) {
+                // Local fallback
                 const d = localStorage.getItem(DB_KEY+u);
-                if(d){const o=JSON.parse(d).user;if(o.pass===p){user=o;localStorage.setItem(LAST_KEY,u);location.reload();}else notify("Contraseña incorrecta","error");}else notify("Usuario no encontrado (Local)","error");
+                if(d){const o=JSON.parse(d).user;if(o.pass===p){user=o;finishLogin(u);}else notify("Contraseña incorrecta","error");}else notify("Usuario local no encontrado","error");
                 return;
             }
             db.collection("users").doc(u).get().then(doc => {
                 if(doc.exists) {
                     const data = doc.data();
-                    if(data.pass === p) {
+                    if(data.pass === p && data.pass !== "google-auth") {
                         user = {...user, ...data};
-                        localStorage.setItem(LAST_KEY, u);
-                        location.reload();
-                    } else notify("Contraseña incorrecta", "error");
+                        finishLogin(u);
+                    } else notify("Contraseña incorrecta o usa Google", "error");
                 } else notify("Usuario no encontrado", "error");
             });
         }
@@ -667,119 +752,208 @@ const firebaseConfig = {
             db.collection("users").doc(u).get().then(doc => {
                 if(doc.exists) notify("El usuario ya existe", "error");
                 else {
-                    const newUser = { name:u, pass:p, xp:0, lvl:1, pp:0, plays:0, score:0, friends:[], requests:[], online:true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() };
-                    db.collection("users").doc(u).set(newUser).then(() => {
-                        user = newUser;
-                        localStorage.setItem(LAST_KEY, u);
-                        db.collection("leaderboard").doc(u).set({name:u, pp:0, score:0, lvl:1});
-                        location.reload();
-                    });
+                    handleAuthUser(u, false); // V80: Auto-login after register
                 }
             });
         }
 
-        function openOnline() {
-            if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
-            openModal('online'); 
+        function finishLogin(name) {
+            localStorage.setItem(LAST_KEY, name);
+            location.reload();
         }
 
+        function changePassword() {
+             const newPass = document.getElementById('new-pass').value;
+             if(!newPass || newPass.length < 4) return notify("Contraseña muy corta", "error");
+             if(user.pass === "google-auth") return notify("No puedes cambiar la contraseña de una cuenta Google aquí", "error");
+             
+             db.collection("users").doc(user.name).update({ pass: newPass }).then(() => {
+                 user.pass = newPass; save();
+                 notify("Contraseña actualizada", "success");
+                 document.getElementById('new-pass').value = "";
+             });
+        }
+
+        /* === SOCIAL & FRIENDS (V80 OVERHAUL) === */
         function openFriends() {
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             if(!db) return notify("Error de conexión", "error");
             
-            const reqL = document.getElementById('req-list');
             const friL = document.getElementById('friend-list');
-
             db.collection("users").doc(user.name).onSnapshot(doc => {
                 const data = doc.data();
-                if(data) {
-                    reqL.innerHTML = '';
-                    if(data.requests && data.requests.length > 0) {
-                        data.requests.forEach(req => {
-                            const d = document.createElement('div'); d.className='friend-row';
-                            d.innerHTML = `<span>${req}</span> <button class="btn-small btn-acc" onclick="acceptFriend('${req}')">ACEPTAR</button>`;
-                            reqL.appendChild(d);
-                        });
-                    } else { reqL.innerHTML = '<div style="color:#666;">No hay solicitudes</div>'; }
-
+                if(data && data.friends && data.friends.length > 0) {
                     friL.innerHTML = '';
-                    if(data.friends && data.friends.length > 0) {
-                        data.friends.forEach(f => {
-                            db.collection("users").doc(f).get().then(fDoc => {
-                                const fData = fDoc.data();
-                                // TIME BASED ONLINE CHECK (40s Threshold)
-                                const now = Math.floor(Date.now() / 1000);
-                                const last = fData.lastSeen ? fData.lastSeen.seconds : 0;
-                                const isOnline = (now - last) < 40; 
-                                const statusClass = isOnline ? 'online' : '';
-                                
-                                const d = document.createElement('div'); d.className='friend-row';
-                                let html = `<div style="display:flex;align-items:center;"><div class="friend-status ${statusClass}"></div><span style="color:var(--blue); font-weight:bold;">${f}</span></div>`;
-                                html += `<div style="display:flex;">
-                                            <button class="btn-small btn-chat" onclick="openDirectChat('${f}')">CHATEAR</button>`;
-                                if(isOnline) {
-                                    html += `<button class="btn-small btn-add" onclick="challengeFriend('${f}')">DESAFIAR</button>`;
-                                }
-                                html += `</div>`;
-                                d.innerHTML = html;
-                                friL.appendChild(d);
-                            });
+                    data.friends.forEach(f => {
+                        db.collection("users").doc(f).get().then(fDoc => {
+                            const fData = fDoc.data();
+                            // TIME BASED ONLINE CHECK (40s)
+                            const now = Math.floor(Date.now() / 1000);
+                            const last = fData.lastSeen ? fData.lastSeen.seconds : 0;
+                            const isOnline = (now - last) < 40; 
+                            
+                            const d = document.createElement('div'); d.className='friend-row';
+                            d.onclick = () => showFriendProfile(f, fData, isOnline); // V80: Open Profile
+                            
+                            let avStyle = fData.avatarData ? `background-image:url(${fData.avatarData})` : '';
+                            d.innerHTML = `<div style="display:flex;align-items:center;"><div class="friend-status ${isOnline?'online':''}"></div><div class="f-row-av" style="${avStyle}"></div><span class="friend-row-name">${f}</span></div>`;
+                            friL.appendChild(d);
                         });
-                    } else { friL.innerHTML = '<div style="color:#666;">No tienes amigos aún</div>'; }
-                }
+                    });
+                } else { friL.innerHTML = '<div style="color:#666; padding:20px;">No tienes amigos aún. ¡Agrega a alguien!</div>'; }
             });
             openModal('friends');
+        }
+
+        // V80 NEW FRIEND PROFILE
+        function showFriendProfile(fName, fData, isOnline) {
+            selectedFriend = fName;
+            document.getElementById('fp-name').innerText = fName;
+            document.getElementById('fp-lvl').innerText = "LVL " + fData.lvl;
+            document.getElementById('fp-score').innerText = fData.score.toLocaleString();
+            document.getElementById('fp-pp').innerText = fData.pp;
+            
+            if(fData.avatarData) document.getElementById('fp-av').style.backgroundImage = `url(${fData.avatarData})`;
+            else document.getElementById('fp-av').style.backgroundImage = '';
+
+            const statusTxt = document.getElementById('fp-status-text');
+            const chalBtn = document.getElementById('btn-challenge');
+            if(isOnline) {
+                statusTxt.innerText = "En línea"; statusTxt.style.color = "var(--good)";
+                chalBtn.disabled = false;
+            } else {
+                statusTxt.innerText = "Desconectado"; statusTxt.style.color = "#888";
+                chalBtn.disabled = true; chalBtn.onclick = null;
+            }
+            chalBtn.onclick = () => { challengeFriend(fName); closeModal('friend-profile'); };
+            
+            closeModal('friends');
+            openModal('friend-profile');
         }
 
         function sendFriendRequest() {
             const target = document.getElementById('friend-inp').value.trim();
             if(!target || target === user.name) return;
-            
             db.collection("users").doc(target).get().then(doc => {
                 if(doc.exists) {
-                    db.collection("users").doc(target).update({ requests: firebase.firestore.FieldValue.arrayUnion(user.name) });
+                    // V80: Send notification document instead of array update for better handling
+                    sendNotification(target, 'friend_req', 'Solicitud de Amistad', user.name + ' quiere ser tu amigo.');
                     notify("Solicitud enviada a " + target);
                 } else notify("Usuario no encontrado", "error");
             });
         }
 
-        function acceptFriend(target) {
-            const batch = db.batch();
-            const myRef = db.collection("users").doc(user.name);
-            const theirRef = db.collection("users").doc(target);
-            batch.update(myRef, { friends: firebase.firestore.FieldValue.arrayUnion(target), requests: firebase.firestore.FieldValue.arrayRemove(target) });
-            batch.update(theirRef, { friends: firebase.firestore.FieldValue.arrayUnion(user.name) }); // FIX: update not set to avoid overwrite
-            batch.commit().then(() => notify("¡Ahora eres amigo de " + target + "!"));
-        }
-
-        function openDirectChat(target) {
-            challengeFriend(target); 
+        function openChatWithFriend() {
+             if(selectedFriend) {
+                 closeModal('friend-profile');
+                 openOnline(true, selectedFriend); // Open lobby in chat mode
+             }
         }
 
         function challengeFriend(target) {
             db.collection("users").doc(target).get().then(doc => {
                 const data = doc.data();
                 if(doc.exists && data.peerId) {
-                    const pid = data.peerId;
-                    conn = peer.connect(pid);
-                    setupConnection();
-                    notify("Conectando con " + target + "...");
-                    closeModal('friends');
+                    // V80: Send interactive notification for challenge
+                    sendNotification(target, 'challenge', '¡Desafío 1v1!', user.name + ' te desafía a un duelo.');
+                    notify("Desafío enviado a " + target + ". Esperando respuesta...");
                 } else notify(target + " no está disponible", "error");
             });
         }
 
-        function copyID() { if(myPeerId) { navigator.clipboard.writeText(myPeerId); notify("ID copiado"); } }
-        function connectToPeer() {
-            const id = document.getElementById('friend-id-inp').value.trim();
-            if(!id) return;
-            conn = peer.connect(id);
-            setupConnection();
-            notify("Conectando...", "info");
+        /* === V80 INTERACTIVE NOTIFICATIONS === */
+        function setupNotificationsListener() {
+            if(user.name === "Guest" || !db) return;
+            db.collection("users").doc(user.name).collection("notifications").where("read", "==", false)
+                .onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        if(change.type === "added") {
+                            const n = change.doc.data();
+                            handleNotification(change.doc.id, n);
+                        }
+                    });
+                });
+        }
+
+        function handleNotification(id, data) {
+            // Mark as read immediately to avoid spam
+            db.collection("users").doc(user.name).collection("notifications").doc(id).update({read:true});
+
+            let html = data.body;
+            let duration = 8000;
+
+            if(data.type === 'friend_req') {
+                html += `<div class="notify-actions"><button class="notify-btn btn-accept" onclick="respondFriend('${data.from}', true, '${id}')">ACEPTAR</button><button class="notify-btn btn-deny" onclick="respondFriend('${data.from}', false, '${id}')">RECHAZAR</button></div>`;
+                duration = 15000;
+            } else if (data.type === 'challenge') {
+                html += `<div class="notify-actions"><button class="notify-btn btn-accept" onclick="acceptChallenge('${data.from}', '${id}')">ACEPTAR</button><button class="notify-btn btn-deny" onclick="closeNotification('${id}')">RECHAZAR</button></div>`;
+                duration = 10000;
+            }
+
+            notifyInteractive(id, data.title, html, duration);
+        }
+
+        function sendNotification(target, type, title, body) {
+            db.collection("users").doc(target).collection("notifications").add({
+                type: type, title: title, body: body, from: user.name, read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        function respondFriend(target, accept, notifId) {
+            closeNotification(notifId);
+            if(accept) {
+                const batch = db.batch();
+                batch.update(db.collection("users").doc(user.name), { friends: firebase.firestore.FieldValue.arrayUnion(target) });
+                batch.update(db.collection("users").doc(target), { friends: firebase.firestore.FieldValue.arrayUnion(user.name) });
+                batch.commit().then(() => notify("¡Ahora eres amigo de " + target + "!"));
+            }
+        }
+
+        function acceptChallenge(target, notifId) {
+            closeNotification(notifId);
+            // Connect to the challenger
+             db.collection("users").doc(target).get().then(doc => {
+                if(doc.exists && doc.data().peerId) {
+                    conn = peer.connect(doc.data().peerId);
+                    setupConnection();
+                } else notify("El retador ya no está disponible.", "error");
+            });
+        }
+
+        function notifyInteractive(id, title, html, duration) {
+            const area = document.getElementById('notification-area');
+            const card = document.createElement('div'); card.className = 'notify-card'; card.id = 'notif-'+id;
+            card.innerHTML = `<div class="notify-content"><div class="notify-title">${title}</div><div class="notify-body">${html}</div></div><div class="notify-progress" style="transition-duration:${duration}ms"></div>`;
+            area.appendChild(card);
+            setTimeout(() => card.querySelector('.notify-progress').style.width = '0%', 50);
+            setTimeout(() => closeNotification(id), duration);
+        }
+        function closeNotification(id) {
+            const card = document.getElementById('notif-'+id);
+            if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); }
+        }
+
+        /* === ONLINE LOBBY & CHAT === */
+        function openOnline(chatMode = false, chatPartner = null) {
+            if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
+            
+            const lobbyUi = document.getElementById('lobby-game-ui');
+            const chatTitle = document.getElementById('chat-with-title');
+            
+            if(chatMode && chatPartner) {
+                lobbyUi.style.display = 'none';
+                chatTitle.innerText = "CHAT CON " + chatPartner.toUpperCase();
+                initChatListener(chatPartner);
+            } else {
+                lobbyUi.style.display = 'block';
+                chatTitle.innerText = "CHAT DE SALA";
+                // Chat listener init handled by connection
+            }
+            openModal('online'); 
         }
 
         function setupConnection() {
-            conn.on('open', () => { conn.send({ type: 'hello', name: user.name }); enterLobby(); });
+            conn.on('open', () => { conn.send({ type: 'hello', name: user.name }); openOnline(); });
             conn.on('data', async (data) => {
                 if(data.type === 'hello') {
                     notify("Conectado con: " + data.name);
@@ -787,7 +961,6 @@ const firebaseConfig = {
                     document.getElementById('lobby-opp-name').innerText = data.name;
                     initChatListener(data.name); 
                 }
-                if(data.type === 'chat') { addChatMsg(data.name, data.msg); }
                 if(data.type === 'song_data') {
                     notify("Recibiendo canción...");
                     document.getElementById('opp-pick-name').innerText = data.name;
@@ -803,20 +976,22 @@ const firebaseConfig = {
                     document.getElementById('p2-score').innerText = opponentScore.toLocaleString();
                 }
             });
+            conn.on('close', () => { notify("Conexión perdida.", "error"); closeLobby(); });
         }
 
-        function enterLobby() {
-            openModal('online');
-            document.getElementById('online-connect-view').style.display = 'none';
-            document.getElementById('online-lobby-view').style.display = 'block';
+        function closeLobby() {
+            if(conn) conn.close();
+            if(chatListener) chatListener(); // Unsubscribe
+            closeModal('online');
         }
 
         function initChatListener(oppName) {
             const users = [user.name, oppName].sort();
             currentChatRoom = users.join("_");
             document.getElementById('chat-box').innerHTML = ''; 
-            db.collection("chats").doc(currentChatRoom).collection("messages")
-                .orderBy("timestamp").limit(20)
+            if(chatListener) chatListener(); 
+            chatListener = db.collection("chats").doc(currentChatRoom).collection("messages")
+                .orderBy("timestamp").limit(30)
                 .onSnapshot(snapshot => {
                     snapshot.docChanges().forEach(change => {
                         if(change.type === "added") { addChatMsgUI(change.doc.data().user, change.doc.data().text); }
@@ -841,8 +1016,6 @@ const firebaseConfig = {
             box.appendChild(d);
             box.scrollTop = box.scrollHeight;
         }
-
-        function addChatMsg(name, msg) {} // P2P dummy
 
         function filterBadWords(text) {
             const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto", "mierda"];
@@ -962,7 +1135,11 @@ const firebaseConfig = {
                             document.getElementById('p-global-rank').innerText = "#" + i;
                             if(d.pp > user.pp) { user.pp = d.pp; save(); }
                         }
-                        tr.innerHTML = `<td>#${i++}</td><td>${d.name}</td><td style="color:var(--blue)">${d.pp}pp</td>`;
+                        // V80: Add Avatar to Ranking
+                        let avHtml = '<div class="rank-av"></div>';
+                        if(d.avatarData) avHtml = `<div class="rank-av" style="background-image:url(${d.avatarData})"></div>`;
+                        
+                        tr.innerHTML = `<td>#${i++}</td><td>${avHtml}${d.name}</td><td style="color:var(--blue)">${d.pp}pp</td>`;
                         l.appendChild(tr);
                     });
                 });
@@ -975,7 +1152,7 @@ const firebaseConfig = {
                 all.forEach((p,i)=>{
                     const tr = document.createElement('tr');
                     if(p.n===user.name) tr.className='rank-row-me';
-                    tr.innerHTML = `<td>#${i+1}</td><td>${p.n}</td><td style="color:var(--blue)">${p.p}pp</td>`;
+                    tr.innerHTML = `<td>#${i+1}</td><td><div class="rank-av"></div>${p.n}</td><td style="color:var(--blue)">${p.p}pp</td>`;
                     l.appendChild(tr);
                 });
                 openModal('rank');
@@ -985,9 +1162,9 @@ const firebaseConfig = {
         function updateFirebaseScore() {
             if(db && user.name !== "Guest") {
                 db.collection("leaderboard").doc(user.name).set({
-                    name: user.name, pp: user.pp, score: user.score, lvl: user.lvl
+                    name: user.name, pp: user.pp, score: user.score, lvl: user.lvl, avatarData: user.avatarData
                 }, { merge: true });
-                db.collection("users").doc(user.name).set({ name: user.name }, { merge: true });
+                db.collection("users").doc(user.name).set({ name: user.name, score:user.score, pp:user.pp, lvl:user.lvl }, { merge: true });
             }
         }
 
@@ -1006,7 +1183,11 @@ const firebaseConfig = {
             document.getElementById('p-xp-txt').innerText = `${user.xp} / ${targetXP} XP`;
             document.getElementById('p-global-rank').innerText = "#--";
             
-            if(user.avatar) { document.getElementById('m-av').style.backgroundImage=`url(${user.avatar})`; document.getElementById('m-av').innerText=""; document.getElementById('p-av-big').style.backgroundImage=`url(${user.avatar})`; document.getElementById('ig-av').style.backgroundImage=`url(${user.avatar})`; }
+            if(user.avatarData) { 
+                document.getElementById('m-av').style.backgroundImage=`url(${user.avatarData})`; document.getElementById('m-av').innerText=""; 
+                document.getElementById('p-av-big').style.backgroundImage=`url(${user.avatarData})`; 
+                document.getElementById('ig-av').style.backgroundImage=`url(${user.avatarData})`; 
+            }
             if(user.bg) { document.getElementById('bg-image').src=user.bg; document.getElementById('bg-image').style.opacity=0.3; }
 
             document.getElementById('set-spd').value=cfg.spd;
@@ -1015,13 +1196,25 @@ const firebaseConfig = {
             document.getElementById('set-hvol').value=cfg.hvol*100;
             document.getElementById('set-down').checked=cfg.down;
             document.getElementById('set-vivid').checked=cfg.vivid;
-            const shakeEl = document.getElementById('set-shake'); if(shakeEl) shakeEl.checked=cfg.shake;
+            const shakeEl = document.getElementById('set-shake'); if(shakeEl) cfg.shake=shakeEl.checked;
             document.getElementById('set-off').value=cfg.off;
             document.getElementById('set-track-op').value=cfg.trackOp;
             document.getElementById('set-judge-y').value=cfg.judgeY;
             document.getElementById('set-judge-x').value=cfg.judgeX;
             document.getElementById('set-judge-s').value=cfg.judgeS;
             document.getElementById('set-judge-vis').checked=cfg.judgeVis;
+            
+            // V80 Profile Tabs
+            const isGoogle = user.pass === "google-auth";
+            document.getElementById('local-acc-settings').style.display = isGoogle ? 'none' : 'block';
+            document.getElementById('google-acc-settings').style.display = isGoogle ? 'block' : 'none';
+        }
+
+        function switchProfileTab(tab) {
+            document.querySelectorAll('.settings-tabs .kb-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('ptab-'+tab).classList.add('active');
+            document.getElementById('p-tab-content-resumen').style.display = tab === 'resumen' ? 'block' : 'none';
+            document.getElementById('p-tab-content-cuenta').style.display = tab === 'cuenta' ? 'block' : 'none';
         }
 
         /* === AUDIO & ENGINE === */
@@ -1218,7 +1411,7 @@ const firebaseConfig = {
         function applyCfg() { document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100); document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%'); document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%'); document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10); document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0); }
         function saveProfile(){ user.name=document.getElementById('l-user').value||"Guest"; save(); closeModal('profile'); }
         function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
-        function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;save(); updUI();}; r.readAsDataURL(i.files[0]); i.value=""; }}
+        function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;user.avatarData=e.target.result;save(); updUI(); updateFirebaseScore();}; r.readAsDataURL(i.files[0]); i.value=""; }}
         function renderLaneConfig(k){ document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); document.getElementById('tab-'+k).classList.add('active'); const c=document.getElementById('lanes-container'); c.innerHTML=''; for(let i=0; i<k; i++){ const l = cfg.modes[k][i]; const d=document.createElement('div'); d.className='l-col'; const shapePath = PATHS[l.s] || PATHS['circle']; d.innerHTML=`<div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; c.appendChild(d); } }
         function remapKey(k,i){ 
             if(document.activeElement) document.activeElement.blur(); 
