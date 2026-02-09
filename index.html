@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>A NOTES GAME</title>
-    <link rel="icon" type="image/png" href="icon.png"
+    <link rel="icon" type="image/png" href="icon.png"  
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
@@ -12,7 +12,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
     <style>
-        /* === ESTILOS BASE V80 === */
+        /* === ESTILOS BASE === */
         @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700;900&family=Nunito:wght@700;900&display=swap');
 
         :root {
@@ -25,26 +25,55 @@
         * { box-sizing: border-box; user-select: none; outline: none; }
         body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakra Petch', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
 
-        @keyframes slideIn { 0% { transform: translateX(100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
-        @keyframes slideOut { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
+        @keyframes slideIn { 0% { transform: translateX(120%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(120%); opacity: 0; } }
         @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes pulse-btn { 0% { box-shadow: 0 0 0 0 rgba(255, 102, 170, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(255, 102, 170, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 102, 170, 0); } }
         @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(3px, 3px); } 50% { transform: translate(-3px, -3px); } 75% { transform: translate(3px, -3px); } 100% { transform: translate(0,0); } }
         .shaking { animation: shake 0.15s ease-in-out; }
 
-        /* --- NUEVO SISTEMA DE NOTIFICACIONES V80 --- */
-        #notification-area { position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 350px; }
-        .notify-card { background: rgba(20, 20, 30, 0.98); border-left: 5px solid var(--accent); border-radius: 8px; box-shadow: 0 5px 25px rgba(0,0,0,0.7); pointer-events: auto; overflow: hidden; position: relative; animation: slideIn 0.3s ease-out; transition: 0.3s; }
+        /* === SISTEMA DE NOTIFICACIONES V81 (RESTORED) === */
+        #notification-area { position: fixed; top: 20px; right: 20px; z-index: 20000; display: flex; flex-direction: column; gap: 12px; pointer-events: none; width: 320px; }
+        
+        .notify-card { 
+            background: rgba(15, 15, 20, 0.95); 
+            backdrop-filter: blur(10px);
+            border-left: 5px solid var(--accent); 
+            border-radius: 6px; 
+            box-shadow: 0 8px 30px rgba(0,0,0,0.6); 
+            pointer-events: auto; 
+            position: relative; 
+            overflow: hidden;
+            animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+            transition: 0.3s;
+        }
+        
         .notify-card.closing { animation: slideOut 0.3s ease-in forwards; }
-        .notify-content { padding: 15px; }
-        .notify-title { font-weight: 900; font-size: 1.1rem; margin-bottom: 5px; color: var(--blue); display: flex; align-items: center; gap: 10px; }
-        .notify-body { font-family: 'Nunito'; font-size: 0.95rem; color: #ddd; line-height: 1.4; }
-        .notify-actions { display: flex; gap: 10px; margin-top: 15px; }
-        .notify-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: 900; cursor: pointer; font-family: 'Chakra Petch'; transition: 0.2s; }
-        .btn-accept { background: var(--good); color: black; } .btn-deny { background: var(--miss); color: white; }
-        .notify-btn:hover { filter: brightness(1.1); transform: scale(1.02); }
-        .notify-progress { position: absolute; bottom: 0; left: 0; height: 4px; background: var(--accent); width: 100%; transition: width linear; }
+        
+        .notify-content { padding: 18px 20px; }
+        
+        .notify-title { 
+            font-weight: 900; font-size: 1rem; margin-bottom: 6px; 
+            text-transform: uppercase; color: var(--accent); letter-spacing: 1px;
+            display:flex; justify-content:space-between;
+        }
+        
+        .notify-body { 
+            font-family: 'Nunito'; font-size: 0.95rem; color: #eee; line-height: 1.4; font-weight: 600; 
+        }
+        
+        .notify-progress { 
+            position: absolute; bottom: 0; left: 0; height: 4px; 
+            background: var(--accent); width: 100%; 
+            transition-timing-function: linear; 
+        }
 
+        .notify-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .notify-btn { flex: 1; padding: 8px; border: none; border-radius: 4px; font-weight: 900; cursor: pointer; font-family: 'Chakra Petch'; transition: 0.2s; font-size: 0.8rem; }
+        .btn-accept { background: var(--good); color: black; } 
+        .btn-deny { background: var(--miss); color: white; }
+        .notify-btn:hover { filter: brightness(1.2); transform: translateY(-2px); }
+
+        /* Game Layers */
         #bg-layer { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 0; pointer-events: none; background: #000; overflow: hidden; }
         #bg-video, #bg-image { width: 100%; height: 100%; object-fit: cover; opacity: 0.3; position: absolute; top:0; left:0; transition: opacity 0.5s; filter: brightness(0.5); }
         
@@ -119,8 +148,6 @@
         .lane-flash.active { opacity: 0.6; }
 
         .splash { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--c); z-index: 300; pointer-events: none; animation: splash 0.3s ease-out forwards; top: -30px; opacity: 0; box-shadow: 0 0 30px var(--c); }
-        .particle { position: fixed; width: 15px; height: 15px; border-radius: 50%; z-index: 400; animation: burst 0.5s ease-out forwards; pointer-events: none; }
-        @keyframes burst { 0% { transform: translate(0,0) scale(1); opacity: 1; } 100% { transform: translate(var(--vx), var(--vy)) scale(0); opacity: 0; } }
 
         #hud { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); text-align: right; pointer-events: none; z-index: 300; display: flex; flex-direction: row; align-items: center; gap: 20px; }
         .stats-col { display: flex; flex-direction: column; gap: 10px; text-shadow: 0 2px 10px black; align-items: flex-end; }
@@ -271,7 +298,7 @@
             </div>
 
             <label class="import-btn" id="imp-btn" onmouseenter="playHover()">
-                <span id="imp-txt">📂 IMPORTAR CANCION</span>
+                <span id="imp-txt">📂 IMPORTAR MP3</span>
                 <input type="file" id="imp-input" accept="audio/*" style="display:none" onchange="handleAudio(this)" onclick="this.value=null">
             </label>
             <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
@@ -334,13 +361,11 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION 0.80 (SOCIAL OVERHAUL)</div>
+                <div class="patch-ver">VERSION 0.81 (VISUAL RESTORE)</div>
                 <ul>
-                    <li><b>NOTIFICACIONES INTERACTIVAS:</b> Acepta solicitudes y desafíos directamente desde la alerta.</li>
-                    <li><b>PERFILES DE AMIGOS:</b> Haz clic en un amigo para ver su perfil completo y opciones.</li>
-                    <li><b>CHAT HÍBRIDO:</b> Chatea con amigos aunque estén desconectados.</li>
-                    <li><b>RANKING CON AVATARES:</b> Ahora puedes ver la foto de los mejores jugadores.</li>
-                    <li><b>MEJORAS DE CUENTA:</b> Registro automático y nueva pestaña de gestión en Ajustes.</li>
+                    <li><b>NOTIFICACIONES PRO:</b> Vuelven las tarjetas con animación y barra de tiempo.</li>
+                    <li><b>SOCIAL MEJORADO:</b> Interactúa mejor con solicitudes y desafíos.</li>
+                    <li><b>GOOGLE LOGIN FIX:</b> Creación de cuenta automática corregida.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -354,6 +379,8 @@
                 <input type="text" id="friend-inp" class="log-inp" placeholder="Nombre de usuario..." style="margin:0;">
                 <button class="btn-small btn-add" style="font-size:1rem;" onclick="sendFriendRequest()">AGREGAR</button>
             </div>
+            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">SOLICITUDES</div>
+            <div id="req-list" class="friend-list" style="margin-bottom:20px;"></div>
             <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS</div>
             <div id="friend-list" class="friend-list"></div>
             <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
@@ -597,7 +624,7 @@ const firebaseConfig = {
         } catch(e) { console.error("Error Firebase:", e); }
 
         const DB_KEY="omega_u_"; const LAST_KEY="omega_last"; const DB_NAME = "OmegaDB"; const DB_STORE = "songs";
-        const CURRENT_VERSION = 80; // V80 FLAG
+        const CURRENT_VERSION = 81; 
 
         let cfg = { 
             spd:22, den:5, vol:0.5, hvol:0.6, down:false, vivid:true, shake:true, off:0, trackOp:10, judgeY:40, judgeX:50, judgeS:7, judgeVis:true,
@@ -613,7 +640,7 @@ const firebaseConfig = {
         let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
         let onlineState = { myPick: null, oppPick: null };
         let currentChatRoom = null, chatListener = null;
-        let selectedFriend = null; // For friend profile modal
+        let selectedFriend = null; 
 
         let st = { 
             act:false, paused:false, ctx:null, src:null, t0:0, 
@@ -637,7 +664,7 @@ const firebaseConfig = {
             initOnline(); 
             document.addEventListener('click', unlockAudio); 
             renderMenu(); 
-            checkUpdate(); // V80 Check for updates
+            checkUpdate();
             
             // PRESENCE SYSTEM (HEARTBEAT)
             setInterval(() => {
@@ -654,22 +681,14 @@ const firebaseConfig = {
         window.addEventListener('keydown', onKd); 
         window.addEventListener('keyup', onKu);
 
-        /* === V80 UPDATE CHECKER === */
+        /* === UPDATE CHECKER === */
         function checkUpdate() {
             if(!db) return;
             db.collection("system").doc("status").get().then(doc => {
                 if(doc.exists) {
                     const data = doc.data();
                     if(data.latestVersion > CURRENT_VERSION) {
-                        // Update available, show permanent blocking notification or redirect
-                        document.body.innerHTML = "<div style='display:flex;height:100vh;align-items:center;justify-content:center;flex-direction:column;'><h1 style='color:var(--accent);font-size:3rem;'>ACTUALIZACIÓN NECESARIA</h1><p>Hay una nueva versión del juego. Por favor, recarga la página.</p></div>";
-                    } else {
-                        // Check if we just updated
-                        const lastSeenVersion = localStorage.getItem("last_version");
-                        if(lastSeenVersion && parseInt(lastSeenVersion) < CURRENT_VERSION) {
-                             notifyInteractive("update_note", "¡JUEGO ACTUALIZADO!", "Bienvenido a la V80. Revisa las novedades en el menú principal.", 10000);
-                        }
-                        localStorage.setItem("last_version", CURRENT_VERSION);
+                         notifyInteractive("update_note", "¡ACTUALIZACIÓN!", "Nueva versión disponible. Por favor recarga la página.", 10000);
                     }
                 }
             });
@@ -684,20 +703,19 @@ const firebaseConfig = {
                     db.collection("users").doc(user.name).set({ peerId: id, online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
                 }
             });
-            peer.on('error', (err) => { console.error(err); notify("Error Online: " + err.type, "error"); });
+            peer.on('error', (err) => { console.error(err); });
             peer.on('connection', (c) => { 
                 conn = c; 
                 setupConnection(); 
             });
         }
 
-        /* === AUTH (V80 IMPROVED FLOW) === */
+        /* === AUTH === */
         function loginGoogle() {
             if(!db) return notify("Error: Firebase no conectado", "error");
             const provider = new firebase.auth.GoogleAuthProvider();
             firebase.auth().signInWithPopup(provider).then(result => {
                 const u = result.user;
-                // Use a sanitized email prefix if display name is missing
                 const name = (u.displayName ? u.displayName.replace(/\s/g, '') : u.email.split('@')[0]).substring(0,15);
                 handleAuthUser(name, true);
             }).catch(e => notify("Error Google: " + e.message, "error"));
@@ -709,7 +727,7 @@ const firebaseConfig = {
                     user = {...user, ...doc.data()};
                     finishLogin(name);
                 } else {
-                    // NEW USER -> REGISTER AUTOMATICALLY
+                    // NEW USER
                     const newUser = {
                         name: name, pass: isGoogle ? "google-auth" : null, xp:0, lvl:1, pp:0, plays:0, score:0, 
                         friends:[], avatarData:null, online:true, lastSeen: firebase.firestore.FieldValue.serverTimestamp()
@@ -752,7 +770,7 @@ const firebaseConfig = {
             db.collection("users").doc(u).get().then(doc => {
                 if(doc.exists) notify("El usuario ya existe", "error");
                 else {
-                    handleAuthUser(u, false); // V80: Auto-login after register
+                    handleAuthUser(u, false); 
                 }
             });
         }
@@ -774,7 +792,7 @@ const firebaseConfig = {
              });
         }
 
-        /* === SOCIAL & FRIENDS (V80 OVERHAUL) === */
+        /* === SOCIAL & FRIENDS === */
         function openFriends() {
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             if(!db) return notify("Error de conexión", "error");
@@ -787,13 +805,12 @@ const firebaseConfig = {
                     data.friends.forEach(f => {
                         db.collection("users").doc(f).get().then(fDoc => {
                             const fData = fDoc.data();
-                            // TIME BASED ONLINE CHECK (40s)
                             const now = Math.floor(Date.now() / 1000);
                             const last = fData.lastSeen ? fData.lastSeen.seconds : 0;
                             const isOnline = (now - last) < 40; 
                             
                             const d = document.createElement('div'); d.className='friend-row';
-                            d.onclick = () => showFriendProfile(f, fData, isOnline); // V80: Open Profile
+                            d.onclick = () => showFriendProfile(f, fData, isOnline);
                             
                             let avStyle = fData.avatarData ? `background-image:url(${fData.avatarData})` : '';
                             d.innerHTML = `<div style="display:flex;align-items:center;"><div class="friend-status ${isOnline?'online':''}"></div><div class="f-row-av" style="${avStyle}"></div><span class="friend-row-name">${f}</span></div>`;
@@ -805,7 +822,6 @@ const firebaseConfig = {
             openModal('friends');
         }
 
-        // V80 NEW FRIEND PROFILE
         function showFriendProfile(fName, fData, isOnline) {
             selectedFriend = fName;
             document.getElementById('fp-name').innerText = fName;
@@ -836,7 +852,6 @@ const firebaseConfig = {
             if(!target || target === user.name) return;
             db.collection("users").doc(target).get().then(doc => {
                 if(doc.exists) {
-                    // V80: Send notification document instead of array update for better handling
                     sendNotification(target, 'friend_req', 'Solicitud de Amistad', user.name + ' quiere ser tu amigo.');
                     notify("Solicitud enviada a " + target);
                 } else notify("Usuario no encontrado", "error");
@@ -846,7 +861,7 @@ const firebaseConfig = {
         function openChatWithFriend() {
              if(selectedFriend) {
                  closeModal('friend-profile');
-                 openOnline(true, selectedFriend); // Open lobby in chat mode
+                 openOnline(true, selectedFriend); 
              }
         }
 
@@ -854,14 +869,13 @@ const firebaseConfig = {
             db.collection("users").doc(target).get().then(doc => {
                 const data = doc.data();
                 if(doc.exists && data.peerId) {
-                    // V80: Send interactive notification for challenge
                     sendNotification(target, 'challenge', '¡Desafío 1v1!', user.name + ' te desafía a un duelo.');
                     notify("Desafío enviado a " + target + ". Esperando respuesta...");
                 } else notify(target + " no está disponible", "error");
             });
         }
 
-        /* === V80 INTERACTIVE NOTIFICATIONS === */
+        /* === NOTIFICATIONS V81 === */
         function setupNotificationsListener() {
             if(user.name === "Guest" || !db) return;
             db.collection("users").doc(user.name).collection("notifications").where("read", "==", false)
@@ -876,7 +890,6 @@ const firebaseConfig = {
         }
 
         function handleNotification(id, data) {
-            // Mark as read immediately to avoid spam
             db.collection("users").doc(user.name).collection("notifications").doc(id).update({read:true});
 
             let html = data.body;
@@ -911,7 +924,6 @@ const firebaseConfig = {
 
         function acceptChallenge(target, notifId) {
             closeNotification(notifId);
-            // Connect to the challenger
              db.collection("users").doc(target).get().then(doc => {
                 if(doc.exists && doc.data().peerId) {
                     conn = peer.connect(doc.data().peerId);
@@ -925,15 +937,32 @@ const firebaseConfig = {
             const card = document.createElement('div'); card.className = 'notify-card'; card.id = 'notif-'+id;
             card.innerHTML = `<div class="notify-content"><div class="notify-title">${title}</div><div class="notify-body">${html}</div></div><div class="notify-progress" style="transition-duration:${duration}ms"></div>`;
             area.appendChild(card);
-            setTimeout(() => card.querySelector('.notify-progress').style.width = '0%', 50);
+            setTimeout(() => { 
+                const prog = card.querySelector('.notify-progress');
+                if(prog) prog.style.width = '0%'; 
+            }, 50);
             setTimeout(() => closeNotification(id), duration);
         }
+        
+        function notify(msg, type="info", duration=3000) {
+            const area = document.getElementById('notification-area');
+            const id = Date.now();
+            const card = document.createElement('div'); card.className = 'notify-card'; card.id = 'notif-'+id;
+            if(type==="error") card.style.borderLeftColor = "#F9393F";
+            else if(type==="success") card.style.borderLeftColor = "#12FA05";
+            
+            card.innerHTML = `<div class="notify-content"><div class="notify-title">${type.toUpperCase()}</div><div class="notify-body">${msg}</div></div><div class="notify-progress" style="transition-duration:${duration}ms"></div>`;
+            area.appendChild(card);
+            setTimeout(() => { const prog = card.querySelector('.notify-progress'); if(prog) prog.style.width = '0%'; }, 50);
+            setTimeout(() => closeNotification(id), duration);
+        }
+
         function closeNotification(id) {
             const card = document.getElementById('notif-'+id);
             if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); }
         }
 
-        /* === ONLINE LOBBY & CHAT === */
+        /* === ONLINE LOBBY === */
         function openOnline(chatMode = false, chatPartner = null) {
             if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
             
@@ -947,7 +976,6 @@ const firebaseConfig = {
             } else {
                 lobbyUi.style.display = 'block';
                 chatTitle.innerText = "CHAT DE SALA";
-                // Chat listener init handled by connection
             }
             openModal('online'); 
         }
@@ -961,6 +989,7 @@ const firebaseConfig = {
                     document.getElementById('lobby-opp-name').innerText = data.name;
                     initChatListener(data.name); 
                 }
+                if(data.type === 'chat') { addChatMsg(data.name, data.msg); }
                 if(data.type === 'song_data') {
                     notify("Recibiendo canción...");
                     document.getElementById('opp-pick-name').innerText = data.name;
@@ -981,7 +1010,7 @@ const firebaseConfig = {
 
         function closeLobby() {
             if(conn) conn.close();
-            if(chatListener) chatListener(); // Unsubscribe
+            if(chatListener) chatListener();
             closeModal('online');
         }
 
@@ -1016,6 +1045,8 @@ const firebaseConfig = {
             box.appendChild(d);
             box.scrollTop = box.scrollHeight;
         }
+
+        function addChatMsg(name, msg) {} 
 
         function filterBadWords(text) {
             const bad = ["bobo", "tonto", "idiota", "noob", "ptm", "ctm", "verga", "puto", "mierda"];
@@ -1288,9 +1319,14 @@ const firebaseConfig = {
                     const dirClass = cfg.down ? 'hold-down' : 'hold-up';
                     el.className = `arrow-wrapper ${n.type==='hold'?'hold-note '+dirClass:''}`; 
                     el.style.left = (n.l*w)+'%'; el.style.width = w+'%'; el.style.zIndex = 150;
+                    
                     const conf = cfg.modes[keys][n.l]; const shapePath = PATHS[conf.s] || PATHS['circle'];
                     let svg = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shapePath}" fill="${conf.c}" stroke="white" stroke-width="2"/></svg>`;
-                    if(n.type==='hold') { const h = (n.len/1000)*cfg.spd*60; svg += `<div class="sustain-trail" style="height:${h}px; background:${conf.c};"></div>`; }
+                    
+                    if(n.type==='hold') { 
+                        const h = (n.len/1000)*cfg.spd*60; 
+                        svg += `<div class="sustain-trail" style="height:${h}px; background:${conf.c};"></div>`; 
+                    }
                     el.innerHTML = svg; if(cfg.vivid) el.querySelector('.arrow-path').style.filter=`drop-shadow(0 0 8px ${conf.c})`;
                     document.getElementById('track').appendChild(el); n.el = el; st.spawned.push(n); n.s = true;
                 } else break;
@@ -1299,8 +1335,11 @@ const firebaseConfig = {
             for(let i=st.spawned.length-1; i>=0; i--) {
                 const n = st.spawned[i]; 
                 if(!n.el) { st.spawned.splice(i,1); continue; } 
-                const diff = n.t - now + cfg.off; const dist = (diff / 1000) * cfg.spd * 60; 
+
+                const diff = n.t - now + cfg.off; 
+                const dist = (diff / 1000) * cfg.spd * 60; 
                 let finalY = cfg.down ? (yReceptor - dist) : (yReceptor + dist);
+                
                 if(n.h && n.type==='hold') {
                     n.el.style.top = yReceptor+'px'; n.el.style.opacity=0.8; const rem = (n.t + n.len) - now;
                     if(rem <= 0) { n.el.remove(); st.spawned.splice(i,1); continue; }
@@ -1315,9 +1354,23 @@ const firebaseConfig = {
         }
 
         // FIXED KEYBOARD LISTENER
-        function onKd(e) { if(e.key==="Escape"){togglePause();return;} if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
-            if(remapMode!==null){ cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); renderLaneConfig(remapMode); remapMode=null; return; } 
-            if(!e.repeat) { const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); if(idx !== -1) hit(idx, true); } }
+        function onKd(e) { 
+            if(e.key==="Escape"){togglePause();return;} 
+            // PREVENT DEFAULT KEYS
+            if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
+
+            if(remapMode!==null){ 
+                // ASSIGN KEY
+                cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
+                renderLaneConfig(remapMode); 
+                remapMode=null; 
+                return; 
+            } 
+            if(!e.repeat) { 
+                const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); 
+                if(idx !== -1) hit(idx, true); 
+            } 
+        }
         function onKu(e) { const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); if(idx !== -1) hit(idx, false); }
 
         function hit(l, p) {
@@ -1374,33 +1427,30 @@ const firebaseConfig = {
             document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
             document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
             
-            // PP CALCULATION WITH PENALTY
-            let ppChange = 0;
             if(!died && songFinished && user.name!=="Guest"){ 
                 const xp = Math.floor(st.sc/500); user.xp+=xp; user.score+=st.sc; user.plays++; 
                 if(user.xp >= user.lvl*1000) { user.xp -= user.lvl*1000; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!"); }
-                
                 if(st.ranked) { 
-                    if(acc < 50) {
-                        ppChange = -15; // PENALTY
-                        user.pp = Math.max(0, user.pp - 15);
-                    } else {
-                        ppChange = Math.floor(st.sc/5000);
-                        user.pp += ppChange;
-                    }
-                }
+                    if(acc < 50) { user.pp = Math.max(0, user.pp - 15); document.getElementById('pp-gain-loss').innerText = "-15 PP"; document.getElementById('pp-gain-loss').style.color = "var(--miss)"; }
+                    else { const ppG = Math.floor(st.sc/5000); user.pp += ppG; document.getElementById('pp-gain-loss').innerText = `+${ppG} PP`; document.getElementById('pp-gain-loss').style.color = "var(--gold)"; }
+                } else { document.getElementById('pp-gain-loss').innerText = "0 PP"; document.getElementById('pp-gain-loss').style.color = "white"; }
                 save(); updateFirebaseScore(); 
                 document.getElementById('res-xp').innerText = xp;
             } else { document.getElementById('res-xp').innerText = 0; }
-
-            // SHOW PP CHANGE
-            const ppEl = document.getElementById('pp-gain-loss');
-            if(ppChange > 0) { ppEl.innerText = `+${ppChange} PP`; ppEl.style.color = "var(--gold)"; }
-            else if(ppChange < 0) { ppEl.innerText = `${ppChange} PP`; ppEl.style.color = "var(--miss)"; }
-            else { ppEl.innerText = "0 PP"; ppEl.style.color = "white"; }
         }
         function toMenu() { location.reload(); }
-        function notify(msg, type="info") { const area = document.getElementById('notification-area'); const n = document.createElement('div'); n.className = 'notify-msg'; n.innerText = msg; n.style.borderLeftColor = type==="error" ? "#F9393F" : "#ff66aa"; if(type==="success") n.style.borderLeftColor = "#12FA05"; area.appendChild(n); setTimeout(()=>n.remove(), 3000); }
+        function notify(msg, type="info", duration=3000) {
+            const area = document.getElementById('notification-area');
+            const id = Date.now();
+            const card = document.createElement('div'); card.className = 'notify-card'; card.id = 'notif-'+id;
+            if(type==="error") card.style.borderLeftColor = "#F9393F";
+            else if(type==="success") card.style.borderLeftColor = "#12FA05";
+            
+            card.innerHTML = `<div class="notify-content"><div class="notify-title">${type.toUpperCase()}</div><div class="notify-body">${msg}</div></div><div class="notify-progress" style="transition-duration:${duration}ms"></div>`;
+            area.appendChild(card);
+            setTimeout(() => { const prog = card.querySelector('.notify-progress'); if(prog) prog.style.width = '0%'; }, 50);
+            setTimeout(() => closeNotification(id), duration);
+        }
         async function handleAudio(i){ const b=document.getElementById('imp-txt'); b.innerText="PROCESANDO..."; if(i.files[0]){ unlockAudio(); const r=new FileReader(); r.onload=async e=>{ try{ const rawData = e.target.result; const bufferCopy = rawData.slice(0); const buf=await st.ctx.decodeAudioData(rawData); const n=i.files[0].name.replace(/\.[^/.]+$/,""); if(!user.songs.find(s=>s.id===n)){user.songs.push({id:n});save();} saveSongToDB(n, bufferCopy); const map = genMap(buf, 4); ramSongs=ramSongs.filter(s=>s.id!==n); ramSongs.push({id:n, buf:buf, map:map}); renderMenu(); notify("Canción importada: "+n); }catch(e){notify("Error audio: " + e, "error"); console.log(e);}finally{ b.innerText='📂 IMPORTAR MP3'; i.value=""; } }; r.readAsArrayBuffer(i.files[0]); } else { b.innerText='📂 IMPORTAR MP3'; } }
         async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound Actualizado!"); i.value = ""; } }
         function renderMenu(f=""){ const g=document.getElementById('song-grid'); g.innerHTML=''; user.songs.forEach(s=>{ const id = s.id || s; if(f&&!id.toLowerCase().includes(f.toLowerCase()))return; const c=document.createElement('div'); c.className='beatmap-card'; const isLoaded = ramSongs.find(r=>r.id===id); c.innerHTML=`<div class="bc-bg" style="background-image:linear-gradient(135deg,hsl(${(id.length*40)%360},60%,20%),black)"></div><div class="bc-info"><div class="bc-title">${id}</div><div class="bc-meta">${isLoaded ? '<span class="tag">READY</span>' : '<span class="tag warn">⚠️ CARGANDO DB...</span>'}<span class="tag keys">4K | 6K | 7K | 9K</span></div></div>`; c.onclick=()=>{ curSongId=id; if(isLoaded) openModal('diff'); else notify("Espera a que cargue la base de datos...", "error"); }; g.appendChild(c); }); }
