@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MEJORADO V9 - ANTI SPAM & BETTER FLOW) === */
+/* === AUDIO & ENGINE (FIX PAUSE & COMBO & SPAM V10) === */
 
 function unlockAudio() {
     if (!st.ctx) {
@@ -32,77 +32,53 @@ function playHit() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
-    // Muestreo optimizado
     for (let i = 0; i < filteredData.length; i += 100) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
     const multiplier = 0.95 / max;
-    // Solo normalizar si está muy bajo o muy saturado
     if (multiplier > 1.1 || multiplier < 0.9) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
     }
     return filteredData;
 }
 
-// === GENERADOR DE MAPAS INTELIGENTE ===
+// === GENERADOR DE MAPAS (ANTI-SPAM) ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
-
-    // Configuración de dificultad basada en el slider (1 a 10)
     let density = cfg.den || 5; 
-    
-    // Parámetros de Ventana y Energía
     const windowSize = 1024;
-    const step = Math.floor(sampleRate / (40 + (density * 5))); // Más densidad = pasos más cortos
-    
-    // Variables de Estado del Algoritmo
-    let laneFreeTime = new Array(k).fill(0); // Para evitar superposiciones
+    const step = Math.floor(sampleRate / (40 + (density * 5))); 
+    let laneFreeTime = new Array(k).fill(0);
     let lastNoteTime = -5000;
     let lastLane = 0;
-    let consecutiveInLane = 0; // Contador anti-spam de carril
-    
-    // Historial de Energía para detectar picos relativos
+    let consecutiveInLane = 0;
     let energyHistory = [];
-    const historySize = 44100 / step; // ~1 segundo de historia
-
-    // Umbrales dinámicos
-    const thresholdBase = 1.4 - (density * 0.04); // Dificultad alta = umbral más bajo
-    const minGap = Math.max(80, 400 - (density * 30)); // Tiempo mínimo entre notas (ms)
+    const historySize = 44100 / step; 
+    const thresholdBase = 1.4 - (density * 0.04); 
+    const minGap = Math.max(80, 400 - (density * 30)); 
 
     for (let i = 0; i < data.length - windowSize; i += step) {
-        // 1. Calcular Energía Instantánea (RMS)
         let sum = 0;
         for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
         const instantEnergy = Math.sqrt(sum / windowSize);
-
-        // Actualizar promedio local
         energyHistory.push(instantEnergy);
         if (energyHistory.length > historySize) energyHistory.shift();
         let localAvg = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
-
-        // Convertir índice a milisegundos
         const timeMs = (i / sampleRate) * 1000;
 
-        // 2. Detección de Beat
-        // El beat ocurre si la energía instantánea supera al promedio local * factor
         if (instantEnergy > localAvg * thresholdBase && instantEnergy > 0.05) {
-            
-            // Control de tiempo (MinGap)
             if (timeMs - lastNoteTime >= minGap) {
-                
-                // === LÓGICA DE SELECCIÓN DE CARRIL ===
                 let lane = Math.floor(Math.random() * k);
                 
-                // A. Anti-Jackhammer (Evitar más de 2 notas seguidas en el mismo carril)
+                // Anti-Jackhammer
                 if (lane === lastLane) {
                     consecutiveInLane++;
                     if (consecutiveInLane >= 2) {
-                        // Forzar cambio de carril
                         lane = (lane + 1 + Math.floor(Math.random() * (k - 1))) % k;
                         consecutiveInLane = 0;
                     }
@@ -110,33 +86,21 @@ function genMap(buf, k) {
                     consecutiveInLane = 0;
                 }
 
-                // B. Patrones de Flujo (Escaleras/Trinos)
-                // Si la dificultad es alta, a veces forzamos patrones
-                if (density > 5 && Math.random() > 0.7) {
-                    lane = (lastLane + 1) % k; // Escalera simple
-                }
+                if (density > 5 && Math.random() > 0.7) lane = (lastLane + 1) % k;
 
-                // === LÓGICA DE HOLD NOTES (NOTAS LARGAS) ===
                 let type = 'tap';
                 let len = 0;
-                
-                // Si la energía se mantiene alta por un periodo, es un Hold
-                // Bajamos el requisito para que salgan más holds
                 if (instantEnergy > localAvg * 1.2 && timeMs > 5000) { 
-                    // Verificar si el sonido se mantiene fuerte en el futuro cercano
                     let futureIndex = i + (step * 4);
                     if (futureIndex < data.length && Math.abs(data[futureIndex]) > localAvg * 0.8) {
-                        if (Math.random() > 0.4) { // 60% chance de hold si hay energía
+                        if (Math.random() > 0.4) { 
                             type = 'hold';
-                            // Duración basada en dificultad y aleatoriedad
                             len = Math.min(1500, Math.max(200, Math.random() * 600)); 
                         }
                     }
                 }
 
-                // Verificar colisión con notas existentes
                 if (timeMs < laneFreeTime[lane] + 20) {
-                    // Buscar carril libre
                     let found = false;
                     for (let tryL = 0; tryL < k; tryL++) {
                         if (timeMs >= laneFreeTime[tryL] + 20) {
@@ -145,30 +109,21 @@ function genMap(buf, k) {
                             break;
                         }
                     }
-                    if (!found) continue; // Si no hay sitio, saltar nota
+                    if (!found) continue; 
                 }
 
-                // Registrar nota principal
                 map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
-                laneFreeTime[lane] = timeMs + len + 20; // Reservar carril
+                laneFreeTime[lane] = timeMs + len + 20; 
                 lastNoteTime = timeMs;
                 lastLane = lane;
 
-                // === LÓGICA DE ACORDES (CHORDS) ===
-                // Solo permitimos acordes si la dificultad es > 3 y la energía es muy alta
                 if (density >= 4 && instantEnergy > localAvg * 1.8) {
-                    // Máximo 1 nota extra (Doble) para evitar spam masivo de 4 notas
-                    // Solo triples si es dificultad máxima (9 o 10)
                     let maxExtra = (density >= 9 && instantEnergy > localAvg * 2.5) ? 2 : 1;
-                    
                     let extrasAdded = 0;
                     for (let offset = 1; offset < k; offset++) {
                         if (extrasAdded >= maxExtra) break;
-                        
                         let chordLane = (lane + offset) % k;
-                        // Evitar carriles adyacentes en dificultades bajas para legibilidad
                         if (density < 6 && Math.abs(chordLane - lane) === 1) continue;
-
                         if (timeMs >= laneFreeTime[chordLane] + 20) {
                             map.push({ t: timeMs, l: chordLane, type: 'tap', len: 0, h: false });
                             laneFreeTime[chordLane] = timeMs + 20;
@@ -209,7 +164,6 @@ function initReceptors(k) {
     }
 }
 
-// === CARGA Y GESTIÓN DE ERRORES ===
 async function prepareAndPlaySong(k) {
     if (!curSongData) return notify("Error: No hay canción seleccionada", "error");
 
@@ -217,13 +171,10 @@ async function prepareAndPlaySong(k) {
     document.getElementById('loading-text').innerText = "Cargando audio...";
 
     try {
-        unlockAudio(); // Asegurar contexto de audio
-
-        // Buscar en caché RAM
+        unlockAudio(); 
         let songInRam = ramSongs.find(s => s.id === curSongData.id);
 
         if (!songInRam) {
-            // Descargar
             const response = await fetch(curSongData.audioURL);
             if (!response.ok) throw new Error("Error red: " + response.status);
             
@@ -233,18 +184,13 @@ async function prepareAndPlaySong(k) {
             const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
             
             document.getElementById('loading-text').innerText = "Generando mapa...";
-            
-            // !! IMPORTANTE: Delay para permitir que el UI se renderice antes de congelar con cálculos
             await new Promise(r => setTimeout(r, 100)); 
 
             const map = genMap(audioBuffer, k);
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map, kVersion: k };
-            
-            // Guardar en caché
             ramSongs.push(songInRam);
             if (ramSongs.length > 5) ramSongs.shift();
         } else {
-            // Regenerar si cambia dificultad
             if (songInRam.kVersion !== k) {
                 document.getElementById('loading-text').innerText = "Reajustando...";
                 await new Promise(r => setTimeout(r, 50));
@@ -283,20 +229,19 @@ function playSongInternal(s) {
         document.getElementById('menu-container').classList.add('hidden');
         document.getElementById('game-layer').style.display = 'block';
         document.getElementById('hud').style.display = 'flex';
+        document.getElementById('g-combo').style.opacity = '0'; // Ocultar combo al inicio
 
         initReceptors(keys);
         updHUD();
 
-        // === START ===
         const cd = document.getElementById('countdown');
         let c = 3; cd.innerHTML = c;
 
-        st.startTime = performance.now() + 3000;
+        // Reset completo de tiempos
+        st.startTime = 0; 
         st.t0 = null;
         st.act = true; 
         st.paused = false;
-
-        requestAnimationFrame(loop);
 
         const iv = setInterval(async () => {
             c--;
@@ -318,8 +263,13 @@ function playSongInternal(s) {
                     gain.connect(st.ctx.destination);
                     
                     st.t0 = st.ctx.currentTime;
+                    st.startTime = performance.now(); // Fallback
                     st.src.start(0);
                     st.src.onended = () => { songFinished = true; end(false); };
+                    
+                    // Iniciar loop visual
+                    loop();
+
                 } catch(e) { console.error("Audio start err", e); }
             }
         }, 1000);
@@ -332,12 +282,18 @@ function playSongInternal(s) {
 
 function formatTime(s) { const m = Math.floor(s / 60); const sc = Math.floor(s % 60); return `${m}:${sc.toString().padStart(2, '0')}`; }
 
+// === GAME LOOP OPTIMIZADO PARA PAUSA ===
 function loop() {
     if (!st.act || st.paused) return;
 
     let now;
-    if (st.t0 !== null && st.ctx && st.ctx.state === 'running') now = (st.ctx.currentTime - st.t0) * 1000;
-    else now = performance.now() - st.startTime;
+    // Si el contexto de audio está corriendo, usamos su tiempo (es el más preciso)
+    if (st.t0 !== null && st.ctx && st.ctx.state === 'running') {
+        now = (st.ctx.currentTime - st.t0) * 1000;
+    } else {
+        // Fallback si no hay audio context activo (raro)
+        now = performance.now() - st.startTime;
+    }
 
     if (st.songDuration > 0 && now > 0) {
         const currentSec = now / 1000;
@@ -349,9 +305,12 @@ function loop() {
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
     const w = 100 / keys;
 
+    // Lógica de spawn y movimiento
     for (let i = 0; i < st.notes.length; i++) {
         const n = st.notes[i];
         if (n.s) continue;
+        
+        // Spawn un poco antes
         if (n.t < now - 200) { n.s = true; continue; }
 
         if (n.t - now < 1500) {
@@ -407,33 +366,30 @@ function loop() {
         }
     }
     
-    if (!st.paused) requestAnimationFrame(loop);
+    requestAnimationFrame(loop);
 }
 
-// === PAUSA CORREGIDA ===
+// === PAUSA SIMPLE (SIN MATEMÁTICAS RARAS) ===
 function togglePause() {
     if (!st.act) return; 
     
-    st.paused = !st.paused;
-
-    if (st.paused) {
-        st.lastPause = performance.now();
+    if (!st.paused) {
+        // PAUSAR
+        st.paused = true;
+        if (st.ctx && st.ctx.state === 'running') st.ctx.suspend();
         
-        if (st.ctx && st.ctx.state === 'running') {
-            st.ctx.suspend();
-        }
-
+        // Mostrar Modal
         const modal = document.getElementById('modal-pause');
         modal.style.display = 'flex';
-
+        
+        // Update Pause UI
         const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
-        const elAcc = document.getElementById('p-acc');
-        if(elAcc) elAcc.innerText = acc + "%";
-
+        document.getElementById('p-acc').innerText = acc + "%";
         if(document.getElementById('p-sick')) document.getElementById('p-sick').innerText = st.stats.s;
         if(document.getElementById('p-good')) document.getElementById('p-good').innerText = st.stats.g;
         if(document.getElementById('p-bad')) document.getElementById('p-bad').innerText = st.stats.b;
         if(document.getElementById('p-miss')) document.getElementById('p-miss').innerText = st.stats.m;
+
     } else {
         resumeGame();
     }
@@ -441,18 +397,18 @@ function togglePause() {
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
-    
-    if (st.ctx) st.ctx.resume();
-
-    if (st.lastPause) {
-        const duration = performance.now() - st.lastPause;
-        st.startTime += duration;
-        if (st.t0 !== null) st.t0 += (duration / 1000); 
-        st.lastPause = 0;
-    }
-
     st.paused = false;
-    requestAnimationFrame(loop);
+    
+    // Al reanudar el contexto, el tiempo sigue desde donde se quedó.
+    // No necesitamos recalcular st.startTime ni st.t0 manualmente.
+    if (st.ctx && st.ctx.state === 'suspended') {
+        st.ctx.resume().then(() => {
+            // Reiniciar loop solo cuando el audio esté listo
+            requestAnimationFrame(loop);
+        });
+    } else {
+        requestAnimationFrame(loop);
+    }
 }
 
 // === INPUTS ===
@@ -649,9 +605,24 @@ function end(died) {
 
 function toMenu() { location.reload(); }
 function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
+
+// === HUD FIX ===
 function updHUD() {
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
-    document.getElementById('g-combo').innerText = st.cmb;
+    
+    // COMBO FIX: Mostrar solo si > 0 y actualizar valor sin moverlo
+    const comboEl = document.getElementById('g-combo');
+    if (st.cmb > 0) {
+        comboEl.innerText = st.cmb;
+        comboEl.style.opacity = '1';
+        // Quitamos la línea que movía el --combo-y para evitar el bug visual
+        comboEl.classList.remove('pulse'); 
+        void comboEl.offsetWidth; // reset anim
+        comboEl.classList.add('pulse');
+    } else {
+        comboEl.style.opacity = '0';
+    }
+
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
     document.getElementById('g-acc').innerText = acc + "%";
     
@@ -661,7 +632,6 @@ function updHUD() {
     document.getElementById('h-miss').innerText = st.stats.m;
     
     document.getElementById('health-fill').style.height = st.hp + '%';
-    document.documentElement.style.setProperty('--combo-y', st.cmb % 2 === 0 ? '50%' : '51%');
     
     if (isMultiplayer) sendLobbyScore(st.sc);
 }
