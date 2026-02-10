@@ -1,6 +1,5 @@
-/* === UI LOGIC & INTERACTION (FIXED + FULL) === */
+/* === UI LOGIC & INTERACTION (FULL) === */
 
-// FIX IMPORTANTE: Definir playHover aquí para que el menú HTML lo encuentre siempre
 function playHover(){ 
     if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
         try {
@@ -98,9 +97,64 @@ function switchProfileTab(tab) {
     document.getElementById('p-tab-content-cuenta').style.display = tab === 'cuenta' ? 'block' : 'none';
 }
 
+// === TIENDA E INVENTARIO (MODIFICADO) ===
 function openShop() {
+    const grid = document.getElementById('shop-items');
+    if(!grid) return;
+    
     document.getElementById('shop-sp').innerText = (user.sp || 0).toLocaleString();
+    grid.innerHTML = '';
+
+    SHOP_ITEMS.forEach(item => {
+        const owned = user.inventory && user.inventory.includes(item.id);
+        const isEquipped = user.equipped && user.equipped[item.type] === item.id;
+
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+        if (owned) div.style.borderColor = "var(--blue)"; 
+
+        div.innerHTML = `
+            <div class="shop-icon" style="background-color:${item.color || '#333'}"></div>
+            <div class="shop-name">${item.name}</div>
+            <div style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">${item.desc}</div>
+            <div class="shop-price">${owned ? 'ADQUIRIDO' : item.price + ' SP'}</div>
+            
+            ${!owned 
+                ? `<button class="btn-small btn-add" onclick="buyItem('${item.id}', ${item.price})">COMPRAR</button>`
+                : `<button class="btn-small ${isEquipped ? 'btn-acc' : 'btn-chat'}" onclick="equipItem('${item.id}', '${item.type}')">
+                    ${isEquipped ? 'EQUIPADO' : 'EQUIPAR'}
+                   </button>`
+            }
+        `;
+        grid.appendChild(div);
+    });
     openModal('shop');
+}
+
+function buyItem(id, price) {
+    if ((user.sp || 0) < price) {
+        return notify("No tienes suficientes SP", "error");
+    }
+    user.sp -= price;
+    if (!user.inventory) user.inventory = [];
+    user.inventory.push(id);
+    save(); 
+    notify("¡Ítem comprado!", "success");
+    openShop(); 
+    updUI(); 
+}
+
+function equipItem(id, type) {
+    if (!user.equipped) user.equipped = {};
+    if (user.equipped[type] === id) {
+        user.equipped[type] = 'default';
+        notify("Ítem desequipado");
+    } else {
+        user.equipped[type] = id;
+        notify("¡Equipado!");
+    }
+    save();
+    openShop();
 }
 
 function openFriends() {
