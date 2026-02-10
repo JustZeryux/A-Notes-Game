@@ -1,7 +1,4 @@
-/* === UI LOGIC & INTERACTION (ULTRA FINAL FIXED V11) === */
-
-// === 1. HELPERS & NOTIFICATIONS (CRÍTICO) ===
-function notify(msg, type="info") {
+function notify(msg, type="info", duration=4000) {
     const area = document.getElementById('notification-area');
     if(!area) return console.log(msg);
     
@@ -13,38 +10,45 @@ function notify(msg, type="info") {
     card.innerHTML = `
         <div class="notify-title">${type.toUpperCase()}</div>
         <div class="notify-body">${msg}</div>
+        <div class="notify-progress" style="height:3px; background:rgba(255,255,255,0.5); width:100%; position:absolute; bottom:0; left:0; transition:width ${duration}ms linear;"></div>
     `;
     area.appendChild(card);
     
+    // Animar barra
+    setTimeout(() => {
+        const bar = card.querySelector('.notify-progress');
+        if(bar) bar.style.width = '0%';
+    }, 50);
+
     setTimeout(() => {
         card.style.animation = "slideOut 0.3s forwards";
         setTimeout(() => card.remove(), 300);
-    }, 4000);
+    }, duration);
 }
 
-function playHover(){ 
-    if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
-        try {
-            const o=st.ctx.createOscillator(); 
-            const g=st.ctx.createGain(); 
-            o.frequency.value=600; 
-            g.gain.value=0.05; 
-            o.connect(g); 
-            g.connect(st.ctx.destination); 
-            o.start(); 
-            o.stop(st.ctx.currentTime+0.05); 
-        } catch(e){}
-    } 
+function updateGlobalRank() {
+    if(!db || user.name === "Guest") return;
+    // Solo contar jugadores con PP > 0 para optimizar
+    db.collection("leaderboard").orderBy("pp", "desc").get().then(snap => {
+        let rank = "#--";
+        let found = false;
+        snap.docs.forEach((doc, index) => {
+            if(doc.id === user.name) {
+                rank = "#" + (index + 1);
+                found = true;
+            }
+        });
+        if(found) setText('p-global-rank', rank);
+    }).catch(e => console.log("Rank update limit", e));
 }
 
+// Helpers DOM
 function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
 function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
 
-// === 2. UPDATE UI (CORE) ===
 function updUI() {
     if(!user || !cfg) return;
 
-    // Checks
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
@@ -74,13 +78,18 @@ function updUI() {
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
         setStyle('p-av-big', 'backgroundImage', url); setStyle('ig-av', 'backgroundImage', url);
     }
-    if(user.bg) { 
-        const bg = document.getElementById('bg-image');
-        if(bg) { bg.src = user.bg; bg.style.opacity = 0.3; }
-    }
+    
+    // Llamar rank solo si no está seteado
+    if(document.getElementById('p-global-rank').innerText === "#--") updateGlobalRank();
 
     applyCfg();
 
+    const isGoogle = user.pass === "google-auth";
+    const locSet = document.getElementById('local-acc-settings');
+    const gooSet = document.getElementById('google-acc-settings');
+    if(locSet) locSet.style.display = isGoogle ? 'none' : 'block';
+    if(gooSet) gooSet.style.display = isGoogle ? 'block' : 'none';
+}
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
