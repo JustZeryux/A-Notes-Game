@@ -610,18 +610,46 @@ function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
 function updHUD() {
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
     
-    // COMBO FIX: Mostrar solo si > 0 y actualizar valor sin moverlo
+    // LOGICA COMBO GIGANTE
     const comboEl = document.getElementById('g-combo');
-    if (st.cmb > 0) {
-        comboEl.innerText = st.cmb;
-        comboEl.style.opacity = '1';
-        // Quitamos la línea que movía el --combo-y para evitar el bug visual
-        comboEl.classList.remove('pulse'); 
-        void comboEl.offsetWidth; // reset anim
-        comboEl.classList.add('pulse');
-    } else {
-        comboEl.style.opacity = '0';
+    if(comboEl) {
+        if (st.cmb > 0) {
+            comboEl.innerText = st.cmb;
+            comboEl.style.opacity = '1';
+            comboEl.classList.remove('pulse'); 
+            void comboEl.offsetWidth; 
+            comboEl.classList.add('pulse');
+        } else {
+            comboEl.style.opacity = '0';
+        }
     }
+
+    // LOGICA FC & MEAN
+    const fcEl = document.getElementById('hud-fc');
+    if(fcEl && st.fcStatus) {
+        fcEl.innerText = cfg.showFC ? st.fcStatus : "";
+        if(st.fcStatus === "PFC") fcEl.style.color = "cyan";
+        else if(st.fcStatus === "GFC") fcEl.style.color = "gold";
+        else if(st.fcStatus === "FC") fcEl.style.color = "lime";
+        else fcEl.style.color = "red";
+    }
+
+    const meanEl = document.getElementById('hud-mean');
+    if(meanEl) {
+        meanEl.innerText = (cfg.showMean && st.hitCount > 0) ? (st.totalOffset / st.hitCount).toFixed(2) + "ms" : "";
+    }
+
+    const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
+    document.getElementById('g-acc').innerText = acc + "%";
+    
+    document.getElementById('h-sick').innerText = st.stats.s;
+    document.getElementById('h-good').innerText = st.stats.g;
+    document.getElementById('h-bad').innerText = st.stats.b;
+    document.getElementById('h-miss').innerText = st.stats.m;
+    
+    document.getElementById('health-fill').style.height = st.hp + '%';
+    
+    if (isMultiplayer) sendLobbyScore(st.sc);
 
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
     document.getElementById('g-acc').innerText = acc + "%";
