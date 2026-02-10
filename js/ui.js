@@ -283,7 +283,6 @@ function renderMenu(filter="") {
                 
                 const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(${(songId.length*40)%360},60%,20%),black)`;
                 
-                // Mostrar Score y Rango si existen
                 let scoreTag = '';
                 if(user.scores && user.scores[songId]) {
                     const us = user.scores[songId];
@@ -307,7 +306,7 @@ function renderMenu(filter="") {
                 c.onclick = () => { 
                     curSongData = { id: songId, ...s }; 
                     openModal('diff'); 
-                    document.getElementById('create-lobby-opts').style.display = 'none'; // Ocultar crear lobby en modo solo
+                    document.getElementById('create-lobby-opts').style.display = 'none'; 
                 };
                 grid.appendChild(c);
             });
@@ -416,7 +415,36 @@ function openModal(id){
     }
 }
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
-function saveSettings(){ cfg.spd=document.getElementById('set-spd').value; cfg.den=document.getElementById('set-den').value; cfg.vol=document.getElementById('set-vol').value/100; cfg.hvol=document.getElementById('set-hvol').value/100; cfg.down=document.getElementById('set-down').checked; cfg.vivid=document.getElementById('set-vivid').checked; const shakeEl = document.getElementById('set-shake'); if(shakeEl) cfg.shake=shakeEl.checked; cfg.off=parseInt(document.getElementById('set-off').value); cfg.trackOp=document.getElementById('set-track-op').value; cfg.judgeY=document.getElementById('set-judge-y').value; cfg.judgeX=document.getElementById('set-judge-x').value; cfg.judgeS=document.getElementById('set-judge-s').value; cfg.judgeVis=document.getElementById('set-judge-vis').checked; applyCfg(); save(); document.getElementById('modal-settings').style.display='none'; notify("Ajustes guardados"); }
+
+// FUNCIÓN SAVE SETTINGS CORREGIDA
+function saveSettings(){ 
+    cfg.spd=document.getElementById('set-spd').value; 
+    cfg.den=document.getElementById('set-den').value; 
+    cfg.vol=document.getElementById('set-vol').value/100; 
+    cfg.hvol=document.getElementById('set-hvol').value/100; 
+    cfg.down=document.getElementById('set-down').checked; 
+    cfg.vivid=document.getElementById('set-vivid').checked; 
+    const shakeEl = document.getElementById('set-shake'); if(shakeEl) cfg.shake=shakeEl.checked; 
+    cfg.off=parseInt(document.getElementById('set-off').value); 
+    cfg.trackOp=document.getElementById('set-track-op').value; 
+    cfg.judgeY=document.getElementById('set-judge-y').value; 
+    cfg.judgeX=document.getElementById('set-judge-x').value; 
+    cfg.judgeS=document.getElementById('set-judge-s').value; 
+    cfg.judgeVis=document.getElementById('set-judge-vis').checked; 
+    
+    applyCfg(); 
+    
+    // Llamar a save() que ahora sí existe en auth.js
+    if(typeof save === 'function') {
+        save(); 
+        notify("Ajustes guardados");
+    } else {
+        console.error("Save function missing");
+    }
+    
+    document.getElementById('modal-settings').style.display='none'; 
+}
+
 function applyCfg() { document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100); document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%'); document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%'); document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10); document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0); }
 function saveProfile(){ user.name=document.getElementById('l-user').value||"Guest"; save(); closeModal('profile'); }
 function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
