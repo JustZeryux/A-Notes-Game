@@ -45,7 +45,7 @@ function challengeFriend(target) {
              sendNotification(target, 'challenge', '¡Desafío 1v1!', user.name + ' te desafía a un duelo.');
              notify("Desafío enviado. Esperando...");
         } else {
-            notify("El usuario parece desconectado.", "error");
+            notify("Usuario desconectado", "error");
         }
     });
 }
@@ -60,7 +60,7 @@ function acceptChallenge(target, notifId) {
     });
 }
 
-/* === LOBBY SYSTEM (4 PLAYERS) === */
+/* === LOBBY SYSTEM === */
 function openLobbyBrowser() {
     if(user.name === 'Guest') return notify("Inicia sesión para jugar online", "error");
     openModal('lobbies');
@@ -73,7 +73,7 @@ function refreshLobbies() {
     
     db.collection("lobbies").where("status", "==", "waiting").limit(20).get().then(snap => {
         list.innerHTML = '';
-        if(snap.empty) { list.innerHTML = '<div style="padding:20px;">No hay salas disponibles. ¡Crea una!</div>'; return; }
+        if(snap.empty) { list.innerHTML = '<div style="padding:20px;">No hay salas disponibles.</div>'; return; }
         
         snap.forEach(doc => {
             const d = doc.data();
@@ -82,7 +82,7 @@ function refreshLobbies() {
             row.innerHTML = `
                 <div class="lobby-info">
                     <div class="lobby-host">${d.host}</div>
-                    <div class="lobby-details">${d.songTitle} [${d.diff}K] - ${d.players.length}/4 Jugadores</div>
+                    <div class="lobby-details">${d.songTitle} [${d.diff}K] - ${d.players.length}/4</div>
                 </div>
                 <button class="btn-small btn-acc" onclick="joinLobby('${doc.id}')">UNIRSE</button>
             `;
@@ -91,14 +91,12 @@ function refreshLobbies() {
     });
 }
 
-// 1. ABRIR EL SELECTOR DE CANCIONES (NUEVO FLUJO)
 function openSongSelectorForLobby() {
     closeModal('lobbies');
     openModal('song-selector');
     renderLobbySongList();
 }
 
-// 2. RENDERIZAR LISTA DE CANCIONES (REUTILIZADA DE UI PERO EN MODAL)
 function renderLobbySongList(filter="") {
     const grid = document.getElementById('lobby-song-grid');
     grid.innerHTML = 'Cargando...';
@@ -106,7 +104,7 @@ function renderLobbySongList(filter="") {
     db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).get().then(snapshot => {
         grid.innerHTML = '';
         if(snapshot.empty) {
-            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">No hay canciones.</div>';
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">No hay canciones globales.</div>';
             return;
         }
         snapshot.forEach(doc => {
@@ -125,17 +123,16 @@ function renderLobbySongList(filter="") {
                 </div>
             `;
             c.onclick = () => {
-                curSongData = { id: doc.id, ...s }; // Seleccionar
-                closeModal('song-selector'); // Cerrar selector
-                openModal('diff'); // Abrir dificultad
-                document.getElementById('create-lobby-opts').style.display = 'block'; // Mostrar boton de crear sala
+                curSongData = { id: doc.id, ...s }; 
+                closeModal('song-selector'); 
+                openModal('diff'); 
+                document.getElementById('create-lobby-opts').style.display = 'block'; 
             };
             grid.appendChild(c);
         });
     });
 }
 
-// 3. CONFIRMAR Y CREAR EN FIRESTORE
 function confirmCreateLobby() {
     const k = keys; 
     const lobbyData = {
@@ -164,7 +161,7 @@ function joinLobby(id) {
         return transaction.get(lobbyRef).then(doc => {
             if(!doc.exists) throw "Sala no existe";
             const d = doc.data();
-            if(d.status !== "waiting") throw "Partida ya iniciada";
+            if(d.status !== "waiting") throw "Partida iniciada";
             if(d.players.length >= 4) throw "Sala llena";
             
             const newPlayers = [...d.players, {name: user.name, ready: false, score: 0, isHost: false}];
@@ -174,12 +171,11 @@ function joinLobby(id) {
     }).then((data) => {
         currentLobbyId = id;
         isLobbyHost = false;
-        // Cargar datos de la canción del lobby
         curSongData = { id: data.songId, title: data.songTitle, audioURL: data.songAudio };
         keys = data.diff;
         closeModal('lobbies');
         enterLobbyRoom();
-    }).catch(e => notify("Error al unirse: " + e, "error"));
+    }).catch(e => notify("Error: " + e, "error"));
 }
 
 function enterLobbyRoom() {
@@ -187,10 +183,10 @@ function enterLobbyRoom() {
     isMultiplayer = true;
     
     lobbyListener = db.collection("lobbies").doc(currentLobbyId).onSnapshot(doc => {
-        if(!doc.exists) { leaveLobby(); notify("La sala se cerró."); return; }
+        if(!doc.exists) { leaveLobby(); notify("Sala cerrada."); return; }
         const d = doc.data();
         
-        document.getElementById('room-host-name').innerText = "SALA DE " + d.host;
+        document.getElementById('room-host-name').innerText = "HOST: " + d.host;
         document.getElementById('room-song').innerText = d.songTitle + " [" + d.diff + "K]";
         
         const pCont = document.getElementById('room-players');
@@ -215,7 +211,7 @@ function enterLobbyRoom() {
         if(d.status === 'playing') {
             if(document.getElementById('modal-lobby-room').style.display !== 'none') {
                 closeModal('lobby-room');
-                prepareAndPlaySong(d.diff); // Usar la nueva función de carga global
+                prepareAndPlaySong(d.diff);
             }
             updateMultiHud(d.players);
         }
