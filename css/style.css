@@ -1,4 +1,4 @@
-/* === ESTILOS BASE === */
+/* === ESTILOS BASE (ULTRA UPDATE) === */
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700;900&family=Nunito:wght@700;900&display=swap');
 
 :root {
@@ -11,24 +11,25 @@
 * { box-sizing: border-box; user-select: none; outline: none; }
 body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakra Petch', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
 
+/* ANIMACIONES */
 @keyframes slideIn { 0% { transform: translateX(120%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
 @keyframes slideOut { 0% { transform: translateX(0); opacity: 1; } 100% { transform: translateX(120%); opacity: 0; } }
 @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(3px, 3px); } 50% { transform: translate(-3px, -3px); } 75% { transform: translate(3px, -3px); } 100% { transform: translate(0,0); } }
 .shaking { animation: shake 0.15s ease-in-out; }
 
-/* LOADER OVERLAY */
+/* LOADER */
 #loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .loader { border: 8px solid #333; border-top: 8px solid var(--accent); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 #loading-text { font-size: 1.5rem; font-weight: 900; color: var(--accent); letter-spacing: 2px; }
 
-/* TOP PROGRESS BAR */
+/* TOP BAR & PROGRESS */
 #top-progress-bar { position: absolute; top: 0; left: 0; width: 100%; height: 10px; background: #111; z-index: 500; }
 #top-progress-fill { height: 100%; background: linear-gradient(90deg, var(--blue), var(--accent)); width: 0%; transition: width 0.1s linear; box-shadow: 0 0 10px var(--accent); }
 #top-progress-time { position: absolute; top: 15px; right: 20px; font-size: 1.2rem; font-weight: 900; text-shadow: 0 2px 5px black; z-index: 501; }
 
-/* CHATS FLOTANTES */
+/* CHATS */
 #chat-overlay-container { position: fixed; bottom: 0; right: 20px; z-index: 10000; display: flex; gap: 10px; align-items: flex-end; pointer-events: none; }
 .chat-window { width: 280px; background: rgba(10,10,15,0.95); border: 1px solid #333; border-radius: 8px 8px 0 0; display: flex; flex-direction: column; pointer-events: auto; box-shadow: 0 0 20px rgba(0,0,0,0.8); transition: 0.2s; }
 .chat-window.minimized { height: 40px; overflow: hidden; }
@@ -53,7 +54,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 .btn-accept { background: var(--good); color: black; } .btn-deny { background: var(--miss); color: white; }
 .notify-btn:hover { filter: brightness(1.2); transform: translateY(-2px); }
 
-/* CAPAS */
+/* CAPAS Y MENU */
 #bg-layer { position: absolute; top:0; left:0; width:100%; height:100%; z-index: 0; pointer-events: none; background: #000; overflow: hidden; }
 #bg-video, #bg-image { width: 100%; height: 100%; object-fit: cover; opacity: 0.3; position: absolute; top:0; left:0; transition: opacity 0.5s; filter: brightness(0.5); }
 
@@ -99,6 +100,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 .tag.rank-tag { font-weight: 900; padding: 4px 8px; }
 .tag.score-tag { font-family: 'Nunito'; color: var(--gold); }
 
+/* GAME LAYER */
 #game-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; display: none; }
 #ig-profile { position: absolute; top: 40px; left: 40px; display: flex; align-items: center; gap: 20px; opacity: 0.9; z-index: 200; }
 #ig-av { width: 80px; height: 80px; border-radius: 50%; background: #333; background-size: cover; border: 3px solid white; box-shadow: 0 0 20px black; }
@@ -111,7 +113,9 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 .multi-p-score { font-size: 1.5rem; font-weight: 900; line-height: 1; }
 .multi-p-card.is-me { border-color: var(--good); }
 
-#track { position: relative; width: 100%; max-width: 800px; height: 100%; margin: 0 auto; background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); border-left: 2px solid rgba(255,255,255,0.1); border-right: 2px solid rgba(255,255,255,0.1); transition: width 0.3s; }
+/* TRACK (Soporte Middlescroll) */
+#track { position: relative; width: 100%; max-width: 800px; height: 100%; margin: 0 auto; background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); border-left: 2px solid rgba(255,255,255,0.1); border-right: 2px solid rgba(255,255,255,0.1); transition: all 0.3s; }
+#track.middle-scroll { max-width: 600px; position: absolute; left: 50%; transform: translateX(-50%); border: none; background: rgba(0,0,0, var(--track-alpha)); }
 
 .arrow-wrapper { position: absolute; width: var(--lane-width); height: 120px; display: flex; align-items: center; justify-content: center; z-index: 150; will-change: top; }
 .arrow-svg { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); position:relative; z-index:2; }
@@ -132,6 +136,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 
 .splash { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--c); z-index: 300; pointer-events: none; animation: splash 0.3s ease-out forwards; top: -30px; opacity: 0; box-shadow: 0 0 30px var(--c); }
 
+/* HUD ACTUALIZADO */
 #hud { position: absolute; right: 50px; top: 50%; transform: translateY(-50%); text-align: right; pointer-events: none; z-index: 300; display: flex; flex-direction: row; align-items: center; gap: 20px; }
 .stats-col { display: flex; flex-direction: column; gap: 10px; text-shadow: 0 2px 10px black; align-items: flex-end; }
 .stat-item { font-weight: 900; font-size: 1.5rem; opacity: 0.9; font-family: 'Chakra Petch'; }
@@ -141,6 +146,10 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 .acc-label { color: #888; font-weight: bold; font-size: 1rem; }
 .acc-val { font-size: 2.5rem; color: var(--blue); font-weight: 900; }
 .combo-val { position: absolute; top: var(--combo-y); right: 450px; font-size: 7rem; font-weight: 900; line-height: 1; text-shadow: 0 0 30px black; }
+
+/* NUEVOS INDICADORES HUD */
+.hud-fc { font-size: 2.5rem; font-weight: 900; margin-bottom: 5px; text-shadow: 0 0 15px currentColor; }
+.hud-mean { font-size: 1.2rem; font-weight: bold; color: #aaa; margin-top: 5px; }
 
 .health-bar { width: 16px; height: 600px; background: #222; border: 3px solid white; border-radius: 8px; position: relative; overflow: hidden; box-shadow: 0 0 30px black; }
 .health-fill { width: 100%; height: 50%; position: absolute; bottom: 0; background: linear-gradient(to top, #F00, #FF0, #0F0); transition: height 0.1s linear; box-shadow: 0 0 20px white; }
@@ -152,13 +161,28 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 .modal-panel { background: #0a0a0a; border: 1px solid #333; padding: 50px; border-radius: 25px; width: 900px; max-width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 0 150px black; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .m-title { font-size: 2.5rem; font-weight: 900; text-align: center; text-transform: uppercase; margin-bottom: 40px; letter-spacing: 3px; border-bottom: 2px solid #222; padding-bottom: 10px; color:white; }
 
-.set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; text-align: left; }
-.set-head { color: var(--blue); font-weight: 900; font-size: 1.2rem; border-bottom: 2px solid #222; margin-bottom: 25px; padding-bottom: 5px; text-transform: uppercase; }
-.set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: #ddd; font-weight: 700; font-family: 'Nunito'; font-size: 1.1rem; }
+/* === NUEVO MENU DE AJUSTES (SIDEBAR LAYOUT) === */
+.settings-layout { display: flex; height: 500px; overflow: hidden; border: 1px solid #333; border-radius: 10px; background: #050505; }
+.settings-sidebar { width: 30%; background: #111; border-right: 1px solid #333; display: flex; flex-direction: column; }
+.settings-content { width: 70%; padding: 20px; overflow-y: auto; background: #080808; }
+
+.set-tab-btn { padding: 15px; border: none; background: transparent; color: #888; text-align: left; font-weight: 900; cursor: pointer; border-bottom: 1px solid #222; transition: 0.2s; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+.set-tab-btn:hover { background: #1a1a1a; color: white; }
+.set-tab-btn.active { background: var(--accent); color: black; padding-left: 20px; }
+
+.set-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #222; margin-bottom: 5px; }
+.set-row:last-child { border-bottom: none; }
+.set-label { font-weight: bold; font-size: 1rem; color: #ddd; font-family: 'Nunito'; }
+
+/* Toggle Switch (Red/Green Style) */
+.toggle-switch { width: 60px; height: 30px; border-radius: 6px; border: none; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; font-family: 'Chakra Petch'; font-size: 0.9rem; }
+.toggle-switch.on { background: #12FA05; color: black; box-shadow: 0 0 10px rgba(18, 250, 5, 0.4); }
+.toggle-switch.off { background: #F9393F; color: white; opacity: 0.6; }
 
 input[type="range"] { accent-color: white; width: 160px; cursor: pointer; height: 8px; border-radius: 4px; }
-input[type="checkbox"] { width: 30px; height: 30px; accent-color: white; cursor: pointer; border-radius: 6px; }
+.num-input { background: #222; border: 1px solid #444; color: white; width: 60px; padding: 5px; text-align: center; font-weight: bold; border-radius: 4px; }
 
+/* Resto de estilos */
 .kb-tabs { display: flex; gap: 15px; margin-bottom: 30px; justify-content: center; }
 .kb-tab { padding: 10px 20px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; cursor: pointer; font-weight: 900; color: #666; transition: 0.2s; min-width: 60px; text-align: center; }
 .kb-tab:hover { border-color: #666; }
