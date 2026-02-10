@@ -1,10 +1,9 @@
-/* === AUDIO & ENGINE (REWORKED) === */
+/* === AUDIO & ENGINE (CLEAN & FIXED) === */
 function unlockAudio(){ if(!st.ctx){ st.ctx=new(window.AudioContext||window.webkitAudioContext)(); genHit(); } if(st.ctx.state==='suspended') st.ctx.resume(); }
 function genHit(){ const b=st.ctx.createBuffer(1,2000,44100),d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.sin(i*0.5)*Math.exp(-i/300); hitBuf=b; }
 function playHit(){ if(hitBuf&&cfg.hvol>0&&st.ctx){ const s=st.ctx.createBufferSource(); s.buffer=hitBuf; const g=st.ctx.createGain(); g.gain.value=cfg.hvol; s.connect(g); g.connect(st.ctx.destination); s.start(0); } }
 function playHover(){ if(st.ctx && cfg.hvol>0 && st.ctx.state==='running') { const o=st.ctx.createOscillator(); const g=st.ctx.createGain(); o.frequency.value=600; g.gain.value=0.05; o.connect(g); g.connect(st.ctx.destination); o.start(); o.stop(st.ctx.currentTime+0.05); } }
 
-// === NUEVO ALGORITMO DE GENERACIÓN ===
 function normalizeAudio(filteredData) {
     let max = 0;
     for (let i = 0; i < filteredData.length; i++) {
@@ -12,9 +11,11 @@ function normalizeAudio(filteredData) {
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
-    const multiplier = 0.8 / max; // Normalizar al 80%
-    for (let i = 0; i < filteredData.length; i++) {
-        filteredData[i] *= multiplier;
+    const multiplier = 0.8 / max; 
+    if(multiplier > 1.2) {
+        for (let i = 0; i < filteredData.length; i++) {
+            filteredData[i] *= multiplier;
+        }
     }
     return filteredData;
 }
@@ -22,66 +23,53 @@ function normalizeAudio(filteredData) {
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData)); 
-    
     const map = [];
     const sampleRate = buf.sampleRate;
-    
     const windowSize = 1024; 
     const step = Math.floor(sampleRate / 60); 
-    
     let laneFreeTime = new Array(k).fill(0); 
-    
     let lastNoteTime = -1000;
-    const thresholdFactor = 1.6 - (cfg.den * 0.08); 
-    const minGap = Math.max(100, 600 - (cfg.den * 50)); 
-
+    const thresholdFactor = 1.55 - (cfg.den * 0.05); 
+    const minGap = Math.max(100, 550 - (cfg.den * 45)); 
     let energyHistory = [];
     const historySize = 43; 
 
     for (let i = 0; i < data.length - windowSize; i += step) {
         let sum = 0;
-        for (let j = 0; j < windowSize; j++) {
-            sum += data[i + j] * data[i + j];
-        }
+        for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
         const instantEnergy = Math.sqrt(sum / windowSize);
-
         energyHistory.push(instantEnergy);
         if (energyHistory.length > historySize) energyHistory.shift();
-
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
-
         const timeMs = (i / sampleRate) * 1000;
 
-        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.02) {
+        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.01) {
             if (timeMs - lastNoteTime > minGap) {
                 let type = 'tap';
                 let len = 0;
                 if (instantEnergy > localAvg * 1.8 && Math.random() > 0.6) {
                     type = 'hold';
-                    len = Math.min(1000, Math.random() * 400 + 100); 
+                    len = Math.min(1500, Math.random() * 500 + 100); 
                 }
-
                 let bestLane = -1;
                 let attempts = 0;
-                while(attempts < 10) {
+                while(attempts < 15) {
                     let potentialLane = Math.floor(Math.random() * k);
-                    if (timeMs >= laneFreeTime[potentialLane] + 50) { 
+                    if (timeMs >= laneFreeTime[potentialLane] + 30) { 
                         bestLane = potentialLane;
                         break;
                     }
                     attempts++;
                 }
-
                 if (bestLane !== -1) {
                     map.push({ t: timeMs, l: bestLane, type: type, len: len, h: false });
-                    laneFreeTime[bestLane] = timeMs + len;
+                    laneFreeTime[bestLane] = timeMs + len; 
                     lastNoteTime = timeMs;
-
-                    if ((k >= 7 || cfg.den >= 8) && instantEnergy > localAvg * 2.5) {
+                    if ((k >= 6 || cfg.den >= 7) && instantEnergy > localAvg * 2.8) {
                         for(let l=0; l<k; l++) {
-                            if(l !== bestLane && timeMs >= laneFreeTime[l] + 50) {
+                            if(l !== bestLane && timeMs >= laneFreeTime[l] + 30) {
                                 map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
                                 laneFreeTime[l] = timeMs; 
                                 break;
@@ -107,7 +95,7 @@ function initReceptors(k) {
 }
 
 async function prepareAndPlaySong(k) {
-    if(!curSongData) return notify("Error: No hay canción", "error");
+    if(!curSongData) return notify("Error: No hay canción seleccionada", "error");
     let songInRam = ramSongs.find(s => s.id === curSongData.id);
 
     if(!songInRam) {
@@ -121,7 +109,7 @@ async function prepareAndPlaySong(k) {
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map };
             ramSongs.push(songInRam);
         } catch(e) {
-            console.error(e); notify("Error carga", "error");
+            notify("Error al cargar canción", "error");
             document.getElementById('loading-overlay').style.display = 'none'; return;
         }
         document.getElementById('loading-overlay').style.display = 'none';
@@ -204,16 +192,30 @@ function loop(){
     requestAnimationFrame(loop);
 }
 
+// === CORRECCIÓN DEL ERROR DE TECLAS ===
 function onKd(e) { 
     if(e.key==="Escape"){togglePause();return;} 
     if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
-    if(remapMode!==null){ cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); renderLaneConfig(remapMode); remapMode=null; return; } 
+    
+    // Verificamos que cfg.modes exista antes de leer
+    if(remapMode!==null && cfg.modes[remapMode]){ 
+        cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
+        renderLaneConfig(remapMode); 
+        remapMode=null; 
+        return; 
+    } 
     if(!e.repeat) { 
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); 
-        if(idx !== -1) hit(idx, true); 
+        // USAMOS ?. PARA EVITAR EL ERROR "UNDEFINED"
+        const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase()); 
+        if(idx !== undefined && idx !== -1) hit(idx, true); 
     } 
 }
-function onKu(e) { const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); if(idx !== -1) hit(idx, false); }
+
+function onKu(e) { 
+    // USAMOS ?. PARA EVITAR EL ERROR
+    const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase()); 
+    if(idx !== undefined && idx !== -1) hit(idx, false); 
+}
 
 function hit(l, p) {
     if(!st.act || st.paused) return;
