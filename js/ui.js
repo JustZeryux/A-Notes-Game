@@ -1,8 +1,7 @@
-/* === UI LOGIC & INTERACTION (FULL MERGED) === */
+/* === UI LOGIC & INTERACTION (FIXED + FULL) === */
 
-// Movemos playHover aquí para que esté disponible siempre en el menú
+// FIX IMPORTANTE: Definir playHover aquí para que el menú HTML lo encuentre siempre
 function playHover(){ 
-    // Verificación de seguridad para no causar errores si el audio no está listo
     if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
         try {
             const o=st.ctx.createOscillator(); 
@@ -75,10 +74,8 @@ function updUI() {
     document.getElementById('set-judge-vis').checked = cfg.judgeVis;
     
     const isGoogle = user.pass === "google-auth";
-    const localSet = document.getElementById('local-acc-settings');
-    const googleSet = document.getElementById('google-acc-settings');
-    if(localSet) localSet.style.display = isGoogle ? 'none' : 'block';
-    if(googleSet) googleSet.style.display = isGoogle ? 'block' : 'none';
+    document.getElementById('local-acc-settings').style.display = isGoogle ? 'none' : 'block';
+    document.getElementById('google-acc-settings').style.display = isGoogle ? 'block' : 'none';
 }
 
 function changeSection(sec) {
@@ -119,15 +116,12 @@ function openFriends() {
                 db.collection("users").doc(f).get().then(fDoc => {
                     if(!fDoc.exists) return;
                     const fData = fDoc.data();
-                    const now = Math.floor(Date.now() / 1000);
-                    const last = fData.lastSeen ? fData.lastSeen.seconds : 0;
-                    const isOnline = (now - last) < 120; 
                     
                     const d = document.createElement('div'); d.className = 'friend-row';
-                    d.onclick = function() { showFriendProfile(f, fData, isOnline); };
+                    d.onclick = function() { showFriendProfile(f, fData, true); };
                     
                     let avStyle = fData.avatarData ? `background-image:url(${fData.avatarData})` : '';
-                    d.innerHTML = `<div style="display:flex;align-items:center; pointer-events:none;"><div class="friend-status ${isOnline?'online':''}"></div><div class="f-row-av" style="${avStyle}"></div><span class="friend-row-name">${f}</span></div>`;
+                    d.innerHTML = `<div style="display:flex;align-items:center; pointer-events:none;"><div class="f-row-av" style="${avStyle}"></div><span class="friend-row-name">${f}</span></div>`;
                     friL.appendChild(d);
                 });
             });
@@ -151,18 +145,15 @@ function showFriendProfile(fName, fData, isOnline) {
     const statusTxt = document.getElementById('fp-status-text');
     const chalBtn = document.getElementById('btn-challenge');
     
-    if(isOnline) {
-        statusTxt.innerText = "En línea"; statusTxt.style.color = "var(--good)";
-        chalBtn.disabled = false;
-    } else {
-        statusTxt.innerText = "Desconectado"; statusTxt.style.color = "#888";
-        chalBtn.disabled = true; 
-    }
+    statusTxt.innerText = "Jugador"; 
+    chalBtn.disabled = false;
+    
     chalBtn.onclick = () => { challengeFriend(fName); closeModal('friend-profile'); };
     closeModal('friends');
     openModal('friend-profile');
 }
 
+/* CHATS */
 let activeChats = [];
 function openFloatingChat(friendName) {
     const target = friendName || selectedFriend;
@@ -199,6 +190,7 @@ function initFloatChatListener(target) {
     });
 }
 
+/* NOTIFICATIONS */
 function setupNotificationsListener() {
     if(user.name === "Guest" || !db) return;
     db.collection("users").doc(user.name).collection("notifications").where("read", "==", false)
@@ -244,6 +236,7 @@ function notify(msg, type="info", duration=3000) {
 }
 function closeNotification(id) { const card = document.getElementById('notif-'+id); if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); } }
 
+/* GLOBAL MENU */
 let globalSongsListener = null;
 function renderMenu(filter="") {
     if(!db) return;
@@ -264,14 +257,19 @@ function renderMenu(filter="") {
                 scoreTag = `<div style="margin-top:10px; display:flex; gap:5px; align-items:center;"><span class="tag rank-tag" style="color:${getRankColor(us.rank)}; background:rgba(0,0,0,0.5);">${us.rank}</span><span class="tag score-tag">${us.score.toLocaleString()}</span></div>`;
             }
             c.innerHTML = `<div class="bc-bg" style="${bgStyle}"></div><div class="bc-info"><div class="bc-title">${s.title}</div><div class="bc-meta" style="font-size:0.8rem; color:#aaa;">Subido por: ${s.uploader}</div>${scoreTag}<div class="bc-meta"><span class="tag keys">4K | 6K | 7K | 9K</span></div></div>`;
-            c.onclick = () => { curSongData = { id: songId, ...s }; openModal('diff'); const lb = document.getElementById('create-lobby-opts'); if(lb) lb.style.display = 'none'; };
+            c.onclick = () => { 
+                curSongData = { id: songId, ...s }; 
+                openModal('diff'); 
+                const lobbyBtn = document.getElementById('create-lobby-opts');
+                if(lobbyBtn) lobbyBtn.style.display = 'none'; 
+            };
             grid.appendChild(c);
         });
     });
 }
 function getRankColor(r) { if(r==="SS") return "cyan"; if(r==="S") return "gold"; if(r==="A") return "lime"; if(r==="B") return "yellow"; if(r==="C") return "orange"; return "red"; }
 
-// === UPLOADCARE ===
+/* UPLOADCARE */
 function autoFillTitle(input) { if(input.files[0]) { let name = input.files[0].name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "); document.getElementById('up-title').value = name; document.getElementById('upload-status').innerText = ""; } }
 function uploadFileToUC(file) { return new Promise((resolve, reject) => { const u = uploadcare.fileFrom('object', file); u.done(info => resolve(info.cdnUrl)).fail(err => reject(err)); }); }
 async function startGlobalUpload() {
