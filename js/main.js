@@ -1,7 +1,7 @@
 /* === MAIN INITIALIZATION === */
 window.onload = async () => { 
     loadData(); 
-    await initDB();
+    // await initDB(); // Desactivado para usar Full Cloud
     initOnline(); 
     document.addEventListener('click', unlockAudio); 
     renderMenu(); 
