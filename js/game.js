@@ -606,11 +606,11 @@ function end(died) {
 function toMenu() { location.reload(); }
 function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
 
-// === HUD FIX ===
 function updHUD() {
+    // Score
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
     
-    // LOGICA COMBO GIGANTE
+    // COMBO GIGANTE Y FC (Nuevo sistema)
     const comboEl = document.getElementById('g-combo');
     if(comboEl) {
         if (st.cmb > 0) {
@@ -624,7 +624,6 @@ function updHUD() {
         }
     }
 
-    // LOGICA FC & MEAN
     const fcEl = document.getElementById('hud-fc');
     if(fcEl && st.fcStatus) {
         fcEl.innerText = cfg.showFC ? st.fcStatus : "";
@@ -642,6 +641,7 @@ function updHUD() {
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
     document.getElementById('g-acc').innerText = acc + "%";
     
+    // Stats de la izquierda
     document.getElementById('h-sick').innerText = st.stats.s;
     document.getElementById('h-good').innerText = st.stats.g;
     document.getElementById('h-bad').innerText = st.stats.b;
@@ -650,6 +650,7 @@ function updHUD() {
     document.getElementById('health-fill').style.height = st.hp + '%';
     
     if (isMultiplayer) sendLobbyScore(st.sc);
+}
 
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
     document.getElementById('g-acc').innerText = acc + "%";
