@@ -1,6 +1,28 @@
-/* === UI LOGIC & INTERACTION (ULTRA FINAL FIXED V9) === */
+/* === UI LOGIC & INTERACTION (ULTRA FINAL REPAIR) === */
 
-// Helpers visuales
+// === 1. HELPERS & NOTIFICATIONS (CRÍTICO) ===
+function notify(msg, type="info") {
+    const area = document.getElementById('notification-area');
+    if(!area) return console.log(msg); // Fallback seguro
+    
+    const card = document.createElement('div');
+    card.className = 'notify-card';
+    if(type==="error") card.style.borderLeftColor = "#F9393F";
+    else if(type==="success") card.style.borderLeftColor = "#12FA05";
+    
+    card.innerHTML = `
+        <div class="notify-title">${type.toUpperCase()}</div>
+        <div class="notify-body">${msg}</div>
+    `;
+    area.appendChild(card);
+    
+    // Auto-remove
+    setTimeout(() => {
+        card.style.animation = "slideOut 0.3s forwards";
+        setTimeout(() => card.remove(), 300);
+    }, 4000);
+}
+
 function playHover(){ 
     if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
         try {
@@ -16,18 +38,20 @@ function playHover(){
     } 
 }
 
-// Helpers DOM seguros
 function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
 function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
 
+// === 2. UPDATE UI (CORE) ===
 function updUI() {
     if(!user || !cfg) return;
 
+    // Default Checks
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
     if(cfg.noteScale === undefined) cfg.noteScale = 1;
 
+    // Text Updates
     setText('m-name', user.name);
     setText('p-name', user.name);
     setText('ig-name', user.name);
@@ -40,6 +64,7 @@ function updUI() {
     setText('m-rank', "LVL " + user.lvl);
     setText('p-lvl-txt', "LVL " + user.lvl);
     
+    // XP Bar
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
@@ -47,6 +72,7 @@ function updUI() {
     setStyle('p-xp-bar', 'width', pct + "%");
     setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
     
+    // Images
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
@@ -59,6 +85,7 @@ function updUI() {
 
     applyCfg();
 
+    // HUD Live Update (GFC Color & Combo)
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
@@ -84,6 +111,7 @@ function updUI() {
         }
     }
 
+    // Login/Logout Views
     const isGoogle = user.pass === "google-auth";
     const locSet = document.getElementById('local-acc-settings');
     const gooSet = document.getElementById('google-acc-settings');
@@ -107,13 +135,14 @@ function applyCfg() {
     }
 }
 
-// === SETTINGS MENU (3 COLUMNS: MENU | CONTENT | PREVIEW) ===
+// === 3. SETTINGS MENU (FIXED SAVE & CLOSE) ===
 function openSettingsMenu() {
     const modal = document.getElementById('modal-settings');
     if(!modal) return;
     
+    // Asegurar clase ancha
     const panel = modal.querySelector('.modal-panel');
-    panel.className = "modal-panel settings-panel";
+    panel.classList.add('settings-panel');
     
     panel.innerHTML = `
         <div class="settings-header">
@@ -132,15 +161,22 @@ function openSettingsMenu() {
             </div>
             <div class="settings-content" id="set-content-area"></div>
             <div class="settings-preview">
-                <div class="preview-title">PREVIEW</div>
-                <div class="preview-box" id="preview-box">
-                    </div>
+                <div class="preview-title">VISTA PREVIA</div>
+                <div class="preview-box" id="preview-box"></div>
             </div>
         </div>
     `;
     
     modal.style.display = 'flex';
     switchSetTab('gameplay');
+}
+
+function saveSettings() {
+    applyCfg();
+    if(typeof save === 'function') { save(); notify("Ajustes guardados"); }
+    // FIX: Forzar cierre del modal
+    document.getElementById('modal-settings').style.display = 'none';
+    updUI();
 }
 
 function switchSetTab(tab) {
@@ -202,9 +238,6 @@ function switchSetTab(tab) {
 function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
-    
-    // Simulate a note based on current config
-    // Default shape is circle if not found, but let's try to get 4K lane 0
     const sampleLane = cfg.modes[4][0];
     const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
     const scale = cfg.noteScale || 1;
@@ -244,16 +277,14 @@ function toggleCfg(key) {
 function updateCfgVal(key, val) {
     const disp = document.getElementById('disp-'+key);
     if(disp) disp.innerText = val;
-    
     if (key.includes('vol')) cfg[key] = val / 100;
     else if (key === 'noteScale') cfg[key] = parseFloat(val);
     else cfg[key] = parseInt(val);
-    
     applyCfg();
     updatePreview();
 }
 
-// === HANDLER GLOBAL ===
+// === 4. GLOBAL HANDLER & NAVIGATION ===
 window.openModal = function(id) {
     if (id === 'settings') {
         openSettingsMenu();
@@ -288,18 +319,66 @@ window.openModal = function(id) {
 
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
 
-function saveSettings() {
-    applyCfg();
-    if(typeof save === 'function') { save(); notify("Ajustes guardados"); }
-    const m = document.getElementById('modal-settings');
-    if(m) m.style.display='none';
-    updUI();
+// === 5. SONG LOADING (CON REINTENTO) ===
+let globalSongsListener = null;
+function renderMenu(filter="") {
+    if(!db) {
+        // FIX: Si DB no está lista, reintentar en 500ms
+        setTimeout(() => renderMenu(filter), 500);
+        return;
+    }
+    const grid = document.getElementById('song-grid');
+    if(!grid) return;
+
+    if(globalSongsListener) globalSongsListener(); 
+    
+    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
+        grid.innerHTML = '';
+        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666; text-align:center;">No hay canciones. ¡Sube una!</div>'; return; }
+        
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            const songId = doc.id;
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+            
+            const c = document.createElement('div'); 
+            c.className = 'beatmap-card';
+            
+            let bgStyle;
+            if(s.imageURL) {
+                bgStyle = `background-image:url(${s.imageURL})`;
+            } else {
+                let hash = 0;
+                for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
+                const hue = Math.abs(hash % 360);
+                bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
+            }
+            
+            let scoreTag = '';
+            if(user.scores && user.scores[songId]) {
+                const us = user.scores[songId];
+                scoreTag = `<span class="tag rank-tag" style="color:gold">${us.rank}</span>`;
+            }
+
+            c.innerHTML = `
+                <div class="bc-bg" style="${bgStyle}"></div>
+                <div class="bc-info">
+                    <div class="bc-title">${s.title}</div>
+                    <div class="bc-meta" style="font-size:0.8rem;color:#aaa;">${s.uploader} ${scoreTag}</div>
+                </div>`;
+            c.onclick = () => { 
+                curSongData = { id: songId, ...s }; 
+                openModal('diff'); 
+            };
+            grid.appendChild(c);
+        });
+    });
 }
 
+// === 6. OTROS (AMIGOS, TIENDA, PERFIL) ===
 function openFriends() {
     if(user.name === "Guest") return notify("Inicia sesión primero", "error");
     if(!db) return notify("Error de conexión", "error");
-    
     const friL = document.getElementById('friend-list');
     if(!friL) return;
     
@@ -331,7 +410,6 @@ function showFriendProfile(name, data) {
     setText('fp-score', data.score.toLocaleString());
     const av = document.getElementById('fp-av');
     if(av) av.style.backgroundImage = data.avatarData ? `url(${data.avatarData})` : '';
-    
     const btn = document.getElementById('btn-challenge');
     if(btn) {
         btn.disabled = false;
@@ -362,11 +440,9 @@ function renderLaneConfig(k){
     document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); 
     const tab = document.getElementById('tab-'+k);
     if(tab) tab.classList.add('active'); 
-    
     const c=document.getElementById('lanes-container'); 
     if(!c) return;
     c.innerHTML=''; 
-    
     for(let i=0; i<k; i++){ 
         const l = cfg.modes[k][i]; 
         const d=document.createElement('div'); d.className='l-col'; 
@@ -377,13 +453,7 @@ function renderLaneConfig(k){
 }
 function remapKey(k,i){ if(document.activeElement) document.activeElement.blur(); remapMode=k; remapIdx=i; renderLaneConfig(k); }
 function updateLaneColor(k,i,v){ cfg.modes[k][i].c=v; updatePreview(); }
-function cycleShape(k,i){ 
-    const shapes=['circle','arrow','square','diamond']; 
-    const cur=shapes.indexOf(cfg.modes[k][i].s); 
-    cfg.modes[k][i].s = shapes[(cur+1)%4]; 
-    renderLaneConfig(k); 
-    updatePreview(); 
-}
+function cycleShape(k,i){ const shapes=['circle','arrow','square','diamond']; const cur=shapes.indexOf(cfg.modes[k][i].s); cfg.modes[k][i].s = shapes[(cur+1)%4]; renderLaneConfig(k); updatePreview(); }
 
 function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
 function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;user.avatarData=e.target.result;save(); updUI(); updateFirebaseScore();}; r.readAsDataURL(i.files[0]); i.value=""; }}
