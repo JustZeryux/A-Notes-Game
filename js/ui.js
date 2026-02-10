@@ -1,4 +1,4 @@
-/* === UI LOGIC & INTERACTION (FINAL FIX V8) === */
+/* === UI LOGIC & INTERACTION (ULTRA FINAL FIXED V9) === */
 
 // Helpers visuales
 function playHover(){ 
@@ -23,12 +23,11 @@ function setStyle(id, prop, val) { const el = document.getElementById(id); if(el
 function updUI() {
     if(!user || !cfg) return;
 
-    // Default values
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
+    if(cfg.noteScale === undefined) cfg.noteScale = 1;
 
-    // User Data
     setText('m-name', user.name);
     setText('p-name', user.name);
     setText('ig-name', user.name);
@@ -41,7 +40,6 @@ function updUI() {
     setText('m-rank', "LVL " + user.lvl);
     setText('p-lvl-txt', "LVL " + user.lvl);
     
-    // XP Bar
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
@@ -49,7 +47,6 @@ function updUI() {
     setStyle('p-xp-bar', 'width', pct + "%");
     setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
     
-    // Visuals
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
@@ -62,7 +59,6 @@ function updUI() {
 
     applyCfg();
 
-    // HUD LIVE UPDATE
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
@@ -88,7 +84,6 @@ function updUI() {
         }
     }
 
-    // Auth UI
     const isGoogle = user.pass === "google-auth";
     const locSet = document.getElementById('local-acc-settings');
     const gooSet = document.getElementById('google-acc-settings');
@@ -99,6 +94,7 @@ function updUI() {
 function applyCfg() {
     document.documentElement.style.setProperty('--track-alpha', (cfg.trackOp || 10) / 100); 
     document.documentElement.style.setProperty('--note-op', (cfg.noteOp || 100) / 100);
+    document.documentElement.style.setProperty('--note-scale', cfg.noteScale || 1);
     document.documentElement.style.setProperty('--judge-y', (cfg.judgeY || 40) + '%'); 
     document.documentElement.style.setProperty('--judge-x', (cfg.judgeX || 50) + '%'); 
     document.documentElement.style.setProperty('--judge-scale', (cfg.judgeS || 7)/10); 
@@ -111,12 +107,11 @@ function applyCfg() {
     }
 }
 
-// === SETTINGS MENU (ROBLOX STYLE) ===
+// === SETTINGS MENU (3 COLUMNS: MENU | CONTENT | PREVIEW) ===
 function openSettingsMenu() {
     const modal = document.getElementById('modal-settings');
     if(!modal) return;
     
-    // Add custom class for width
     const panel = modal.querySelector('.modal-panel');
     panel.className = "modal-panel settings-panel";
     
@@ -136,6 +131,11 @@ function openSettingsMenu() {
                 <button class="set-tab-btn" onclick="switchSetTab('controls')">⌨️ CONTROLS</button>
             </div>
             <div class="settings-content" id="set-content-area"></div>
+            <div class="settings-preview">
+                <div class="preview-title">PREVIEW</div>
+                <div class="preview-box" id="preview-box">
+                    </div>
+            </div>
         </div>
     `;
     
@@ -154,24 +154,23 @@ function switchSetTab(tab) {
     let html = '';
     
     if (tab === 'gameplay') {
-        html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
-        html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 40);
+        html += renderToggle('Middlescroll', 'middleScroll');
+        html += renderToggle('Downscroll', 'down');
+        html += renderRange('Velocidad', 'spd', 10, 40);
         html += renderRange('Dificultad IA', 'den', 1, 10);
-        html += renderRange('Offset Global (ms)', 'off', -200, 200);
+        html += renderRange('Offset (ms)', 'off', -200, 200);
     } 
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
         html += renderToggle('Screen Shake', 'shake');
         html += renderToggle('Mostrar Juez', 'judgeVis');
-        html += renderToggle('Mostrar FC Status', 'showFC');
+        html += renderToggle('Mostrar FC', 'showFC');
         html += renderToggle('Mostrar Mean MS', 'showMean');
-        html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100);
-        html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100);
-        html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
-        html += renderRange('Posición Juez X', 'judgeX', 0, 100);
-        html += renderRange('Tamaño Juez', 'judgeS', 5, 20);
-        html += `<div style="margin-top:20px;"><button class="btn-small btn-add" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button></div>`;
+        html += renderRange('Opacidad Carril', 'trackOp', 0, 100);
+        html += renderRange('Opacidad Notas', 'noteOp', 10, 100);
+        html += renderRange('Tamaño Nota', 'noteScale', 0.5, 1.5, 0.1);
+        html += renderRange('Pos. Juez Y', 'judgeY', 0, 100);
+        html += `<div style="margin-top:20px;"><button class="btn-small btn-add" onclick="document.getElementById('bg-file').click()">🖼️ FONDO</button></div>`;
         html += `<input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">`;
     } 
     else if (tab === 'audio') {
@@ -180,9 +179,9 @@ function switchSetTab(tab) {
         html += renderRange('Volumen Hits', 'hvol', 0, 100);
         html += renderToggle('Miss Sounds', 'missSound');
         html += renderRange('Volumen Miss', 'missVol', 0, 100);
-        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT SOUND</button></div>`;
+        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 HIT SOUND</button></div>`;
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">`;
-        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS SOUND</button></div>`;
+        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 MISS SOUND</button></div>`;
         html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
     else if (tab === 'controls') {
@@ -197,6 +196,27 @@ function switchSetTab(tab) {
     }
 
     content.innerHTML = html;
+    updatePreview();
+}
+
+function updatePreview() {
+    const box = document.getElementById('preview-box');
+    if (!box) return;
+    
+    // Simulate a note based on current config
+    // Default shape is circle if not found, but let's try to get 4K lane 0
+    const sampleLane = cfg.modes[4][0];
+    const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
+    const scale = cfg.noteScale || 1;
+    const opacity = (cfg.noteOp || 100) / 100;
+    
+    box.innerHTML = `
+        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity};">
+            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 10px ${sampleLane.c});">
+                <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
+            </svg>
+        </div>
+    `;
 }
 
 function renderToggle(label, key) {
@@ -204,10 +224,10 @@ function renderToggle(label, key) {
     return `<div class="set-row"><span class="set-label">${label}</span><button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button></div>`;
 }
 
-function renderRange(label, key, min, max) {
+function renderRange(label, key, min, max, step=1) {
     let val = cfg[key];
     if (key.includes('vol')) val = Math.round((val||0.5) * 100);
-    return `<div class="set-row"><span class="set-label">${label}</span><div style="display:flex;gap:10px;align-items:center;"><input type="range" min="${min}" max="${max}" value="${val}" oninput="updateCfgVal('${key}', this.value)"><div id="disp-${key}" class="num-input">${val}</div></div></div>`;
+    return `<div class="set-row"><span class="set-label">${label}</span><div style="display:flex;gap:10px;align-items:center;"><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="updateCfgVal('${key}', this.value)"><div id="disp-${key}" class="num-input">${val}</div></div></div>`;
 }
 
 function toggleCfg(key) {
@@ -218,17 +238,22 @@ function toggleCfg(key) {
         btn.innerText = cfg[key] ? 'ON' : 'OFF';
     }
     applyCfg();
+    updatePreview();
 }
 
 function updateCfgVal(key, val) {
     const disp = document.getElementById('disp-'+key);
     if(disp) disp.innerText = val;
+    
     if (key.includes('vol')) cfg[key] = val / 100;
+    else if (key === 'noteScale') cfg[key] = parseFloat(val);
     else cfg[key] = parseInt(val);
+    
     applyCfg();
+    updatePreview();
 }
 
-// === GLOBAL HANDLER ===
+// === HANDLER GLOBAL ===
 window.openModal = function(id) {
     if (id === 'settings') {
         openSettingsMenu();
@@ -252,7 +277,6 @@ window.openModal = function(id) {
             if(curSongData.imageURL) {
                 cover.style.backgroundImage = `url(${curSongData.imageURL})`;
             } else {
-                // Fallback color si no hay imagen
                 let hash = 0;
                 for (let i = 0; i < curSongData.id.length; i++) hash = curSongData.id.charCodeAt(i) + ((hash << 5) - hash);
                 const hue = Math.abs(hash % 360);
@@ -272,7 +296,6 @@ function saveSettings() {
     updUI();
 }
 
-// === AMIGOS ===
 function openFriends() {
     if(user.name === "Guest") return notify("Inicia sesión primero", "error");
     if(!db) return notify("Error de conexión", "error");
@@ -318,7 +341,6 @@ function showFriendProfile(name, data) {
     openModal('friend-profile');
 }
 
-// === UTILS ===
 function changeSection(sec) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     const map = { 'songs': 'nav-songs', 'multi': 'nav-multi', 'shop': 'nav-shop', 'settings': 'nav-settings', 'rank': 'nav-rank', 'friends': 'nav-friends' };
@@ -354,15 +376,20 @@ function renderLaneConfig(k){
     } 
 }
 function remapKey(k,i){ if(document.activeElement) document.activeElement.blur(); remapMode=k; remapIdx=i; renderLaneConfig(k); }
-function updateLaneColor(k,i,v){ cfg.modes[k][i].c=v; }
-function cycleShape(k,i){ const shapes=['circle','arrow','square','diamond']; const cur=shapes.indexOf(cfg.modes[k][i].s); cfg.modes[k][i].s = shapes[(cur+1)%4]; renderLaneConfig(k); }
+function updateLaneColor(k,i,v){ cfg.modes[k][i].c=v; updatePreview(); }
+function cycleShape(k,i){ 
+    const shapes=['circle','arrow','square','diamond']; 
+    const cur=shapes.indexOf(cfg.modes[k][i].s); 
+    cfg.modes[k][i].s = shapes[(cur+1)%4]; 
+    renderLaneConfig(k); 
+    updatePreview(); 
+}
 
 function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
 function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;user.avatarData=e.target.result;save(); updUI(); updateFirebaseScore();}; r.readAsDataURL(i.files[0]); i.value=""; }}
 async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound cargado"); i.value = ""; } }
 async function loadMissSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); missBuf = await st.ctx.decodeAudioData(buf); notify("Miss Sound cargado"); i.value = ""; } }
 
-// === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
     const grid = document.getElementById('shop-items');
