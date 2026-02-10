@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (STABLE V8 + ERROR REPORTING) === */
+/* === AUDIO & ENGINE (STABLE V8 + ERROR REPORTING + FIX PAUSE/LOAD) === */
 
 function unlockAudio() {
     if (!st.ctx) {
@@ -30,16 +30,13 @@ function playHit() {
     }
 }
 
-// === NORMALIZACIÓN SEGURA ===
 function normalizeAudio(filteredData) {
     let max = 0;
-    // Muestreo rápido para evitar congelamiento
     for (let i = 0; i < filteredData.length; i += 50) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
-    
     const multiplier = 0.95 / max;
     if (multiplier > 1.1) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
@@ -47,7 +44,6 @@ function normalizeAudio(filteredData) {
     return filteredData;
 }
 
-// === GENERADOR V7 (OPTIMIZADO PARA NO CONGELAR) ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
@@ -65,7 +61,6 @@ function genMap(buf, k) {
     let energyHistory = [];
     const historySize = 40; 
     
-    // Protección contra valores inválidos de dificultad
     let safeDen = cfg.den || 5;
     const density = Math.max(1, Math.min(10, safeDen));
     const thresholdFactor = 1.35 - (density * 0.06); 
@@ -92,7 +87,6 @@ function genMap(buf, k) {
             if (instantEnergy > localAvg * 2.5) currentGap *= 0.5; 
 
             if (timeMs - lastNoteTime >= currentGap) {
-                
                 if (patternCounter <= 0 || Math.random() > 0.9) {
                     const r = Math.random();
                     if (r < 0.30) patternType = 0; 
@@ -126,7 +120,6 @@ function genMap(buf, k) {
                     do { lane = Math.floor(Math.random() * k); tries++; } while (lane === lastLane && tries < 5);
                 }
 
-                // Anti-Overlap simple
                 if (timeMs < laneFreeTime[lane] + 20) {
                     let found = false;
                     for (let offset = 1; offset < k; offset++) {
@@ -146,7 +139,6 @@ function genMap(buf, k) {
                 lastLane = lane;
                 patternCounter--;
 
-                // Acordes
                 if ((k >= 4 && density >= 6) && instantEnergy > localAvg * 2.2) {
                     for (let l = 0; l < k; l++) {
                         if (Math.abs(l - lane) > 1 && timeMs >= laneFreeTime[l] + 20) {
@@ -193,46 +185,55 @@ function initReceptors(k) {
 async function prepareAndPlaySong(k) {
     if (!curSongData) return notify("Error: No hay canción seleccionada", "error");
 
-    let songInRam = ramSongs.find(s => s.id === curSongData.id);
     document.getElementById('loading-overlay').style.display = 'flex';
-    document.getElementById('loading-text').innerText = "Descargando...";
+    document.getElementById('loading-text').innerText = "Cargando audio...";
 
-    if (!songInRam) {
-        try {
-            unlockAudio();
+    try {
+        unlockAudio(); // Asegurar contexto de audio
+
+        // Buscar en caché RAM
+        let songInRam = ramSongs.find(s => s.id === curSongData.id);
+
+        if (!songInRam) {
+            // Descargar
             const response = await fetch(curSongData.audioURL);
-            if(!response.ok) throw new Error("Error HTTP: " + response.status);
+            if (!response.ok) throw new Error("Error red: " + response.status);
             
             const arrayBuffer = await response.arrayBuffer();
+            
+            document.getElementById('loading-text').innerText = "Decodificando...";
             const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
             
             document.getElementById('loading-text').innerText = "Generando mapa...";
-            // Usamos setTimeout para dar tiempo al UI de actualizarse antes de congelar con genMap
-            await new Promise(r => setTimeout(r, 50)); 
             
+            // !! IMPORTANTE: Delay para permitir que el UI se renderice antes de congelar con cálculos
+            await new Promise(r => setTimeout(r, 100)); 
+
             const map = genMap(audioBuffer, k);
-            
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map, kVersion: k };
+            
+            // Guardar en caché
             ramSongs.push(songInRam);
             if (ramSongs.length > 5) ramSongs.shift();
+        } else {
+            // Regenerar si cambia dificultad
+            if (songInRam.kVersion !== k) {
+                document.getElementById('loading-text').innerText = "Reajustando...";
+                await new Promise(r => setTimeout(r, 50));
+                songInRam.map = genMap(songInRam.buf, k);
+                songInRam.kVersion = k;
+            }
+        }
 
-        } catch (e) {
-            console.error(e);
-            notify("Error cargando canción: " + e.message, "error");
-            document.getElementById('loading-overlay').style.display = 'none';
-            return; // AQUÍ DETENEMOS SI HAY ERROR
-        }
-    } else {
-        if (songInRam.kVersion !== k) {
-            document.getElementById('loading-text').innerText = "Regenerando mapa...";
-            await new Promise(r => setTimeout(r, 50));
-            songInRam.map = genMap(songInRam.buf, k);
-            songInRam.kVersion = k;
-        }
+        document.getElementById('loading-overlay').style.display = 'none';
+        playSongInternal(songInRam);
+
+    } catch (e) {
+        console.error("Error crítico carga:", e);
+        notify("Error al cargar: " + e.message, "error");
+        document.getElementById('loading-overlay').style.display = 'none';
+        toMenu(); 
     }
-
-    document.getElementById('loading-overlay').style.display = 'none';
-    playSongInternal(songInRam);
 }
 
 function playSongInternal(s) {
@@ -264,7 +265,7 @@ function playSongInternal(s) {
 
         st.startTime = performance.now() + 3000;
         st.t0 = null;
-        st.act = true; // Activo inmediatamente para permitir Pausa
+        st.act = true; 
         st.paused = false;
 
         requestAnimationFrame(loop);
@@ -381,25 +382,30 @@ function loop() {
     if (!st.paused) requestAnimationFrame(loop);
 }
 
-// === FIX DE PAUSA (FORZADO) ===
+// === PAUSA CORREGIDA ===
 function togglePause() {
-    // Si no ha empezado el juego, no hacemos nada
-    if (!st.act && st.spawned.length === 0) return;
+    if (!st.act) return; 
     
     st.paused = !st.paused;
-    
+
     if (st.paused) {
         st.lastPause = performance.now();
-        // Mostrar UI visualmente antes de tocar el audio
-        document.getElementById('modal-pause').style.display = 'flex';
-        document.getElementById('p-sick').innerText = st.stats.s;
-        document.getElementById('p-good').innerText = st.stats.g;
-        document.getElementById('p-bad').innerText = st.stats.b;
-        document.getElementById('p-miss').innerText = st.stats.m;
         
         if (st.ctx && st.ctx.state === 'running') {
-            st.ctx.suspend().catch(e => console.warn(e));
+            st.ctx.suspend();
         }
+
+        const modal = document.getElementById('modal-pause');
+        modal.style.display = 'flex';
+
+        const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
+        const elAcc = document.getElementById('p-acc');
+        if(elAcc) elAcc.innerText = acc + "%";
+
+        if(document.getElementById('p-sick')) document.getElementById('p-sick').innerText = st.stats.s;
+        if(document.getElementById('p-good')) document.getElementById('p-good').innerText = st.stats.g;
+        if(document.getElementById('p-bad')) document.getElementById('p-bad').innerText = st.stats.b;
+        if(document.getElementById('p-miss')) document.getElementById('p-miss').innerText = st.stats.m;
     } else {
         resumeGame();
     }
@@ -407,12 +413,16 @@ function togglePause() {
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
-    if (st.ctx) st.ctx.resume().catch(e => console.warn(e));
+    
+    if (st.ctx) st.ctx.resume();
+
     if (st.lastPause) {
-        const dur = performance.now() - st.lastPause;
-        st.startTime += dur;
+        const duration = performance.now() - st.lastPause;
+        st.startTime += duration;
+        if (st.t0 !== null) st.t0 += (duration / 1000); 
         st.lastPause = 0;
     }
+
     st.paused = false;
     requestAnimationFrame(loop);
 }
@@ -434,7 +444,6 @@ function onKd(e) {
     }
 
     if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
-        // Fix de seguridad por si keys no coincide
         const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
         if (idx !== -1) hit(idx, true);
     }
@@ -612,3 +621,19 @@ function end(died) {
 
 function toMenu() { location.reload(); }
 function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
+function updHUD() {
+    document.getElementById('g-score').innerText = st.sc.toLocaleString();
+    document.getElementById('g-combo').innerText = st.cmb;
+    const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
+    document.getElementById('g-acc').innerText = acc + "%";
+    
+    document.getElementById('h-sick').innerText = st.stats.s;
+    document.getElementById('h-good').innerText = st.stats.g;
+    document.getElementById('h-bad').innerText = st.stats.b;
+    document.getElementById('h-miss').innerText = st.stats.m;
+    
+    document.getElementById('health-fill').style.height = st.hp + '%';
+    document.documentElement.style.setProperty('--combo-y', st.cmb % 2 === 0 ? '50%' : '51%');
+    
+    if (isMultiplayer) sendLobbyScore(st.sc);
+}
