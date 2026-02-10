@@ -1,11 +1,10 @@
-/* === UI LOGIC & INTERACTION (ULTRA STABLE V3) === */
+/* === UI LOGIC & INTERACTION (REPARADO FINAL) === */
 
-// Helper para evitar el error "Cannot set property of null"
+// Helper para evitar errores si el elemento no existe
 function setText(id, txt) { const el = document.getElementById(id); if (el) el.innerText = txt; }
-function setVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
-function setCheck(id, val) { const el = document.getElementById(id); if (el) el.checked = val; }
 function setStyle(id, prop, val) { const el = document.getElementById(id); if (el) el.style[prop] = val; }
 
+// Sonido de Hover
 function playHover(){ 
     if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
         try {
@@ -17,83 +16,79 @@ function playHover(){
     } 
 }
 
+// Actualizar toda la interfaz
 function updUI() {
     if(!user || !cfg) return;
 
-    // === PERFIL & HUD (Con seguridad anti-crash) ===
+    // Asegurar valores por defecto
+    if(cfg.middleScroll === undefined) cfg.middleScroll = false;
+    if(cfg.trackOp === undefined) cfg.trackOp = 10;
+
+    // Perfil
     setText('m-name', user.name);
     setText('p-name', user.name);
     setText('ig-name', user.name);
-    
     setText('h-pp', user.pp);
     setText('h-sp', (user.sp || 0).toLocaleString());
-    
     setText('p-score', user.score.toLocaleString());
     setText('p-plays', user.plays);
     setText('p-pp-display', user.pp);
     setText('p-sp-display', (user.sp || 0).toLocaleString());
-
     setText('m-rank', "LVL " + user.lvl);
     setText('p-lvl-txt', "LVL " + user.lvl);
     
-    // XP Bar Calculation
+    // XP
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
     const pct = Math.min(100, (user.xp / xpReq) * 100);
-    
     setStyle('p-xp-bar', 'width', pct + "%");
     setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
-    setText('p-global-rank', "#--"); 
     
-    // Avatar & BG
+    // Avatar y Fondo
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
-        setStyle('m-av', 'backgroundImage', url);
-        setText('m-av', ""); 
-        setStyle('p-av-big', 'backgroundImage', url);
-        setStyle('ig-av', 'backgroundImage', url);
+        setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
+        setStyle('p-av-big', 'backgroundImage', url); setStyle('ig-av', 'backgroundImage', url);
     }
-    
     if(user.bg) { 
-        const bgEl = document.getElementById('bg-image');
-        if(bgEl) { bgEl.src = user.bg; bgEl.style.opacity = 0.3; }
+        const bg = document.getElementById('bg-image');
+        if(bg) { bg.src = user.bg; bg.style.opacity = 0.3; }
     }
 
-    // === VARIABLES CSS EN TIEMPO REAL ===
-    // Esto maneja la opacidad, posición del juez, etc.
-    document.documentElement.style.setProperty('--track-alpha', (cfg.trackOp !== undefined ? cfg.trackOp : 10) / 100); 
+    // Aplicar Configuración Visual
+    applyCfg();
+
+    // Gestión Cuentas
+    const isGoogle = user.pass === "google-auth";
+    const lSet = document.getElementById('local-acc-settings');
+    const gSet = document.getElementById('google-acc-settings');
+    if(lSet) lSet.style.display = isGoogle ? 'none' : 'block';
+    if(gSet) gSet.style.display = isGoogle ? 'block' : 'none';
+}
+
+function applyCfg() {
+    document.documentElement.style.setProperty('--track-alpha', (cfg.trackOp || 10) / 100); 
     document.documentElement.style.setProperty('--judge-y', (cfg.judgeY || 40) + '%'); 
     document.documentElement.style.setProperty('--judge-x', (cfg.judgeX || 50) + '%'); 
     document.documentElement.style.setProperty('--judge-scale', (cfg.judgeS || 7)/10); 
     document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0);
+    document.documentElement.style.setProperty('--note-op', (cfg.noteOp || 100) / 100);
 
-    // Middlescroll Class Toggle
     const track = document.getElementById('track');
     if (track) {
         if (cfg.middleScroll) track.classList.add('middle-scroll');
         else track.classList.remove('middle-scroll');
     }
-
-    // === GESTIÓN DE CUENTAS ===
-    const isGoogle = user.pass === "google-auth";
-    const locSet = document.getElementById('local-acc-settings');
-    const gooSet = document.getElementById('google-acc-settings');
-    if(locSet) locSet.style.display = isGoogle ? 'none' : 'block';
-    if(gooSet) gooSet.style.display = isGoogle ? 'block' : 'none';
 }
 
-/* === SISTEMA DE MENÚ DE AJUSTES (ESTILO ROBLOX/MODERNO) === */
-// Genera el HTML dinámicamente para no depender de que el usuario actualice index.html
+// === MENÚ DE AJUSTES ROBLOX STYLE ===
 function openSettingsMenu() {
     const modal = document.getElementById('modal-settings');
-    if(!modal) return;
-    
     const panel = modal.querySelector('.modal-panel');
     
-    // Estructura del menú lateral
     panel.innerHTML = `
-        <div class="m-title" style="margin-bottom:20px; font-size:2rem;">CONFIGURACIÓN</div>
+        <div class="m-title" style="margin-bottom:20px;">CONFIGURACIÓN</div>
         <div class="settings-layout">
             <div class="settings-sidebar">
                 <button class="set-tab-btn active" onclick="switchSetTab('gameplay')">🎮 GAMEPLAY</button>
@@ -103,61 +98,56 @@ function openSettingsMenu() {
             </div>
             <div class="settings-content" id="set-content-area"></div>
         </div>
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px;">
-            <button class="action" style="width:auto; padding:10px 30px; font-size:1rem;" onclick="saveSettings()">GUARDAR</button>
-            <button class="action secondary" style="width:auto; padding:10px 30px; font-size:1rem;" onclick="closeModal('settings')">CANCELAR</button>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+            <button class="action" style="width:auto; padding:10px 30px;" onclick="saveSettings()">GUARDAR</button>
+            <button class="action secondary" style="width:auto; padding:10px 30px;" onclick="closeModal('settings')">CANCELAR</button>
         </div>
     `;
     
     modal.style.display = 'flex';
-    switchSetTab('gameplay'); // Cargar primera pestaña por defecto
+    switchSetTab('gameplay');
 }
 
 function switchSetTab(tab) {
     const content = document.getElementById('set-content-area');
     document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
     
-    // Activar botón visualmente
+    // Activar botón (simple index check)
     const btns = document.querySelectorAll('.set-tab-btn');
-    const idx = ['gameplay', 'visuals', 'audio', 'controls'].indexOf(tab);
-    if(idx !== -1 && btns[idx]) btns[idx].classList.add('active');
+    if(tab==='gameplay') btns[0].classList.add('active');
+    if(tab==='visuals') btns[1].classList.add('active');
+    if(tab==='audio') btns[2].classList.add('active');
+    if(tab==='controls') btns[3].classList.add('active');
 
     let html = '';
     
-    // Generador de Contenido según Pestaña
     if (tab === 'gameplay') {
-        html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
-        html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 40);
+        html += renderToggle('Middlescroll', 'middleScroll');
+        html += renderToggle('Downscroll', 'down');
+        html += renderRange('Velocidad', 'spd', 10, 40);
         html += renderRange('Dificultad IA', 'den', 1, 10);
         html += renderRange('Offset Global (ms)', 'off', -200, 200);
-        html += `<div class="set-row"><span class="set-label">Input System</span><span style="color:#aaa; font-weight:bold;">FunkyFriday (Default)</span></div>`;
     } 
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
         html += renderToggle('Screen Shake', 'shake');
         html += renderToggle('Mostrar Juez', 'judgeVis');
-        html += renderToggle('Mostrar FC Status', 'showFC'); // Nuevo
-        html += renderToggle('Mostrar Mean MS', 'showMean'); // Nuevo
+        html += renderToggle('Mostrar Mean MS', 'showMean');
+        html += renderToggle('Mostrar FC Status', 'showFC');
         html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100);
+        html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100);
         html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
-        html += renderRange('Posición Juez X', 'judgeX', 0, 100);
-        html += renderRange('Tamaño Juez', 'judgeS', 5, 20);
-        html += `<div style="margin-top:15px;"><button class="btn-small btn-add" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button></div>`;
+        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('bg-file').click()">🖼️ FONDO</button></div>`;
         html += `<input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">`;
     } 
     else if (tab === 'audio') {
         html += renderRange('Volumen Música', 'vol', 0, 100);
-        html += renderToggle('Hit Sounds', 'hitSound'); // Nuevo toggle
+        html += renderToggle('Hit Sounds', 'hitSound');
         html += renderRange('Volumen Hits', 'hvol', 0, 100);
-        html += renderToggle('Miss Sounds', 'missSound'); // Nuevo toggle
+        html += renderToggle('Miss Sounds', 'missSound');
         html += renderRange('Volumen Miss', 'missVol', 0, 100);
-        html += `<div style="margin-top:15px; display:flex; gap:10px;">
-            <button class="btn-small btn-add" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT</button>
-            <button class="btn-small btn-chat" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS</button>
-        </div>`;
+        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 HIT SOUND</button></div>`;
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">`;
-        html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
     else if (tab === 'controls') {
         html += `<div class="kb-tabs">
@@ -173,34 +163,17 @@ function switchSetTab(tab) {
     content.innerHTML = html;
 }
 
-// Helpers HTML
 function renderToggle(label, key) {
-    if (typeof cfg[key] === 'undefined') cfg[key] = false; 
     const val = cfg[key];
-    // Usa onclick inline para cambiar el valor al instante
-    return `
-    <div class="set-row">
-        <span class="set-label">${label}</span>
-        <button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button>
-    </div>`;
+    return `<div class="set-row"><span class="set-label">${label}</span><button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button></div>`;
 }
 
 function renderRange(label, key, min, max) {
     let val = cfg[key];
-    // Normalizar volúmenes que son 0.0-1.0 a 0-100
-    if (key === 'vol' || key === 'hvol' || key === 'missVol') val = Math.round((val||0.5) * 100);
-    if (val === undefined) val = (min + max) / 2;
-    return `
-    <div class="set-row">
-        <span class="set-label">${label}</span>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <input type="range" min="${min}" max="${max}" value="${val}" oninput="updateCfgVal('${key}', this.value)">
-            <div id="disp-${key}" class="num-input">${val}</div>
-        </div>
-    </div>`;
+    if (key.includes('vol')) val = Math.round(val * 100);
+    return `<div class="set-row"><span class="set-label">${label}</span><div style="display:flex;gap:10px;align-items:center;"><input type="range" min="${min}" max="${max}" value="${val}" oninput="updateCfgVal('${key}', this.value)"><div id="disp-${key}" class="num-input">${val}</div></div></div>`;
 }
 
-// Lógica de cambio de valores
 function toggleCfg(key) {
     cfg[key] = !cfg[key];
     const btn = document.getElementById('tog-' + key);
@@ -208,146 +181,183 @@ function toggleCfg(key) {
         btn.className = `toggle-switch ${cfg[key] ? 'on' : 'off'}`;
         btn.innerText = cfg[key] ? 'ON' : 'OFF';
     }
-    applyCfg(); // Aplicar cambios visuales (como middlescroll) al instante
-}
-
-function updateCfgVal(key, val) {
-    const disp = document.getElementById('disp-'+key);
-    if(disp) disp.innerText = val;
-    
-    if (key === 'vol' || key === 'hvol' || key === 'missVol') cfg[key] = val / 100;
-    else cfg[key] = parseInt(val);
-    
     applyCfg();
 }
 
-// Sobrescritura de openModal para interceptar 'settings'
-const _origOpenModal = window.openModal; 
-window.openModal = function(id) {
+function updateCfgVal(key, val) {
+    document.getElementById('disp-'+key).innerText = val;
+    if (key.includes('vol')) cfg[key] = val / 100;
+    else cfg[key] = parseInt(val);
+    applyCfg();
+}
+
+// === FUNCIONES GENERALES (FRIENDS, SONGS, ETC) ===
+
+function openModal(id) {
     if (id === 'settings') {
         openSettingsMenu();
     } else {
         const m = document.getElementById('modal-'+id);
         if(m) m.style.display='flex';
-        // Lógica legacy para otros modales
-        if(id==='profile') { 
-            const lv = document.getElementById('login-view');
-            const pv = document.getElementById('profile-view');
-            if(lv && pv) {
-                lv.style.display = user.name==='Guest'?'block':'none';
-                pv.style.display = user.name==='Guest'?'none':'block';
-            }
-            switchProfileTab('resumen'); 
-        }
-        if(id==='upload') setText('upload-status', "");
         if(id==='diff' && curSongData) { 
             setText('diff-song-title', curSongData.title);
             const cover = document.getElementById('diff-song-cover');
             if(cover) cover.style.backgroundImage = curSongData.imageURL ? `url(${curSongData.imageURL})` : ''; 
         }
+        if(id==='profile') switchProfileTab('resumen');
     }
 }
 
+function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
+
 function saveSettings() {
-    applyCfg();
     if(typeof save === 'function') { save(); notify("Ajustes guardados"); }
-    const m = document.getElementById('modal-settings');
-    if(m) m.style.display='none';
+    document.getElementById('modal-settings').style.display='none';
     updUI();
 }
 
-function applyCfg() { 
-    // Aplicar variables CSS
-    document.documentElement.style.setProperty('--track-alpha', (cfg.trackOp!==undefined?cfg.trackOp:10)/100); 
-    document.documentElement.style.setProperty('--judge-y', (cfg.judgeY||40) + '%'); 
+// SISTEMA DE AMIGOS (FIXED)
+function openFriends() {
+    if(user.name === "Guest") return notify("Inicia sesión primero", "error");
+    if(!db) return notify("Error de conexión", "error");
     
-    // Aplicar Middle Scroll Class
-    const track = document.getElementById('track');
-    if(track) {
-        if(cfg.middleScroll) track.classList.add('middle-scroll');
-        else track.classList.remove('middle-scroll');
+    const friL = document.getElementById('friend-list');
+    if(!friL) return;
+    
+    db.collection("users").doc(user.name).onSnapshot(doc => {
+        const data = doc.data();
+        friL.innerHTML = '';
+        if(data && data.friends && data.friends.length > 0) {
+            data.friends.forEach(f => {
+                db.collection("users").doc(f).get().then(fDoc => {
+                    if(!fDoc.exists) return;
+                    const fData = fDoc.data();
+                    const d = document.createElement('div'); 
+                    d.className = 'friend-row';
+                    d.onclick = function() { showFriendProfile(f, fData); };
+                    let avStyle = fData.avatarData ? `background-image:url(${fData.avatarData})` : '';
+                    d.innerHTML = `<div style="display:flex;align-items:center;"><div class="f-row-av" style="${avStyle}"></div><span class="friend-row-name">${f}</span></div>`;
+                    friL.appendChild(d);
+                });
+            });
+        } else { friL.innerHTML = '<div style="padding:20px;color:#666;">Sin amigos aún.</div>'; }
+    });
+    openModal('friends');
+}
+
+function showFriendProfile(name, data) {
+    selectedFriend = name;
+    setText('fp-name', name);
+    setText('fp-lvl', "LVL " + data.lvl);
+    setText('fp-score', data.score.toLocaleString());
+    
+    const av = document.getElementById('fp-av');
+    if(av) av.style.backgroundImage = data.avatarData ? `url(${data.avatarData})` : '';
+    
+    // Activar botón de desafío
+    const btn = document.getElementById('btn-challenge');
+    if(btn) {
+        btn.disabled = false;
+        btn.onclick = () => { challengeFriend(name); closeModal('friend-profile'); };
     }
-}
-
-// === FUNCIONES ESTÁNDAR (TIENDA, AMIGOS, ETC) ===
-function changeSection(sec) {
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    const map = { 'songs': 'nav-songs', 'multi': 'nav-multi', 'shop': 'nav-shop', 'settings': 'nav-settings', 'rank': 'nav-rank', 'friends': 'nav-friends' };
-    const target = document.getElementById(map[sec]);
-    if(target) target.classList.add('active');
-}
-
-function switchProfileTab(tab) {
-    document.querySelectorAll('.settings-tabs .kb-tab').forEach(t => t.classList.remove('active'));
-    const btn = document.getElementById('ptab-'+tab);
-    if(btn) btn.classList.add('active');
     
-    const r = document.getElementById('p-tab-content-resumen');
-    const c = document.getElementById('p-tab-content-cuenta');
-    if(r) r.style.display = tab === 'resumen' ? 'block' : 'none';
-    if(c) c.style.display = tab === 'cuenta' ? 'block' : 'none';
+    closeModal('friends');
+    openModal('friend-profile');
 }
 
+// SISTEMA DE CANCIONES (RENDER MENU)
+let globalSongsListener = null;
+function renderMenu(filter="") {
+    if(!db) return;
+    const grid = document.getElementById('song-grid');
+    if(!grid) return;
+
+    if(globalSongsListener) globalSongsListener(); // Limpiar listener anterior
+    
+    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
+        grid.innerHTML = '';
+        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666;">No hay canciones. ¡Sube una!</div>'; return; }
+        
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            const songId = doc.id;
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+            
+            const c = document.createElement('div'); 
+            c.className = 'beatmap-card';
+            const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,#222,#000)`;
+            
+            // Score Tag
+            let scoreTag = '';
+            if(user.scores && user.scores[songId]) {
+                const us = user.scores[songId];
+                scoreTag = `<span class="tag rank-tag" style="color:gold">${us.rank}</span>`;
+            }
+
+            c.innerHTML = `
+                <div class="bc-bg" style="${bgStyle}"></div>
+                <div class="bc-info">
+                    <div class="bc-title">${s.title}</div>
+                    <div class="bc-meta" style="font-size:0.8rem;color:#aaa;">${s.uploader} ${scoreTag}</div>
+                </div>`;
+            c.onclick = () => { 
+                curSongData = { id: songId, ...s }; 
+                openModal('diff'); 
+            };
+            grid.appendChild(c);
+        });
+    });
+}
+
+// TIENDA
 function openShop() {
-    setText('shop-sp', (user.sp || 0).toLocaleString());
     const grid = document.getElementById('shop-items');
-    if(grid && typeof SHOP_ITEMS !== 'undefined') {
+    setText('shop-sp', (user.sp||0).toLocaleString());
+    if(grid) {
         grid.innerHTML = '';
         SHOP_ITEMS.forEach(item => {
             const owned = user.inventory && user.inventory.includes(item.id);
-            const isEquipped = user.equipped && user.equipped[item.type] === item.id;
+            const equipped = user.equipped && user.equipped[item.type] === item.id;
             const div = document.createElement('div');
             div.className = 'shop-item';
-            if (owned) div.style.borderColor = "var(--blue)";
+            if(owned) div.style.borderColor = "var(--blue)";
             div.innerHTML = `
-                <div class="shop-icon" style="background-color:${item.color || '#333'}"></div>
+                <div class="shop-icon" style="background-color:${item.color}"></div>
                 <div class="shop-name">${item.name}</div>
-                <div style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">${item.desc}</div>
                 <div class="shop-price">${owned ? 'ADQUIRIDO' : item.price + ' SP'}</div>
-                ${!owned 
-                    ? `<button class="btn-small btn-add" onclick="buyItem('${item.id}', ${item.price})">COMPRAR</button>`
-                    : `<button class="btn-small ${isEquipped ? 'btn-acc' : 'btn-chat'}" onclick="equipItem('${item.id}', '${item.type}')">
-                        ${isEquipped ? 'EQUIPADO' : 'EQUIPAR'}
-                       </button>`
-                }
+                <button class="btn-small ${owned?'btn-chat':'btn-add'}" onclick="${owned ? `equipItem('${item.id}','${item.type}')` : `buyItem('${item.id}',${item.price})`}">${owned ? (equipped?'EQUIPADO':'EQUIPAR') : 'COMPRAR'}</button>
             `;
             grid.appendChild(div);
         });
     }
-    // Usamos la implementación interna, no la global recursiva
-    const m = document.getElementById('modal-shop');
-    if(m) m.style.display = 'flex';
+    openModal('shop');
 }
 
 function buyItem(id, price) {
-    if ((user.sp || 0) < price) return notify("SP Insuficientes", "error");
+    if((user.sp||0) < price) return notify("SP Insuficientes", "error");
     user.sp -= price;
-    if (!user.inventory) user.inventory = [];
+    if(!user.inventory) user.inventory=[];
     user.inventory.push(id);
-    save(); notify("¡Comprado!", "success"); openShop(); updUI();
+    save(); notify("Comprado!", "success"); openShop(); updUI();
 }
 
 function equipItem(id, type) {
-    if (!user.equipped) user.equipped = {};
-    if (user.equipped[type] === id) { user.equipped[type] = 'default'; notify("Desequipado"); } 
-    else { user.equipped[type] = id; notify("Equipado"); }
-    save(); openShop();
+    if(!user.equipped) user.equipped={};
+    user.equipped[type] = (user.equipped[type] === id) ? 'default' : id;
+    save(); openShop(); notify("Actualizado");
 }
 
-// === FUNCIONES DE CONFIG DE TECLAS ===
+// CONFIG TECLAS
 function renderLaneConfig(k){ 
     document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); 
     const tab = document.getElementById('tab-'+k);
     if(tab) tab.classList.add('active'); 
-    
     const c=document.getElementById('lanes-container'); 
     if(!c) return;
     c.innerHTML=''; 
-    
     for(let i=0; i<k; i++){ 
         const l = cfg.modes[k][i]; 
-        const d=document.createElement('div'); 
-        d.className='l-col'; 
+        const d=document.createElement('div'); d.className='l-col'; 
         const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[l.s] || PATHS['circle']) : ""; 
         d.innerHTML=`<div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; 
         c.appendChild(d); 
@@ -357,9 +367,8 @@ function remapKey(k,i){ if(document.activeElement) document.activeElement.blur()
 function updateLaneColor(k,i,v){ cfg.modes[k][i].c=v; }
 function cycleShape(k,i){ const shapes=['circle','arrow','square','diamond']; const cur=shapes.indexOf(cfg.modes[k][i].s); cfg.modes[k][i].s = shapes[(cur+1)%4]; renderLaneConfig(k); }
 
-// === UPLOAD HELPERS ===
+// HELPERS DE ARCHIVOS
 function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
-function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;user.avatarData=e.target.result;save(); updUI(); updateFirebaseScore();}; r.readAsDataURL(i.files[0]); i.value=""; }}
-async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound Custom cargado"); i.value = ""; } }
-async function loadMissSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); missBuf = await st.ctx.decodeAudioData(buf); notify("Miss Sound Custom cargado"); i.value = ""; } }
-function closeModal(id){ const m = document.getElementById('modal-'+id); if(m) m.style.display='none'; }
+async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound cargado"); i.value = ""; } }
+function changeSection(sec) { document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); const m={ 'songs': 'nav-songs', 'multi': 'nav-multi', 'shop': 'nav-shop', 'settings': 'nav-settings', 'rank': 'nav-rank', 'friends': 'nav-friends' }; const t=document.getElementById(m[sec]); if(t)t.classList.add('active'); }
+function switchProfileTab(tab) { const r=document.getElementById('p-tab-content-resumen'); const c=document.getElementById('p-tab-content-cuenta'); if(r)r.style.display=tab==='resumen'?'block':'none'; if(c)c.style.display=tab==='cuenta'?'block':'none'; }
