@@ -9,19 +9,20 @@ const firebaseConfig = {
 };
 
 let db = null;
+let storage = null; // Variable para Storage
+
 try {
     if(firebaseConfig.apiKey !== "TU_API_KEY") {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        console.log("Firebase Conectado");
+        storage = firebase.storage(); // Inicialización de Storage
+        console.log("Firebase (DB + Storage) Conectado");
     }
 } catch(e) { console.error("Error Firebase:", e); }
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
-const DB_NAME = "OmegaDB"; 
-const DB_STORE = "songs";
-const CURRENT_VERSION = 90; // Actualizado a 0.9
+const CURRENT_VERSION = 95; 
 
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
@@ -36,29 +37,33 @@ let cfg = {
     modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
 };
 
-// Se agrega 'sp' (ScorePoints)
 let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
-let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
-let ctx=null, hitBuf=null, idb=null;
+
+// Variables para canciones y juego
+let ramSongs=[]; // Canciones cargadas en memoria
+let curSongData = null; // Metadatos de canción seleccionada (global o lobby)
+let keys=4, remapMode=null, remapIdx=null;
+let ctx=null, hitBuf=null;
 let songFinished = false; 
 
-// ONLINE VARIABLES (Updated)
+// ONLINE VARIABLES
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
 let onlineState = { myPick: null, oppPick: null };
 let currentChatRoom = null, chatListener = null;
 let selectedFriend = null; 
 
-// Lobby System
+// LOBBY VARIABLES
 let currentLobbyId = null;
 let isLobbyHost = false;
-let lobbyPlayers = []; // [{name: 'X', ready: false, score: 0}]
+let lobbyPlayers = []; 
 let lobbyListener = null;
 
 let st = { 
     act:false, paused:false, ctx:null, src:null, t0:0, 
     notes:[], spawned:[], keys:[], 
     sc:0, cmb:0, hp:50, stats:{s:0,g:0,b:0,m:0}, 
-    totalHits:0, maxScorePossible:0, ranked:false, startTime:0 
+    totalHits:0, maxScorePossible:0, ranked:false, startTime:0,
+    songDuration: 0, lastPause: 0
 };
 
 const PATHS = {
