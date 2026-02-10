@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (FIXED CRASH + V6 SYNC) === */
+/* === AUDIO & ENGINE (V7: FULL PATTERNS + FALLING START) === */
 
 function unlockAudio() {
     if (!st.ctx) {
@@ -27,127 +27,174 @@ function playHit() {
     }
 }
 
-// Normalización
+// === NORMALIZACIÓN AGRESIVA ===
 function normalizeAudio(filteredData) {
     let max = 0;
-    // Muestreo rápido
-    for (let i = 0; i < filteredData.length; i+=10) {
+    // Muestreo optimizado
+    for (let i = 0; i < filteredData.length; i += 10) {
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
-    const multiplier = 0.95 / max;
-    if (multiplier > 1.1) {
+    
+    // Subir volumen hasta el techo (0.98) para detectar notas sutiles
+    const multiplier = 0.98 / max;
+    if (multiplier > 1.05) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
     }
     return filteredData;
 }
 
-// === GENERADOR V6: PEAK DETECTION (MEJOR RITMO) ===
+// === GENERADOR V7: PATRONES COMPLEJOS ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
 
+    // Ventana de análisis (aprox 23ms)
     const windowSize = 1024;
-    const step = Math.floor(sampleRate / 100); // 100fps análisis
+    const step = Math.floor(sampleRate / 85); // Frecuencia de escaneo
 
+    // Estado del Generador
     let laneFreeTime = new Array(k).fill(0);
-    let lastNoteTime = -2000;
+    let lastNoteTime = -5000;
     let lastLane = 0;
     
-    let patternState = 0; 
-    let patternCount = 0;
+    // Máquina de Estados de Patrones
+    let patternType = 0; // 0:Random, 1:StairUP, 2:StairDOWN, 3:Trill, 4:Jack
+    let patternCounter = 0; 
 
+    // Análisis de Energía
     let energyHistory = [];
-    const lookback = 5; // Mirar atrás para confirmar pico
+    const historySize = 40; 
 
-    const thresholdFactor = 1.35 - (cfg.den * 0.05);
-    const minGap = Math.max(80, 500 - (cfg.den * 45));
+    // Ajuste de Dificultad (cfg.den va de 1 a 10)
+    // Más den = umbral más bajo (más notas) y gap más corto
+    const density = Math.max(1, Math.min(10, cfg.den));
+    const thresholdFactor = 1.35 - (density * 0.06); 
+    const minGapBase = Math.max(70, 550 - (density * 45)); 
 
     for (let i = 0; i < data.length - windowSize; i += step) {
+        // RMS (Root Mean Square) para energía
         let sum = 0;
         for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
         const instantEnergy = Math.sqrt(sum / windowSize);
 
-        energyHistory.push({t: i, e: instantEnergy});
+        energyHistory.push(instantEnergy);
+        if (energyHistory.length > historySize) energyHistory.shift();
+        
+        let localAvg = 0;
+        for(let e of energyHistory) localAvg += e;
+        localAvg /= energyHistory.length;
 
-        if (energyHistory.length > lookback * 2) {
-            const current = energyHistory[energyHistory.length - 1 - lookback];
+        const timeMs = (i / sampleRate) * 1000;
+
+        // === DETECCIÓN DE GOLPE ===
+        // Si supera el promedio local * factor Y un mínimo absoluto de silencio
+        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.02) {
             
-            let localAvg = 0;
-            for(let h of energyHistory) localAvg += h.e;
-            localAvg /= energyHistory.length;
+            // Gap Dinámico: Si la música es intensa, permitimos ráfagas más rápidas
+            let currentGap = minGapBase;
+            if (instantEnergy > localAvg * 1.8) currentGap *= 0.6; // Stream mode
+            if (instantEnergy > localAvg * 2.5) currentGap *= 0.5; // Burst mode
 
-            energyHistory.shift();
-
-            // Es un pico si es mayor que sus vecinos y el promedio
-            const isPeak = current.e > localAvg * thresholdFactor 
-                           && current.e > energyHistory[energyHistory.length-2].e 
-                           && current.e > energyHistory[0].e;
-
-            if (isPeak && current.e > 0.02) {
-                const timeMs = (current.t / sampleRate) * 1000;
-
-                let dynamicGap = minGap;
-                if (current.e > localAvg * 2.2) dynamicGap *= 0.6; 
-
-                if (timeMs - lastNoteTime > dynamicGap) {
+            if (timeMs - lastNoteTime >= currentGap) {
+                
+                // === SELECCIÓN DE PATRÓN ===
+                // Cambiar patrón cada 4-8 notas o aleatoriamente
+                if (patternCounter <= 0 || Math.random() > 0.9) {
+                    const r = Math.random();
+                    if (r < 0.30) patternType = 0; // Random (30%)
+                    else if (r < 0.50) patternType = 1; // Escalera Arriba (20%)
+                    else if (r < 0.70) patternType = 2; // Escalera Abajo (20%)
+                    else if (r < 0.90) patternType = 3; // Trill (20%)
+                    else patternType = 4; // Jack/Repetición (10%)
                     
-                    if (patternCount <= 0 || Math.random() > 0.9) {
-                        const r = Math.random();
-                        if (r < 0.3) patternState = 0; 
-                        else if (r < 0.55) patternState = 1; // Escalera
-                        else if (r < 0.8) patternState = 2; 
-                        else patternState = 3; // Trill
-                        patternCount = Math.floor(Math.random() * 5) + 3;
-                    }
+                    patternCounter = Math.floor(Math.random() * 5) + 4; // Duración del patrón
+                }
 
-                    let type = 'tap';
-                    let len = 0;
-                    if ((current.e > localAvg * 1.8 && Math.random() > 0.65)) {
+                // === TIPO DE NOTA (Tap vs Hold) ===
+                let type = 'tap';
+                let len = 0;
+                // Probabilidad de Hold aumenta con la energía y si no estamos en ráfaga rápida
+                if (instantEnergy > localAvg * 1.4 && currentGap > 100) {
+                    if (Math.random() > 0.65) { 
                         type = 'hold';
-                        len = Math.min(600, Math.random() * 300 + 100);
+                        // Largo del hold basado en intensidad
+                        len = Math.min(1000, Math.random() * 400 + 150);
                     }
+                }
 
-                    let selectedLane = -1;
-                    if (patternState === 1) selectedLane = (lastLane + 1) % k;
-                    else if (patternState === 2) selectedLane = (lastLane - 1 + k) % k;
-                    else if (patternState === 3) selectedLane = (lastLane + 1) % 2 + (lastLane >= 2 ? 2 : 0);
-                    else {
-                        let attempts = 0;
-                        while (attempts < 8) {
-                            selectedLane = Math.floor(Math.random() * k);
-                            if (selectedLane !== lastLane) break;
-                            attempts++;
+                // === SELECCIÓN DE CARRIL ===
+                let lane = 0;
+                
+                if (patternType === 1) { // Stair UP
+                    lane = (lastLane + 1) % k;
+                } else if (patternType === 2) { // Stair DOWN
+                    lane = (lastLane - 1 + k) % k;
+                } else if (patternType === 3) { // Trill (0-2-0-2 o 1-3-1-3)
+                    if (k === 4) lane = (lastLane === 0 ? 1 : (lastLane === 1 ? 0 : (lastLane === 2 ? 3 : 2)));
+                    else lane = (lastLane + 2) % k;
+                } else if (patternType === 4) { // Jack (Repetir o cerca)
+                    lane = lastLane; 
+                    // A veces cambiar un poco para no ser aburrido
+                    if(Math.random() > 0.7) lane = (lastLane + 1) % k;
+                } else { // Random Inteligente (Evitar repetición excesiva)
+                    let tries = 0;
+                    do {
+                        lane = Math.floor(Math.random() * k);
+                        tries++;
+                    } while (lane === lastLane && tries < 5);
+                }
+
+                // === ANTI-COLISIÓN DE HOLDS ===
+                // Si el carril elegido está ocupado por un hold previo, buscar otro
+                if (timeMs < laneFreeTime[lane] + 20) {
+                    let found = false;
+                    // Intentar buscar carril libre ordenadamente
+                    for (let offset = 1; offset < k; offset++) {
+                        let tryLane = (lane + offset) % k;
+                        if (timeMs >= laneFreeTime[tryLane] + 20) {
+                            lane = tryLane;
+                            found = true;
+                            break;
                         }
                     }
+                    // Si todo está lleno, saltar nota (evita bugs visuales)
+                    if (!found) continue; 
+                }
 
-                    if (timeMs < laneFreeTime[selectedLane] + 30) {
-                        for(let x=0; x<k; x++) {
-                            if(timeMs >= laneFreeTime[x] + 30) {
-                                selectedLane = x;
-                                break;
-                            }
+                // === GENERAR LA NOTA ===
+                map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
+                
+                // Actualizar estado
+                laneFreeTime[lane] = timeMs + len; // Ocupar carril
+                lastNoteTime = timeMs;
+                lastLane = lane;
+                patternCounter--;
+
+                // === EXTRAS: DOBLES Y TRIPLES (ACORDES) ===
+                // Solo si la dificultad es media/alta y la energía explota
+                
+                // Dobles (Densidad >= 4)
+                if (density >= 4 && instantEnergy > localAvg * 1.8 && k >= 2) {
+                    // Solo si no es una ráfaga demasiado rápida
+                    if (currentGap > 90) {
+                        let lane2 = (lane + Math.floor(k/2)) % k; // Carril opuesto/lejano
+                        if (timeMs >= laneFreeTime[lane2] + 20) {
+                            map.push({ t: timeMs, l: lane2, type: 'tap', len: 0, h: false });
+                            laneFreeTime[lane2] = timeMs;
                         }
                     }
+                }
 
-                    map.push({ t: timeMs, l: selectedLane, type: type, len: len, h: false });
-                    laneFreeTime[selectedLane] = timeMs + len;
-                    lastNoteTime = timeMs;
-                    lastLane = selectedLane;
-                    patternCount--;
-
-                    // Acordes
-                    if ((k >= 4 && cfg.den >= 5) && current.e > localAvg * 2.5) {
-                        for (let l = 0; l < k; l++) {
-                            if (Math.abs(l - selectedLane) > 1 && timeMs >= laneFreeTime[l] + 30) {
-                                map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
-                                laneFreeTime[l] = timeMs;
-                                break;
-                            }
-                        }
+                // Triples (Densidad >= 8, Solo momentos CLIMAX)
+                if (density >= 8 && instantEnergy > localAvg * 2.8 && k >= 4) {
+                    let lane3 = (lane + 1) % k;
+                    if (lane3 !== lane && timeMs >= laneFreeTime[lane3] + 20) {
+                        map.push({ t: timeMs, l: lane3, type: 'tap', len: 0, h: false });
+                        laneFreeTime[lane3] = timeMs;
                     }
                 }
             }
@@ -183,6 +230,7 @@ function initReceptors(k) {
     }
 }
 
+// === OPTIMIZACIÓN: CACHÉ EN RAM ===
 async function prepareAndPlaySong(k) {
     if (!curSongData) return;
 
@@ -200,13 +248,14 @@ async function prepareAndPlaySong(k) {
             
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map, kVersion: k };
             ramSongs.push(songInRam);
-            if (ramSongs.length > 5) ramSongs.shift();
+            if (ramSongs.length > 5) ramSongs.shift(); // Max 5 songs cache
 
         } catch (e) {
             document.getElementById('loading-overlay').style.display = 'none';
             return;
         }
     } else {
+        // Regenerar si cambia dificultad
         if (songInRam.kVersion !== k) {
             songInRam.map = genMap(songInRam.buf, k);
             songInRam.kVersion = k;
@@ -243,12 +292,13 @@ function playSongInternal(s) {
     const cd = document.getElementById('countdown');
     let c = 3; cd.innerHTML = c;
 
+    // Reloj negativo para caída (3s antes)
     st.startTime = performance.now() + 3000;
     st.t0 = null;
     st.act = true;
     st.paused = false;
 
-    // Arrancar loop visual YA
+    // Arrancar visual ya
     requestAnimationFrame(loop);
 
     const iv = setInterval(async () => {
@@ -293,7 +343,7 @@ function loop() {
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
     const w = 100 / keys;
 
-    // Spawn (Tiempo negativo para caída)
+    // SPAWN LOGIC (Funciona con tiempo negativo)
     for (let i = 0; i < st.notes.length; i++) {
         const n = st.notes[i];
         if (n.s) continue;
@@ -324,7 +374,7 @@ function loop() {
         } else break;
     }
 
-    // Move
+    // MOVEMENT
     for (let i = st.spawned.length - 1; i >= 0; i--) {
         const n = st.spawned[i];
         if (!n.el) { st.spawned.splice(i, 1); continue; }
@@ -356,13 +406,38 @@ function loop() {
     if (!st.paused) requestAnimationFrame(loop);
 }
 
-// === FIX CRÍTICO: TECLAS QUE CONGELABAN EL JUEGO ===
-function onKd(e) {
-    if (e.key === "Escape") { 
-        e.preventDefault(); 
-        togglePause(); 
-        return; 
+// === FIX DE PAUSA INSTANTÁNEA ===
+function togglePause() {
+    if (!st.act) return;
+    st.paused = !st.paused;
+    if (st.paused) {
+        st.lastPause = performance.now();
+        document.getElementById('modal-pause').style.display = 'flex';
+        document.getElementById('p-sick').innerText = st.stats.s;
+        document.getElementById('p-good').innerText = st.stats.g;
+        document.getElementById('p-bad').innerText = st.stats.b;
+        document.getElementById('p-miss').innerText = st.stats.m;
+        if (st.ctx && st.ctx.state === 'running') st.ctx.suspend();
+    } else {
+        resumeGame();
     }
+}
+
+function resumeGame() {
+    document.getElementById('modal-pause').style.display = 'none';
+    if (st.ctx) st.ctx.resume();
+    if (st.lastPause) {
+        const dur = performance.now() - st.lastPause;
+        st.startTime += dur;
+        st.lastPause = 0;
+    }
+    st.paused = false;
+    requestAnimationFrame(loop);
+}
+
+// === INPUTS (SAFE & FAST) ===
+function onKd(e) {
+    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (["Tab", "Alt", "Control", "Shift"].includes(e.key)) return;
 
     if (remapMode !== null && cfg.modes[remapMode]) {
@@ -372,18 +447,16 @@ function onKd(e) {
         return;
     }
 
-    // PROTECCIÓN CONTRA EL ERROR DE UNDEFINED
-    if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, true);
+    if (!e.repeat) {
+        // Safe check
+        const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
+        if (idx !== undefined && idx !== -1) hit(idx, true);
     }
 }
 
 function onKu(e) {
-    if (cfg && cfg.modes && cfg.modes[keys]) {
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, false);
-    }
+    const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
+    if (idx !== undefined && idx !== -1) hit(idx, false);
 }
 
 function hit(l, p) {
@@ -479,54 +552,6 @@ function showJudge(t, c) {
     j.style.color = c;
     document.body.appendChild(j);
     setTimeout(() => j.remove(), 400);
-}
-
-function updHUD() {
-    document.getElementById('g-score').innerText = st.sc.toLocaleString();
-    if (isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(st.sc);
-    else if (conn && conn.open) conn.send({ type: 'score', val: st.sc });
-    document.getElementById('g-combo').innerText = st.cmb;
-    const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
-    document.getElementById('g-acc').innerText = acc + "%";
-    document.getElementById('health-fill').style.height = st.hp + "%";
-    document.getElementById('h-sick').innerText = st.stats.s;
-    document.getElementById('h-good').innerText = st.stats.g;
-    document.getElementById('h-bad').innerText = st.stats.b;
-    document.getElementById('h-miss').innerText = st.stats.m;
-}
-
-function togglePause() {
-    if (!st.act) return;
-    
-    st.paused = !st.paused;
-    
-    if (st.paused) {
-        // Pausa instantánea
-        st.lastPause = performance.now();
-        document.getElementById('modal-pause').style.display = 'flex';
-        document.getElementById('p-sick').innerText = st.stats.s;
-        document.getElementById('p-good').innerText = st.stats.g;
-        document.getElementById('p-bad').innerText = st.stats.b;
-        document.getElementById('p-miss').innerText = st.stats.m;
-        
-        // Suspender audio async
-        if (st.ctx && st.ctx.state === 'running') st.ctx.suspend();
-        
-    } else {
-        resumeGame();
-    }
-}
-
-function resumeGame() {
-    document.getElementById('modal-pause').style.display = 'none';
-    if (st.ctx) st.ctx.resume();
-    if (st.lastPause) {
-        const dur = performance.now() - st.lastPause;
-        st.startTime += dur;
-        st.lastPause = 0;
-    }
-    st.paused = false;
-    requestAnimationFrame(loop);
 }
 
 function end(died) {
