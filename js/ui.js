@@ -114,7 +114,7 @@ function showFriendProfile(fName, fData, isOnline) {
         statusTxt.innerText = "En línea"; statusTxt.style.color = "var(--good)";
         chalBtn.disabled = false;
     } else {
-        statusTxt.innerText = "Desconectado (Puede recibir mensajes)"; statusTxt.style.color = "#888";
+        statusTxt.innerText = "Desconectado"; statusTxt.style.color = "#888";
         chalBtn.disabled = true; 
     }
     chalBtn.onclick = () => { challengeFriend(fName); closeModal('friend-profile'); };
@@ -256,7 +256,7 @@ function closeNotification(id) {
     if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); }
 }
 
-// --- RENDER MENU CON SCORES ---
+// --- RENDER MENU CON SCORES Y CARGA GLOBAL ---
 let globalSongsListener = null;
 
 function renderMenu(filter="") {
@@ -283,7 +283,6 @@ function renderMenu(filter="") {
                 
                 const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(${(songId.length*40)%360},60%,20%),black)`;
                 
-                // Mostrar Score y Rango si existen
                 let scoreTag = '';
                 if(user.scores && user.scores[songId]) {
                     const us = user.scores[songId];
@@ -307,7 +306,7 @@ function renderMenu(filter="") {
                 c.onclick = () => { 
                     curSongData = { id: songId, ...s }; 
                     openModal('diff'); 
-                    document.getElementById('create-lobby-opts').style.display = 'none'; // Ocultar crear lobby en modo solo
+                    document.getElementById('create-lobby-opts').style.display = 'none'; 
                 };
                 grid.appendChild(c);
             });
@@ -319,22 +318,19 @@ function getRankColor(r) {
     if(r==="B") return "yellow"; if(r==="C") return "orange"; return "red";
 }
 
-// === NUEVA FUNCIÓN PARA AUTOCOMPLETAR TÍTULO ===
+// === AUTO COMPLETAR TÍTULO ===
 function autoFillTitle(input) {
     if(input.files[0]) {
-        // Remover extensión (ej. .mp3)
         let name = input.files[0].name.replace(/\.[^/.]+$/, "");
-        // Reemplazar guiones bajos y medios por espacios para que se vea mejor
         name = name.replace(/[_-]/g, " ");
         document.getElementById('up-title').value = name;
-        // Limpiar mensaje de estado si había error previo
         document.getElementById('upload-status').innerText = ""; 
     }
 }
 
-// --- SUBIDA GLOBAL ACTUALIZADA (IMAGEN OPCIONAL) ---
+// === SUBIDA GLOBAL ===
 async function startGlobalUpload() {
-    if(user.name === "Guest") return notify("Debes iniciar sesión para subir canciones", "error");
+    if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
     if(!storage || !db) return notify("Error de conexión a Firebase", "error");
 
     const titleInp = document.getElementById('up-title');
@@ -347,11 +343,10 @@ async function startGlobalUpload() {
     const audioFile = audioInp.files[0];
     const imageFile = imageInp.files[0];
 
-    // Ahora solo Audio y Título son obligatorios
-    if(!title || !audioFile) return notify("El Audio y el Título son obligatorios.", "error");
+    if(!title || !audioFile) return notify("Título y Audio obligatorios", "error");
     
-    if(audioFile.size > 15 * 1024 * 1024) return notify("El audio no debe superar los 15MB", "error");
-    if(imageFile && imageFile.size > 3 * 1024 * 1024) return notify("La imagen no debe superar los 3MB", "error");
+    if(audioFile.size > 15 * 1024 * 1024) return notify("Audio máximo 15MB", "error");
+    if(imageFile && imageFile.size > 3 * 1024 * 1024) return notify("Imagen máxima 3MB", "error");
 
     btn.disabled = true;
     btn.innerText = "SUBIENDO...";
@@ -359,21 +354,13 @@ async function startGlobalUpload() {
 
     try {
         const songId = db.collection("globalSongs").doc().id;
-        let imageURL = null; // Por defecto no hay imagen
+        let imageURL = null;
 
-        // 1. Subir Audio (Obligatorio)
-        status.innerText = "Subiendo audio (0%)...";
+        status.innerText = "Subiendo audio...";
         const audioRef = storage.ref(`songs/audio/${songId}_${audioFile.name}`);
-        const audioUpload = audioRef.put(audioFile);
-        
-        audioUpload.on('state_changed', (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            status.innerText = `Subiendo audio (${Math.round(progress)}%)...`;
-        });
-        await audioUpload;
+        await audioRef.put(audioFile);
         const audioURL = await audioRef.getDownloadURL();
 
-        // 2. Subir Imagen (Solo si existe)
         if(imageFile) {
             status.innerText = "Subiendo imagen...";
             const imageRef = storage.ref(`songs/images/${songId}_${imageFile.name}`);
@@ -381,31 +368,27 @@ async function startGlobalUpload() {
             imageURL = await imageRef.getDownloadURL();
         }
 
-        // 3. Guardar datos en Firestore
-        status.innerText = "Finalizando...";
+        status.innerText = "Guardando...";
         await db.collection("globalSongs").doc(songId).set({
             title: title,
             uploader: user.name,
             audioURL: audioURL,
-            imageURL: imageURL, // Será null si no se subió imagen
+            imageURL: imageURL,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        notify("¡Canción subida exitosamente!", "success");
+        notify("¡Subida exitosa!", "success");
         closeModal('upload');
-        // Limpiar inputs
         titleInp.value = ""; audioInp.value = ""; imageInp.value = "";
     } catch(e) {
         console.error(e);
-        notify("Error en la subida: " + e.message, "error");
-        status.innerText = "Error al subir.";
+        notify("Error subida: " + e.message, "error");
     } finally {
         btn.disabled = false;
-        btn.innerText = "☁️ PUBLICAR";
+        btn.innerText = "☁️ PUBLICAR AHORA";
         status.innerText = "";
     }
 }
-
 
 async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound Actualizado!"); i.value = ""; } }
 
@@ -418,13 +401,11 @@ function openModal(id){
         switchProfileTab('resumen');
     }
     if(id==='upload') {
-         // Limpiar estado del modal de subida al abrirlo
          document.getElementById('upload-status').innerText = "";
          document.getElementById('up-title').value = "";
          document.getElementById('up-audio').value = "";
          document.getElementById('up-image').value = "";
     }
-    // Lógica para imagen en Dificultad
     if(id==='diff' && curSongData) {
         document.getElementById('diff-song-title').innerText = curSongData.title;
         const cover = document.getElementById('diff-song-cover');
