@@ -1,9 +1,9 @@
-/* === UI LOGIC & INTERACTION (ULTRA FINAL REPAIR) === */
+/* === UI LOGIC & INTERACTION (ULTRA FINAL FIXED V11) === */
 
 // === 1. HELPERS & NOTIFICATIONS (CRÍTICO) ===
 function notify(msg, type="info") {
     const area = document.getElementById('notification-area');
-    if(!area) return console.log(msg); // Fallback seguro
+    if(!area) return console.log(msg);
     
     const card = document.createElement('div');
     card.className = 'notify-card';
@@ -16,7 +16,6 @@ function notify(msg, type="info") {
     `;
     area.appendChild(card);
     
-    // Auto-remove
     setTimeout(() => {
         card.style.animation = "slideOut 0.3s forwards";
         setTimeout(() => card.remove(), 300);
@@ -45,13 +44,12 @@ function setStyle(id, prop, val) { const el = document.getElementById(id); if(el
 function updUI() {
     if(!user || !cfg) return;
 
-    // Default Checks
+    // Checks
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
     if(cfg.noteScale === undefined) cfg.noteScale = 1;
 
-    // Text Updates
     setText('m-name', user.name);
     setText('p-name', user.name);
     setText('ig-name', user.name);
@@ -64,7 +62,6 @@ function updUI() {
     setText('m-rank', "LVL " + user.lvl);
     setText('p-lvl-txt', "LVL " + user.lvl);
     
-    // XP Bar
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
@@ -72,7 +69,6 @@ function updUI() {
     setStyle('p-xp-bar', 'width', pct + "%");
     setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
     
-    // Images
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
@@ -85,7 +81,6 @@ function updUI() {
 
     applyCfg();
 
-    // HUD Live Update (GFC Color & Combo)
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
@@ -111,7 +106,6 @@ function updUI() {
         }
     }
 
-    // Login/Logout Views
     const isGoogle = user.pass === "google-auth";
     const locSet = document.getElementById('local-acc-settings');
     const gooSet = document.getElementById('google-acc-settings');
@@ -135,14 +129,13 @@ function applyCfg() {
     }
 }
 
-// === 3. SETTINGS MENU (FIXED SAVE & CLOSE) ===
+// === 3. SETTINGS MENU (3 COLUMNS) ===
 function openSettingsMenu() {
     const modal = document.getElementById('modal-settings');
     if(!modal) return;
     
-    // Asegurar clase ancha
     const panel = modal.querySelector('.modal-panel');
-    panel.classList.add('settings-panel');
+    panel.className = "modal-panel settings-panel";
     
     panel.innerHTML = `
         <div class="settings-header">
@@ -174,7 +167,6 @@ function openSettingsMenu() {
 function saveSettings() {
     applyCfg();
     if(typeof save === 'function') { save(); notify("Ajustes guardados"); }
-    // FIX: Forzar cierre del modal
     document.getElementById('modal-settings').style.display = 'none';
     updUI();
 }
@@ -284,7 +276,7 @@ function updateCfgVal(key, val) {
     updatePreview();
 }
 
-// === 4. GLOBAL HANDLER & NAVIGATION ===
+// === 4. GLOBAL HANDLER ===
 window.openModal = function(id) {
     if (id === 'settings') {
         openSettingsMenu();
@@ -319,14 +311,10 @@ window.openModal = function(id) {
 
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
 
-// === 5. SONG LOADING (CON REINTENTO) ===
+// === 5. FUNCIONES GENERALES ===
 let globalSongsListener = null;
 function renderMenu(filter="") {
-    if(!db) {
-        // FIX: Si DB no está lista, reintentar en 500ms
-        setTimeout(() => renderMenu(filter), 500);
-        return;
-    }
+    if(!db) { setTimeout(() => renderMenu(filter), 500); return; }
     const grid = document.getElementById('song-grid');
     if(!grid) return;
 
@@ -375,7 +363,6 @@ function renderMenu(filter="") {
     });
 }
 
-// === 6. OTROS (AMIGOS, TIENDA, PERFIL) ===
 function openFriends() {
     if(user.name === "Guest") return notify("Inicia sesión primero", "error");
     if(!db) return notify("Error de conexión", "error");
