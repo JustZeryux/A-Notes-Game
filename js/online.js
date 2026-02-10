@@ -1,6 +1,5 @@
 /* === ONLINE SYSTEM === */
 function initOnline() {
-    // PeerJS solo se usa para la vieja sincronización 1v1 directa, los lobbies usarán Firestore para sync.
     peer = new Peer(null, { secure: true }); 
     peer.on('open', (id) => {
         myPeerId = id;
@@ -13,11 +12,8 @@ function initOnline() {
 function sendFriendRequest() {
     const target = document.getElementById('friend-inp').value.trim();
     if(!target || target === user.name) return;
-    
-    // Verificar si existe el usuario
     db.collection("users").doc(target).get().then(doc => {
         if(doc.exists) {
-            // Se envía a Firestore, no importa si está desconectado
             sendNotification(target, 'friend_req', 'Solicitud de Amistad', user.name + ' quiere ser tu amigo.');
             notify("Solicitud enviada a " + target);
         } else notify("Usuario no encontrado", "error");
@@ -41,10 +37,8 @@ function respondFriend(target, accept, notifId) {
 }
 
 function challengeFriend(target) {
-    // OLD 1v1 Logic (Direct P2P) - Se mantiene como legado o desafío rápido
     db.collection("users").doc(target).get().then(doc => {
         const data = doc.data();
-        // Check online status via timestamp
         const now = Math.floor(Date.now()/1000);
         const last = data.lastSeen ? data.lastSeen.seconds : 0;
         if(now - last < 120) {
@@ -61,7 +55,7 @@ function acceptChallenge(target, notifId) {
      db.collection("users").doc(target).get().then(doc => {
         if(doc.exists && doc.data().peerId) {
             conn = peer.connect(doc.data().peerId);
-            setupConnection(); // Reusa la lógica vieja
+            setupConnection();
         } else notify("Error de conexión.", "error");
     });
 }
@@ -88,7 +82,7 @@ function refreshLobbies() {
             row.innerHTML = `
                 <div class="lobby-info">
                     <div class="lobby-host">${d.host}</div>
-                    <div class="lobby-details">${d.song} [${d.diff}K] - ${d.players.length}/4 Jugadores</div>
+                    <div class="lobby-details">${d.songTitle} [${d.diff}K] - ${d.players.length}/4 Jugadores</div>
                 </div>
                 <button class="btn-small btn-acc" onclick="joinLobby('${doc.id}')">UNIRSE</button>
             `;
@@ -97,22 +91,58 @@ function refreshLobbies() {
     });
 }
 
-// Paso 1: Abrir selector de dificultad con opción de Crear Sala
-function createLobbyUI() {
+// 1. ABRIR EL SELECTOR DE CANCIONES (NUEVO FLUJO)
+function openSongSelectorForLobby() {
     closeModal('lobbies');
-    // Forzamos selección de canción primero
-    if(!curSongId) { notify("Primero selecciona una canción en el menú principal", "error"); return; }
-    // Abrimos el modal de dificultad pero mostramos el botón de crear
-    openModal('diff');
-    document.getElementById('create-lobby-opts').style.display = 'block';
+    openModal('song-selector');
+    renderLobbySongList();
 }
 
-// Paso 2: Crear el documento en Firestore
+// 2. RENDERIZAR LISTA DE CANCIONES (REUTILIZADA DE UI PERO EN MODAL)
+function renderLobbySongList(filter="") {
+    const grid = document.getElementById('lobby-song-grid');
+    grid.innerHTML = 'Cargando...';
+    
+    db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).get().then(snapshot => {
+        grid.innerHTML = '';
+        if(snapshot.empty) {
+            grid.innerHTML = '<div style="grid-column:1/-1; text-align:center;">No hay canciones.</div>';
+            return;
+        }
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+
+            const c = document.createElement('div');
+            c.className = 'beatmap-card';
+            const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(200,60%,20%),black)`;
+            
+            c.innerHTML = `
+                <div class="bc-bg" style="${bgStyle}"></div>
+                <div class="bc-info">
+                    <div class="bc-title">${s.title}</div>
+                    <div class="bc-meta" style="font-size:0.8rem;">Click para hostear</div>
+                </div>
+            `;
+            c.onclick = () => {
+                curSongData = { id: doc.id, ...s }; // Seleccionar
+                closeModal('song-selector'); // Cerrar selector
+                openModal('diff'); // Abrir dificultad
+                document.getElementById('create-lobby-opts').style.display = 'block'; // Mostrar boton de crear sala
+            };
+            grid.appendChild(c);
+        });
+    });
+}
+
+// 3. CONFIRMAR Y CREAR EN FIRESTORE
 function confirmCreateLobby() {
-    const k = keys; // Keys seleccionadas en startGame o default
+    const k = keys; 
     const lobbyData = {
         host: user.name,
-        song: curSongId,
+        songId: curSongData.id,
+        songTitle: curSongData.title,
+        songAudio: curSongData.audioURL,
         diff: k,
         status: 'waiting',
         players: [{name: user.name, ready: false, score: 0, isHost: true}],
@@ -139,14 +169,13 @@ function joinLobby(id) {
             
             const newPlayers = [...d.players, {name: user.name, ready: false, score: 0, isHost: false}];
             transaction.update(lobbyRef, { players: newPlayers });
-            return d; // Return data for local use
+            return d; 
         });
     }).then((data) => {
         currentLobbyId = id;
         isLobbyHost = false;
-        // Cargar canción si no la tenemos (Mock up: asumimos que la tiene o es local)
-        // En una vers. completa aquí se descargaría la canción del host.
-        curSongId = data.song; 
+        // Cargar datos de la canción del lobby
+        curSongData = { id: data.songId, title: data.songTitle, audioURL: data.songAudio };
         keys = data.diff;
         closeModal('lobbies');
         enterLobbyRoom();
@@ -157,13 +186,12 @@ function enterLobbyRoom() {
     openModal('lobby-room');
     isMultiplayer = true;
     
-    // Listener de cambios en la sala
     lobbyListener = db.collection("lobbies").doc(currentLobbyId).onSnapshot(doc => {
         if(!doc.exists) { leaveLobby(); notify("La sala se cerró."); return; }
         const d = doc.data();
         
         document.getElementById('room-host-name').innerText = "SALA DE " + d.host;
-        document.getElementById('room-song').innerText = d.song + " [" + d.diff + "K]";
+        document.getElementById('room-song').innerText = d.songTitle + " [" + d.diff + "K]";
         
         const pCont = document.getElementById('room-players');
         pCont.innerHTML = '';
@@ -180,18 +208,15 @@ function enterLobbyRoom() {
             if(!p.ready) allReady = false;
         });
 
-        // Inicio automático si todos listos y host
         if(isLobbyHost && d.players.length > 0 && allReady && d.status === 'waiting') {
             startLobbyGame();
         }
         
-        // Si el estado cambia a playing, iniciar juego
         if(d.status === 'playing') {
             if(document.getElementById('modal-lobby-room').style.display !== 'none') {
                 closeModal('lobby-room');
-                startGame(d.diff); // Iniciar motor local
+                prepareAndPlaySong(d.diff); // Usar la nueva función de carga global
             }
-            // Update scores in real time
             updateMultiHud(d.players);
         }
     });
@@ -200,7 +225,6 @@ function enterLobbyRoom() {
 function toggleReady() {
     if(!currentLobbyId) return;
     const ref = db.collection("lobbies").doc(currentLobbyId);
-    // Necesitamos leer y escribir
     db.runTransaction(t => {
         return t.get(ref).then(doc => {
             const d = doc.data();
@@ -218,13 +242,11 @@ function startLobbyGame() {
 }
 
 function leaveLobby() {
-    if(lobbyListener) lobbyListener(); // Detener listener
+    if(lobbyListener) lobbyListener(); 
     if(currentLobbyId) {
-        // Quitarnos de la lista
         if(isLobbyHost) {
-             db.collection("lobbies").doc(currentLobbyId).delete(); // Host cierra sala
+             db.collection("lobbies").doc(currentLobbyId).delete(); 
         } else {
-             // Solo salir
              const ref = db.collection("lobbies").doc(currentLobbyId);
              ref.get().then(doc => {
                  if(doc.exists) {
@@ -251,12 +273,8 @@ function updateMultiHud(players) {
     });
 }
 
-// In Game Score Update
 function sendLobbyScore(score) {
     if(!currentLobbyId) return;
-    // Esto es pesado hacerlo en cada hit, mejor hacerlo cada X ms o throttle
-    // Simplificación: Lo enviamos pero el backend debe manejar concurrencia.
-    // Para evitar sobrecarga de escritura, solo actualizamos DB cada 1 segundo
     const now = Date.now();
     if(!window.lastScoreUpdate || now - window.lastScoreUpdate > 2000) {
         window.lastScoreUpdate = now;

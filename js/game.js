@@ -1,31 +1,126 @@
-/* === AUDIO & ENGINE === */
+/* === AUDIO & ENGINE (REWORKED) === */
 function unlockAudio(){ if(!st.ctx){ st.ctx=new(window.AudioContext||window.webkitAudioContext)(); genHit(); } if(st.ctx.state==='suspended') st.ctx.resume(); }
 function genHit(){ const b=st.ctx.createBuffer(1,2000,44100),d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.sin(i*0.5)*Math.exp(-i/300); hitBuf=b; }
 function playHit(){ if(hitBuf&&cfg.hvol>0&&st.ctx){ const s=st.ctx.createBufferSource(); s.buffer=hitBuf; const g=st.ctx.createGain(); g.gain.value=cfg.hvol; s.connect(g); g.connect(st.ctx.destination); s.start(0); } }
 function playHover(){ if(st.ctx && cfg.hvol>0 && st.ctx.state==='running') { const o=st.ctx.createOscillator(); const g=st.ctx.createGain(); o.frequency.value=600; g.gain.value=0.05; o.connect(g); g.connect(st.ctx.destination); o.start(); o.stop(st.ctx.currentTime+0.05); } }
 
+// === NUEVO ALGORITMO DE GENERACIÓN ===
+function normalizeAudio(filteredData) {
+    let max = 0;
+    for (let i = 0; i < filteredData.length; i++) {
+        const v = Math.abs(filteredData[i]);
+        if (v > max) max = v;
+    }
+    if (max === 0) return filteredData;
+    const multiplier = 0.8 / max; // Normalizar al 80%
+    for (let i = 0; i < filteredData.length; i++) {
+        filteredData[i] *= multiplier;
+    }
+    return filteredData;
+}
+
 function genMap(buf, k) {
-    const d = buf.getChannelData(0); const map=[]; const step = Math.floor(buf.sampleRate/60);
-    let sumVol=0; let count=0; for(let i=0;i<d.length;i+=step){ sumVol+=Math.abs(d[i]); count++; }
-    const avgVol = sumVol/count; const th = avgVol * (2.8 - (cfg.den * 0.15)); const minGap = 600 - (cfg.den * 50);
-    let lastT=-1000; let lastL=0; let stair=0;
-    for(let i=0; i<d.length; i+=step) {
-        let s=0; for(let j=0; j<step && i+j<d.length; j++) s+=d[i+j]**2;
-        const rms = Math.sqrt(s/step);
-        if(rms > th && rms > 0.01) {
-            const t = (i/buf.sampleRate)*1000;
-            if(t-lastT > minGap) {
-                let l=0, type='tap', len=0;
-                if(cfg.den>=4 && rms>avgVol*1.5) { if(stair<=0) stair=4; } else stair=0;
-                if(stair>0) { l=(lastL+1)%k; stair--; } else { l=Math.floor(Math.random()*k); if(l===lastL && Math.random()>0.3) l=(l+1)%k; }
-                if(rms > th*1.3 && Math.random()>0.5) { type='hold'; len=Math.random()*300+100; }
-                map.push({t:t, l:l, type:type, len:len, h:false});
-                if(cfg.den>=7 && rms>avgVol*3.0 && stair===0) { map.push({t:t, l:(l+2)%k, type:'tap', len:0, h:false}); }
-                lastT=t; lastL=l;
+    const rawData = buf.getChannelData(0);
+    // Paso 1: Normalizar audio para que las intros bajitas generen notas
+    const data = normalizeAudio(new Float32Array(rawData)); 
+    
+    const map = [];
+    const sampleRate = buf.sampleRate;
+    
+    // Configuración del algoritmo de ritmo
+    const windowSize = 1024; // Tamaño de ventana para análisis
+    const step = Math.floor(sampleRate / 60); // Analizar ~60 veces por segundo
+    
+    // Variables para evitar overlaps
+    // laneFreeTime[i] guarda el tiempo (ms) en que el carril i estará libre
+    let laneFreeTime = new Array(k).fill(0); 
+    
+    let lastNoteTime = -1000;
+    // Dificultad ajusta el umbral y la densidad
+    // cfg.den va de 1 a 10. 
+    // Umbral más bajo = más notas. MinGap más bajo = notas más rápidas.
+    const thresholdFactor = 1.6 - (cfg.den * 0.08); 
+    const minGap = Math.max(100, 600 - (cfg.den * 50)); 
+
+    // Historial de energía para comparar (Local Energy Average)
+    let energyHistory = [];
+    const historySize = 43; // ~1 segundo de historia
+
+    for (let i = 0; i < data.length - windowSize; i += step) {
+        // Calcular energía instantánea (RMS de la ventana)
+        let sum = 0;
+        for (let j = 0; j < windowSize; j++) {
+            sum += data[i + j] * data[i + j];
+        }
+        const instantEnergy = Math.sqrt(sum / windowSize);
+
+        // Guardar en historial
+        energyHistory.push(instantEnergy);
+        if (energyHistory.length > historySize) energyHistory.shift();
+
+        // Calcular energía promedio local
+        let localAvg = 0;
+        for(let e of energyHistory) localAvg += e;
+        localAvg /= energyHistory.length;
+
+        // DETECCIÓN DE BEAT: Si la energía actual supera el promedio local * factor
+        // Y ha pasado suficiente tiempo desde la última nota
+        const timeMs = (i / sampleRate) * 1000;
+
+        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.02) {
+            if (timeMs - lastNoteTime > minGap) {
+                
+                // Determinar tipo de nota (Tap o Hold)
+                // Hold si hay mucha energía sostenida o aleatorio en dificultades altas
+                let type = 'tap';
+                let len = 0;
+                if (instantEnergy > localAvg * 1.8 && Math.random() > 0.6) {
+                    type = 'hold';
+                    len = Math.min(1000, Math.random() * 400 + 100); // Max 1s hold
+                }
+
+                // === LÓGICA DE CARRILES INTELIGENTE (SIN OVERLAP) ===
+                let bestLane = -1;
+                let attempts = 0;
+                
+                // Intentar encontrar un carril libre
+                while(attempts < 10) {
+                    let potentialLane = Math.floor(Math.random() * k);
+                    // Checar si el carril está libre en el momento de inicio
+                    if (timeMs >= laneFreeTime[potentialLane] + 50) { // +50ms buffer
+                        bestLane = potentialLane;
+                        break;
+                    }
+                    attempts++;
+                }
+
+                // Si encontramos carril válido, agregar nota
+                if (bestLane !== -1) {
+                    map.push({ t: timeMs, l: bestLane, type: type, len: len, h: false });
+                    
+                    // Actualizar cuándo se libera este carril
+                    laneFreeTime[bestLane] = timeMs + len;
+                    lastNoteTime = timeMs;
+
+                    // Generar doble nota en dificultades altas (7K/9K o den > 8)
+                    if ((k >= 7 || cfg.den >= 8) && instantEnergy > localAvg * 2.5) {
+                        // Buscar segundo carril libre
+                        for(let l=0; l<k; l++) {
+                            if(l !== bestLane && timeMs >= laneFreeTime[l] + 50) {
+                                map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
+                                laneFreeTime[l] = timeMs; // Tap ocupa solo un instante
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
-    } return map;
+    }
+    return map;
 }
+
+// === RESTO DEL MOTOR DE JUEGO (MANTENIDO Y OPTIMIZADO) ===
 
 function initReceptors(k) {
     const t = document.getElementById('track'); t.innerHTML = ''; document.documentElement.style.setProperty('--lane-width', (100/k)+'%');
@@ -38,37 +133,65 @@ function initReceptors(k) {
     }
 }
 
-function playSong(name) {
-    unlockAudio(); const s = ramSongs.find(x=>x.id===name); if(!s) return notify("Error RAM", "error"); curIdx = name;
-    document.getElementById('track').innerHTML = ''; 
-    st.notes = JSON.parse(JSON.stringify(s.map)); st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
-    st.lastPause = 0; // Inicializar variable de pausa
-    opponentScore = 0; songFinished = false; 
-    
-    // UI Ajustes
-    if(isMultiplayer) { 
-        document.getElementById('vs-hud').style.display = 'flex'; 
-    } else { 
-        document.getElementById('vs-hud').style.display = 'none'; 
-    }
+async function prepareAndPlaySong(k) {
+    if(!curSongData) return notify("Error: No hay canción seleccionada", "error");
+    let songInRam = ramSongs.find(s => s.id === curSongData.id);
 
+    if(!songInRam) {
+        document.getElementById('loading-overlay').style.display = 'flex';
+        try {
+            unlockAudio();
+            const response = await fetch(curSongData.audioURL);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
+            const map = genMap(audioBuffer, k);
+            songInRam = { id: curSongData.id, buf: audioBuffer, map: map };
+            ramSongs.push(songInRam);
+        } catch(e) {
+            console.error(e); notify("Error al cargar canción", "error");
+            document.getElementById('loading-overlay').style.display = 'none'; return;
+        }
+        document.getElementById('loading-overlay').style.display = 'none';
+    } else if (!songInRam.map || songInRam.map.length === 0) {
+         songInRam.map = genMap(songInRam.buf, k);
+    }
+    playSongInternal(songInRam);
+}
+
+function playSongInternal(s) {
+    document.getElementById('track').innerHTML = ''; 
+    // Clonar mapa para no modificar el original en RAM
+    st.notes = JSON.parse(JSON.stringify(s.map)); 
+    st.spawned = []; st.sc=0; st.cmb=0; st.hp=50; st.stats={s:0,g:0,b:0,m:0}; st.keys=new Array(keys).fill(0); st.maxScorePossible=0; st.totalHits=0; st.ranked = document.getElementById('chk-ranked').checked;
+    st.lastPause = 0; opponentScore = 0; songFinished = false; st.songDuration = s.buf.duration;
+
+    if(isMultiplayer) { document.getElementById('vs-hud').style.display = 'flex'; } else { document.getElementById('vs-hud').style.display = 'none'; }
     document.getElementById('menu-container').classList.add('hidden'); document.getElementById('game-layer').style.display='block'; document.getElementById('hud').style.display='flex';
     
     initReceptors(keys); updHUD();
     
     const cd=document.getElementById('countdown'); let c=3; cd.innerHTML=c;
     const iv=setInterval(async()=>{ if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume(); c--; if(c>0)cd.innerHTML=c; else { clearInterval(iv); cd.innerHTML=""; st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf; const gain = st.ctx.createGain(); gain.gain.value=cfg.vol; st.src.connect(gain); gain.connect(st.ctx.destination); st.startTime = performance.now() + 50; st.t0 = st.ctx.currentTime + 0.05; st.src.start(st.t0); 
-    
     st.src.onended=()=>{ songFinished = true; end(false); };
     st.act=true; st.paused=false; loop(); } },600);
 }
+
+function formatTime(s) { const m = Math.floor(s / 60); const sc = Math.floor(s % 60); return `${m}:${sc.toString().padStart(2, '0')}`; }
 
 function loop(){
     if(!st.act || st.paused) return;
     let now; const audioTime = (st.ctx.currentTime - st.t0) * 1000; const visTime = performance.now() - st.startTime;
     if (st.ctx.state === 'running' && audioTime > 0) now = audioTime; else now = visTime;
+    
+    if(st.songDuration > 0) {
+        const currentSec = now / 1000; const pct = Math.min(100, (currentSec / st.songDuration) * 100);
+        document.getElementById('top-progress-fill').style.width = pct + "%";
+        document.getElementById('top-progress-time').innerText = `${formatTime(currentSec)} / ${formatTime(st.songDuration)}`;
+    }
+
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80; const w = 100/keys;
     
+    // Spawn Logic
     for(let i=0; i<st.notes.length; i++) {
         const n = st.notes[i]; if(n.s) continue; if(n.t < now-200) { n.s=true; continue; }
         if(n.t - now < 1500) {
@@ -89,6 +212,7 @@ function loop(){
         } else break;
     }
 
+    // Movement & Hit Logic
     for(let i=st.spawned.length-1; i>=0; i--) {
         const n = st.spawned[i]; 
         if(!n.el) { st.spawned.splice(i,1); continue; } 
@@ -110,17 +234,10 @@ function loop(){
     requestAnimationFrame(loop);
 }
 
-// FIXED KEYBOARD LISTENER
 function onKd(e) { 
     if(e.key==="Escape"){togglePause();return;} 
     if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
-
-    if(remapMode!==null){ 
-        cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
-        renderLaneConfig(remapMode); 
-        remapMode=null; 
-        return; 
-    } 
+    if(remapMode!==null){ cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); renderLaneConfig(remapMode); remapMode=null; return; } 
     if(!e.repeat) { 
         const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase()); 
         if(idx !== -1) hit(idx, true); 
@@ -153,14 +270,8 @@ function showJudge(t,c){ if(!cfg.judgeVis) return; const j=document.createElemen
 
 function updHUD(){
     document.getElementById('g-score').innerText=st.sc.toLocaleString();
-    
-    // Si es lobby de 4 jugadores, enviar score a Firestore
-    if(isMultiplayer && typeof sendLobbyScore === 'function') {
-        sendLobbyScore(st.sc);
-    } else if (conn && conn.open) {
-        conn.send({ type: 'score', val: st.sc });
-    }
-
+    if(isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(st.sc);
+    else if (conn && conn.open) conn.send({ type: 'score', val: st.sc });
     document.getElementById('g-combo').innerText=st.cmb;
     const acc=st.maxScorePossible>0?Math.round((st.sc/st.maxScorePossible)*100):100;
     document.getElementById('g-acc').innerText=acc+"%";
@@ -169,93 +280,37 @@ function updHUD(){
 }
 
 function togglePause(){ 
-    if(!st.act) return; 
-    st.paused = !st.paused; 
-    
-    if(st.paused){ 
-        st.lastPause = performance.now(); // Guardar timestamp
-        if(st.ctx) st.ctx.suspend(); 
-        document.getElementById('modal-pause').style.display='flex'; 
-        document.getElementById('p-sick').innerText=st.stats.s; 
-        document.getElementById('p-good').innerText=st.stats.g; 
-        document.getElementById('p-bad').innerText=st.stats.b; 
-        document.getElementById('p-miss').innerText=st.stats.m; 
-    } else {
-        resumeGame(); 
-    }
+    if(!st.act) return; st.paused = !st.paused; 
+    if(st.paused){ st.lastPause = performance.now(); if(st.ctx) st.ctx.suspend(); document.getElementById('modal-pause').style.display='flex'; document.getElementById('p-sick').innerText=st.stats.s; document.getElementById('p-good').innerText=st.stats.g; document.getElementById('p-bad').innerText=st.stats.b; document.getElementById('p-miss').innerText=st.stats.m; } else resumeGame(); 
 }
-
-function resumeGame(){ 
-    document.getElementById('modal-pause').style.display='none'; 
-    if(st.ctx) st.ctx.resume(); 
-    
-    // Ajustar tiempo para evitar saltos en fallback visual
-    if(st.lastPause) {
-        const dur = performance.now() - st.lastPause;
-        st.startTime += dur; 
-        st.lastPause = 0;
-    }
-
-    st.paused = false; 
-    loop(); // <--- REINICIA EL BUCLE (SOLUCIÓN)
-}
+function resumeGame(){ document.getElementById('modal-pause').style.display='none'; if(st.ctx) st.ctx.resume(); if(st.lastPause) { st.startTime += (performance.now() - st.lastPause); st.lastPause = 0; } st.paused = false; loop(); }
 
 function end(died){
     st.act=false; if(st.src)try{st.src.stop()}catch(e){}
     document.getElementById('game-layer').style.display='none'; document.getElementById('modal-res').style.display='flex';
     const acc=st.maxScorePossible>0?Math.round((st.sc/st.maxScorePossible)*100):0;
-    let r="F"; let c="red";
-    if(!died){ 
-        if(acc===100){r="SS";c="cyan"} else if(acc>=95){r="S";c="gold"} else if(acc>=90){r="A";c="lime"} else if(acc>=80){r="B";c="yellow"} else if(acc>=70){r="C";c="orange"} else {r="D";c="red"}
-    }
+    let r="F"; let c="red"; if(!died){ if(acc===100){r="SS";c="cyan"} else if(acc>=95){r="S";c="gold"} else if(acc>=90){r="A";c="lime"} else if(acc>=80){r="B";c="yellow"} else if(acc>=70){r="C";c="orange"} else {r="D";c="red"} }
     
-    if(isMultiplayer) {
-         document.getElementById('winner-msg').innerText = "PARTIDA FINALIZADA";
-         document.getElementById('winner-msg').style.display = 'block';
-         document.getElementById('winner-msg').style.color = 'white';
-         if(typeof leaveLobby === 'function') leaveLobby(); 
-    } else { document.getElementById('winner-msg').style.display = 'none'; }
+    if(isMultiplayer) { document.getElementById('winner-msg').innerText = "PARTIDA FINALIZADA"; document.getElementById('winner-msg').style.display = 'block'; document.getElementById('winner-msg').style.color = 'white'; if(typeof leaveLobby === 'function') leaveLobby(); } else { document.getElementById('winner-msg').style.display = 'none'; }
 
     document.getElementById('res-rank').innerText=r; document.getElementById('res-rank').style.color=c;
     document.getElementById('res-score').innerText=st.sc.toLocaleString(); document.getElementById('res-acc').innerText=acc+"%";
     
-    if(!died && songFinished && user.name!=="Guest"){ 
-        // XP FORMULA V2 (Faster)
-        const xpGain = Math.floor(st.sc / 250); 
-        user.xp += xpGain; 
+    if(!died && songFinished && user.name!=="Guest" && curSongData){ 
+        const xpGain = Math.floor(st.sc / 250); user.xp += xpGain; 
+        const spGain = Math.floor(st.sc / 1000); user.sp = (user.sp||0) + spGain;
+        user.score += st.sc; user.plays++; 
+        let xpReq = Math.floor(1000 * Math.pow(user.lvl >= 10 ? 1.02 : 1.05, user.lvl - 1));
+        if(user.xp >= xpReq) { user.xp -= xpReq; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success", 5000); }
+        if(st.ranked) { if(acc < 50) { user.pp = Math.max(0, user.pp - 15); document.getElementById('pp-gain-loss').innerText = "-15 PP"; document.getElementById('pp-gain-loss').style.color = "var(--miss)"; } else { const ppG = Math.floor(st.sc/5000); user.pp += ppG; document.getElementById('pp-gain-loss').innerText = `+${ppG} PP`; document.getElementById('pp-gain-loss').style.color = "var(--gold)"; } } else { document.getElementById('pp-gain-loss').innerText = "0 PP"; document.getElementById('pp-gain-loss').style.color = "white"; }
         
-        // SCORE POINTS (SP)
-        const spGain = Math.floor(st.sc / 1000);
-        if(!user.sp) user.sp = 0;
-        user.sp += spGain;
+        if(!user.scores) user.scores = {};
+        const currentBest = user.scores[curSongData.id] ? user.scores[curSongData.id].score : 0;
+        if(st.sc > currentBest) { user.scores[curSongData.id] = { score: st.sc, rank: r, acc: acc }; }
 
-        user.score += st.sc; 
-        user.plays++; 
-        
-        // Level Up Scaling
-        let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
-        if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1); 
-        xpReq = Math.floor(xpReq);
-
-        if(user.xp >= xpReq) { 
-            user.xp -= xpReq; 
-            user.lvl++; 
-            notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success", 5000); 
-        }
-
-        if(st.ranked) { 
-            if(acc < 50) { user.pp = Math.max(0, user.pp - 15); document.getElementById('pp-gain-loss').innerText = "-15 PP"; document.getElementById('pp-gain-loss').style.color = "var(--miss)"; }
-            else { const ppG = Math.floor(st.sc/5000); user.pp += ppG; document.getElementById('pp-gain-loss').innerText = `+${ppG} PP`; document.getElementById('pp-gain-loss').style.color = "var(--gold)"; }
-        } else { document.getElementById('pp-gain-loss').innerText = "0 PP"; document.getElementById('pp-gain-loss').style.color = "white"; }
-        
         save(); updateFirebaseScore(); 
-        
-        document.getElementById('res-xp').innerText = xpGain;
-        document.getElementById('res-sp').innerText = spGain;
-    } else { 
-        document.getElementById('res-xp').innerText = 0; 
-        document.getElementById('res-sp').innerText = 0;
-    }
+        document.getElementById('res-xp').innerText = xpGain; document.getElementById('res-sp').innerText = spGain;
+    } else { document.getElementById('res-xp').innerText = 0; document.getElementById('res-sp').innerText = 0; }
 }
 function toMenu() { location.reload(); }
-function startGame(k) { keys = k; const s = ramSongs.find(x=>x.id===curSongId); if(!s) return notify("Error RAM.", "error"); s.map = genMap(s.buf, k); closeModal('diff'); playSong(curSongId); }
+function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }

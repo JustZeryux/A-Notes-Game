@@ -14,9 +14,8 @@ function updUI(){
     document.getElementById('m-rank').innerText = "LVL " + user.lvl;
     document.getElementById('p-lvl-txt').innerText = "LVL " + user.lvl;
     
-    // XP Calculation Display
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
-    if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1); // Soft cap visual
+    if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
 
     const pct = Math.min(100, (user.xp / xpReq) * 100);
@@ -52,7 +51,6 @@ function updUI(){
 
 function changeSection(sec) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    // Mapa de botones
     const map = { 'songs': 'nav-songs', 'multi': 'nav-multi', 'shop': 'nav-shop', 'settings': 'nav-settings', 'rank': 'nav-rank', 'friends': 'nav-friends' };
     if(map[sec]) document.getElementById(map[sec]).classList.add('active');
 }
@@ -83,7 +81,7 @@ function openFriends() {
                     const fData = fDoc.data();
                     const now = Math.floor(Date.now() / 1000);
                     const last = fData.lastSeen ? fData.lastSeen.seconds : 0;
-                    const isOnline = (now - last) < 120; // 2 min tolerancia
+                    const isOnline = (now - last) < 120; 
                     
                     const d = document.createElement('div'); d.className='friend-row';
                     d.onclick = function() { showFriendProfile(f, fData, isOnline); };
@@ -105,8 +103,6 @@ function showFriendProfile(fName, fData, isOnline) {
     document.getElementById('fp-score').innerText = fData.score.toLocaleString();
     document.getElementById('fp-pp').innerText = fData.pp;
     document.getElementById('fp-plays').innerText = fData.plays || 0;
-    
-    // Obtener rank (opcional, pesado)
     document.getElementById('fp-rank').innerText = "#?"; 
 
     if(fData.avatarData) document.getElementById('fp-av').style.backgroundImage = `url(${fData.avatarData})`;
@@ -127,16 +123,16 @@ function showFriendProfile(fName, fData, isOnline) {
     openModal('friend-profile');
 }
 
-/* === CHATS FLOTANTES (Estilo Roblox) === */
-let activeChats = []; // ['nombreAmigo']
+/* === CHATS FLOTANTES === */
+let activeChats = [];
 
 function openFloatingChat(friendName) {
     const target = friendName || selectedFriend;
     if(!target) return;
-    if(activeChats.includes(target)) return; // Ya abierto
-    if(activeChats.length >= 3) { closeFloatingChat(activeChats[0]); } // Max 3 chats
+    if(activeChats.includes(target)) return; 
+    if(activeChats.length >= 3) { closeFloatingChat(activeChats[0]); }
     
-    closeModal('friend-profile'); // Cerrar modal si venimos de ahí
+    closeModal('friend-profile');
     
     activeChats.push(target);
     const container = document.getElementById('chat-overlay-container');
@@ -155,8 +151,6 @@ function openFloatingChat(friendName) {
         </div>
     `;
     container.appendChild(div);
-    
-    // Iniciar listener para este chat
     initFloatChatListener(target);
 }
 
@@ -188,7 +182,7 @@ function initFloatChatListener(target) {
     db.collection("chats").doc(room).collection("messages")
         .orderBy("timestamp", "desc").limit(20)
         .onSnapshot(snapshot => {
-            if(!document.getElementById(`cw-body-${target}`)) return; // Chat cerrado
+            if(!document.getElementById(`cw-body-${target}`)) return; 
             body.innerHTML = '';
             const msgs = [];
             snapshot.forEach(doc => msgs.push(doc.data()));
@@ -201,10 +195,9 @@ function initFloatChatListener(target) {
         });
 }
 
-/* === NOTIFICATIONS V81 === */
+/* === NOTIFICATIONS === */
 function setupNotificationsListener() {
     if(user.name === "Guest" || !db) return;
-    // Escuchar cambios en tiempo real, funciona aunque estuviera offline cuando se envió
     db.collection("users").doc(user.name).collection("notifications").where("read", "==", false)
         .onSnapshot(snapshot => {
             snapshot.docChanges().forEach(change => {
@@ -263,18 +256,181 @@ function closeNotification(id) {
     if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); }
 }
 
-async function handleAudio(i){ const b=document.getElementById('imp-txt'); b.innerText="PROCESANDO..."; if(i.files[0]){ unlockAudio(); const r=new FileReader(); r.onload=async e=>{ try{ const rawData = e.target.result; const bufferCopy = rawData.slice(0); const buf=await st.ctx.decodeAudioData(rawData); const n=i.files[0].name.replace(/\.[^/.]+$/,""); if(!user.songs.find(s=>s.id===n)){user.songs.push({id:n});save();} saveSongToDB(n, bufferCopy); const map = genMap(buf, 4); ramSongs=ramSongs.filter(s=>s.id!==n); ramSongs.push({id:n, buf:buf, map:map}); renderMenu(); notify("Canción importada: "+n); }catch(e){notify("Error audio: " + e, "error"); console.log(e);}finally{ b.innerText='📂 IMPORTAR CANCION'; i.value=""; } }; r.readAsArrayBuffer(i.files[0]); } else { b.innerText='📂 IMPORTAR CANCION'; } }
+// --- RENDER MENU CON SCORES ---
+let globalSongsListener = null;
+
+function renderMenu(filter="") {
+    if(!db) return;
+    const grid = document.getElementById('song-grid');
+    
+    if(globalSongsListener) globalSongsListener();
+
+    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50)
+        .onSnapshot(snapshot => {
+            grid.innerHTML = '';
+            if(snapshot.empty) {
+                grid.innerHTML = '<div style="color:#666; grid-column:1/-1; text-align:center;">No hay canciones globales aún. ¡Sube una!</div>';
+                return;
+            }
+
+            snapshot.forEach(doc => {
+                const s = doc.data();
+                const songId = doc.id;
+                if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+
+                const c = document.createElement('div');
+                c.className = 'beatmap-card';
+                
+                const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(${(songId.length*40)%360},60%,20%),black)`;
+                
+                // Mostrar Score y Rango si existen
+                let scoreTag = '';
+                if(user.scores && user.scores[songId]) {
+                    const us = user.scores[songId];
+                    scoreTag = `<div style="margin-top:10px; display:flex; gap:5px; align-items:center;">
+                        <span class="tag rank-tag" style="color:${getRankColor(us.rank)}; background:rgba(0,0,0,0.5);">${us.rank}</span>
+                        <span class="tag score-tag">${us.score.toLocaleString()}</span>
+                    </div>`;
+                }
+
+                c.innerHTML = `
+                    <div class="bc-bg" style="${bgStyle}"></div>
+                    <div class="bc-info">
+                        <div class="bc-title">${s.title}</div>
+                        <div class="bc-meta" style="font-size:0.8rem; color:#aaa;">Subido por: ${s.uploader}</div>
+                        ${scoreTag}
+                        <div class="bc-meta">
+                            <span class="tag keys">4K | 6K | 7K | 9K</span>
+                        </div>
+                    </div>
+                `;
+                c.onclick = () => { 
+                    curSongData = { id: songId, ...s }; 
+                    openModal('diff'); 
+                    document.getElementById('create-lobby-opts').style.display = 'none'; // Ocultar crear lobby en modo solo
+                };
+                grid.appendChild(c);
+            });
+        });
+}
+
+function getRankColor(r) {
+    if(r==="SS") return "cyan"; if(r==="S") return "gold"; if(r==="A") return "lime";
+    if(r==="B") return "yellow"; if(r==="C") return "orange"; return "red";
+}
+
+// === NUEVA FUNCIÓN PARA AUTOCOMPLETAR TÍTULO ===
+function autoFillTitle(input) {
+    if(input.files[0]) {
+        // Remover extensión (ej. .mp3)
+        let name = input.files[0].name.replace(/\.[^/.]+$/, "");
+        // Reemplazar guiones bajos y medios por espacios para que se vea mejor
+        name = name.replace(/[_-]/g, " ");
+        document.getElementById('up-title').value = name;
+        // Limpiar mensaje de estado si había error previo
+        document.getElementById('upload-status').innerText = ""; 
+    }
+}
+
+// --- SUBIDA GLOBAL ACTUALIZADA (IMAGEN OPCIONAL) ---
+async function startGlobalUpload() {
+    if(user.name === "Guest") return notify("Debes iniciar sesión para subir canciones", "error");
+    if(!storage || !db) return notify("Error de conexión a Firebase", "error");
+
+    const titleInp = document.getElementById('up-title');
+    const audioInp = document.getElementById('up-audio');
+    const imageInp = document.getElementById('up-image');
+    const status = document.getElementById('upload-status');
+    const btn = document.getElementById('btn-upload-start');
+
+    const title = titleInp.value.trim();
+    const audioFile = audioInp.files[0];
+    const imageFile = imageInp.files[0];
+
+    // Ahora solo Audio y Título son obligatorios
+    if(!title || !audioFile) return notify("El Audio y el Título son obligatorios.", "error");
+    
+    if(audioFile.size > 15 * 1024 * 1024) return notify("El audio no debe superar los 15MB", "error");
+    if(imageFile && imageFile.size > 3 * 1024 * 1024) return notify("La imagen no debe superar los 3MB", "error");
+
+    btn.disabled = true;
+    btn.innerText = "SUBIENDO...";
+    status.innerText = "Iniciando subida...";
+
+    try {
+        const songId = db.collection("globalSongs").doc().id;
+        let imageURL = null; // Por defecto no hay imagen
+
+        // 1. Subir Audio (Obligatorio)
+        status.innerText = "Subiendo audio (0%)...";
+        const audioRef = storage.ref(`songs/audio/${songId}_${audioFile.name}`);
+        const audioUpload = audioRef.put(audioFile);
+        
+        audioUpload.on('state_changed', (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            status.innerText = `Subiendo audio (${Math.round(progress)}%)...`;
+        });
+        await audioUpload;
+        const audioURL = await audioRef.getDownloadURL();
+
+        // 2. Subir Imagen (Solo si existe)
+        if(imageFile) {
+            status.innerText = "Subiendo imagen...";
+            const imageRef = storage.ref(`songs/images/${songId}_${imageFile.name}`);
+            await imageRef.put(imageFile);
+            imageURL = await imageRef.getDownloadURL();
+        }
+
+        // 3. Guardar datos en Firestore
+        status.innerText = "Finalizando...";
+        await db.collection("globalSongs").doc(songId).set({
+            title: title,
+            uploader: user.name,
+            audioURL: audioURL,
+            imageURL: imageURL, // Será null si no se subió imagen
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        notify("¡Canción subida exitosamente!", "success");
+        closeModal('upload');
+        // Limpiar inputs
+        titleInp.value = ""; audioInp.value = ""; imageInp.value = "";
+    } catch(e) {
+        console.error(e);
+        notify("Error en la subida: " + e.message, "error");
+        status.innerText = "Error al subir.";
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "☁️ PUBLICAR";
+        status.innerText = "";
+    }
+}
+
+
 async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound Actualizado!"); i.value = ""; } }
-function renderMenu(f=""){ const g=document.getElementById('song-grid'); g.innerHTML=''; user.songs.forEach(s=>{ const id = s.id || s; if(f&&!id.toLowerCase().includes(f.toLowerCase()))return; const c=document.createElement('div'); c.className='beatmap-card'; const isLoaded = ramSongs.find(r=>r.id===id); c.innerHTML=`<div class="bc-bg" style="background-image:linear-gradient(135deg,hsl(${(id.length*40)%360},60%,20%),black)"></div><div class="bc-info"><div class="bc-title">${id}</div><div class="bc-meta">${isLoaded ? '<span class="tag">READY</span>' : '<span class="tag warn">⚠️ CARGANDO CANCION...</span>'}<span class="tag keys">4K | 6K | 7K | 9K</span></div></div>`; c.onclick=()=>{ curSongId=id; if(isLoaded) openModal('diff'); else notify("Espera a que cargue la base de datos...", "error"); }; g.appendChild(c); }); }
+
 function openModal(id){ 
     document.getElementById('modal-'+id).style.display='flex'; 
     if(id==='settings')renderLaneConfig(4); 
     if(id==='profile'){
         document.getElementById('login-view').style.display=user.name==='Guest'?'block':'none';
         document.getElementById('profile-view').style.display=user.name==='Guest'?'none':'block';
-        // Reset tab
         switchProfileTab('resumen');
-    } 
+    }
+    if(id==='upload') {
+         // Limpiar estado del modal de subida al abrirlo
+         document.getElementById('upload-status').innerText = "";
+         document.getElementById('up-title').value = "";
+         document.getElementById('up-audio').value = "";
+         document.getElementById('up-image').value = "";
+    }
+    // Lógica para imagen en Dificultad
+    if(id==='diff' && curSongData) {
+        document.getElementById('diff-song-title').innerText = curSongData.title;
+        const cover = document.getElementById('diff-song-cover');
+        if(curSongData.imageURL) cover.style.backgroundImage = `url(${curSongData.imageURL})`;
+        else cover.style.backgroundImage = '';
+    }
 }
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
 function saveSettings(){ cfg.spd=document.getElementById('set-spd').value; cfg.den=document.getElementById('set-den').value; cfg.vol=document.getElementById('set-vol').value/100; cfg.hvol=document.getElementById('set-hvol').value/100; cfg.down=document.getElementById('set-down').checked; cfg.vivid=document.getElementById('set-vivid').checked; const shakeEl = document.getElementById('set-shake'); if(shakeEl) cfg.shake=shakeEl.checked; cfg.off=parseInt(document.getElementById('set-off').value); cfg.trackOp=document.getElementById('set-track-op').value; cfg.judgeY=document.getElementById('set-judge-y').value; cfg.judgeX=document.getElementById('set-judge-x').value; cfg.judgeS=document.getElementById('set-judge-s').value; cfg.judgeVis=document.getElementById('set-judge-vis').checked; applyCfg(); save(); document.getElementById('modal-settings').style.display='none'; notify("Ajustes guardados"); }
