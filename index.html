@@ -11,6 +11,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@uploadcare/file-uploader@1/web/uc-file-uploader-regular.min.css">
+
+<script type="module">
+  import * as UC from 'https://cdn.jsdelivr.net/npm/@uploadcare/file-uploader@1/web/uc-file-uploader-regular.min.js';
+  UC.defineComponents(UC);
+</script>
+
+<uc-config
+  ctx-name="my-uploader"
+  pubkey="TU_LLAVE_PUBLICA_AQUI"
+></uc-config>
+
+<uc-file-uploader-regular ctx-name="my-uploader"></uc-file-uploader-regular>
 
     <link rel="stylesheet" href="css/style.css">
 </head>
