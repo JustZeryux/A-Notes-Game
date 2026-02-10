@@ -1,14 +1,10 @@
 /* === MAIN INITIALIZATION === */
 window.onload = async () => { 
-    // Ahora loadData es la encargada de verificar si hay un usuario logueado en la nube
+    // loadData se encargará de todo (Loader, Auth, y RenderMenu cuando esté listo)
     await loadData(); 
     
     initOnline(); 
     document.addEventListener('click', unlockAudio); 
-    
-    // El renderMenu ahora se llama dentro de loadData si hay sesión, 
-    // pero lo llamamos aquí por si es Guest
-    renderMenu(); 
     checkUpdate();
     
     // PRESENCE SYSTEM (HEARTBEAT)
