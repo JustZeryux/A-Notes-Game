@@ -1,5 +1,6 @@
 /* === AUTH SYSTEM === */
 
+// Configurar persistencia
 if(firebase.auth) {
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
         .catch((error) => console.error("Error persistencia:", error));
@@ -14,16 +15,15 @@ function checkUpdate() {
     });
 }
 
-// === FUNCIÓN SAVE (LA QUE FALTABA) ===
+// === FUNCIÓN DE GUARDADO ===
 function save() {
-    // 1. Guardar en LocalStorage (Cache rápido)
+    // Guardar en LocalStorage (Copia local)
     const saveData = { user: user, cfg: cfg };
     if(user.name !== "Guest") {
         localStorage.setItem(DB_KEY + user.name, JSON.stringify(saveData));
         
-        // 2. Guardar en Nube (Si está logueado)
+        // Guardar en Nube
         if(db) {
-            // Guardamos scores, config y stats
             db.collection("users").doc(user.name).set({
                 name: user.name,
                 score: user.score,
@@ -32,89 +32,110 @@ function save() {
                 sp: user.sp,
                 scores: user.scores || {},
                 avatarData: user.avatarData || null,
-                bg: user.bg || null, // Guardar fondo también
-                savedCfg: cfg // Guardar config en la nube
+                bg: user.bg || null, 
+                savedCfg: cfg 
             }, { merge: true }).catch(e => console.error("Error guardando en nube:", e));
         }
     } else {
-        // Guardar config de invitado
         localStorage.setItem(DB_KEY + "Guest_CFG", JSON.stringify(cfg));
     }
-    updUI();
+    if(typeof updUI === 'function') updUI();
 }
 
+// === CARGA DE DATOS PRINCIPAL ===
 async function loadData() {
-    // MOSTRAR LOADER AL INICIO
     document.getElementById('loading-overlay').style.display = 'flex';
-    document.getElementById('loading-text').innerText = "Iniciando sesión...";
+    document.getElementById('loading-text').innerText = "Conectando...";
 
-    const storedName = localStorage.getItem(LAST_KEY);
-    
-    if (storedName && storedName !== "Guest") {
-        if(!db) { 
-            finishLoad(); return; 
-        }
-        
-        try {
-            const doc = await db.collection("users").doc(storedName).get();
-            if (doc.exists) {
-                const data = doc.data();
-                if(data.sp === undefined) data.sp = 0;
-                if(data.scores === undefined) data.scores = {};
-                
-                user = { ...user, ...data };
-                
-                // Cargar config si existe en la nube
-                if(data.savedCfg) cfg = { ...cfg, ...data.savedCfg };
-                else applyCfg(); // Aplicar defaults si no hay config
-
-                console.log("Sesión recuperada:", storedName);
+    // 1. ESCUCHADOR DE SESIÓN DE FIREBASE (Lo más importante)
+    firebase.auth().onAuthStateChanged(async (u) => {
+        if (u) {
+            // Si Firebase dice que hay usuario logueado (Google o Email)
+            console.log("Usuario detectado por Firebase:", u.displayName || u.email);
+            // Usamos el nombre limpio como ID
+            const cleanName = (u.displayName ? u.displayName.replace(/[^a-zA-Z0-9]/g, '') : u.email.split('@')[0]).substring(0,15);
+            await fetchUserProfile(cleanName);
+        } else {
+            // Si Firebase no detecta usuario, revisamos si hay un login Local (Legacy)
+            const localName = localStorage.getItem(LAST_KEY);
+            if (localName && localName !== "Guest") {
+                console.log("Recuperando sesión local:", localName);
+                await fetchUserProfile(localName);
             } else {
-                logout(); // Usuario borrado o inválido
+                console.log("Entrando como Guest");
+                loadGuestConfig();
+                finishLoad();
             }
-        } catch (e) {
-            console.error("Error loading:", e);
-            notify("Error de conexión", "error");
         }
-    } else {
-        // Cargar config local de Guest
-        const localCfg = localStorage.getItem(DB_KEY + "Guest_CFG");
-        if(localCfg) cfg = { ...cfg, ...JSON.parse(localCfg) };
-    }
+    });
+}
+
+// Función auxiliar para descargar el perfil
+async function fetchUserProfile(name) {
+    if(!db) { console.error("DB no lista"); finishLoad(); return; }
     
-    applyCfg(); // Aplicar volumen, velocidad, etc.
-    updUI();
-    finishLoad(); // QUITAR LOADER
+    try {
+        const doc = await db.collection("users").doc(name).get();
+        if (doc.exists) {
+            const data = doc.data();
+            // Parchear datos faltantes
+            if(data.sp === undefined) data.sp = 0;
+            if(data.scores === undefined) data.scores = {};
+            
+            user = { ...user, ...data };
+            if(data.savedCfg) cfg = { ...cfg, ...data.savedCfg };
+            else applyCfg();
+
+            localStorage.setItem(LAST_KEY, name); // Refrescar local
+            notify("Sesión iniciada: " + name, "success");
+        } else {
+            // El usuario está en Auth pero no en la base de datos (Raro, pero posible)
+            notify("Perfil no encontrado, creando...", "warn");
+            await handleAuthUser(name, true); // Re-crear
+        }
+    } catch (e) {
+        console.error("Error cargando perfil:", e);
+        notify("Error de red al cargar perfil", "error");
+        loadGuestConfig();
+    }
+    finishLoad();
+}
+
+function loadGuestConfig() {
+    const localCfg = localStorage.getItem(DB_KEY + "Guest_CFG");
+    if(localCfg) cfg = { ...cfg, ...JSON.parse(localCfg) };
+    user.name = "Guest";
 }
 
 function finishLoad() {
+    applyCfg(); 
+    if(typeof updUI === 'function') updUI();
     document.getElementById('loading-overlay').style.display = 'none';
     if(typeof renderMenu === 'function') renderMenu();
 }
+
+/* === LOGIN HANDLERS === */
 
 function loginGoogle() {
     if(!db) return notify("Error: Firebase no conectado", "error");
     const provider = new firebase.auth.GoogleAuthProvider();
     
-    firebase.auth().signInWithPopup(provider).then(async (result) => {
-        const u = result.user;
-        const cleanName = (u.displayName ? u.displayName.replace(/[^a-zA-Z0-9]/g, '') : u.email.split('@')[0]).substring(0,15);
-        await handleAuthUser(cleanName, true);
+    firebase.auth().signInWithPopup(provider).then((result) => {
+        // No hacemos nada aquí, el onAuthStateChanged en loadData manejará la carga
     }).catch(e => notify("Error Google: " + e.message, "error"));
 }
 
+// Maneja la creación o recuperación de datos
 async function handleAuthUser(name, isGoogle) {
     try {
-        document.getElementById('loading-overlay').style.display = 'flex';
         const docRef = db.collection("users").doc(name);
         const doc = await docRef.get();
 
         if(doc.exists) {
-            let data = doc.data();
-            if(data.savedCfg) cfg = { ...cfg, ...data.savedCfg };
-            user = {...user, ...data};
-            finishLogin(name);
+            // Ya existe, loadData lo cargará
+            location.reload(); 
         } else {
+            // Crear nuevo
             const newUser = {
                 name: name, 
                 pass: isGoogle ? "google-auth" : null,
@@ -128,12 +149,10 @@ async function handleAuthUser(name, isGoogle) {
             await db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
             
             user = newUser;
-            notify("Bienvenido " + name, "success");
-            setTimeout(() => finishLogin(name), 1000);
+            finishLogin(name);
         }
     } catch (e) {
         console.error(e);
-        document.getElementById('loading-overlay').style.display = 'none';
         notify("Error DB: " + e.message, "error");
     }
 }
@@ -141,21 +160,30 @@ async function handleAuthUser(name, isGoogle) {
 function login() {
     const u = document.getElementById('l-user').value.trim();
     const p = document.getElementById('l-pass').value.trim();
+    
     if(!u || !p) return notify("Ingresa datos", "error");
 
     db.collection("users").doc(u).get().then(doc => {
         if(doc.exists) {
             const data = doc.data();
-            if(data.pass === "google-auth") notify("Usa el botón de Google", "error");
-            else if(data.pass === p) finishLogin(u);
-            else notify("Contraseña incorrecta", "error");
-        } else notify("Usuario no encontrado", "error");
+            if(data.pass === "google-auth") {
+                notify("Usa el botón de Google", "error");
+            } else if(data.pass === p) {
+                // Login manual exitoso
+                finishLogin(u);
+            } else {
+                notify("Contraseña incorrecta", "error");
+            }
+        } else {
+            notify("Usuario no encontrado", "error");
+        }
     }).catch(e => notify("Error conexión", "error"));
 }
 
 function register() {
     const u = document.getElementById('l-user').value.trim();
     const p = document.getElementById('l-pass').value.trim();
+    
     if(!u || !p) return notify("Datos incompletos", "error");
     if(/[^a-zA-Z0-9]/.test(u)) return notify("Solo letras y números", "error");
 
@@ -174,9 +202,7 @@ async function createLocalUser(name, pass) {
         };
         await db.collection("users").doc(name).set(newUser);
         await db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
-        user = newUser;
-        notify("Registrado con éxito", "success");
-        setTimeout(() => finishLogin(name), 1000);
+        finishLogin(name);
     } catch(e) { notify("Error al registrar", "error"); }
 }
 
@@ -213,7 +239,9 @@ function openLeaderboard() {
             });
         });
         openModal('rank');
-    } else { notify("Firebase no configurado", "error"); }
+    } else {
+        notify("Firebase no configurado", "error");
+    }
 }
 
 function updateFirebaseScore() {
