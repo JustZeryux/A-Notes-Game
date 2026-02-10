@@ -10,7 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-
+    
     <script>
         UPLOADCARE_PUBLIC_KEY = '8f24c5ced2ad35839a30'; 
         UPLOADCARE_LOCALE = 'es';
@@ -73,8 +73,7 @@
                      <div style="font-weight:900; color:#aaa;">PP: <span id="h-pp" style="color:white; font-size:1.5rem;">0</span></div>
                 </div>
             </div>
-            <div class="song-grid" id="song-grid">
-                </div>
+            <div class="song-grid" id="song-grid"></div>
         </main>
     </div>
 
@@ -93,6 +92,9 @@
             <div id="ig-name" style="color:white;">User</div>
         </div>
 
+        <div id="hud-mean-ms" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); font-weight:bold; color:#aaa; font-size:1.2rem; text-shadow:0 0 5px black;">0.00ms</div>
+        <div id="hud-fc-status" style="position:absolute; bottom:50px; left:50%; transform:translateX(-50%); font-weight:900; color:var(--gold); font-size:1.5rem; text-shadow:0 0 10px var(--gold); letter-spacing:3px;">GFC</div>
+
         <div id="track"></div>
 
         <div id="hud">
@@ -109,56 +111,108 @@
 
                 <div class="score-label">SCORE</div>
                 <div class="score-val" id="g-score">0</div>
+                <div id="g-combo-box" style="margin-top:20px; text-align:right;">
+                    <div style="font-size:0.8rem; color:#888; font-weight:bold;">COMBO</div>
+                    <div id="g-combo" class="combo-val-hud">0</div>
+                </div>
             </div>
             
             <div class="health-bar"><div class="health-fill" id="health-fill"></div></div>
         </div>
         
-        <div class="combo-val" id="g-combo">0</div>
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
+    </div>
+
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-panel" style="width:900px; display:flex; padding:0; overflow:hidden; height:600px;">
+            <div class="settings-sidebar">
+                <div class="set-cat active" onclick="switchSetTab('gameplay')">🎮 GAMEPLAY</div>
+                <div class="set-cat" onclick="switchSetTab('visuals')">🎨 VISUALS</div>
+                <div class="set-cat" onclick="switchSetTab('audio')">🔊 AUDIO</div>
+                <div class="set-cat" onclick="switchSetTab('controls')">⌨️ CONTROLS</div>
+                <div class="set-cat" onclick="switchSetTab('advanced')">🛠️ ADVANCED</div>
+            </div>
+            
+            <div class="settings-content">
+                <div class="m-title" style="font-size:1.8rem; margin-bottom:20px;">CONFIGURACIÓN</div>
+                
+                <div id="set-tab-gameplay" class="set-page">
+                    <div class="set-row"><span>Velocidad (Scroll Speed)</span><input type="range" id="set-spd" min="10" max="40" step="1"><span id="val-spd">22</span></div>
+                    <div class="set-row"><span>Downscroll</span><input type="checkbox" id="set-down"></div>
+                    <div class="set-row"><span>Middlescroll (Centrado)</span><input type="checkbox" id="set-middle"></div>
+                    <div class="set-row"><span>Offset Global (ms)</span><input type="number" id="set-off" class="num-inp"></div>
+                    <div class="set-row"><span>Dificultad IA (Random)</span><input type="range" id="set-den" min="1" max="10"></div>
+                </div>
+
+                <div id="set-tab-visuals" class="set-page" style="display:none;">
+                    <div class="set-row"><span>Vivid Lights</span><input type="checkbox" id="set-vivid"></div>
+                    <div class="set-row"><span>Screen Shake</span><input type="checkbox" id="set-shake"></div>
+                    <div class="set-row"><span>Ocultar Score/HUD</span><input type="checkbox" id="set-hide-hud"></div>
+                    <div class="set-row"><span>Opacidad Carril (%)</span><input type="range" id="set-track-op" min="0" max="100"><span id="val-track-op">10</span></div>
+                    <div class="set-row"><span>Opacidad Notas (Hold)</span><input type="range" id="set-note-op" min="10" max="100"><span id="val-note-op">100</span></div>
+                    <button class="action secondary" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button>
+                    <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">
+                </div>
+
+                <div id="set-tab-audio" class="set-page" style="display:none;">
+                    <div class="set-row"><span>Volumen Música</span><input type="range" id="set-vol" min="0" max="100"></div>
+                    <div class="set-row"><span>Activar Hit Sounds</span><input type="checkbox" id="set-hit-sound"></div>
+                    <div class="set-row"><span>Volumen Hits</span><input type="range" id="set-hvol" min="0" max="100"></div>
+                    <div class="set-row"><span>Activar Miss Sounds</span><input type="checkbox" id="set-miss-sound"></div>
+                    <div class="set-row"><span>Volumen Miss</span><input type="range" id="set-miss-vol" min="0" max="100"></div>
+                    <button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT SOUND</button>
+                    <input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">
+                    <button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS SOUND</button>
+                    <input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">
+                </div>
+
+                <div id="set-tab-controls" class="set-page" style="display:none;">
+                    <div class="kb-tabs">
+                        <div class="kb-tab active" id="tab-4" onclick="renderLaneConfig(4)">4K</div>
+                        <div class="kb-tab" id="tab-6" onclick="renderLaneConfig(6)">6K</div>
+                        <div class="kb-tab" id="tab-7" onclick="renderLaneConfig(7)">7K</div>
+                        <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
+                    </div>
+                    <div class="lane-cfg-box"><div id="lanes-container" class="lanes-view"></div></div>
+                </div>
+
+                <div id="set-tab-advanced" class="set-page" style="display:none;">
+                    <div class="set-row"><span>Mostrar Latencia (MS)</span><input type="checkbox" id="set-show-ms"></div>
+                    <div class="set-row"><span>Mostrar Promedio (Mean)</span><input type="checkbox" id="set-show-mean"></div>
+                    <div class="set-row"><span>Pos. Juez Y</span><input type="range" id="set-judge-y" min="10" max="90"></div>
+                    <div class="set-row"><span>Ver Juez</span><input type="checkbox" id="set-judge-vis"></div>
+                </div>
+
+                <button class="action" style="margin-top:20px;" onclick="saveSettings()">GUARDAR Y SALIR</button>
+            </div>
+        </div>
     </div>
 
     <div id="modal-finish-reg" class="modal-overlay" style="z-index: 6000;">
         <div class="modal-panel login-box">
             <div class="m-title">CASI LISTO</div>
-            <p style="color:#aaa; margin-bottom:20px;">Estás vinculando una nueva cuenta. Elige tu nombre de usuario único:</p>
             <input type="text" id="reg-google-user" class="log-inp" placeholder="Nombre de Usuario">
             <button class="action" onclick="finishGoogleRegistration()">CREAR CUENTA</button>
-            <button class="action secondary" onclick="location.reload()">CANCELAR</button>
         </div>
     </div>
 
     <div id="modal-song-selector" class="modal-overlay">
         <div class="modal-panel" style="width:800px; height:80vh;">
-            <div class="m-title">ELIGE CANCIÓN PARA EL HOST</div>
-            <input type="text" class="search-inp" style="width:100%; margin-bottom:20px;" placeholder="Buscar..." oninput="renderLobbySongList(this.value)">
-            <div class="song-grid" id="lobby-song-grid" style="padding:10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); box-shadow:none;"></div>
-            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('song-selector')">CANCELAR</button>
+            <div class="m-title">ELIGE CANCIÓN</div>
+            <input type="text" class="search-inp" style="width:100%;" placeholder="Buscar..." oninput="renderLobbySongList(this.value)">
+            <div class="song-grid" id="lobby-song-grid" style="padding:10px;"></div>
+            <button class="action secondary" onclick="closeModal('song-selector')">CANCELAR</button>
         </div>
     </div>
 
     <div id="modal-upload" class="modal-overlay">
-        <div class="modal-panel login-box" style="text-align:left;">
+        <div class="modal-panel login-box">
             <div class="m-title">SUBIR A LA NUBE</div>
-            <div style="color:#aaa; margin-bottom:20px; font-size:0.9rem;">Servidor rápido powered by Uploadcare.</div>
-            
-            <div style="margin-bottom:15px;">
-                <label style="font-weight:bold;">1. Audio (MP3/WAV)</label>
-                <input type="file" id="up-audio" accept="audio/*" class="log-inp" style="padding:10px;" onchange="autoFillTitle(this)">
-            </div>
-
-            <div style="margin-bottom:15px;">
-                <label style="font-weight:bold;">2. Título (Editable)</label>
-                <input type="text" id="up-title" class="log-inp" style="text-align:left;">
-            </div>
-
-             <div style="margin-bottom:20px;">
-                <label style="font-weight:bold;">3. Portada (Opcional)</label>
-                <input type="file" id="up-image" accept="image/*" class="log-inp" style="padding:10px;">
-            </div>
-            
-            <div id="upload-status" style="text-align:center; color:var(--accent); font-weight:bold; margin-bottom:10px;"></div>
-            <button class="action" onclick="startGlobalUpload()" id="btn-upload-start">☁️ PUBLICAR AHORA</button>
+            <input type="file" id="up-audio" accept="audio/*" class="log-inp" onchange="autoFillTitle(this)">
+            <input type="text" id="up-title" class="log-inp" placeholder="Título">
+            <input type="file" id="up-image" accept="image/*" class="log-inp">
+            <div id="upload-status" style="margin-bottom:10px;"></div>
+            <button class="action" onclick="startGlobalUpload()" id="btn-upload-start">☁️ PUBLICAR</button>
             <button class="action secondary" onclick="closeModal('upload')">CANCELAR</button>
         </div>
     </div>
@@ -166,47 +220,37 @@
     <div id="modal-diff" class="modal-overlay">
         <div class="modal-panel" style="width:850px;">
             <div class="m-title">SELECCIONA MODO</div>
-            
-            <div id="diff-song-cover" style="width:250px; height:250px; background:#333; margin:0 auto 20px; border-radius:15px; background-size:cover; background-position:center; border:3px solid var(--accent); box-shadow:0 0 40px rgba(255,102,170,0.2);"></div>
-            <div id="diff-song-title" style="text-align:center; font-size:2rem; font-weight:900; margin-bottom:30px; color:white;">...</div>
-
+            <div id="diff-song-cover" class="cover-display"></div>
+            <div id="diff-song-title" style="text-align:center; font-size:2rem; font-weight:900; margin-bottom:20px;">...</div>
             <div class="diff-grid">
-                <div class="diff-card" onclick="startGame(4)" style="color:#00FFFF"><div style="font-size:3rem;font-weight:900">4K</div>NORMAL</div>
-                <div class="diff-card" onclick="startGame(6)" style="color:#12FA05"><div style="font-size:3rem;font-weight:900">6K</div>HARD</div>
-                <div class="diff-card" onclick="startGame(7)" style="color:#FFD700"><div style="font-size:3rem;font-weight:900">7K</div>INSANE</div>
-                <div class="diff-card" onclick="startGame(9)" style="color:#F9393F"><div style="font-size:3rem;font-weight:900">9K</div>DEMON</div>
+                <div class="diff-card" onclick="startGame(4)" style="color:#00FFFF">4K</div>
+                <div class="diff-card" onclick="startGame(6)" style="color:#12FA05">6K</div>
+                <div class="diff-card" onclick="startGame(7)" style="color:#FFD700">7K</div>
+                <div class="diff-card" onclick="startGame(9)" style="color:#F9393F">9K</div>
             </div>
-            
-            <div class="ranked-toggle">
-                <input type="checkbox" id="chk-ranked">
-                <label for="chk-ranked" style="margin-left:10px; color:var(--accent);">RANKED MODE (GANA PP)</label>
-            </div>
-            
-            <div id="create-lobby-opts" style="display:none; margin-top:20px;">
-                <button class="action" onclick="confirmCreateLobby()">CONFIRMAR SALA</button>
-            </div>
-
-            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('diff')">CANCELAR</button>
+            <div class="ranked-toggle"><input type="checkbox" id="chk-ranked"><label for="chk-ranked">RANKED MODE</label></div>
+            <div id="create-lobby-opts" style="display:none; margin-top:20px;"><button class="action" onclick="confirmCreateLobby()">CREAR SALA</button></div>
+            <button class="action secondary" onclick="closeModal('diff')">CANCELAR</button>
         </div>
     </div>
 
     <div id="modal-lobbies" class="modal-overlay">
         <div class="modal-panel" style="width:800px;">
-            <div class="m-title">SALAS DE JUEGO</div>
+            <div class="m-title">SALAS ONLINE</div>
             <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
                  <button class="btn-small btn-add" onclick="openSongSelectorForLobby()">CREAR SALA</button>
                  <button class="btn-small btn-chat" onclick="refreshLobbies()">ACTUALIZAR</button>
             </div>
-            <div id="lobby-list" style="max-height:400px; overflow-y:auto;"></div>
+            <div id="lobby-list"></div>
             <button class="action secondary" onclick="closeModal('lobbies')">CERRAR</button>
         </div>
     </div>
 
     <div id="modal-lobby-room" class="modal-overlay">
         <div class="modal-panel" style="width:700px; text-align:center;">
-            <div class="m-title" id="room-host-name">SALA DE ...</div>
-            <div style="margin-bottom:20px; font-size:1.2rem; color:var(--blue);">CANCIÓN: <span id="room-song">...</span></div>
-            <div id="room-players" style="display:flex; gap:20px; justify-content:center; margin-bottom:30px;"></div>
+            <div class="m-title" id="room-host-name">SALA</div>
+            <div style="margin-bottom:20px;" id="room-song">...</div>
+            <div id="room-players" style="display:flex; gap:20px; justify-content:center;"></div>
             <button class="action btn-acc" id="btn-ready" onclick="toggleReady()">LISTO</button>
             <button class="action secondary" onclick="leaveLobby()">SALIR</button>
         </div>
@@ -214,8 +258,8 @@
 
     <div id="modal-shop" class="modal-overlay">
         <div class="modal-panel" style="width:800px;">
-            <div class="m-title">TIENDA (SP)</div>
-            <div style="text-align:center; margin-bottom:20px; color:var(--gold); font-size:1.5rem; font-weight:900;">TUS PUNTOS: <span id="shop-sp">0</span> SP</div>
+            <div class="m-title">TIENDA</div>
+            <div style="text-align:center; margin-bottom:20px;">SP: <span id="shop-sp">0</span></div>
             <div class="shop-grid" id="shop-items"></div>
             <button class="action secondary" onclick="closeModal('shop')">CERRAR</button>
         </div>
@@ -223,14 +267,13 @@
 
     <div id="modal-news" class="modal-overlay">
         <div class="modal-panel" style="width:600px;">
-            <div class="m-title">NOVEDADES</div>
+            <div class="m-title">NOVEDADES ULTRA</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION GLOBAL</div>
                 <ul>
-                    <li><b>NOTAS CAYENDO:</b> Ahora ves las notas caer antes de que empiece la canción.</li>
-                    <li><b>OPTIMIZACIÓN:</b> Carga más rápida al reintentar canciones.</li>
-                    <li><b>LOGIN GOOGLE:</b> Ahora puedes elegir tu nombre al registrarte.</li>
-                    <li><b>GESTIÓN DE CUENTA:</b> Cambia tu nombre y vincula Google desde Ajustes.</li>
+                    <li><b>HOLD NOTES COMPLEX:</b> ¡Ahora debes mantener presionado! Soltar antes rompe el combo.</li>
+                    <li><b>MEAN MS & FC:</b> Nuevos indicadores para calibración y perfección.</li>
+                    <li><b>MIDDLESCROLL:</b> Opción para centrar las notas.</li>
+                    <li><b>AJUSTES PRO:</b> Nuevo menú organizado por categorías.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -239,159 +282,94 @@
 
     <div id="modal-friends" class="modal-overlay">
         <div class="modal-panel" style="width:650px;">
-            <div class="m-title">SOCIAL HUB</div>
-            <div style="display:flex; gap:10px; margin-bottom:20px;">
-                <input type="text" id="friend-inp" class="log-inp" placeholder="Usuario..." style="margin:0;">
-                <button class="btn-small btn-add" style="font-size:1rem;" onclick="sendFriendRequest()">AGREGAR</button>
-            </div>
-            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">SOLICITUDES</div>
-            <div id="req-list" class="friend-list" style="margin-bottom:20px;"></div>
-            <div style="color:#aaa; font-weight:bold; margin-bottom:10px;">AMIGOS</div>
+            <div class="m-title">AMIGOS</div>
+            <input type="text" id="friend-inp" class="log-inp" placeholder="Usuario...">
+            <button class="btn-small btn-add" onclick="sendFriendRequest()">AGREGAR</button>
+            <div id="req-list" class="friend-list"></div>
             <div id="friend-list" class="friend-list"></div>
             <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
         </div>
     </div>
 
     <div id="modal-friend-profile" class="modal-overlay">
-        <div class="modal-panel login-box" style="text-align:center;">
+        <div class="modal-panel login-box">
             <div id="fp-av" class="prof-av-big"></div>
-            <div id="fp-name">...</div>
-            <div id="fp-lvl" style="color:var(--accent); font-weight:900;">LVL ...</div>
-            <div id="fp-stats" style="display:flex; justify-content:center; gap:20px;">
-                <div class="fp-stat-box">SCORE<br><span id="fp-score">0</span></div>
-                <div class="fp-stat-box">PP<br><span id="fp-pp">0</span></div>
-            </div>
-            <div id="fp-status-text" style="color:#888; margin-bottom:15px;">...</div>
+            <h2 id="fp-name">...</h2>
+            <div id="fp-lvl">LVL ...</div>
+            <div id="fp-stats"><div class="fp-stat-box">SCORE<br><span id="fp-score">0</span></div></div>
+            <div id="fp-status-text">...</div>
             <div class="fp-actions">
-                <button class="btn-chat" onclick="openFloatingChat()">💬 CHATEAR</button>
-                <button id="btn-challenge" class="btn-add" disabled>⚔️ DESAFIAR</button>
+                <button class="btn-chat" onclick="openFloatingChat()">💬</button>
+                <button id="btn-challenge" class="btn-add" disabled>⚔️</button>
             </div>
-            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('friend-profile')">CERRAR</button>
+            <button class="action secondary" onclick="closeModal('friend-profile')">CERRAR</button>
         </div>
     </div>
 
     <div id="modal-rank" class="modal-overlay">
         <div class="modal-panel">
-            <div class="m-title">RANKING GLOBAL</div>
+            <div class="m-title">RANKING</div>
             <table class="rank-table">
                 <thead><tr><th>#</th><th>JUGADOR</th><th>PP</th></tr></thead>
                 <tbody id="rank-list"></tbody>
             </table>
-            <button class="action secondary" style="margin-top:30px;" onclick="closeModal('rank')">CERRAR</button>
+            <button class="action secondary" onclick="closeModal('rank')">CERRAR</button>
         </div>
     </div>
 
     <div id="modal-profile" class="modal-overlay">
         <div class="modal-panel login-box">
             <div id="login-view">
-                <div class="m-title">ACCESO</div>
-                <button class="btn-google" onclick="loginGoogle()">CONTINUAR CON GOOGLE</button>
-                <div style="margin: 15px 0; color:#666;">--- O USA CUENTA LOCAL ---</div>
-                <input type="text" id="l-user" class="log-inp" placeholder="Usuario">
-                <input type="password" id="l-pass" class="log-inp" placeholder="Contraseña">
+                <div class="m-title">LOGIN</div>
+                <button class="btn-google" onclick="loginGoogle()">GOOGLE</button>
+                <input type="text" id="l-user" class="log-inp" placeholder="User">
+                <input type="password" id="l-pass" class="log-inp" placeholder="Pass">
                 <button class="action" onclick="login()">ENTRAR</button>
                 <button class="action secondary" onclick="register()">REGISTRAR</button>
             </div>
             <div id="profile-view" style="display:none;">
-                <div class="m-title">TU PERFIL</div>
+                <div class="m-title">PERFIL</div>
                 <div class="settings-tabs">
                     <div class="kb-tab active" id="ptab-resumen" onclick="switchProfileTab('resumen')">RESUMEN</div>
                     <div class="kb-tab" id="ptab-cuenta" onclick="switchProfileTab('cuenta')">CUENTA</div>
                 </div>
                 <div id="p-tab-content-resumen">
                     <label class="prof-av-big" id="p-av-big"><input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)"></label>
-                    <h2 id="p-name" style="margin:0;">User</h2>
-                    <div id="p-lvl-txt" style="color:var(--accent); font-weight:900; font-size:1.4rem;">LVL 1</div>
+                    <h2 id="p-name">User</h2>
+                    <div id="p-lvl-txt">LVL 1</div>
                     <div class="xp-container"><div class="xp-fill" id="p-xp-bar"></div></div>
                     <div class="xp-text" id="p-xp-txt">0 / 1000 XP</div>
-                    <div style="color:var(--blue); font-weight:bold; margin:20px 0; font-size:1.2rem;">GLOBAL RANK: <span id="p-global-rank">#--</span></div>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:30px;">
-                        <div style="background:#151515; padding:20px; border-radius:12px;">SCORE<br><span id="p-score" style="font-size:1.5rem; color:white;">0</span></div>
-                        <div style="background:#151515; padding:20px; border-radius:12px;">PP<br><span id="p-pp-display" style="font-size:1.5rem; color:var(--blue);">0</span></div>
-                        <div style="background:#151515; padding:20px; border-radius:12px;">JUGADAS<br><span id="p-plays" style="font-size:1.5rem; color:white;">0</span></div>
-                        <div style="background:#151515; padding:20px; border-radius:12px;">SP<br><span id="p-sp-display" style="font-size:1.5rem; color:var(--gold);">0</span></div>
-                    </div>
+                    <div style="margin-top:20px;">Global Rank: <span id="p-global-rank">#--</span></div>
                 </div>
                 <div id="p-tab-content-cuenta" style="display:none;">
                     <div id="local-acc-settings">
-                        <div style="color:#aaa; margin-bottom:15px;">Cambiar Contraseña</div>
-                        <input type="password" id="new-pass" class="log-inp" placeholder="Nueva contraseña">
-                        <button class="action secondary" onclick="changePassword()">ACTUALIZAR</button>
+                        <input type="password" id="new-pass" class="log-inp" placeholder="New Pass">
+                        <button class="action secondary" onclick="changePassword()">CAMBIAR PASS</button>
                     </div>
-                    
-                    <div id="acc-mgmt-area" style="margin-top:20px; border-top:1px solid #333; padding-top:20px;">
-                        <button class="action secondary" style="border-color:var(--blue); color:var(--blue); margin-bottom:15px;" onclick="linkGoogleAccount()">VINCULAR CUENTA GOOGLE</button>
-                        
-                        <div style="color:#aaa; margin-bottom:10px;">Cambiar Nombre de Usuario</div>
-                        <input type="text" id="new-username" class="log-inp" placeholder="Nuevo Nombre" style="margin-bottom:10px;">
+                    <div id="acc-mgmt-area" style="margin-top:20px;">
+                        <button class="action secondary" onclick="linkGoogleAccount()">VINCULAR GOOGLE</button>
+                        <input type="text" id="new-username" class="log-inp" placeholder="New Name">
                         <button class="action secondary" onclick="changeUsername()">CAMBIAR NOMBRE</button>
                     </div>
-
-                    <div id="google-acc-settings" style="display:none; color:#aaa; margin-top:20px;">Cuenta vinculada con Google.</div>
-                     <button class="action secondary" style="border-color:#F9393F; color:#F9393F; margin-top:30px;" onclick="logout()">CERRAR SESIÓN</button>
+                    <button class="action secondary" onclick="logout()">LOGOUT</button>
                 </div>
             </div>
-            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('profile')">CERRAR</button>
-        </div>
-    </div>
-
-    <div id="modal-settings" class="modal-overlay">
-        <div class="modal-panel">
-            <div class="m-title">CONFIGURACIÓN</div>
-            <div class="set-grid">
-                <div>
-                    <div class="set-head">GENERAL</div>
-                    <div class="set-row"><span>Velocidad</span><input type="range" id="set-spd" min="10" max="40"></div>
-                    <div class="set-row"><span>Dificultad (AI)</span><input type="range" id="set-den" min="1" max="10"></div>
-                    <div class="set-row"><span>Vol. Música</span><input type="range" id="set-vol" min="0" max="100"></div>
-                    <div class="set-row"><span>Vol. Hits</span><input type="range" id="set-hvol" min="0" max="100"></div>
-                    <div class="set-row"><span>Downscroll</span><input type="checkbox" id="set-down"></div>
-                    <div class="set-row"><span>Vivid Light</span><input type="checkbox" id="set-vivid"></div>
-                    <div class="set-row"><span>Screen Shake</span><input type="checkbox" id="set-shake"></div>
-                    <div class="set-row"><span>Offset (ms)</span><input type="number" id="set-off" style="width:70px;background:#111;color:white;border:1px solid #444;"></div>
-                    <div class="set-head" style="margin-top:20px;">HUD</div>
-                    <div class="set-row"><span>Opacidad Carril</span><input type="range" id="set-track-op" min="0" max="100"></div>
-                    <div class="set-row"><span>Pos. Juez Y</span><input type="range" id="set-judge-y" min="10" max="90"></div>
-                    <div class="set-row"><span>Pos. Juez X</span><input type="range" id="set-judge-x" min="10" max="90"></div>
-                    <div class="set-row"><span>Tam. Juez</span><input type="range" id="set-judge-s" min="5" max="20"></div>
-                    <div class="set-row"><span>Ver Juez</span><input type="checkbox" id="set-judge-vis"></div>
-                    <button class="action secondary" onclick="document.getElementById('bg-file').click()">🖼️ FONDO</button>
-                    <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">
-                </div>
-                <div>
-                    <div class="set-head">CONTROLES</div>
-                    <div class="kb-tabs">
-                        <div class="kb-tab active" id="tab-4" onclick="renderLaneConfig(4)">4K</div>
-                        <div class="kb-tab" id="tab-6" onclick="renderLaneConfig(6)">6K</div>
-                        <div class="kb-tab" id="tab-7" onclick="renderLaneConfig(7)">7K</div>
-                        <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
-                    </div>
-                    <div class="lane-cfg-box"><div id="lanes-container" class="lanes-view"></div></div>
-                    <button class="action secondary" style="margin-top:20px;" onclick="document.getElementById('hit-file').click()">🔊 HIT SOUND</button>
-                    <input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">
-                </div>
-            </div>
-            <button class="action" onclick="saveSettings()">GUARDAR</button>
+            <button class="action secondary" onclick="closeModal('profile')">CERRAR</button>
         </div>
     </div>
 
     <div id="modal-pause" class="modal-overlay">
         <div class="modal-panel login-box">
             <div class="m-title">PAUSA</div>
-            
-            <div style="font-size: 3rem; font-weight: 900; color: var(--blue); margin-bottom: 20px; text-shadow: 0 0 20px var(--blue);">
-                ACC: <span id="p-acc">100%</span>
+            <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">100%</span></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
+                <div style="color:var(--sick)">SICK: <span id="p-sick">0</span></div>
+                <div style="color:var(--good)">GOOD: <span id="p-good">0</span></div>
+                <div style="color:var(--bad)">BAD: <span id="p-bad">0</span></div>
+                <div style="color:var(--miss)">MISS: <span id="p-miss">0</span></div>
             </div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px; font-weight:bold;">
-                <div style="color:var(--sick)">SICK: <span id="p-sick" style="color:white">0</span></div>
-                <div style="color:var(--good)">GOOD: <span id="p-good" style="color:white">0</span></div>
-                <div style="color:var(--bad)">BAD: <span id="p-bad" style="color:white">0</span></div>
-                <div style="color:var(--miss)">MISS: <span id="p-miss" style="color:white">0</span></div>
-            </div>
-
             <button class="action" onclick="resumeGame()">CONTINUAR</button>
-            <button class="action secondary" onclick="toMenu()">SALIR AL MENU</button>
+            <button class="action secondary" onclick="toMenu()">SALIR</button>
         </div>
     </div>
 
@@ -399,13 +377,13 @@
         <div class="modal-panel login-box" style="width:600px;">
             <div class="m-title">RESULTADOS</div>
             <div class="res-rank" id="res-rank">S</div>
-            <div id="winner-msg" style="font-size:2rem; font-weight:900; color:var(--sick); display:none; margin-bottom:10px;">¡GANASTE!</div>
+            <div id="winner-msg" style="display:none;">¡GANASTE!</div>
             <div style="font-size:4rem; font-weight:900;" id="res-score">0</div>
-            <div style="color:#aaa; font-size:1.5rem;">ACC: <span id="res-acc" style="color:white; font-weight:bold;">100%</span></div>
-            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px; font-size:1.2rem;">+0 PP</div>
-            <div style="display:flex; justify-content:space-around; margin-top:15px; font-weight:bold;">
-                <div style="color:var(--blue); font-size:1rem;">+<span id="res-xp">0</span> XP</div>
-                <div style="color:var(--gold); font-size:1rem;">+<span id="res-sp">0</span> SP</div>
+            <div style="color:#aaa; font-size:1.5rem;">ACC: <span id="res-acc" style="color:white;">100%</span></div>
+            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px;">+0 PP</div>
+            <div style="display:flex; justify-content:space-around; margin-top:15px;">
+                <div style="color:var(--blue);">+<span id="res-xp">0</span> XP</div>
+                <div style="color:var(--gold);">+<span id="res-sp">0</span> SP</div>
             </div>
             <button class="action" onclick="toMenu()">VOLVER</button>
         </div>
