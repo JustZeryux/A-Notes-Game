@@ -1,42 +1,32 @@
-// js/globals.js
+/* === GLOBAL CONFIG & VARIABLES === */
 
-// 🔴 IMPORTANTE: PEGA AQUÍ TU CONFIGURACIÓN REAL DE FIREBASE 🔴
+// Pega aquí tu configuración REAL de Firebase
 const firebaseConfig = {
-    apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8", // <--- TU API KEY REAL
+    apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
     authDomain: "a-notes-game.firebaseapp.com",
     projectId: "a-notes-game",
-    storageBucket: "a-notes-game.appspot.com", 
+    storageBucket: "a-notes-game.appspot.com",
     messagingSenderId: "149492857447",
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
 let db = null;
-// let storage = null; // YA NO USAMOS STORAGE (Usamos Uploadcare)
+let storage = null; 
 
-// Inicialización FORZADA (Sin 'if' que bloquee)
 try {
-    if (typeof firebase !== 'undefined') {
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        } else {
-            firebase.app(); 
-        }
-        
-        db = firebase.firestore();
-        console.log("✅ Firebase Base de Datos Conectada");
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
     } else {
-        console.error("❌ La librería de Firebase no se cargó en el HTML");
+        firebase.app(); 
     }
-} catch(e) { 
-    console.error("❌ Error inicializando Firebase:", e);
-    alert("Error de conexión. Revisa la consola.");
-}
+    db = firebase.firestore();
+    // Ya no hacemos console.log aquí para limpiar la consola
+} catch(e) { console.error("Error Firebase:", e); }
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
-const CURRENT_VERSION = 100; 
+const CURRENT_VERSION = 101; 
 
-// Helpers para configuración de teclas
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
     const cols = ['#00FFFF','#12FA05','#F9393F','#FFD700','#BD00FF','#0055FF','#FF8800','#FFFFFF','#AAAAAA'];
@@ -52,13 +42,11 @@ let cfg = {
 
 let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
 
-// Variables de juego
 let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
 let ctx=null, hitBuf=null;
 let songFinished = false; 
 let curSongData = null; 
 
-// Online
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
 let onlineState = { myPick: null, oppPick: null };
 let currentChatRoom = null, chatListener = null;
