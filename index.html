@@ -3,23 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>A NOTES GAME - Global</title>
+    <title>A NOTES GAME</title>
     <link rel="icon" type="image/png" href="icon.png">
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
 
     <script>
-        // Si tienes tu propia PUBLIC KEY de Uploadcare, ponla aquí en lugar de 'demopublickey'
-        // Regístrate en uploadcare.com para obtener una gratis si quieres que los archivos duren para siempre.
         UPLOADCARE_PUBLIC_KEY = '8f24c5ced2ad35839a30'; 
         UPLOADCARE_LOCALE = 'es';
         UPLOADCARE_TABS = 'file'; 
     </script>
     <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
+
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -120,6 +118,16 @@
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     </div>
 
+    <div id="modal-finish-reg" class="modal-overlay" style="z-index: 6000;">
+        <div class="modal-panel login-box">
+            <div class="m-title">CASI LISTO</div>
+            <p style="color:#aaa; margin-bottom:20px;">Estás vinculando una nueva cuenta. Elige tu nombre de usuario único:</p>
+            <input type="text" id="reg-google-user" class="log-inp" placeholder="Nombre de Usuario">
+            <button class="action" onclick="finishGoogleRegistration()">CREAR CUENTA</button>
+            <button class="action secondary" onclick="location.reload()">CANCELAR</button>
+        </div>
+    </div>
+
     <div id="modal-song-selector" class="modal-overlay">
         <div class="modal-panel" style="width:800px; height:80vh;">
             <div class="m-title">ELIGE CANCIÓN PARA EL HOST</div>
@@ -140,7 +148,7 @@
             </div>
 
             <div style="margin-bottom:15px;">
-                <label style="font-weight:bold;">2. Título</label>
+                <label style="font-weight:bold;">2. Título (Editable)</label>
                 <input type="text" id="up-title" class="log-inp" style="text-align:left;">
             </div>
 
@@ -208,14 +216,7 @@
         <div class="modal-panel" style="width:800px;">
             <div class="m-title">TIENDA (SP)</div>
             <div style="text-align:center; margin-bottom:20px; color:var(--gold); font-size:1.5rem; font-weight:900;">TUS PUNTOS: <span id="shop-sp">0</span> SP</div>
-            <div class="shop-grid" id="shop-items">
-                <div class="shop-item">
-                    <div class="shop-icon" style="background:var(--blue)"></div>
-                    <div class="shop-name">Skin: Blue Neon</div>
-                    <div class="shop-price">1000 SP</div>
-                    <button class="btn-small btn-add" style="width:100%">COMPRAR</button>
-                </div>
-            </div>
+            <div class="shop-grid" id="shop-items"></div>
             <button class="action secondary" onclick="closeModal('shop')">CERRAR</button>
         </div>
     </div>
@@ -224,12 +225,12 @@
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES</div>
             <div class="patch-text">
-                <div class="patch-ver">VERSION GLOBAL UPDATE</div>
+                <div class="patch-ver">VERSION GLOBAL</div>
                 <ul>
-                    <li><b>BASE DE DATOS GLOBAL:</b> ¡Todas las canciones subidas son visibles para todos!</li>
-                    <li><b>SISTEMA DE HOSTING:</b> Crea salas con la canción que tú elijas.</li>
-                    <li><b>MAPEO MEJORADO:</b> Nuevo algoritmo de notas basado en energía y sin overlap.</li>
-                    <li><b>SUBIDA RÁPIDA:</b> Nuevo servidor Uploadcare para subir canciones sin errores.</li>
+                    <li><b>NOTAS CAYENDO:</b> Ahora ves las notas caer antes de que empiece la canción.</li>
+                    <li><b>OPTIMIZACIÓN:</b> Carga más rápida al reintentar canciones.</li>
+                    <li><b>LOGIN GOOGLE:</b> Ahora puedes elegir tu nombre al registrarte.</li>
+                    <li><b>GESTIÓN DE CUENTA:</b> Cambia tu nombre y vincula Google desde Ajustes.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
@@ -253,12 +254,12 @@
 
     <div id="modal-friend-profile" class="modal-overlay">
         <div class="modal-panel login-box" style="text-align:center;">
-            <div id="fp-av"></div>
+            <div id="fp-av" class="prof-av-big"></div>
             <div id="fp-name">...</div>
             <div id="fp-lvl" style="color:var(--accent); font-weight:900;">LVL ...</div>
-            <div id="fp-stats">
-                <div class="fp-stat-box">SCORE<br><span id="fp-score" style="font-size:1.5rem; color:white;">0</span></div>
-                <div class="fp-stat-box">PP<br><span id="fp-pp" style="font-size:1.5rem; color:var(--blue);">0</span></div>
+            <div id="fp-stats" style="display:flex; justify-content:center; gap:20px;">
+                <div class="fp-stat-box">SCORE<br><span id="fp-score">0</span></div>
+                <div class="fp-stat-box">PP<br><span id="fp-pp">0</span></div>
             </div>
             <div id="fp-status-text" style="color:#888; margin-bottom:15px;">...</div>
             <div class="fp-actions">
@@ -317,6 +318,15 @@
                         <input type="password" id="new-pass" class="log-inp" placeholder="Nueva contraseña">
                         <button class="action secondary" onclick="changePassword()">ACTUALIZAR</button>
                     </div>
+                    
+                    <div id="acc-mgmt-area" style="margin-top:20px; border-top:1px solid #333; padding-top:20px;">
+                        <button class="action secondary" style="border-color:var(--blue); color:var(--blue); margin-bottom:15px;" onclick="linkGoogleAccount()">VINCULAR CUENTA GOOGLE</button>
+                        
+                        <div style="color:#aaa; margin-bottom:10px;">Cambiar Nombre de Usuario</div>
+                        <input type="text" id="new-username" class="log-inp" placeholder="Nuevo Nombre" style="margin-bottom:10px;">
+                        <button class="action secondary" onclick="changeUsername()">CAMBIAR NOMBRE</button>
+                    </div>
+
                     <div id="google-acc-settings" style="display:none; color:#aaa; margin-top:20px;">Cuenta vinculada con Google.</div>
                      <button class="action secondary" style="border-color:#F9393F; color:#F9393F; margin-top:30px;" onclick="logout()">CERRAR SESIÓN</button>
                 </div>
