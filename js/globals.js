@@ -1,6 +1,5 @@
-/* === GLOBAL CONFIG & VARIABLES === */
+/* === GLOBAL CONFIG & VARIABLES (MODIFICADO) === */
 
-// Pega aquí tu configuración REAL de Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
     authDomain: "a-notes-game.firebaseapp.com",
@@ -11,7 +10,6 @@ const firebaseConfig = {
 };
 
 let db = null;
-let storage = null; 
 
 try {
     if (!firebase.apps.length) {
@@ -20,12 +18,19 @@ try {
         firebase.app(); 
     }
     db = firebase.firestore();
-    // Ya no hacemos console.log aquí para limpiar la consola
 } catch(e) { console.error("Error Firebase:", e); }
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
 const CURRENT_VERSION = 101; 
+
+// === NUEVA CONFIGURACIÓN DE TIENDA ===
+const SHOP_ITEMS = [
+    { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Notas brillantes rosas y cian', color: '#ff66aa' },
+    { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado dorado de lujo', color: '#FFD700' },
+    { id: 'skin_dark', name: 'Modo Dark', price: 1000, type: 'skin', desc: 'Estilo monocromático', color: '#444' },
+    { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista para avatar', color: '#00FFFF' }
+];
 
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
@@ -40,7 +45,12 @@ let cfg = {
     modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
 };
 
-let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
+// Aseguramos inventario vacío si no existe
+let user = { 
+    name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, 
+    songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{},
+    inventory: [], equipped: { skin: 'default', ui: 'default' }
+};
 
 let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
 let ctx=null, hitBuf=null;
