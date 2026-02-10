@@ -1,9 +1,6 @@
-/* === UI LOGIC & INTERACTION (FINAL FIX V7) === */
+/* === UI LOGIC & INTERACTION (FINAL FIX V8) === */
 
-// === HELPERS BASICOS ===
-function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
-function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
-
+// Helpers visuales
 function playHover(){ 
     if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
         try {
@@ -19,7 +16,10 @@ function playHover(){
     } 
 }
 
-// === ACTUALIZACIÓN PRINCIPAL UI ===
+// Helpers DOM seguros
+function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
+function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
+
 function updUI() {
     if(!user || !cfg) return;
 
@@ -118,7 +118,7 @@ function openSettingsMenu() {
     
     // Add custom class for width
     const panel = modal.querySelector('.modal-panel');
-    panel.classList.add('settings-panel');
+    panel.className = "modal-panel settings-panel";
     
     panel.innerHTML = `
         <div class="settings-header">
@@ -156,7 +156,7 @@ function switchSetTab(tab) {
     if (tab === 'gameplay') {
         html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
         html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad', 'spd', 10, 40);
+        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 40);
         html += renderRange('Dificultad IA', 'den', 1, 10);
         html += renderRange('Offset Global (ms)', 'off', -200, 200);
     } 
@@ -169,7 +169,9 @@ function switchSetTab(tab) {
         html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100);
         html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100);
         html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
-        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button></div>`;
+        html += renderRange('Posición Juez X', 'judgeX', 0, 100);
+        html += renderRange('Tamaño Juez', 'judgeS', 5, 20);
+        html += `<div style="margin-top:20px;"><button class="btn-small btn-add" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button></div>`;
         html += `<input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">`;
     } 
     else if (tab === 'audio') {
@@ -178,9 +180,9 @@ function switchSetTab(tab) {
         html += renderRange('Volumen Hits', 'hvol', 0, 100);
         html += renderToggle('Miss Sounds', 'missSound');
         html += renderRange('Volumen Miss', 'missVol', 0, 100);
-        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT</button></div>`;
+        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT SOUND</button></div>`;
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">`;
-        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS</button></div>`;
+        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS SOUND</button></div>`;
         html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
     else if (tab === 'controls') {
@@ -197,7 +199,6 @@ function switchSetTab(tab) {
     content.innerHTML = html;
 }
 
-// Helpers Settings
 function renderToggle(label, key) {
     const val = cfg[key];
     return `<div class="set-row"><span class="set-label">${label}</span><button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button></div>`;
@@ -315,59 +316,6 @@ function showFriendProfile(name, data) {
     }
     closeModal('friends');
     openModal('friend-profile');
-}
-
-// === SONGS & RENDER ===
-let globalSongsListener = null;
-function renderMenu(filter="") {
-    if(!db) return;
-    const grid = document.getElementById('song-grid');
-    if(!grid) return;
-
-    if(globalSongsListener) globalSongsListener(); 
-    
-    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
-        grid.innerHTML = '';
-        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666;">No hay canciones. ¡Sube una!</div>'; return; }
-        
-        snapshot.forEach(doc => {
-            const s = doc.data();
-            const songId = doc.id;
-            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
-            
-            const c = document.createElement('div'); 
-            c.className = 'beatmap-card';
-            
-            // FALLBACK COLOR LOGIC
-            let bgStyle;
-            if(s.imageURL) {
-                bgStyle = `background-image:url(${s.imageURL})`;
-            } else {
-                let hash = 0;
-                for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
-                const hue = Math.abs(hash % 360);
-                bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
-            }
-            
-            let scoreTag = '';
-            if(user.scores && user.scores[songId]) {
-                const us = user.scores[songId];
-                scoreTag = `<span class="tag rank-tag" style="color:gold">${us.rank}</span>`;
-            }
-
-            c.innerHTML = `
-                <div class="bc-bg" style="${bgStyle}"></div>
-                <div class="bc-info">
-                    <div class="bc-title">${s.title}</div>
-                    <div class="bc-meta" style="font-size:0.8rem;color:#aaa;">${s.uploader} ${scoreTag}</div>
-                </div>`;
-            c.onclick = () => { 
-                curSongData = { id: songId, ...s }; 
-                openModal('diff'); 
-            };
-            grid.appendChild(c);
-        });
-    });
 }
 
 // === UTILS ===
