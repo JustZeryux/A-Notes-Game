@@ -1,14 +1,16 @@
-/* === AUTH.JS REFACTORED === */
+/* === AUTH SYSTEM === */
 
-// Configurar persistencia para evitar que se desconecte al recargar
-firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-    .catch((error) => console.error("Error persistencia:", error));
+// Configurar persistencia para evitar desconexiones
+if(firebase.auth) {
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .catch((error) => console.error("Error persistencia:", error));
+}
 
 function checkUpdate() {
     if(!db) return;
     db.collection("system").doc("status").get().then(doc => {
         if(doc.exists && doc.data().latestVersion > CURRENT_VERSION) {
-             notifyInteractive("update_note", "¡ACTUALIZACIÓN!", "Nueva versión disponible. Por favor recarga la página.", 10000);
+             notifyInteractive("update_note", "¡ACTUALIZACIÓN!", "Nueva versión disponible. Recarga la página.", 10000);
         }
     });
 }
@@ -19,7 +21,6 @@ function loginGoogle() {
     
     firebase.auth().signInWithPopup(provider).then(async (result) => {
         const u = result.user;
-        // Limpiamos el nombre de caracteres extraños para usarlo como ID
         const cleanName = (u.displayName ? u.displayName.replace(/[^a-zA-Z0-9]/g, '') : u.email.split('@')[0]).substring(0,15);
         await handleAuthUser(cleanName, true);
     }).catch(e => notify("Error Google: " + e.message, "error"));
@@ -32,35 +33,30 @@ async function handleAuthUser(name, isGoogle) {
 
         if(doc.exists) {
             let data = doc.data();
-            // Migración de datos viejos si faltan campos
             if(data.sp === undefined) data.sp = 0;
             if(data.scores === undefined) data.scores = {};
-            
             user = {...user, ...data};
             finishLogin(name);
         } else {
-            // CREAR NUEVO USUARIO
             const newUser = {
                 name: name, 
-                pass: isGoogle ? "google-auth" : null, // Si es Google, no guardamos pass
+                pass: isGoogle ? "google-auth" : null,
                 xp:0, lvl:1, pp:0, sp:0, plays:0, score:0, 
                 friends:[], avatarData:null, 
                 online:true, 
                 lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
                 scores: {}
             };
-
-            // ESPERAR A QUE SE GUARDE ANTES DE CONTINUAR
             await docRef.set(newUser);
             await db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
             
             user = newUser;
-            notify("Cuenta creada: " + name, "success");
-            setTimeout(() => finishLogin(name), 1500); // Pequeño delay para asegurar propagación
+            notify("Bienvenido " + name, "success");
+            setTimeout(() => finishLogin(name), 1500);
         }
     } catch (e) {
         console.error(e);
-        notify("Error en base de datos: " + e.message, "error");
+        notify("Error DB: " + e.message, "error");
     }
 }
 
@@ -68,14 +64,13 @@ function login() {
     const u = document.getElementById('l-user').value.trim();
     const p = document.getElementById('l-pass').value.trim();
     
-    if(!u || !p) return notify("Ingresa usuario y contraseña", "error");
+    if(!u || !p) return notify("Ingresa datos", "error");
 
     db.collection("users").doc(u).get().then(doc => {
         if(doc.exists) {
             const data = doc.data();
-            // Verificamos contraseña O si es cuenta de Google intentando entrar normal (error)
             if(data.pass === "google-auth") {
-                notify("Esta cuenta usa Google. Usa el botón de Google.", "error");
+                notify("Usa el botón de Google", "error");
             } else if(data.pass === p) {
                 user = {...user, ...data};
                 finishLogin(u);
@@ -85,7 +80,7 @@ function login() {
         } else {
             notify("Usuario no encontrado", "error");
         }
-    }).catch(e => notify("Error de conexión", "error"));
+    }).catch(e => notify("Error conexión", "error"));
 }
 
 function register() {
@@ -93,15 +88,11 @@ function register() {
     const p = document.getElementById('l-pass').value.trim();
     
     if(!u || !p) return notify("Datos incompletos", "error");
-    // Validación básica de caracteres para el ID
-    if(/[^a-zA-Z0-9]/.test(u)) return notify("El usuario solo puede tener letras y números", "error");
+    if(/[^a-zA-Z0-9]/.test(u)) return notify("Solo letras y números", "error");
 
     db.collection("users").doc(u).get().then(doc => {
-        if(doc.exists) notify("El usuario ya existe", "error");
-        else {
-            // Pasamos contraseña manual
-            createLocalUser(u, p);
-        }
+        if(doc.exists) notify("Usuario ya existe", "error");
+        else createLocalUser(u, p);
     });
 }
 
@@ -114,27 +105,67 @@ async function createLocalUser(name, pass) {
         };
         await db.collection("users").doc(name).set(newUser);
         await db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
-        
         user = newUser;
         notify("Registrado con éxito", "success");
         setTimeout(() => finishLogin(name), 1000);
-    } catch(e) { notify("Error al registrar: " + e.message, "error"); }
+    } catch(e) { notify("Error al registrar", "error"); }
 }
 
 function finishLogin(name) {
     localStorage.setItem(LAST_KEY, name);
-    // Recargar para aplicar cambios y limpiar estados
     location.reload();
 }
 
 function logout(){ 
     if(db && user.name !== "Guest") db.collection("users").doc(user.name).update({ online: false });
     localStorage.removeItem(LAST_KEY); 
-    firebase.auth().signOut();
+    if(firebase.auth) firebase.auth().signOut();
     location.reload(); 
 }
 
-/* FUNCIONES DE DB NO TOCADAS (Ranking, UpdateScore...) MANTENERLAS IGUAL */
-function openLeaderboard() { /* ... tu código actual ... */ if(db){db.collection("leaderboard").orderBy("pp","desc").limit(50).onSnapshot(s=>{const l=document.getElementById('rank-list');l.innerHTML='';let i=1;s.forEach(d=>{const x=d.data();const tr=document.createElement('tr');if(x.name===user.name)tr.className='rank-row-me';let av='<div class="rank-av"></div>';if(x.avatarData)av=`<div class="rank-av" style="background-image:url(${x.avatarData})"></div>`;tr.innerHTML=`<td>#${i++}</td><td>${av}${x.name}</td><td style="color:var(--blue)">${x.pp}pp</td>`;l.appendChild(tr)})});openModal('rank')} }
-function updateFirebaseScore() { /* ... tu código actual ... */ if(db&&user.name!=="Guest"){db.collection("leaderboard").doc(user.name).set({name:user.name,pp:user.pp,score:user.score,lvl:user.lvl,avatarData:user.avatarData},{merge:true});db.collection("users").doc(user.name).set({name:user.name,score:user.score,pp:user.pp,lvl:user.lvl,sp:user.sp,scores:user.scores},{merge:true})} }
-function changePassword(){ /* ... tu código actual ... */ }
+function openLeaderboard() {
+    if(db) {
+        db.collection("leaderboard").orderBy("pp", "desc").limit(50)
+        .onSnapshot((querySnapshot) => {
+            const l = document.getElementById('rank-list'); l.innerHTML=''; 
+            let i = 1;
+            querySnapshot.forEach((doc) => {
+                const d = doc.data();
+                const tr = document.createElement('tr');
+                if(d.name===user.name) {
+                    tr.className='rank-row-me';
+                    document.getElementById('p-global-rank').innerText = "#" + i;
+                    if(d.pp > user.pp) { user.pp = d.pp; save(); }
+                }
+                let avHtml = '<div class="rank-av"></div>';
+                if(d.avatarData) avHtml = `<div class="rank-av" style="background-image:url(${d.avatarData})"></div>`;
+                tr.innerHTML = `<td>#${i++}</td><td>${avHtml}${d.name}</td><td style="color:var(--blue)">${d.pp}pp</td>`;
+                l.appendChild(tr);
+            });
+        });
+        openModal('rank');
+    } else {
+        notify("Firebase no configurado", "error");
+    }
+}
+
+function updateFirebaseScore() {
+    if(db && user.name !== "Guest") {
+        db.collection("leaderboard").doc(user.name).set({
+            name: user.name, pp: user.pp, score: user.score, lvl: user.lvl, avatarData: user.avatarData
+        }, { merge: true });
+        db.collection("users").doc(user.name).set({ name: user.name, score:user.score, pp:user.pp, lvl:user.lvl, sp:user.sp, scores: user.scores }, { merge: true });
+    }
+}
+
+function changePassword() {
+     const newPass = document.getElementById('new-pass').value;
+     if(!newPass || newPass.length < 4) return notify("Contraseña muy corta", "error");
+     if(user.pass === "google-auth") return notify("Cuenta de Google no permite cambio de pass", "error");
+     
+     db.collection("users").doc(user.name).update({ pass: newPass }).then(() => {
+         user.pass = newPass; save();
+         notify("Contraseña actualizada", "success");
+         document.getElementById('new-pass').value = "";
+     });
+}
