@@ -1,4 +1,4 @@
-/* === ESTILOS BASE (ULTRA UPDATE) === */
+/* === ESTILOS BASE (ULTRA UPDATE V4) === */
 @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700;900&family=Nunito:wght@700;900&display=swap');
 
 :root {
@@ -6,6 +6,7 @@
     --sick: #00FFFF; --good: #12FA05; --bad: #FFD700; --miss: #F9393F;
     --lane-width: 25%; --track-alpha: 0.1;
     --judge-y: 40%; --judge-x: 50%; --judge-s: 1; --judge-op: 1;
+    --note-op: 1;
 }
 
 * { box-sizing: border-box; user-select: none; outline: none; }
@@ -24,7 +25,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 #loading-text { font-size: 1.5rem; font-weight: 900; color: var(--accent); letter-spacing: 2px; }
 
-/* TOP BAR & PROGRESS */
+/* TOP BAR */
 #top-progress-bar { position: absolute; top: 0; left: 0; width: 100%; height: 10px; background: #111; z-index: 500; }
 #top-progress-fill { height: 100%; background: linear-gradient(90deg, var(--blue), var(--accent)); width: 0%; transition: width 0.1s linear; box-shadow: 0 0 10px var(--accent); }
 #top-progress-time { position: absolute; top: 15px; right: 20px; font-size: 1.2rem; font-weight: 900; text-shadow: 0 2px 5px black; z-index: 501; }
@@ -118,7 +119,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 #track.middle-scroll { max-width: 600px; position: absolute; left: 50%; transform: translateX(-50%); border: none; background: rgba(0,0,0, var(--track-alpha)); }
 
 .arrow-wrapper { position: absolute; width: var(--lane-width); height: 120px; display: flex; align-items: center; justify-content: center; z-index: 150; will-change: top; }
-.arrow-svg { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); position:relative; z-index:2; }
+.arrow-svg { width: 80%; height: 80%; overflow: visible; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); position:relative; z-index:2; opacity: var(--note-op); }
 .arrow-path { stroke: white; stroke-width: 5; fill-opacity: 1; paint-order: stroke; transition: filter 0.1s; }
 
 .sustain-trail { position: absolute; width: 40%; opacity: 0.7; z-index: 1; background: currentColor; box-shadow: 0 0 15px currentColor; border-radius: 6px; left: 50%; transform: translateX(-50%); }
@@ -150,6 +151,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 /* NUEVOS INDICADORES HUD */
 .hud-fc { font-size: 2.5rem; font-weight: 900; margin-bottom: 5px; text-shadow: 0 0 15px currentColor; }
 .hud-mean { font-size: 1.2rem; font-weight: bold; color: #aaa; margin-top: 5px; }
+.hud-extra { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; z-index: 400; }
 
 .health-bar { width: 16px; height: 600px; background: #222; border: 3px solid white; border-radius: 8px; position: relative; overflow: hidden; box-shadow: 0 0 30px black; }
 .health-fill { width: 100%; height: 50%; position: absolute; bottom: 0; background: linear-gradient(to top, #F00, #FF0, #0F0); transition: height 0.1s linear; box-shadow: 0 0 20px white; }
@@ -161,7 +163,7 @@ body { margin: 0; background: var(--bg-color); color: white; font-family: 'Chakr
 .modal-panel { background: #0a0a0a; border: 1px solid #333; padding: 50px; border-radius: 25px; width: 900px; max-width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 0 150px black; animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .m-title { font-size: 2.5rem; font-weight: 900; text-align: center; text-transform: uppercase; margin-bottom: 40px; letter-spacing: 3px; border-bottom: 2px solid #222; padding-bottom: 10px; color:white; }
 
-/* === NUEVO MENU DE AJUSTES (SIDEBAR LAYOUT) === */
+/* === SETTINGS MENU NUEVO (SIDEBAR LAYOUT) === */
 .settings-layout { display: flex; height: 500px; overflow: hidden; border: 1px solid #333; border-radius: 10px; background: #050505; }
 .settings-sidebar { width: 30%; background: #111; border-right: 1px solid #333; display: flex; flex-direction: column; }
 .settings-content { width: 70%; padding: 20px; overflow-y: auto; background: #080808; }
