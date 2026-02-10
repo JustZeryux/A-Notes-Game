@@ -652,11 +652,15 @@ function updHUD() {
 }
 
 // FIX: Pantalla de resultados (Bug: "al entrar")
+// ... (resto del código de game.js) ...
+
 function end(died) {
     st.act = false;
     if (st.src) try { st.src.stop() } catch (e) { }
     document.getElementById('game-layer').style.display = 'none';
-    document.getElementById('modal-res').style.display = 'flex';
+    const modal = document.getElementById('modal-res');
+    if(modal) modal.style.display = 'flex'; // Solo mostrar aquí, no antes
+    
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 0;
     
     let r = "F", c = "red";
@@ -674,7 +678,6 @@ function end(died) {
     document.getElementById('res-score').innerText = st.sc.toLocaleString();
     document.getElementById('res-acc').innerText = acc + "%";
     
-    // Si no moriste y fue score válido, guardar
     if (!died && songFinished && user.name !== "Guest" && curSongData) {
         const xpGain = Math.floor(st.sc / 250);
         user.xp += xpGain;
@@ -693,7 +696,6 @@ function end(died) {
             notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success", 5000);
         }
         
-        // Ranked PP Calculation (Simple)
         if (st.ranked) {
             const ppG = (acc > 90) ? Math.floor(st.sc / 5000) : 0;
             user.pp += ppG;
