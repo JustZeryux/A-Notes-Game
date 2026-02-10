@@ -3,26 +3,27 @@ const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
     authDomain: "a-notes-game.firebaseapp.com",
     projectId: "a-notes-game",
-    storageBucket: "a-notes-game.firebasestorage.app",
+    // ⚠️ IMPORTANTE: Si esto falla, intenta cambiar esto a: "a-notes-game.appspot.com"
+    storageBucket: "a-notes-game.firebasestorage.app", 
     messagingSenderId: "149492857447",
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
 let db = null;
-let storage = null; // Variable para Storage
+let storage = null; 
 
 try {
     if(firebaseConfig.apiKey !== "TU_API_KEY") {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        storage = firebase.storage(); // Inicialización de Storage
+        storage = firebase.storage(); 
         console.log("Firebase (DB + Storage) Conectado");
     }
 } catch(e) { console.error("Error Firebase:", e); }
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
-const CURRENT_VERSION = 95; 
+const CURRENT_VERSION = 96; 
 
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
@@ -39,20 +40,16 @@ let cfg = {
 
 let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
 
-// Variables para canciones y juego
-let ramSongs=[]; // Canciones cargadas en memoria
-let curSongData = null; // Metadatos de canción seleccionada (global o lobby)
-let keys=4, remapMode=null, remapIdx=null;
+let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
 let ctx=null, hitBuf=null;
 let songFinished = false; 
+let curSongData = null; 
 
-// ONLINE VARIABLES
+// ONLINE & LOBBY VARIABLES
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
 let onlineState = { myPick: null, oppPick: null };
 let currentChatRoom = null, chatListener = null;
 let selectedFriend = null; 
-
-// LOBBY VARIABLES
 let currentLobbyId = null;
 let isLobbyHost = false;
 let lobbyPlayers = []; 
