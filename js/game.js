@@ -1,11 +1,11 @@
-/* === AUDIO & ENGINE (SAFE START + PAUSE FIX) === */
+/* === AUDIO & ENGINE (STABLE V8 + ERROR REPORTING) === */
 
 function unlockAudio() {
     if (!st.ctx) {
         try {
             st.ctx = new (window.AudioContext || window.webkitAudioContext)();
             genHit();
-        } catch(e) { console.error("Audio error:", e); }
+        } catch(e) { console.error("Audio Context Error:", e); }
     }
     if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
 }
@@ -30,14 +30,16 @@ function playHit() {
     }
 }
 
-// === NORMALIZACIÓN ===
+// === NORMALIZACIÓN SEGURA ===
 function normalizeAudio(filteredData) {
     let max = 0;
-    for (let i = 0; i < filteredData.length; i += 10) {
+    // Muestreo rápido para evitar congelamiento
+    for (let i = 0; i < filteredData.length; i += 50) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
+    
     const multiplier = 0.95 / max;
     if (multiplier > 1.1) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
@@ -45,7 +47,7 @@ function normalizeAudio(filteredData) {
     return filteredData;
 }
 
-// === GENERADOR V7 (Patrones Completos) ===
+// === GENERADOR V7 (OPTIMIZADO PARA NO CONGELAR) ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
@@ -53,19 +55,19 @@ function genMap(buf, k) {
     const sampleRate = buf.sampleRate;
 
     const windowSize = 1024;
-    const step = Math.floor(sampleRate / 85); 
+    const step = Math.floor(sampleRate / 80); 
 
     let laneFreeTime = new Array(k).fill(0);
     let lastNoteTime = -5000;
     let lastLane = 0;
-    
-    let patternType = 0; // 0:Random, 1:StairUP, 2:StairDOWN, 3:Trill, 4:Jack
+    let patternType = 0; 
     let patternCounter = 0; 
-
     let energyHistory = [];
     const historySize = 40; 
-
-    const density = Math.max(1, Math.min(10, cfg.den));
+    
+    // Protección contra valores inválidos de dificultad
+    let safeDen = cfg.den || 5;
+    const density = Math.max(1, Math.min(10, safeDen));
     const thresholdFactor = 1.35 - (density * 0.06); 
     const minGapBase = Math.max(70, 550 - (density * 45)); 
 
@@ -124,6 +126,7 @@ function genMap(buf, k) {
                     do { lane = Math.floor(Math.random() * k); tries++; } while (lane === lastLane && tries < 5);
                 }
 
+                // Anti-Overlap simple
                 if (timeMs < laneFreeTime[lane] + 20) {
                     let found = false;
                     for (let offset = 1; offset < k; offset++) {
@@ -144,7 +147,7 @@ function genMap(buf, k) {
                 patternCounter--;
 
                 // Acordes
-                if ((k >= 4 && cfg.den >= 6) && instantEnergy > localAvg * 2.2) {
+                if ((k >= 4 && density >= 6) && instantEnergy > localAvg * 2.2) {
                     for (let l = 0; l < k; l++) {
                         if (Math.abs(l - lane) > 1 && timeMs >= laneFreeTime[l] + 20) {
                             map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
@@ -186,22 +189,27 @@ function initReceptors(k) {
     }
 }
 
-// === CARGA Y GESTIÓN DE ERRORES ===
+// === CARGA Y GESTIÓN DE ERRORES (IMPORTANTE) ===
 async function prepareAndPlaySong(k) {
-    if (!curSongData) return notify("Selecciona una canción", "error");
+    if (!curSongData) return notify("Error: No hay canción seleccionada", "error");
 
     let songInRam = ramSongs.find(s => s.id === curSongData.id);
     document.getElementById('loading-overlay').style.display = 'flex';
-    document.getElementById('loading-text').innerText = "Cargando...";
+    document.getElementById('loading-text').innerText = "Descargando...";
 
     if (!songInRam) {
         try {
             unlockAudio();
             const response = await fetch(curSongData.audioURL);
-            if(!response.ok) throw new Error("Error red");
+            if(!response.ok) throw new Error("Error HTTP: " + response.status);
             
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
+            
+            document.getElementById('loading-text').innerText = "Generando mapa...";
+            // Usamos setTimeout para dar tiempo al UI de actualizarse antes de congelar con genMap
+            await new Promise(r => setTimeout(r, 50)); 
+            
             const map = genMap(audioBuffer, k);
             
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map, kVersion: k };
@@ -212,10 +220,12 @@ async function prepareAndPlaySong(k) {
             console.error(e);
             notify("Error cargando canción: " + e.message, "error");
             document.getElementById('loading-overlay').style.display = 'none';
-            return;
+            return; // AQUÍ DETENEMOS SI HAY ERROR
         }
     } else {
         if (songInRam.kVersion !== k) {
+            document.getElementById('loading-text').innerText = "Regenerando mapa...";
+            await new Promise(r => setTimeout(r, 50));
             songInRam.map = genMap(songInRam.buf, k);
             songInRam.kVersion = k;
         }
@@ -252,10 +262,9 @@ function playSongInternal(s) {
         const cd = document.getElementById('countdown');
         let c = 3; cd.innerHTML = c;
 
-        // ACTIVAMOS EL JUEGO INMEDIATAMENTE PARA QUE CAIGAN LAS NOTAS
         st.startTime = performance.now() + 3000;
         st.t0 = null;
-        st.act = true; // IMPORTANTE: Esto permite que togglePause funcione
+        st.act = true; // Activo inmediatamente para permitir Pausa
         st.paused = false;
 
         requestAnimationFrame(loop);
@@ -287,7 +296,7 @@ function playSongInternal(s) {
         }, 1000);
     } catch(e) {
         console.error("Play error:", e);
-        notify("Error al iniciar juego", "error");
+        notify("Error fatal al iniciar juego", "error");
         toMenu();
     }
 }
@@ -372,24 +381,22 @@ function loop() {
     if (!st.paused) requestAnimationFrame(loop);
 }
 
-// === PAUSA ARREGLADA ===
+// === FIX DE PAUSA (FORZADO) ===
 function togglePause() {
-    // Permitir pausa si hay notas, incluso si st.act es dudoso, para debugging
-    if (!st.act && st.notes.length === 0) return;
+    // Si no ha empezado el juego, no hacemos nada
+    if (!st.act && st.spawned.length === 0) return;
     
     st.paused = !st.paused;
     
     if (st.paused) {
         st.lastPause = performance.now();
-        
-        // 1. Mostrar menú visual PRIMERO
+        // Mostrar UI visualmente antes de tocar el audio
         document.getElementById('modal-pause').style.display = 'flex';
         document.getElementById('p-sick').innerText = st.stats.s;
         document.getElementById('p-good').innerText = st.stats.g;
         document.getElementById('p-bad').innerText = st.stats.b;
         document.getElementById('p-miss').innerText = st.stats.m;
         
-        // 2. Suspender audio después (si falla no bloquea la UI)
         if (st.ctx && st.ctx.state === 'running') {
             st.ctx.suspend().catch(e => console.warn(e));
         }
@@ -401,7 +408,6 @@ function togglePause() {
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
     if (st.ctx) st.ctx.resume().catch(e => console.warn(e));
-    
     if (st.lastPause) {
         const dur = performance.now() - st.lastPause;
         st.startTime += dur;
@@ -427,16 +433,18 @@ function onKd(e) {
         return;
     }
 
-    if (!e.repeat) {
-        // Safe check
-        const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== undefined && idx !== -1) hit(idx, true);
+    if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
+        // Fix de seguridad por si keys no coincide
+        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
+        if (idx !== -1) hit(idx, true);
     }
 }
 
 function onKu(e) {
-    const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
-    if (idx !== undefined && idx !== -1) hit(idx, false);
+    if(cfg && cfg.modes && cfg.modes[keys]) {
+        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
+        if (idx !== -1) hit(idx, false);
+    }
 }
 
 function hit(l, p) {
