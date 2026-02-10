@@ -8,9 +8,6 @@ const firebaseConfig = {
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
-let db = null;
-let storage = null; // No usado con Uploadcare, pero definido para evitar crash
-
 try {
     if(firebaseConfig.apiKey !== "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8") {
         firebase.initializeApp(firebaseConfig);
