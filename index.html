@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta property="og:site_name" content="A Notes Game">
-    <title>A Notes Game</title>
+    <title>A NOTES GAME</title>
     <link rel="icon" type="image/png" href="icon.png">
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -18,14 +17,7 @@
         UPLOADCARE_TABS = 'file'; 
     </script>
     <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": "A Notes Game",
-  "url": "https://a-notes-game.pages.dev/"
-}
-</script>
+
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -100,8 +92,12 @@
             <div id="ig-name" style="color:white;">User</div>
         </div>
 
-        <div id="hud-mean-ms" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); font-weight:bold; color:#aaa; font-size:1.2rem; text-shadow:0 0 5px black;">0.00ms</div>
-        <div id="hud-fc-status" style="position:absolute; bottom:50px; left:50%; transform:translateX(-50%); font-weight:900; color:var(--gold); font-size:1.5rem; text-shadow:0 0 10px var(--gold); letter-spacing:3px;">GFC</div>
+        <div id="combo-container">
+            <div class="combo-label">COMBO</div>
+            <div id="g-combo" class="combo-val">0</div>
+            <div id="hud-fc" class="hud-fc">GFC</div>
+            <div id="hud-mean" class="hud-mean">0.00ms</div>
+        </div>
 
         <div id="track"></div>
 
@@ -119,10 +115,6 @@
 
                 <div class="score-label">SCORE</div>
                 <div class="score-val" id="g-score">0</div>
-                <div id="g-combo-box" style="margin-top:20px; text-align:right;">
-                    <div style="font-size:0.8rem; color:#888; font-weight:bold;">COMBO</div>
-                    <div id="g-combo" class="combo-val-hud">0</div>
-                </div>
             </div>
             
             <div class="health-bar"><div class="health-fill" id="health-fill"></div></div>
@@ -132,67 +124,50 @@
     </div>
 
     <div id="modal-settings" class="modal-overlay">
-        <div class="modal-panel" style="width:900px; display:flex; padding:0; overflow:hidden; height:600px;">
-            <div class="settings-sidebar">
-                <div class="set-cat active" onclick="switchSetTab('gameplay')">🎮 GAMEPLAY</div>
-                <div class="set-cat" onclick="switchSetTab('visuals')">🎨 VISUALS</div>
-                <div class="set-cat" onclick="switchSetTab('audio')">🔊 AUDIO</div>
-                <div class="set-cat" onclick="switchSetTab('controls')">⌨️ CONTROLS</div>
-                <div class="set-cat" onclick="switchSetTab('advanced')">🛠️ ADVANCED</div>
+        <div class="modal-panel settings-panel">
+            </div>
+    </div>
+
+    <div id="modal-diff" class="modal-overlay">
+        <div class="modal-panel" style="width:1000px;">
+            <div class="m-title">SELECCIONA MODO</div>
+            
+            <div id="diff-song-cover" style="width:200px; height:200px; background:#333; margin:0 auto 20px; border-radius:15px; background-size:cover; background-position:center; border:3px solid var(--accent); box-shadow:0 0 40px rgba(255,102,170,0.2);"></div>
+            <div id="diff-song-title" style="text-align:center; font-size:2rem; font-weight:900; margin-bottom:30px; color:white;">...</div>
+
+            <div class="diff-grid">
+                <div class="diff-card" onclick="startGame(4)" style="color:#00FFFF; border-color:#00FFFF;">
+                    <div class="diff-bg-icon">4K</div>
+                    <div class="diff-num">4K</div>
+                    <div class="diff-label">EASY</div>
+                </div>
+                <div class="diff-card" onclick="startGame(6)" style="color:#12FA05; border-color:#12FA05;">
+                    <div class="diff-bg-icon">6K</div>
+                    <div class="diff-num">6K</div>
+                    <div class="diff-label">NORMAL</div>
+                </div>
+                <div class="diff-card" onclick="startGame(7)" style="color:#FFD700; border-color:#FFD700;">
+                    <div class="diff-bg-icon">7K</div>
+                    <div class="diff-num">7K</div>
+                    <div class="diff-label">INSANE</div>
+                </div>
+                <div class="diff-card" onclick="startGame(9)" style="color:#F9393F; border-color:#F9393F;">
+                    <div class="diff-bg-icon">9K</div>
+                    <div class="diff-num">9K</div>
+                    <div class="diff-label">DEMON</div>
+                </div>
             </div>
             
-            <div class="settings-content">
-                <div class="m-title" style="font-size:1.8rem; margin-bottom:20px;">CONFIGURACIÓN</div>
-                
-                <div id="set-tab-gameplay" class="set-page">
-                    <div class="set-row"><span>Velocidad (Scroll Speed)</span><input type="range" id="set-spd" min="10" max="40" step="1"><span id="val-spd">22</span></div>
-                    <div class="set-row"><span>Downscroll</span><input type="checkbox" id="set-down"></div>
-                    <div class="set-row"><span>Middlescroll (Centrado)</span><input type="checkbox" id="set-middle"></div>
-                    <div class="set-row"><span>Offset Global (ms)</span><input type="number" id="set-off" class="num-inp"></div>
-                    <div class="set-row"><span>Dificultad IA (Random)</span><input type="range" id="set-den" min="1" max="10"></div>
-                </div>
-
-                <div id="set-tab-visuals" class="set-page" style="display:none;">
-                    <div class="set-row"><span>Vivid Lights</span><input type="checkbox" id="set-vivid"></div>
-                    <div class="set-row"><span>Screen Shake</span><input type="checkbox" id="set-shake"></div>
-                    <div class="set-row"><span>Ocultar Score/HUD</span><input type="checkbox" id="set-hide-hud"></div>
-                    <div class="set-row"><span>Opacidad Carril (%)</span><input type="range" id="set-track-op" min="0" max="100"><span id="val-track-op">10</span></div>
-                    <div class="set-row"><span>Opacidad Notas (Hold)</span><input type="range" id="set-note-op" min="10" max="100"><span id="val-note-op">100</span></div>
-                    <button class="action secondary" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button>
-                    <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">
-                </div>
-
-                <div id="set-tab-audio" class="set-page" style="display:none;">
-                    <div class="set-row"><span>Volumen Música</span><input type="range" id="set-vol" min="0" max="100"></div>
-                    <div class="set-row"><span>Activar Hit Sounds</span><input type="checkbox" id="set-hit-sound"></div>
-                    <div class="set-row"><span>Volumen Hits</span><input type="range" id="set-hvol" min="0" max="100"></div>
-                    <div class="set-row"><span>Activar Miss Sounds</span><input type="checkbox" id="set-miss-sound"></div>
-                    <div class="set-row"><span>Volumen Miss</span><input type="range" id="set-miss-vol" min="0" max="100"></div>
-                    <button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT SOUND</button>
-                    <input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">
-                    <button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS SOUND</button>
-                    <input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">
-                </div>
-
-                <div id="set-tab-controls" class="set-page" style="display:none;">
-                    <div class="kb-tabs">
-                        <div class="kb-tab active" id="tab-4" onclick="renderLaneConfig(4)">4K</div>
-                        <div class="kb-tab" id="tab-6" onclick="renderLaneConfig(6)">6K</div>
-                        <div class="kb-tab" id="tab-7" onclick="renderLaneConfig(7)">7K</div>
-                        <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
-                    </div>
-                    <div class="lane-cfg-box"><div id="lanes-container" class="lanes-view"></div></div>
-                </div>
-
-                <div id="set-tab-advanced" class="set-page" style="display:none;">
-                    <div class="set-row"><span>Mostrar Latencia (MS)</span><input type="checkbox" id="set-show-ms"></div>
-                    <div class="set-row"><span>Mostrar Promedio (Mean)</span><input type="checkbox" id="set-show-mean"></div>
-                    <div class="set-row"><span>Pos. Juez Y</span><input type="range" id="set-judge-y" min="10" max="90"></div>
-                    <div class="set-row"><span>Ver Juez</span><input type="checkbox" id="set-judge-vis"></div>
-                </div>
-
-                <button class="action" style="margin-top:20px;" onclick="saveSettings()">GUARDAR Y SALIR</button>
+            <div class="ranked-toggle">
+                <input type="checkbox" id="chk-ranked">
+                <label for="chk-ranked" style="margin-left:10px; color:var(--accent);">RANKED MODE (GANA PP)</label>
             </div>
+            
+            <div id="create-lobby-opts" style="display:none; margin-top:20px;">
+                <button class="action" onclick="confirmCreateLobby()">CREAR SALA ONLINE</button>
+            </div>
+
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('diff')">CANCELAR</button>
         </div>
     </div>
 
@@ -222,23 +197,6 @@
             <div id="upload-status" style="margin-bottom:10px;"></div>
             <button class="action" onclick="startGlobalUpload()" id="btn-upload-start">☁️ PUBLICAR</button>
             <button class="action secondary" onclick="closeModal('upload')">CANCELAR</button>
-        </div>
-    </div>
-
-    <div id="modal-diff" class="modal-overlay">
-        <div class="modal-panel" style="width:850px;">
-            <div class="m-title">SELECCIONA MODO</div>
-            <div id="diff-song-cover" class="cover-display"></div>
-            <div id="diff-song-title" style="text-align:center; font-size:2rem; font-weight:900; margin-bottom:20px;">...</div>
-            <div class="diff-grid">
-                <div class="diff-card" onclick="startGame(4)" style="color:#00FFFF">4K</div>
-                <div class="diff-card" onclick="startGame(6)" style="color:#12FA05">6K</div>
-                <div class="diff-card" onclick="startGame(7)" style="color:#FFD700">7K</div>
-                <div class="diff-card" onclick="startGame(9)" style="color:#F9393F">9K</div>
-            </div>
-            <div class="ranked-toggle"><input type="checkbox" id="chk-ranked"><label for="chk-ranked">RANKED MODE</label></div>
-            <div id="create-lobby-opts" style="display:none; margin-top:20px;"><button class="action" onclick="confirmCreateLobby()">CREAR SALA</button></div>
-            <button class="action secondary" onclick="closeModal('diff')">CANCELAR</button>
         </div>
     </div>
 
@@ -278,10 +236,9 @@
             <div class="m-title">NOVEDADES ULTRA</div>
             <div class="patch-text">
                 <ul>
-                    <li><b>HOLD NOTES COMPLEX:</b> ¡Ahora debes mantener presionado! Soltar antes rompe el combo.</li>
-                    <li><b>MEAN MS & FC:</b> Nuevos indicadores para calibración y perfección.</li>
-                    <li><b>MIDDLESCROLL:</b> Opción para centrar las notas.</li>
-                    <li><b>AJUSTES PRO:</b> Nuevo menú organizado por categorías.</li>
+                    <li><b>UI REMASTER:</b> Nuevo selector de modo, menú de ajustes y HUD.</li>
+                    <li><b>HOLD NOTES:</b> Lógica de notas largas mejorada.</li>
+                    <li><b>INDICADORES:</b> Mean MS y Full Combo status en vivo.</li>
                 </ul>
             </div>
             <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
