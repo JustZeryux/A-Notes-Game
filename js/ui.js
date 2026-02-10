@@ -327,9 +327,18 @@ function autoFillTitle(input) {
     }
 }
 
-// === SUBIDA GLOBAL ROBUSTA ===
+// === HELPER PARA SUBIR ARCHIVOS A UPLOADCARE ===
+function uploadFileToUC(file) {
+    return new Promise((resolve, reject) => {
+        const u = uploadcare.fileFrom('object', file);
+        u.done(info => resolve(info.cdnUrl))
+         .fail(err => reject(err));
+    });
+}
+
+// === SUBIDA GLOBAL CON UPLOADCARE ===
 async function startGlobalUpload() {
-    if(!storage || !db) return notify("Error de conexión a Firebase", "error");
+    if(!db) return notify("Error DB", "error");
 
     const titleInp = document.getElementById('up-title');
     const audioInp = document.getElementById('up-audio');
@@ -341,37 +350,27 @@ async function startGlobalUpload() {
     const audioFile = audioInp.files[0];
     const imageFile = imageInp.files[0];
 
-    if(!title || !audioFile) return notify("Título y Audio obligatorios", "error");
-    if(audioFile.size > 15 * 1024 * 1024) return notify("Audio máximo 15MB", "error");
-    
+    if(!title || !audioFile) return notify("Audio y título requeridos", "error");
+
     btn.disabled = true;
-    btn.innerText = "SUBIENDO...";
-    status.innerText = "Iniciando subida...";
+    btn.innerText = "PROCESANDO...";
+    status.innerText = "Subiendo a Uploadcare...";
 
     try {
-        const songId = db.collection("globalSongs").doc().id;
-        let imageURL = null;
-
-        // SUBIDA AUDIO
-        status.innerText = "Subiendo audio... (Revisa consola si se atora)";
-        console.log("Iniciando subida de audio:", audioFile.name);
+        // 1. Subir Audio
+        const audioURL = await uploadFileToUC(audioFile);
         
-        const audioRef = storage.ref(`songs/audio/${songId}_${audioFile.name}`);
-        const audioSnapshot = await audioRef.put(audioFile);
-        console.log("Audio subido, obteniendo URL...");
-        const audioURL = await audioSnapshot.ref.getDownloadURL();
-
-        // SUBIDA IMAGEN
+        // 2. Subir Imagen (si hay)
+        let imageURL = null;
         if(imageFile) {
-            status.innerText = "Subiendo imagen...";
-            console.log("Iniciando subida de imagen:", imageFile.name);
-            const imageRef = storage.ref(`songs/images/${songId}_${imageFile.name}`);
-            const imgSnapshot = await imageRef.put(imageFile);
-            imageURL = await imgSnapshot.ref.getDownloadURL();
+            status.innerText = "Subiendo portada...";
+            imageURL = await uploadFileToUC(imageFile);
         }
 
-        // GUARDADO DB
-        status.innerText = "Guardando metadatos...";
+        // 3. Guardar en Firestore
+        status.innerText = "Guardando...";
+        const songId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+        
         await db.collection("globalSongs").doc(songId).set({
             title: title,
             uploader: user.name === "Guest" ? "Anónimo" : user.name,
@@ -380,21 +379,17 @@ async function startGlobalUpload() {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        notify("¡Subida exitosa!", "success");
+        notify("¡Subida Completa!", "success");
         closeModal('upload');
         titleInp.value = ""; audioInp.value = ""; imageInp.value = "";
     } catch(e) {
-        console.error("Error detallado de subida:", e);
-        notify("Error subida: " + e.code, "error");
-        status.innerText = "Error: " + e.message;
-        
-        // Si el error es sobre "Bucket" o "CORS"
-        if(e.code === "storage/retry-limit-exceeded" || e.code === "storage/unknown") {
-            alert("Error de conexión con Storage. Verifica tu 'storageBucket' en globals.js");
-        }
+        console.error(e);
+        notify("Error Uploadcare: " + e, "error");
+        status.innerText = "Error.";
     } finally {
         btn.disabled = false;
         btn.innerText = "☁️ PUBLICAR AHORA";
+        status.innerText = "";
     }
 }
 
