@@ -26,29 +26,29 @@ function notify(msg, type="info", duration=4000) {
     }, duration);
 }
 
-function updateGlobalRank() {
-    if(!db || user.name === "Guest") return;
-    // Solo contar jugadores con PP > 0 para optimizar
-    db.collection("leaderboard").orderBy("pp", "desc").get().then(snap => {
-        let rank = "#--";
-        let found = false;
-        snap.docs.forEach((doc, index) => {
-            if(doc.id === user.name) {
-                rank = "#" + (index + 1);
-                found = true;
-            }
-        });
-        if(found) setText('p-global-rank', rank);
-    }).catch(e => console.log("Rank update limit", e));
+function playHover(){ 
+    if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
+        try {
+            const o=st.ctx.createOscillator(); 
+            const g=st.ctx.createGain(); 
+            o.frequency.value=600; 
+            g.gain.value=0.05; 
+            o.connect(g); 
+            g.connect(st.ctx.destination); 
+            o.start(); 
+            o.stop(st.ctx.currentTime+0.05); 
+        } catch(e){}
+    } 
 }
 
-// Helpers DOM
 function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
 function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
 
+// === 2. UPDATE UI (CORE) ===
 function updUI() {
     if(!user || !cfg) return;
 
+    // Checks
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
@@ -78,18 +78,13 @@ function updUI() {
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
         setStyle('p-av-big', 'backgroundImage', url); setStyle('ig-av', 'backgroundImage', url);
     }
-    
-    // Llamar rank solo si no está seteado
-    if(document.getElementById('p-global-rank').innerText === "#--") updateGlobalRank();
+    if(user.bg) { 
+        const bg = document.getElementById('bg-image');
+        if(bg) { bg.src = user.bg; bg.style.opacity = 0.3; }
+    }
 
     applyCfg();
 
-    const isGoogle = user.pass === "google-auth";
-    const locSet = document.getElementById('local-acc-settings');
-    const gooSet = document.getElementById('google-acc-settings');
-    if(locSet) locSet.style.display = isGoogle ? 'none' : 'block';
-    if(gooSet) gooSet.style.display = isGoogle ? 'block' : 'none';
-}
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
