@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (STABLE V8 + ERROR REPORTING + FIX PAUSE/LOAD) === */
+/* === AUDIO & ENGINE (MEJORADO V9 - ANTI SPAM & BETTER FLOW) === */
 
 function unlockAudio() {
     if (!st.ctx) {
@@ -32,119 +32,147 @@ function playHit() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
-    for (let i = 0; i < filteredData.length; i += 50) { 
+    // Muestreo optimizado
+    for (let i = 0; i < filteredData.length; i += 100) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
     const multiplier = 0.95 / max;
-    if (multiplier > 1.1) {
+    // Solo normalizar si está muy bajo o muy saturado
+    if (multiplier > 1.1 || multiplier < 0.9) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
     }
     return filteredData;
 }
 
+// === GENERADOR DE MAPAS INTELIGENTE ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
 
+    // Configuración de dificultad basada en el slider (1 a 10)
+    let density = cfg.den || 5; 
+    
+    // Parámetros de Ventana y Energía
     const windowSize = 1024;
-    const step = Math.floor(sampleRate / 80); 
-
-    let laneFreeTime = new Array(k).fill(0);
+    const step = Math.floor(sampleRate / (40 + (density * 5))); // Más densidad = pasos más cortos
+    
+    // Variables de Estado del Algoritmo
+    let laneFreeTime = new Array(k).fill(0); // Para evitar superposiciones
     let lastNoteTime = -5000;
     let lastLane = 0;
-    let patternType = 0; 
-    let patternCounter = 0; 
-    let energyHistory = [];
-    const historySize = 40; 
+    let consecutiveInLane = 0; // Contador anti-spam de carril
     
-    let safeDen = cfg.den || 5;
-    const density = Math.max(1, Math.min(10, safeDen));
-    const thresholdFactor = 1.35 - (density * 0.06); 
-    const minGapBase = Math.max(70, 550 - (density * 45)); 
+    // Historial de Energía para detectar picos relativos
+    let energyHistory = [];
+    const historySize = 44100 / step; // ~1 segundo de historia
+
+    // Umbrales dinámicos
+    const thresholdBase = 1.4 - (density * 0.04); // Dificultad alta = umbral más bajo
+    const minGap = Math.max(80, 400 - (density * 30)); // Tiempo mínimo entre notas (ms)
 
     for (let i = 0; i < data.length - windowSize; i += step) {
+        // 1. Calcular Energía Instantánea (RMS)
         let sum = 0;
         for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
         const instantEnergy = Math.sqrt(sum / windowSize);
 
+        // Actualizar promedio local
         energyHistory.push(instantEnergy);
         if (energyHistory.length > historySize) energyHistory.shift();
-        
-        let localAvg = 0;
-        for(let e of energyHistory) localAvg += e;
-        localAvg /= energyHistory.length;
+        let localAvg = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
 
+        // Convertir índice a milisegundos
         const timeMs = (i / sampleRate) * 1000;
 
-        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.02) {
+        // 2. Detección de Beat
+        // El beat ocurre si la energía instantánea supera al promedio local * factor
+        if (instantEnergy > localAvg * thresholdBase && instantEnergy > 0.05) {
             
-            let currentGap = minGapBase;
-            if (instantEnergy > localAvg * 1.8) currentGap *= 0.6; 
-            if (instantEnergy > localAvg * 2.5) currentGap *= 0.5; 
-
-            if (timeMs - lastNoteTime >= currentGap) {
-                if (patternCounter <= 0 || Math.random() > 0.9) {
-                    const r = Math.random();
-                    if (r < 0.30) patternType = 0; 
-                    else if (r < 0.50) patternType = 1; 
-                    else if (r < 0.70) patternType = 2; 
-                    else if (r < 0.90) patternType = 3; 
-                    else patternType = 4; 
-                    patternCounter = Math.floor(Math.random() * 5) + 4; 
+            // Control de tiempo (MinGap)
+            if (timeMs - lastNoteTime >= minGap) {
+                
+                // === LÓGICA DE SELECCIÓN DE CARRIL ===
+                let lane = Math.floor(Math.random() * k);
+                
+                // A. Anti-Jackhammer (Evitar más de 2 notas seguidas en el mismo carril)
+                if (lane === lastLane) {
+                    consecutiveInLane++;
+                    if (consecutiveInLane >= 2) {
+                        // Forzar cambio de carril
+                        lane = (lane + 1 + Math.floor(Math.random() * (k - 1))) % k;
+                        consecutiveInLane = 0;
+                    }
+                } else {
+                    consecutiveInLane = 0;
                 }
 
+                // B. Patrones de Flujo (Escaleras/Trinos)
+                // Si la dificultad es alta, a veces forzamos patrones
+                if (density > 5 && Math.random() > 0.7) {
+                    lane = (lastLane + 1) % k; // Escalera simple
+                }
+
+                // === LÓGICA DE HOLD NOTES (NOTAS LARGAS) ===
                 let type = 'tap';
                 let len = 0;
-                if (instantEnergy > localAvg * 1.4 && currentGap > 100) {
-                    if (Math.random() > 0.65) { 
-                        type = 'hold';
-                        len = Math.min(1000, Math.random() * 400 + 150);
+                
+                // Si la energía se mantiene alta por un periodo, es un Hold
+                // Bajamos el requisito para que salgan más holds
+                if (instantEnergy > localAvg * 1.2 && timeMs > 5000) { 
+                    // Verificar si el sonido se mantiene fuerte en el futuro cercano
+                    let futureIndex = i + (step * 4);
+                    if (futureIndex < data.length && Math.abs(data[futureIndex]) > localAvg * 0.8) {
+                        if (Math.random() > 0.4) { // 60% chance de hold si hay energía
+                            type = 'hold';
+                            // Duración basada en dificultad y aleatoriedad
+                            len = Math.min(1500, Math.max(200, Math.random() * 600)); 
+                        }
                     }
                 }
 
-                let lane = 0;
-                if (patternType === 1) lane = (lastLane + 1) % k;
-                else if (patternType === 2) lane = (lastLane - 1 + k) % k;
-                else if (patternType === 3) {
-                    if (k === 4) lane = (lastLane === 0 ? 1 : (lastLane === 1 ? 0 : (lastLane === 2 ? 3 : 2)));
-                    else lane = (lastLane + 2) % k;
-                } else if (patternType === 4) {
-                    lane = lastLane; 
-                    if(Math.random() > 0.7) lane = (lastLane + 1) % k;
-                } else {
-                    let tries = 0;
-                    do { lane = Math.floor(Math.random() * k); tries++; } while (lane === lastLane && tries < 5);
-                }
-
+                // Verificar colisión con notas existentes
                 if (timeMs < laneFreeTime[lane] + 20) {
+                    // Buscar carril libre
                     let found = false;
-                    for (let offset = 1; offset < k; offset++) {
-                        let tryLane = (lane + offset) % k;
-                        if (timeMs >= laneFreeTime[tryLane] + 20) {
-                            lane = tryLane;
+                    for (let tryL = 0; tryL < k; tryL++) {
+                        if (timeMs >= laneFreeTime[tryL] + 20) {
+                            lane = tryL;
                             found = true;
                             break;
                         }
                     }
-                    if (!found) continue; 
+                    if (!found) continue; // Si no hay sitio, saltar nota
                 }
 
+                // Registrar nota principal
                 map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
-                laneFreeTime[lane] = timeMs + len; 
+                laneFreeTime[lane] = timeMs + len + 20; // Reservar carril
                 lastNoteTime = timeMs;
                 lastLane = lane;
-                patternCounter--;
 
-                if ((k >= 4 && density >= 6) && instantEnergy > localAvg * 2.2) {
-                    for (let l = 0; l < k; l++) {
-                        if (Math.abs(l - lane) > 1 && timeMs >= laneFreeTime[l] + 20) {
-                            map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
-                            laneFreeTime[l] = timeMs;
-                            break; 
+                // === LÓGICA DE ACORDES (CHORDS) ===
+                // Solo permitimos acordes si la dificultad es > 3 y la energía es muy alta
+                if (density >= 4 && instantEnergy > localAvg * 1.8) {
+                    // Máximo 1 nota extra (Doble) para evitar spam masivo de 4 notas
+                    // Solo triples si es dificultad máxima (9 o 10)
+                    let maxExtra = (density >= 9 && instantEnergy > localAvg * 2.5) ? 2 : 1;
+                    
+                    let extrasAdded = 0;
+                    for (let offset = 1; offset < k; offset++) {
+                        if (extrasAdded >= maxExtra) break;
+                        
+                        let chordLane = (lane + offset) % k;
+                        // Evitar carriles adyacentes en dificultades bajas para legibilidad
+                        if (density < 6 && Math.abs(chordLane - lane) === 1) continue;
+
+                        if (timeMs >= laneFreeTime[chordLane] + 20) {
+                            map.push({ t: timeMs, l: chordLane, type: 'tap', len: 0, h: false });
+                            laneFreeTime[chordLane] = timeMs + 20;
+                            extrasAdded++;
                         }
                     }
                 }
@@ -181,7 +209,7 @@ function initReceptors(k) {
     }
 }
 
-// === CARGA Y GESTIÓN DE ERRORES (IMPORTANTE) ===
+// === CARGA Y GESTIÓN DE ERRORES ===
 async function prepareAndPlaySong(k) {
     if (!curSongData) return notify("Error: No hay canción seleccionada", "error");
 
