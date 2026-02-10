@@ -606,24 +606,24 @@ function end(died) {
 function toMenu() { location.reload(); }
 function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
 
+/* === GAME LOGIC (HUD & RESULTS FIX) === */
+
 function updHUD() {
-    // Score
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
     
-    // COMBO GIGANTE Y FC (Nuevo sistema)
+    // COMBO GIGANTE
     const comboEl = document.getElementById('g-combo');
-    if(comboEl) {
-        if (st.cmb > 0) {
-            comboEl.innerText = st.cmb;
-            comboEl.style.opacity = '1';
-            comboEl.classList.remove('pulse'); 
-            void comboEl.offsetWidth; 
-            comboEl.classList.add('pulse');
-        } else {
-            comboEl.style.opacity = '0';
-        }
+    if (st.cmb > 0) {
+        comboEl.innerText = st.cmb;
+        comboEl.style.opacity = '1';
+        comboEl.classList.remove('pulse'); 
+        void comboEl.offsetWidth; 
+        comboEl.classList.add('pulse');
+    } else {
+        comboEl.style.opacity = '0';
     }
 
+    // FC STATUS
     const fcEl = document.getElementById('hud-fc');
     if(fcEl && st.fcStatus) {
         fcEl.innerText = cfg.showFC ? st.fcStatus : "";
@@ -641,7 +641,6 @@ function updHUD() {
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
     document.getElementById('g-acc').innerText = acc + "%";
     
-    // Stats de la izquierda
     document.getElementById('h-sick').innerText = st.stats.s;
     document.getElementById('h-good').innerText = st.stats.g;
     document.getElementById('h-bad').innerText = st.stats.b;
@@ -652,15 +651,63 @@ function updHUD() {
     if (isMultiplayer) sendLobbyScore(st.sc);
 }
 
-    const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
-    document.getElementById('g-acc').innerText = acc + "%";
+// FIX: Pantalla de resultados (Bug: "al entrar")
+function end(died) {
+    st.act = false;
+    if (st.src) try { st.src.stop() } catch (e) { }
+    document.getElementById('game-layer').style.display = 'none';
+    document.getElementById('modal-res').style.display = 'flex';
+    const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 0;
     
-    document.getElementById('h-sick').innerText = st.stats.s;
-    document.getElementById('h-good').innerText = st.stats.g;
-    document.getElementById('h-bad').innerText = st.stats.b;
-    document.getElementById('h-miss').innerText = st.stats.m;
+    let r = "F", c = "red";
+    if (!died) {
+        if (acc === 100) { r = "SS"; c = "cyan" }
+        else if (acc >= 95) { r = "S"; c = "gold" }
+        else if (acc >= 90) { r = "A"; c = "lime" }
+        else if (acc >= 80) { r = "B"; c = "yellow" }
+        else if (acc >= 70) { r = "C"; c = "orange" }
+        else { r = "D"; c = "red" }
+    }
     
-    document.getElementById('health-fill').style.height = st.hp + '%';
+    document.getElementById('res-rank').innerText = r;
+    document.getElementById('res-rank').style.color = c;
+    document.getElementById('res-score').innerText = st.sc.toLocaleString();
+    document.getElementById('res-acc').innerText = acc + "%";
     
-    if (isMultiplayer) sendLobbyScore(st.sc);
+    // Si no moriste y fue score válido, guardar
+    if (!died && songFinished && user.name !== "Guest" && curSongData) {
+        const xpGain = Math.floor(st.sc / 250);
+        user.xp += xpGain;
+        const spGain = Math.floor(st.sc / 1000);
+        user.sp = (user.sp || 0) + spGain;
+        user.score += st.sc;
+        user.plays++;
+        
+        let xpReq = 1000 * Math.pow(user.lvl >= 10 ? 1.02 : 1.05, user.lvl - 1);
+        if (user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
+        xpReq = Math.floor(xpReq);
+        
+        if (user.xp >= xpReq) {
+            user.xp -= xpReq;
+            user.lvl++;
+            notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success", 5000);
+        }
+        
+        // Ranked PP Calculation (Simple)
+        if (st.ranked) {
+            const ppG = (acc > 90) ? Math.floor(st.sc / 5000) : 0;
+            user.pp += ppG;
+            document.getElementById('pp-gain-loss').innerText = `+${ppG} PP`;
+        } else {
+            document.getElementById('pp-gain-loss').innerText = "0 PP";
+        }
+        
+        save();
+        updateFirebaseScore();
+        document.getElementById('res-xp').innerText = xpGain;
+        document.getElementById('res-sp').innerText = spGain;
+    } else {
+        document.getElementById('res-xp').innerText = 0;
+        document.getElementById('res-sp').innerText = 0;
+    }
 }
