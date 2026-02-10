@@ -1,6 +1,6 @@
-/* === UI LOGIC & INTERACTION (FINAL FIX V6) === */
+/* === UI LOGIC & INTERACTION (FINAL FIX V7) === */
 
-// Helpers DOM seguros
+// === HELPERS BASICOS ===
 function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
 function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
 
@@ -19,13 +19,16 @@ function playHover(){
     } 
 }
 
+// === ACTUALIZACIÓN PRINCIPAL UI ===
 function updUI() {
     if(!user || !cfg) return;
 
+    // Default values
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
 
+    // User Data
     setText('m-name', user.name);
     setText('p-name', user.name);
     setText('ig-name', user.name);
@@ -38,6 +41,7 @@ function updUI() {
     setText('m-rank', "LVL " + user.lvl);
     setText('p-lvl-txt', "LVL " + user.lvl);
     
+    // XP Bar
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
@@ -45,6 +49,7 @@ function updUI() {
     setStyle('p-xp-bar', 'width', pct + "%");
     setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
     
+    // Visuals
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
@@ -57,7 +62,7 @@ function updUI() {
 
     applyCfg();
 
-    // Actualizar HUD Extra (Combo & FC) en tiempo real
+    // HUD LIVE UPDATE
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
@@ -83,6 +88,7 @@ function updUI() {
         }
     }
 
+    // Auth UI
     const isGoogle = user.pass === "google-auth";
     const locSet = document.getElementById('local-acc-settings');
     const gooSet = document.getElementById('google-acc-settings');
@@ -105,67 +111,14 @@ function applyCfg() {
     }
 }
 
-// === RENDER MENU DE CANCIONES (CON FALLBACK DE COLOR) ===
-let globalSongsListener = null;
-function renderMenu(filter="") {
-    if(!db) return;
-    const grid = document.getElementById('song-grid');
-    if(!grid) return;
-
-    if(globalSongsListener) globalSongsListener(); 
-    
-    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
-        grid.innerHTML = '';
-        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666;">No hay canciones. ¡Sube una!</div>'; return; }
-        
-        snapshot.forEach(doc => {
-            const s = doc.data();
-            const songId = doc.id;
-            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
-            
-            const c = document.createElement('div'); 
-            c.className = 'beatmap-card';
-            
-            // LOGICA FALLBACK COLOR: Si no hay imagen, generar gradiente basado en el ID
-            let bgStyle;
-            if(s.imageURL) {
-                bgStyle = `background-image:url(${s.imageURL})`;
-            } else {
-                // Generar HSL basado en el ID del string para que siempre sea el mismo color
-                let hash = 0;
-                for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
-                const hue = Math.abs(hash % 360);
-                bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
-            }
-            
-            let scoreTag = '';
-            if(user.scores && user.scores[songId]) {
-                const us = user.scores[songId];
-                scoreTag = `<span class="tag rank-tag" style="color:gold">${us.rank}</span>`;
-            }
-
-            c.innerHTML = `
-                <div class="bc-bg" style="${bgStyle}"></div>
-                <div class="bc-info">
-                    <div class="bc-title">${s.title}</div>
-                    <div class="bc-meta" style="font-size:0.8rem;color:#aaa;">${s.uploader} ${scoreTag}</div>
-                </div>`;
-            c.onclick = () => { 
-                curSongData = { id: songId, ...s }; 
-                openModal('diff'); 
-            };
-            grid.appendChild(c);
-        });
-    });
-}
-
-// === MENÚ DE AJUSTES (ESTRUCTURA ROBLOX) ===
+// === SETTINGS MENU (ROBLOX STYLE) ===
 function openSettingsMenu() {
     const modal = document.getElementById('modal-settings');
     if(!modal) return;
     
+    // Add custom class for width
     const panel = modal.querySelector('.modal-panel');
-    panel.className = "modal-panel settings-panel"; // Asegurar clase ancha
+    panel.classList.add('settings-panel');
     
     panel.innerHTML = `
         <div class="settings-header">
@@ -203,7 +156,7 @@ function switchSetTab(tab) {
     if (tab === 'gameplay') {
         html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
         html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 40);
+        html += renderRange('Velocidad', 'spd', 10, 40);
         html += renderRange('Dificultad IA', 'den', 1, 10);
         html += renderRange('Offset Global (ms)', 'off', -200, 200);
     } 
@@ -216,9 +169,7 @@ function switchSetTab(tab) {
         html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100);
         html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100);
         html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
-        html += renderRange('Posición Juez X', 'judgeX', 0, 100);
-        html += renderRange('Tamaño Juez', 'judgeS', 5, 20);
-        html += `<div style="margin-top:20px;"><button class="btn-small btn-add" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button></div>`;
+        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO</button></div>`;
         html += `<input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">`;
     } 
     else if (tab === 'audio') {
@@ -227,9 +178,9 @@ function switchSetTab(tab) {
         html += renderRange('Volumen Hits', 'hvol', 0, 100);
         html += renderToggle('Miss Sounds', 'missSound');
         html += renderRange('Volumen Miss', 'missVol', 0, 100);
-        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT SOUND</button></div>`;
+        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 CUSTOM HIT</button></div>`;
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">`;
-        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS SOUND</button></div>`;
+        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 CUSTOM MISS</button></div>`;
         html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
     else if (tab === 'controls') {
@@ -246,6 +197,7 @@ function switchSetTab(tab) {
     content.innerHTML = html;
 }
 
+// Helpers Settings
 function renderToggle(label, key) {
     const val = cfg[key];
     return `<div class="set-row"><span class="set-label">${label}</span><button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button></div>`;
@@ -275,7 +227,7 @@ function updateCfgVal(key, val) {
     applyCfg();
 }
 
-// === HANDLER GLOBAL MODAL ===
+// === GLOBAL HANDLER ===
 window.openModal = function(id) {
     if (id === 'settings') {
         openSettingsMenu();
@@ -296,10 +248,10 @@ window.openModal = function(id) {
         if(id==='diff' && curSongData) { 
             setText('diff-song-title', curSongData.title);
             const cover = document.getElementById('diff-song-cover');
-            // FIX: Renderizar portada o color si no tiene
             if(curSongData.imageURL) {
                 cover.style.backgroundImage = `url(${curSongData.imageURL})`;
             } else {
+                // Fallback color si no hay imagen
                 let hash = 0;
                 for (let i = 0; i < curSongData.id.length; i++) hash = curSongData.id.charCodeAt(i) + ((hash << 5) - hash);
                 const hue = Math.abs(hash % 360);
@@ -355,6 +307,7 @@ function showFriendProfile(name, data) {
     setText('fp-score', data.score.toLocaleString());
     const av = document.getElementById('fp-av');
     if(av) av.style.backgroundImage = data.avatarData ? `url(${data.avatarData})` : '';
+    
     const btn = document.getElementById('btn-challenge');
     if(btn) {
         btn.disabled = false;
@@ -362,6 +315,59 @@ function showFriendProfile(name, data) {
     }
     closeModal('friends');
     openModal('friend-profile');
+}
+
+// === SONGS & RENDER ===
+let globalSongsListener = null;
+function renderMenu(filter="") {
+    if(!db) return;
+    const grid = document.getElementById('song-grid');
+    if(!grid) return;
+
+    if(globalSongsListener) globalSongsListener(); 
+    
+    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
+        grid.innerHTML = '';
+        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666;">No hay canciones. ¡Sube una!</div>'; return; }
+        
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            const songId = doc.id;
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+            
+            const c = document.createElement('div'); 
+            c.className = 'beatmap-card';
+            
+            // FALLBACK COLOR LOGIC
+            let bgStyle;
+            if(s.imageURL) {
+                bgStyle = `background-image:url(${s.imageURL})`;
+            } else {
+                let hash = 0;
+                for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
+                const hue = Math.abs(hash % 360);
+                bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
+            }
+            
+            let scoreTag = '';
+            if(user.scores && user.scores[songId]) {
+                const us = user.scores[songId];
+                scoreTag = `<span class="tag rank-tag" style="color:gold">${us.rank}</span>`;
+            }
+
+            c.innerHTML = `
+                <div class="bc-bg" style="${bgStyle}"></div>
+                <div class="bc-info">
+                    <div class="bc-title">${s.title}</div>
+                    <div class="bc-meta" style="font-size:0.8rem;color:#aaa;">${s.uploader} ${scoreTag}</div>
+                </div>`;
+            c.onclick = () => { 
+                curSongData = { id: songId, ...s }; 
+                openModal('diff'); 
+            };
+            grid.appendChild(c);
+        });
+    });
 }
 
 // === UTILS ===
@@ -390,6 +396,7 @@ function renderLaneConfig(k){
     const c=document.getElementById('lanes-container'); 
     if(!c) return;
     c.innerHTML=''; 
+    
     for(let i=0; i<k; i++){ 
         const l = cfg.modes[k][i]; 
         const d=document.createElement('div'); d.className='l-col'; 
