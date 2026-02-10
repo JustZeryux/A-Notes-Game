@@ -1,9 +1,13 @@
 /* === MAIN INITIALIZATION === */
 window.onload = async () => { 
-    loadData(); 
-    // await initDB(); // Desactivado para usar Full Cloud
+    // Ahora loadData es la encargada de verificar si hay un usuario logueado en la nube
+    await loadData(); 
+    
     initOnline(); 
     document.addEventListener('click', unlockAudio); 
+    
+    // El renderMenu ahora se llama dentro de loadData si hay sesión, 
+    // pero lo llamamos aquí por si es Guest
     renderMenu(); 
     checkUpdate();
     
