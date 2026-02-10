@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (CLEAN & FIXED) === */
+/* === AUDIO & ENGINE (OPTIMIZED V3) === */
 function unlockAudio(){ if(!st.ctx){ st.ctx=new(window.AudioContext||window.webkitAudioContext)(); genHit(); } if(st.ctx.state==='suspended') st.ctx.resume(); }
 function genHit(){ const b=st.ctx.createBuffer(1,2000,44100),d=b.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.sin(i*0.5)*Math.exp(-i/300); hitBuf=b; }
 function playHit(){ if(hitBuf&&cfg.hvol>0&&st.ctx){ const s=st.ctx.createBufferSource(); s.buffer=hitBuf; const g=st.ctx.createGain(); g.gain.value=cfg.hvol; s.connect(g); g.connect(st.ctx.destination); s.start(0); } }
@@ -11,8 +11,8 @@ function normalizeAudio(filteredData) {
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
-    const multiplier = 0.8 / max; 
-    if(multiplier > 1.2) {
+    const multiplier = 0.85 / max; 
+    if(multiplier > 1.1) {
         for (let i = 0; i < filteredData.length; i++) {
             filteredData[i] *= multiplier;
         }
@@ -20,17 +20,25 @@ function normalizeAudio(filteredData) {
     return filteredData;
 }
 
+// === GENERADOR DE MAPAS MEJORADO (RITMO + VARIEDAD) ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData)); 
     const map = [];
     const sampleRate = buf.sampleRate;
-    const windowSize = 1024; 
-    const step = Math.floor(sampleRate / 60); 
+    
+    // Ventana más pequeña para detectar golpes rápidos
+    const windowSize = 512; 
+    const step = Math.floor(sampleRate / 80); // Mayor resolución de análisis
+    
     let laneFreeTime = new Array(k).fill(0); 
-    let lastNoteTime = -1000;
-    const thresholdFactor = 1.55 - (cfg.den * 0.05); 
-    const minGap = Math.max(100, 550 - (cfg.den * 45)); 
+    let lastNoteTime = -2000;
+    
+    // Factores dinámicos basados en dificultad
+    const thresholdFactor = 1.4 - (cfg.den * 0.04); 
+    // Gap dinámico: si la música es muy rápida, permitimos notas más seguidas
+    const baseGap = Math.max(90, 500 - (cfg.den * 40)); 
+    
     let energyHistory = [];
     const historySize = 43; 
 
@@ -38,38 +46,55 @@ function genMap(buf, k) {
         let sum = 0;
         for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
         const instantEnergy = Math.sqrt(sum / windowSize);
+
         energyHistory.push(instantEnergy);
         if (energyHistory.length > historySize) energyHistory.shift();
+
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
+
         const timeMs = (i / sampleRate) * 1000;
 
-        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.01) {
-            if (timeMs - lastNoteTime > minGap) {
+        // Detectar golpe (Beat)
+        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.015) {
+            
+            // Variación del Gap según intensidad
+            let dynamicGap = baseGap;
+            if (instantEnergy > localAvg * 2.5) dynamicGap *= 0.6; // Ráfagas en partes intensas
+
+            if (timeMs - lastNoteTime > dynamicGap) {
                 let type = 'tap';
                 let len = 0;
-                if (instantEnergy > localAvg * 1.8 && Math.random() > 0.6) {
+                
+                // Más probabilidad de Holds en partes intensas pero no frenéticas
+                if (instantEnergy > localAvg * 1.6 && instantEnergy < localAvg * 3 && Math.random() > 0.65) {
                     type = 'hold';
-                    len = Math.min(1500, Math.random() * 500 + 100); 
+                    len = Math.min(1000, Math.random() * 400 + 150); 
                 }
+
+                // Selección de carril inteligente
                 let bestLane = -1;
                 let attempts = 0;
-                while(attempts < 15) {
+                while(attempts < 10) {
                     let potentialLane = Math.floor(Math.random() * k);
-                    if (timeMs >= laneFreeTime[potentialLane] + 30) { 
+                    // Evitar repetir el mismo carril muchas veces seguidas si es tap
+                    if (timeMs >= laneFreeTime[potentialLane] + 20) { 
                         bestLane = potentialLane;
                         break;
                     }
                     attempts++;
                 }
+
                 if (bestLane !== -1) {
                     map.push({ t: timeMs, l: bestLane, type: type, len: len, h: false });
                     laneFreeTime[bestLane] = timeMs + len; 
                     lastNoteTime = timeMs;
-                    if ((k >= 6 || cfg.den >= 7) && instantEnergy > localAvg * 2.8) {
+
+                    // Notas dobles (Acordes) en golpes muy fuertes
+                    if ((k >= 6 || cfg.den >= 6) && instantEnergy > localAvg * 2.6) {
                         for(let l=0; l<k; l++) {
-                            if(l !== bestLane && timeMs >= laneFreeTime[l] + 30) {
+                            if(l !== bestLane && timeMs >= laneFreeTime[l] + 20) {
                                 map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
                                 laneFreeTime[l] = timeMs; 
                                 break;
@@ -95,27 +120,32 @@ function initReceptors(k) {
 }
 
 async function prepareAndPlaySong(k) {
-    if(!curSongData) return notify("Error: No hay canción seleccionada", "error");
+    if(!curSongData) return;
     let songInRam = ramSongs.find(s => s.id === curSongData.id);
 
+    // Loader visible mientras procesamos
+    document.getElementById('loading-overlay').style.display = 'flex';
+    document.getElementById('loading-text').innerText = "Procesando mapa...";
+
     if(!songInRam) {
-        document.getElementById('loading-overlay').style.display = 'flex';
         try {
             unlockAudio();
             const response = await fetch(curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
+            // Generar mapa en segundo plano
             const map = genMap(audioBuffer, k);
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map };
             ramSongs.push(songInRam);
         } catch(e) {
-            notify("Error al cargar canción", "error");
             document.getElementById('loading-overlay').style.display = 'none'; return;
         }
-        document.getElementById('loading-overlay').style.display = 'none';
     } else if (!songInRam.map || songInRam.map.length === 0) {
          songInRam.map = genMap(songInRam.buf, k);
     }
+    
+    // Ocultar loader justo antes de iniciar la transición
+    document.getElementById('loading-overlay').style.display = 'none';
     playSongInternal(songInRam);
 }
 
@@ -130,18 +160,56 @@ function playSongInternal(s) {
     
     initReceptors(keys); updHUD();
     
-    const cd=document.getElementById('countdown'); let c=3; cd.innerHTML=c;
-    const iv=setInterval(async()=>{ if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume(); c--; if(c>0)cd.innerHTML=c; else { clearInterval(iv); cd.innerHTML=""; st.src = st.ctx.createBufferSource(); st.src.buffer=s.buf; const gain = st.ctx.createGain(); gain.gain.value=cfg.vol; st.src.connect(gain); gain.connect(st.ctx.destination); st.startTime = performance.now() + 50; st.t0 = st.ctx.currentTime + 0.05; st.src.start(st.t0); 
-    st.src.onended=()=>{ songFinished = true; end(false); };
-    st.act=true; st.paused=false; loop(); } },600);
+    // === CONTADOR DE INICIO REAL ===
+    const cd = document.getElementById('countdown'); 
+    let c = 3; 
+    cd.innerHTML = c;
+    st.act = false; // Bloquear motor mientras cuenta
+
+    const iv = setInterval(async() => { 
+        c--; 
+        if(c > 0) {
+            cd.innerHTML = c;
+        } else { 
+            clearInterval(iv); 
+            cd.innerHTML = "GO!";
+            setTimeout(() => cd.innerHTML = "", 500);
+
+            // Iniciar Audio y Motor al mismo tiempo
+            if(st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
+            
+            st.src = st.ctx.createBufferSource(); 
+            st.src.buffer = s.buf; 
+            const gain = st.ctx.createGain(); 
+            gain.gain.value = cfg.vol; 
+            st.src.connect(gain); 
+            gain.connect(st.ctx.destination); 
+            
+            // Sincronización precisa
+            st.startTime = performance.now(); 
+            st.t0 = st.ctx.currentTime; 
+            st.src.start(0); 
+            
+            st.src.onended = () => { songFinished = true; end(false); };
+            st.act = true; 
+            st.paused = false; 
+            loop(); 
+        } 
+    }, 1000);
 }
 
 function formatTime(s) { const m = Math.floor(s / 60); const sc = Math.floor(s % 60); return `${m}:${sc.toString().padStart(2, '0')}`; }
 
 function loop(){
     if(!st.act || st.paused) return;
-    let now; const audioTime = (st.ctx.currentTime - st.t0) * 1000; const visTime = performance.now() - st.startTime;
-    if (st.ctx.state === 'running' && audioTime > 0) now = audioTime; else now = visTime;
+    
+    // Tiempo actual sincronizado
+    let now; 
+    const audioTime = (st.ctx.currentTime - st.t0) * 1000; 
+    
+    // Si el audio está corriendo, usamos su tiempo (más preciso), si no, fallback a reloj visual
+    if (st.ctx.state === 'running' && audioTime >= 0) now = audioTime; 
+    else now = performance.now() - st.startTime;
     
     if(st.songDuration > 0) {
         const currentSec = now / 1000; const pct = Math.min(100, (currentSec / st.songDuration) * 100);
@@ -151,8 +219,14 @@ function loop(){
 
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80; const w = 100/keys;
     
+    // Spawn Logic
     for(let i=0; i<st.notes.length; i++) {
-        const n = st.notes[i]; if(n.s) continue; if(n.t < now-200) { n.s=true; continue; }
+        const n = st.notes[i]; if(n.s) continue; 
+        
+        // Si la nota ya pasó hace mucho, la marcamos como spawneada
+        if(n.t < now - 200) { n.s=true; continue; }
+        
+        // Pre-visualización (Spawnear notas que vienen en 1.5s)
         if(n.t - now < 1500) {
             const el = document.createElement('div');
             const dirClass = cfg.down ? 'hold-down' : 'hold-up';
@@ -168,9 +242,10 @@ function loop(){
             }
             el.innerHTML = svg; if(cfg.vivid) el.querySelector('.arrow-path').style.filter=`drop-shadow(0 0 8px ${conf.c})`;
             document.getElementById('track').appendChild(el); n.el = el; st.spawned.push(n); n.s = true;
-        } else break;
+        } else break; // Si la siguiente nota está lejos, dejamos de iterar
     }
 
+    // Movement & Hit Logic
     for(let i=st.spawned.length-1; i>=0; i--) {
         const n = st.spawned[i]; 
         if(!n.el) { st.spawned.splice(i,1); continue; } 
@@ -186,18 +261,17 @@ function loop(){
             if(st.keys[n.l]) { st.hp = Math.min(100, st.hp+0.1); updHUD(); } else n.el.style.opacity=0.3;
         } else if(!n.h) {
             n.el.style.top = finalY + 'px'; 
+            // Miss condition
             if(diff < -160) { miss(n); n.h=true; n.el.style.opacity=0.4; setTimeout(()=>{if(n.el)n.el.remove()},200); st.spawned.splice(i,1); }
         } else { n.el.remove(); st.spawned.splice(i,1); }
     } 
     requestAnimationFrame(loop);
 }
 
-// === CORRECCIÓN DEL ERROR DE TECLAS ===
 function onKd(e) { 
     if(e.key==="Escape"){togglePause();return;} 
     if(["Tab","Alt","Control","Shift"].includes(e.key)) return;
     
-    // Verificamos que cfg.modes exista antes de leer
     if(remapMode!==null && cfg.modes[remapMode]){ 
         cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase(); 
         renderLaneConfig(remapMode); 
@@ -205,14 +279,12 @@ function onKd(e) {
         return; 
     } 
     if(!e.repeat) { 
-        // USAMOS ?. PARA EVITAR EL ERROR "UNDEFINED"
         const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase()); 
         if(idx !== undefined && idx !== -1) hit(idx, true); 
     } 
 }
 
 function onKu(e) { 
-    // USAMOS ?. PARA EVITAR EL ERROR
     const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase()); 
     if(idx !== undefined && idx !== -1) hit(idx, false); 
 }
@@ -222,7 +294,11 @@ function hit(l, p) {
     const r = document.getElementById(`rec-${l}`); const flash = document.getElementById(`flash-${l}`);
     if(p) {
         st.keys[l] = 1; if(r) r.classList.add('pressed'); if(flash) { flash.style.opacity = 0.6; setTimeout(() => flash.style.opacity = 0, 100); }
-        const audioTime = (st.ctx.currentTime - st.t0) * 1000; const visTime = performance.now() - st.startTime; const now = (st.ctx.state === 'running' && audioTime > 0) ? audioTime : visTime;
+        
+        let now; 
+        const audioTime = (st.ctx.currentTime - st.t0) * 1000; 
+        if (st.ctx.state === 'running' && audioTime >= 0) now = audioTime; else now = performance.now() - st.startTime;
+
         const n = st.spawned.find(x => x.l===l && !x.h && Math.abs(x.t-(now+cfg.off))<160);
         if(n) {
             const d = Math.abs(n.t-(now+cfg.off)); let t="BAD", c="yellow", pts=50;
