@@ -1,4 +1,4 @@
-/* === GLOBAL CONFIG & VARIABLES (MODIFICADO) === */
+/* === GLOBAL CONFIG & VARIABLES (STABLE) === */
 
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
@@ -10,21 +10,17 @@ const firebaseConfig = {
 };
 
 let db = null;
-
 try {
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    } else {
-        firebase.app(); 
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    else firebase.app();
     db = firebase.firestore();
 } catch(e) { console.error("Error Firebase:", e); }
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
-const CURRENT_VERSION = 101; 
+const CURRENT_VERSION = 102; 
 
-// === NUEVA CONFIGURACIÓN DE TIENDA ===
+// Items de la tienda
 const SHOP_ITEMS = [
     { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Notas brillantes rosas y cian', color: '#ff66aa' },
     { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado dorado de lujo', color: '#FFD700' },
@@ -40,12 +36,16 @@ function createLanes(k) {
     return arr;
 }
 
+// Configuración por defecto (Evita errores de undefined)
 let cfg = { 
-    spd:22, den:5, vol:0.5, hvol:0.6, down:false, vivid:true, shake:true, off:0, trackOp:10, judgeY:40, judgeX:50, judgeS:7, judgeVis:true,
+    spd: 22, den: 5, down: false, middleScroll: false, off: 0,
+    vivid: true, shake: true, trackOp: 10, noteOp: 100,
+    hideHud: false, judgeVis: true, judgeY: 40, judgeX: 50, judgeS: 7, 
+    vol: 0.5, hvol: 0.6, missVol: 0.4, hitSound: true, missSound: true,
+    showMs: true, showMean: true, showFC: true,
     modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
 };
 
-// Aseguramos inventario vacío si no existe
 let user = { 
     name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, 
     songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{},
@@ -53,25 +53,21 @@ let user = {
 };
 
 let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
-let ctx=null, hitBuf=null;
+let ctx=null, hitBuf=null, missBuf=null; 
 let songFinished = false; 
 let curSongData = null; 
 
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
-let onlineState = { myPick: null, oppPick: null };
-let currentChatRoom = null, chatListener = null;
-let selectedFriend = null; 
-let currentLobbyId = null;
-let isLobbyHost = false;
-let lobbyPlayers = []; 
-let lobbyListener = null;
+let currentLobbyId = null; let isLobbyHost = false; let lobbyListener = null;
 
 let st = { 
     act:false, paused:false, ctx:null, src:null, t0:0, 
     notes:[], spawned:[], keys:[], 
-    sc:0, cmb:0, hp:50, stats:{s:0,g:0,b:0,m:0}, 
+    sc:0, cmb:0, maxCmb:0, hp:50, 
+    stats:{ s:0, g:0, b:0, m:0 }, 
     totalHits:0, maxScorePossible:0, ranked:false, startTime:0,
-    songDuration: 0, lastPause: 0
+    songDuration: 0, lastPause: 0,
+    totalOffset: 0, hitCount: 0, fcStatus: "GFC", activeHolds: [] 
 };
 
 const PATHS = {
@@ -80,5 +76,3 @@ const PATHS = {
     square: "M 15,15 L 85,15 L 85,85 L 15,85 Z",
     diamond: "M 50,10 L 90,50 L 50,90 L 10,50 Z"
 };
-
-const BOTS = [ {n:"Cookiezi", p:1500}, {n:"Mrekk", p:1450}, {n:"WhiteCat", p:1300}, {n:"Ryuk", p:1200} ];
