@@ -318,7 +318,6 @@ function getRankColor(r) {
     if(r==="B") return "yellow"; if(r==="C") return "orange"; return "red";
 }
 
-// === AUTO COMPLETAR TÍTULO ===
 function autoFillTitle(input) {
     if(input.files[0]) {
         let name = input.files[0].name.replace(/\.[^/.]+$/, "");
@@ -328,9 +327,8 @@ function autoFillTitle(input) {
     }
 }
 
-// === SUBIDA GLOBAL (GUEST ALLOWED) ===
+// === SUBIDA GLOBAL ROBUSTA ===
 async function startGlobalUpload() {
-    // SE ELIMINÓ EL CHECK DE GUEST
     if(!storage || !db) return notify("Error de conexión a Firebase", "error");
 
     const titleInp = document.getElementById('up-title');
@@ -344,10 +342,8 @@ async function startGlobalUpload() {
     const imageFile = imageInp.files[0];
 
     if(!title || !audioFile) return notify("Título y Audio obligatorios", "error");
-    
     if(audioFile.size > 15 * 1024 * 1024) return notify("Audio máximo 15MB", "error");
-    if(imageFile && imageFile.size > 3 * 1024 * 1024) return notify("Imagen máxima 3MB", "error");
-
+    
     btn.disabled = true;
     btn.innerText = "SUBIENDO...";
     status.innerText = "Iniciando subida...";
@@ -356,22 +352,28 @@ async function startGlobalUpload() {
         const songId = db.collection("globalSongs").doc().id;
         let imageURL = null;
 
-        status.innerText = "Subiendo audio...";
+        // SUBIDA AUDIO
+        status.innerText = "Subiendo audio... (Revisa consola si se atora)";
+        console.log("Iniciando subida de audio:", audioFile.name);
+        
         const audioRef = storage.ref(`songs/audio/${songId}_${audioFile.name}`);
-        await audioRef.put(audioFile);
-        const audioURL = await audioRef.getDownloadURL();
+        const audioSnapshot = await audioRef.put(audioFile);
+        console.log("Audio subido, obteniendo URL...");
+        const audioURL = await audioSnapshot.ref.getDownloadURL();
 
+        // SUBIDA IMAGEN
         if(imageFile) {
             status.innerText = "Subiendo imagen...";
+            console.log("Iniciando subida de imagen:", imageFile.name);
             const imageRef = storage.ref(`songs/images/${songId}_${imageFile.name}`);
-            await imageRef.put(imageFile);
-            imageURL = await imageRef.getDownloadURL();
+            const imgSnapshot = await imageRef.put(imageFile);
+            imageURL = await imgSnapshot.ref.getDownloadURL();
         }
 
-        status.innerText = "Guardando...";
+        // GUARDADO DB
+        status.innerText = "Guardando metadatos...";
         await db.collection("globalSongs").doc(songId).set({
             title: title,
-            // Si es Guest, usamos "Anónimo" o el nombre de usuario
             uploader: user.name === "Guest" ? "Anónimo" : user.name,
             audioURL: audioURL,
             imageURL: imageURL,
@@ -382,12 +384,17 @@ async function startGlobalUpload() {
         closeModal('upload');
         titleInp.value = ""; audioInp.value = ""; imageInp.value = "";
     } catch(e) {
-        console.error(e);
-        notify("Error subida: " + e.message, "error");
+        console.error("Error detallado de subida:", e);
+        notify("Error subida: " + e.code, "error");
+        status.innerText = "Error: " + e.message;
+        
+        // Si el error es sobre "Bucket" o "CORS"
+        if(e.code === "storage/retry-limit-exceeded" || e.code === "storage/unknown") {
+            alert("Error de conexión con Storage. Verifica tu 'storageBucket' en globals.js");
+        }
     } finally {
         btn.disabled = false;
         btn.innerText = "☁️ PUBLICAR AHORA";
-        status.innerText = "";
     }
 }
 
@@ -415,8 +422,6 @@ function openModal(id){
     }
 }
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
-
-// FUNCIÓN SAVE SETTINGS CORREGIDA
 function saveSettings(){ 
     cfg.spd=document.getElementById('set-spd').value; 
     cfg.den=document.getElementById('set-den').value; 
@@ -431,20 +436,10 @@ function saveSettings(){
     cfg.judgeX=document.getElementById('set-judge-x').value; 
     cfg.judgeS=document.getElementById('set-judge-s').value; 
     cfg.judgeVis=document.getElementById('set-judge-vis').checked; 
-    
     applyCfg(); 
-    
-    // Llamar a save() que ahora sí existe en auth.js
-    if(typeof save === 'function') {
-        save(); 
-        notify("Ajustes guardados");
-    } else {
-        console.error("Save function missing");
-    }
-    
+    if(typeof save === 'function') { save(); notify("Ajustes guardados"); }
     document.getElementById('modal-settings').style.display='none'; 
 }
-
 function applyCfg() { document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100); document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%'); document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%'); document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10); document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0); }
 function saveProfile(){ user.name=document.getElementById('l-user').value||"Guest"; save(); closeModal('profile'); }
 function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
