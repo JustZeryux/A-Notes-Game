@@ -1,27 +1,40 @@
-/* === UI LOGIC & INTERACTION (FULL MERGED VERSION) === */
+/* === UI LOGIC & INTERACTION (FULL MERGED) === */
 
-// --- 1. ACTUALIZACIÓN DE INTERFAZ PRINCIPAL ---
+// Movemos playHover aquí para que esté disponible siempre en el menú
+function playHover(){ 
+    // Verificación de seguridad para no causar errores si el audio no está listo
+    if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
+        try {
+            const o=st.ctx.createOscillator(); 
+            const g=st.ctx.createGain(); 
+            o.frequency.value=600; 
+            g.gain.value=0.05; 
+            o.connect(g); 
+            g.connect(st.ctx.destination); 
+            o.start(); 
+            o.stop(st.ctx.currentTime+0.05); 
+        } catch(e){}
+    } 
+}
+
 function updUI() {
-    // Datos de Usuario
+    if(!user || !cfg) return;
+
     document.getElementById('m-name').innerText = user.name;
     document.getElementById('p-name').innerText = user.name;
     document.getElementById('ig-name').innerText = user.name;
     
-    // Stats Superiores
     document.getElementById('h-pp').innerText = user.pp;
     document.getElementById('h-sp').innerText = (user.sp || 0).toLocaleString();
     
-    // Stats de Perfil
     document.getElementById('p-score').innerText = user.score.toLocaleString();
     document.getElementById('p-plays').innerText = user.plays;
     document.getElementById('p-pp-display').innerText = user.pp;
     document.getElementById('p-sp-display').innerText = (user.sp || 0).toLocaleString();
 
-    // Nivel y Barra de XP
     document.getElementById('m-rank').innerText = "LVL " + user.lvl;
     document.getElementById('p-lvl-txt').innerText = "LVL " + user.lvl;
     
-    // Cálculo de XP (Curva exponencial)
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
@@ -31,7 +44,6 @@ function updUI() {
     document.getElementById('p-xp-txt').innerText = `${Math.floor(user.xp)} / ${xpReq} XP`;
     document.getElementById('p-global-rank').innerText = "#--"; 
     
-    // Avatar
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
         document.getElementById('m-av').style.backgroundImage = url; 
@@ -40,13 +52,11 @@ function updUI() {
         document.getElementById('ig-av').style.backgroundImage = url; 
     }
     
-    // Fondo Personalizado
     if(user.bg) { 
         document.getElementById('bg-image').src = user.bg; 
         document.getElementById('bg-image').style.opacity = 0.3; 
     }
 
-    // Cargar valores en Ajustes
     document.getElementById('set-spd').value = cfg.spd;
     document.getElementById('set-den').value = cfg.den;
     document.getElementById('set-vol').value = cfg.vol * 100;
@@ -64,7 +74,6 @@ function updUI() {
     document.getElementById('set-judge-s').value = cfg.judgeS;
     document.getElementById('set-judge-vis').checked = cfg.judgeVis;
     
-    // Gestión de cuenta (Google vs Local)
     const isGoogle = user.pass === "google-auth";
     const localSet = document.getElementById('local-acc-settings');
     const googleSet = document.getElementById('google-acc-settings');
@@ -72,7 +81,6 @@ function updUI() {
     if(googleSet) googleSet.style.display = isGoogle ? 'block' : 'none';
 }
 
-// --- 2. NAVEGACIÓN ---
 function changeSection(sec) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     const map = { 
@@ -98,7 +106,6 @@ function openShop() {
     openModal('shop');
 }
 
-// --- 3. SISTEMA DE AMIGOS ---
 function openFriends() {
     if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
     if(!db) return notify("Error de conexión", "error");
@@ -152,63 +159,29 @@ function showFriendProfile(fName, fData, isOnline) {
         chalBtn.disabled = true; 
     }
     chalBtn.onclick = () => { challengeFriend(fName); closeModal('friend-profile'); };
-    
     closeModal('friends');
     openModal('friend-profile');
 }
 
-// --- 4. CHATS FLOTANTES ---
 let activeChats = [];
-
 function openFloatingChat(friendName) {
     const target = friendName || selectedFriend;
     if(!target) return;
     if(activeChats.includes(target)) return; 
     if(activeChats.length >= 3) { closeFloatingChat(activeChats[0]); }
-    
     closeModal('friend-profile');
-    
     activeChats.push(target);
     const container = document.getElementById('chat-overlay-container');
     const div = document.createElement('div');
     div.className = 'chat-window';
     div.id = 'chat-w-' + target;
-    
-    div.innerHTML = `
-        <div class="cw-header" onclick="toggleMinChat('${target}')">
-            <span>${target}</span>
-            <span style="font-size:0.8rem; color:#888;" onclick="event.stopPropagation(); closeFloatingChat('${target}')">✕</span>
-        </div>
-        <div class="cw-body" id="cw-body-${target}"></div>
-        <div class="cw-input-area">
-            <input type="text" class="cw-input" placeholder="Mensaje..." onkeydown="if(event.key==='Enter') sendFloatChat('${target}', this)">
-        </div>
-    `;
+    div.innerHTML = `<div class="cw-header" onclick="toggleMinChat('${target}')"><span>${target}</span><span style="font-size:0.8rem; color:#888;" onclick="event.stopPropagation(); closeFloatingChat('${target}')">✕</span></div><div class="cw-body" id="cw-body-${target}"></div><div class="cw-input-area"><input type="text" class="cw-input" placeholder="Mensaje..." onkeydown="if(event.key==='Enter') sendFloatChat('${target}', this)"></div>`;
     container.appendChild(div);
     initFloatChatListener(target);
 }
-
-function closeFloatingChat(target) {
-    const el = document.getElementById('chat-w-' + target);
-    if(el) el.remove();
-    activeChats = activeChats.filter(c => c !== target);
-}
-
-function toggleMinChat(target) {
-    const el = document.getElementById('chat-w-' + target);
-    if(el) el.classList.toggle('minimized');
-}
-
-function sendFloatChat(target, inp) {
-    const txt = inp.value.trim();
-    if(!txt) return;
-    const room = [user.name, target].sort().join("_");
-    db.collection("chats").doc(room).collection("messages").add({
-        user: user.name, text: txt, timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    inp.value = "";
-}
-
+function closeFloatingChat(target) { const el = document.getElementById('chat-w-' + target); if(el) el.remove(); activeChats = activeChats.filter(c => c !== target); }
+function toggleMinChat(target) { const el = document.getElementById('chat-w-' + target); if(el) el.classList.toggle('minimized'); }
+function sendFloatChat(target, inp) { const txt = inp.value.trim(); if(!txt) return; const room = [user.name, target].sort().join("_"); db.collection("chats").doc(room).collection("messages").add({ user: user.name, text: txt, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); inp.value = ""; }
 function initFloatChatListener(target) {
     const room = [user.name, target].sort().join("_");
     const body = document.getElementById(`cw-body-${target}`);
@@ -226,7 +199,6 @@ function initFloatChatListener(target) {
     });
 }
 
-// --- 5. NOTIFICACIONES ---
 function setupNotificationsListener() {
     if(user.name === "Guest" || !db) return;
     db.collection("users").doc(user.name).collection("notifications").where("read", "==", false)
@@ -239,28 +211,19 @@ function setupNotificationsListener() {
             });
         });
 }
-
 function handleNotification(id, data) {
     db.collection("users").doc(user.name).collection("notifications").doc(id).update({read:true});
     let html = data.body;
     let duration = 8000;
-
     if(data.type === 'friend_req') {
-        html += `<div class="notify-actions">
-            <button class="notify-btn btn-accept" onclick="respondFriend('${data.from}', true, '${id}')">ACEPTAR</button>
-            <button class="notify-btn btn-deny" onclick="respondFriend('${data.from}', false, '${id}')">RECHAZAR</button>
-        </div>`;
+        html += `<div class="notify-actions"><button class="notify-btn btn-accept" onclick="respondFriend('${data.from}', true, '${id}')">ACEPTAR</button><button class="notify-btn btn-deny" onclick="respondFriend('${data.from}', false, '${id}')">RECHAZAR</button></div>`;
         duration = 15000;
     } else if (data.type === 'challenge') {
-        html += `<div class="notify-actions">
-            <button class="notify-btn btn-accept" onclick="acceptChallenge('${data.from}', '${id}')">ACEPTAR</button>
-            <button class="notify-btn btn-deny" onclick="closeNotification('${id}')">RECHAZAR</button>
-        </div>`;
+        html += `<div class="notify-actions"><button class="notify-btn btn-accept" onclick="acceptChallenge('${data.from}', '${id}')">ACEPTAR</button><button class="notify-btn btn-deny" onclick="closeNotification('${id}')">RECHAZAR</button></div>`;
         duration = 10000;
     }
     notifyInteractive(id, data.title, html, duration);
 }
-
 function notifyInteractive(id, title, html, duration) {
     const area = document.getElementById('notification-area');
     const card = document.createElement('div'); card.className = 'notify-card'; card.id = 'notif-'+id;
@@ -269,268 +232,85 @@ function notifyInteractive(id, title, html, duration) {
     setTimeout(() => { const prog = card.querySelector('.notify-progress'); if(prog) prog.style.width = '0%'; }, 50);
     setTimeout(() => closeNotification(id), duration);
 }
-
 function notify(msg, type="info", duration=3000) {
     const area = document.getElementById('notification-area');
     const id = Date.now();
     const card = document.createElement('div'); card.className = 'notify-card'; card.id = 'notif-'+id;
-    if(type==="error") card.style.borderLeftColor = "#F9393F";
-    else if(type==="success") card.style.borderLeftColor = "#12FA05";
+    if(type==="error") card.style.borderLeftColor = "#F9393F"; else if(type==="success") card.style.borderLeftColor = "#12FA05";
     card.innerHTML = `<div class="notify-content"><div class="notify-title">${type.toUpperCase()}</div><div class="notify-body">${msg}</div></div><div class="notify-progress" style="transition-duration:${duration}ms"></div>`;
     area.appendChild(card);
     setTimeout(() => { const prog = card.querySelector('.notify-progress'); if(prog) prog.style.width = '0%'; }, 50);
     setTimeout(() => closeNotification(id), duration);
 }
+function closeNotification(id) { const card = document.getElementById('notif-'+id); if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); } }
 
-function closeNotification(id) {
-    const card = document.getElementById('notif-'+id);
-    if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); }
-}
-
-// --- 6. RENDERIZADO GLOBAL DE CANCIONES ---
 let globalSongsListener = null;
-
 function renderMenu(filter="") {
     if(!db) return;
     const grid = document.getElementById('song-grid');
     if(globalSongsListener) globalSongsListener();
-
-    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50)
-        .onSnapshot(snapshot => {
-            grid.innerHTML = '';
-            if(snapshot.empty) {
-                grid.innerHTML = '<div style="color:#666; grid-column:1/-1; text-align:center;">No hay canciones globales aún. ¡Sube una!</div>';
-                return;
+    globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
+        grid.innerHTML = '';
+        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666; grid-column:1/-1; text-align:center;">No hay canciones globales aún. ¡Sube una!</div>'; return; }
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            const songId = doc.id;
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+            const c = document.createElement('div'); c.className = 'beatmap-card';
+            const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(${(songId.length*40)%360},60%,20%),black)`;
+            let scoreTag = '';
+            if(user.scores && user.scores[songId]) {
+                const us = user.scores[songId];
+                scoreTag = `<div style="margin-top:10px; display:flex; gap:5px; align-items:center;"><span class="tag rank-tag" style="color:${getRankColor(us.rank)}; background:rgba(0,0,0,0.5);">${us.rank}</span><span class="tag score-tag">${us.score.toLocaleString()}</span></div>`;
             }
-
-            snapshot.forEach(doc => {
-                const s = doc.data();
-                const songId = doc.id;
-                if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
-
-                const c = document.createElement('div');
-                c.className = 'beatmap-card';
-                
-                const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(${(songId.length*40)%360},60%,20%),black)`;
-                
-                let scoreTag = '';
-                if(user.scores && user.scores[songId]) {
-                    const us = user.scores[songId];
-                    scoreTag = `<div style="margin-top:10px; display:flex; gap:5px; align-items:center;">
-                        <span class="tag rank-tag" style="color:${getRankColor(us.rank)}; background:rgba(0,0,0,0.5);">${us.rank}</span>
-                        <span class="tag score-tag">${us.score.toLocaleString()}</span>
-                    </div>`;
-                }
-
-                c.innerHTML = `
-                    <div class="bc-bg" style="${bgStyle}"></div>
-                    <div class="bc-info">
-                        <div class="bc-title">${s.title}</div>
-                        <div class="bc-meta" style="font-size:0.8rem; color:#aaa;">Subido por: ${s.uploader}</div>
-                        ${scoreTag}
-                        <div class="bc-meta"><span class="tag keys">4K | 6K | 7K | 9K</span></div>
-                    </div>
-                `;
-                c.onclick = () => { 
-                    curSongData = { id: songId, ...s }; 
-                    openModal('diff'); 
-                    const lobbyBtn = document.getElementById('create-lobby-opts');
-                    if(lobbyBtn) lobbyBtn.style.display = 'none'; 
-                };
-                grid.appendChild(c);
-            });
+            c.innerHTML = `<div class="bc-bg" style="${bgStyle}"></div><div class="bc-info"><div class="bc-title">${s.title}</div><div class="bc-meta" style="font-size:0.8rem; color:#aaa;">Subido por: ${s.uploader}</div>${scoreTag}<div class="bc-meta"><span class="tag keys">4K | 6K | 7K | 9K</span></div></div>`;
+            c.onclick = () => { curSongData = { id: songId, ...s }; openModal('diff'); const lb = document.getElementById('create-lobby-opts'); if(lb) lb.style.display = 'none'; };
+            grid.appendChild(c);
         });
-}
-
-function getRankColor(r) {
-    if(r==="SS") return "cyan"; if(r==="S") return "gold"; if(r==="A") return "lime";
-    if(r==="B") return "yellow"; if(r==="C") return "orange"; return "red";
-}
-
-// --- 7. UPLOADCARE SYSTEM ---
-function autoFillTitle(input) {
-    if(input.files[0]) {
-        let name = input.files[0].name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ");
-        document.getElementById('up-title').value = name;
-        document.getElementById('upload-status').innerText = ""; 
-    }
-}
-
-function uploadFileToUC(file) {
-    return new Promise((resolve, reject) => {
-        const u = uploadcare.fileFrom('object', file);
-        u.done(info => resolve(info.cdnUrl)).fail(err => reject(err));
     });
 }
+function getRankColor(r) { if(r==="SS") return "cyan"; if(r==="S") return "gold"; if(r==="A") return "lime"; if(r==="B") return "yellow"; if(r==="C") return "orange"; return "red"; }
 
+// === UPLOADCARE ===
+function autoFillTitle(input) { if(input.files[0]) { let name = input.files[0].name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "); document.getElementById('up-title').value = name; document.getElementById('upload-status').innerText = ""; } }
+function uploadFileToUC(file) { return new Promise((resolve, reject) => { const u = uploadcare.fileFrom('object', file); u.done(info => resolve(info.cdnUrl)).fail(err => reject(err)); }); }
 async function startGlobalUpload() {
-    if(!db) return notify("Error DB: Conéctate a internet", "error");
-
-    const titleInp = document.getElementById('up-title');
-    const audioInp = document.getElementById('up-audio');
-    const imageInp = document.getElementById('up-image');
-    const status = document.getElementById('upload-status');
-    const btn = document.getElementById('btn-upload-start');
-
-    const title = titleInp.value.trim();
-    const audioFile = audioInp.files[0];
-    const imageFile = imageInp.files[0];
-
+    if(!db) return notify("Error DB", "error");
+    const titleInp = document.getElementById('up-title'); const audioInp = document.getElementById('up-audio'); const imageInp = document.getElementById('up-image'); const status = document.getElementById('upload-status'); const btn = document.getElementById('btn-upload-start');
+    const title = titleInp.value.trim(); const audioFile = audioInp.files[0]; const imageFile = imageInp.files[0];
     if(!title || !audioFile) return notify("Audio y título requeridos", "error");
-    if(audioFile.size > 20 * 1024 * 1024) return notify("Audio muy pesado (>20MB)", "error");
-
-    btn.disabled = true;
-    btn.innerText = "PROCESANDO...";
-    status.innerText = "Subiendo audio...";
-
+    if(audioFile.size > 20 * 1024 * 1024) return notify("Audio max 20MB", "error");
+    btn.disabled = true; btn.innerText = "PROCESANDO..."; status.innerText = "Subiendo...";
     try {
         const audioURL = await uploadFileToUC(audioFile);
-        let imageURL = null;
-        if(imageFile) {
-            status.innerText = "Subiendo portada...";
-            imageURL = await uploadFileToUC(imageFile);
-        }
-
+        let imageURL = null; if(imageFile) { status.innerText = "Subiendo imagen..."; imageURL = await uploadFileToUC(imageFile); }
         status.innerText = "Guardando...";
         const songId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-        
-        await db.collection("globalSongs").doc(songId).set({
-            title: title,
-            uploader: user.name === "Guest" ? "Anónimo" : user.name,
-            audioURL: audioURL,
-            imageURL: imageURL,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        notify("¡Subida Completa!", "success");
-        closeModal('upload');
-        titleInp.value = ""; audioInp.value = ""; imageInp.value = "";
-    } catch(e) {
-        console.error(e); notify("Error: " + e, "error");
-        status.innerText = "Error.";
-    } finally {
-        btn.disabled = false; btn.innerText = "☁️ PUBLICAR AHORA"; status.innerText = "";
-    }
+        await db.collection("globalSongs").doc(songId).set({ title: title, uploader: user.name === "Guest" ? "Anónimo" : user.name, audioURL: audioURL, imageURL: imageURL, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        notify("¡Subida Éxito!", "success"); closeModal('upload'); titleInp.value = ""; audioInp.value = ""; imageInp.value = "";
+    } catch(e) { console.error(e); notify("Error: " + e, "error"); status.innerText="Error"; } finally { btn.disabled = false; btn.innerText = "☁️ PUBLICAR AHORA"; status.innerText = ""; }
 }
 
-// --- 8. AJUSTES, MODALES Y HELPERS ---
-async function loadHitSound(i) { 
-    if(i.files[0]) { 
-        const buf = await i.files[0].arrayBuffer(); 
-        hitBuf = await st.ctx.decodeAudioData(buf); 
-        notify("Hit Sound Actualizado!"); 
-        i.value = ""; 
-    } 
-}
-
+async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound Actualizado!"); i.value = ""; } }
 function openModal(id){ 
     document.getElementById('modal-'+id).style.display='flex'; 
-    if(id==='settings') renderLaneConfig(4); 
-    if(id==='profile'){
-        document.getElementById('login-view').style.display = user.name==='Guest' ? 'block' : 'none';
-        document.getElementById('profile-view').style.display = user.name==='Guest' ? 'none' : 'block';
-        switchProfileTab('resumen');
-    }
-    if(id==='upload') document.getElementById('upload-status').innerText = "";
-    if(id==='diff' && curSongData) {
-        document.getElementById('diff-song-title').innerText = curSongData.title;
-        const cover = document.getElementById('diff-song-cover');
-        if(curSongData.imageURL) cover.style.backgroundImage = `url(${curSongData.imageURL})`;
-        else cover.style.backgroundImage = '';
-    }
+    if(id==='settings')renderLaneConfig(4); 
+    if(id==='profile'){ document.getElementById('login-view').style.display=user.name==='Guest'?'block':'none'; document.getElementById('profile-view').style.display=user.name==='Guest'?'none':'block'; switchProfileTab('resumen'); } 
+    if(id==='upload') { document.getElementById('upload-status').innerText = ""; } 
+    if(id==='diff' && curSongData) { document.getElementById('diff-song-title').innerText = curSongData.title; const cover = document.getElementById('diff-song-cover'); if(curSongData.imageURL) cover.style.backgroundImage = `url(${curSongData.imageURL})`; else cover.style.backgroundImage = ''; } 
 }
-
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
-
 function saveSettings(){ 
-    cfg.spd = document.getElementById('set-spd').value; 
-    cfg.den = document.getElementById('set-den').value; 
-    cfg.vol = document.getElementById('set-vol').value/100; 
-    cfg.hvol = document.getElementById('set-hvol').value/100; 
-    cfg.down = document.getElementById('set-down').checked; 
-    cfg.vivid = document.getElementById('set-vivid').checked; 
-    const shakeEl = document.getElementById('set-shake'); 
-    if(shakeEl) cfg.shake = shakeEl.checked; 
-    
-    cfg.off = parseInt(document.getElementById('set-off').value); 
-    cfg.trackOp = document.getElementById('set-track-op').value; 
-    cfg.judgeY = document.getElementById('set-judge-y').value; 
-    cfg.judgeX = document.getElementById('set-judge-x').value; 
-    cfg.judgeS = document.getElementById('set-judge-s').value; 
-    cfg.judgeVis = document.getElementById('set-judge-vis').checked; 
-    
+    cfg.spd=document.getElementById('set-spd').value; cfg.den=document.getElementById('set-den').value; cfg.vol=document.getElementById('set-vol').value/100; cfg.hvol=document.getElementById('set-hvol').value/100; cfg.down=document.getElementById('set-down').checked; cfg.vivid=document.getElementById('set-vivid').checked; const shakeEl = document.getElementById('set-shake'); if(shakeEl) cfg.shake=shakeEl.checked; cfg.off=parseInt(document.getElementById('set-off').value); cfg.trackOp=document.getElementById('set-track-op').value; cfg.judgeY=document.getElementById('set-judge-y').value; cfg.judgeX=document.getElementById('set-judge-x').value; cfg.judgeS=document.getElementById('set-judge-s').value; cfg.judgeVis=document.getElementById('set-judge-vis').checked; 
     applyCfg(); 
-    if(typeof save === 'function') { save(); notify("Ajustes guardados"); }
+    if(typeof save === 'function') { save(); notify("Ajustes guardados"); } 
     document.getElementById('modal-settings').style.display='none'; 
 }
-
-function applyCfg() { 
-    document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100); 
-    document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%'); 
-    document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%'); 
-    document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10); 
-    document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0); 
-}
-
-function saveProfile() { 
-    user.name = document.getElementById('l-user').value || "Guest"; 
-    save(); 
-    closeModal('profile'); 
-}
-
-function handleBg(i){ 
-    if(i.files[0]){ 
-        const r = new FileReader(); 
-        r.onload = e => { user.bg = e.target.result; save(); }; 
-        r.readAsDataURL(i.files[0]); 
-        i.value = ""; 
-    }
-}
-
-function uploadAvatar(i){ 
-    if(i.files[0]){ 
-        const r = new FileReader(); 
-        r.onload = e => { 
-            user.avatar = e.target.result; 
-            user.avatarData = e.target.result; 
-            save(); 
-            updUI(); 
-            updateFirebaseScore(); 
-        }; 
-        r.readAsDataURL(i.files[0]); 
-        i.value = ""; 
-    }
-}
-
-// Configuración de Teclas (Keybinds)
-function renderLaneConfig(k){ 
-    document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); 
-    document.getElementById('tab-'+k).classList.add('active'); 
-    const c = document.getElementById('lanes-container'); 
-    c.innerHTML = ''; 
-    for(let i=0; i<k; i++){ 
-        const l = cfg.modes[k][i]; 
-        const d = document.createElement('div'); d.className = 'l-col'; 
-        const shapePath = PATHS[l.s] || PATHS['circle']; 
-        d.innerHTML = `
-            <div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div>
-            <div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div>
-            <input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">
-        `; 
-        c.appendChild(d); 
-    } 
-}
-
-function remapKey(k,i){ 
-    if(document.activeElement) document.activeElement.blur(); 
-    remapMode = k; remapIdx = i; renderLaneConfig(k); 
-}
-
-function updateLaneColor(k,i,v){ cfg.modes[k][i].c = v; }
-
-function cycleShape(k,i){ 
-    const shapes = ['circle','arrow','square','diamond']; 
-    const cur = shapes.indexOf(cfg.modes[k][i].s); 
-    cfg.modes[k][i].s = shapes[(cur+1)%4]; 
-    renderLaneConfig(k); 
-}
+function applyCfg() { document.documentElement.style.setProperty('--track-alpha', cfg.trackOp/100); document.documentElement.style.setProperty('--judge-y', cfg.judgeY + '%'); document.documentElement.style.setProperty('--judge-x', cfg.judgeX + '%'); document.documentElement.style.setProperty('--judge-scale', cfg.judgeS/10); document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0); }
+function saveProfile(){ user.name=document.getElementById('l-user').value||"Guest"; save(); closeModal('profile'); }
+function handleBg(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.bg=e.target.result;save();}; r.readAsDataURL(i.files[0]); i.value=""; }}
+function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>{user.avatar=e.target.result;user.avatarData=e.target.result;save(); updUI(); updateFirebaseScore();}; r.readAsDataURL(i.files[0]); i.value=""; }}
+function renderLaneConfig(k){ document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); document.getElementById('tab-'+k).classList.add('active'); const c=document.getElementById('lanes-container'); c.innerHTML=''; for(let i=0; i<k; i++){ const l = cfg.modes[k][i]; const d=document.createElement('div'); d.className='l-col'; const shapePath = PATHS[l.s] || PATHS['circle']; d.innerHTML=`<div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; c.appendChild(d); } }
+function remapKey(k,i){ if(document.activeElement) document.activeElement.blur(); remapMode=k; remapIdx=i; renderLaneConfig(k); }
+function updateLaneColor(k,i,v){ cfg.modes[k][i].c=v; }
+function cycleShape(k,i){ const shapes=['circle','arrow','square','diamond']; const cur=shapes.indexOf(cfg.modes[k][i].s); cfg.modes[k][i].s = shapes[(cur+1)%4]; renderLaneConfig(k); }
