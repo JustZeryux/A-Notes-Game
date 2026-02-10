@@ -1,9 +1,11 @@
-/* === AUDIO & ENGINE (STABLE PAUSE + V7 GEN) === */
+/* === AUDIO & ENGINE (SAFE START + PAUSE FIX) === */
 
 function unlockAudio() {
     if (!st.ctx) {
-        st.ctx = new (window.AudioContext || window.webkitAudioContext)();
-        genHit();
+        try {
+            st.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            genHit();
+        } catch(e) { console.error("Audio error:", e); }
     }
     if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
 }
@@ -18,7 +20,6 @@ function genHit() {
 
 function playHit() {
     if (hitBuf && cfg.hvol > 0 && st.ctx) {
-        // Crear gain y source cada vez
         const s = st.ctx.createBufferSource();
         s.buffer = hitBuf;
         const g = st.ctx.createGain();
@@ -29,6 +30,7 @@ function playHit() {
     }
 }
 
+// === NORMALIZACIÓN ===
 function normalizeAudio(filteredData) {
     let max = 0;
     for (let i = 0; i < filteredData.length; i += 10) {
@@ -36,8 +38,8 @@ function normalizeAudio(filteredData) {
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
-    const multiplier = 0.98 / max;
-    if (multiplier > 1.05) {
+    const multiplier = 0.95 / max;
+    if (multiplier > 1.1) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
     }
     return filteredData;
@@ -49,16 +51,20 @@ function genMap(buf, k) {
     const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
+
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 85); 
 
     let laneFreeTime = new Array(k).fill(0);
     let lastNoteTime = -5000;
     let lastLane = 0;
-    let patternType = 0; 
+    
+    let patternType = 0; // 0:Random, 1:StairUP, 2:StairDOWN, 3:Trill, 4:Jack
     let patternCounter = 0; 
+
     let energyHistory = [];
     const historySize = 40; 
+
     const density = Math.max(1, Math.min(10, cfg.den));
     const thresholdFactor = 1.35 - (density * 0.06); 
     const minGapBase = Math.max(70, 550 - (density * 45)); 
@@ -70,6 +76,7 @@ function genMap(buf, k) {
 
         energyHistory.push(instantEnergy);
         if (energyHistory.length > historySize) energyHistory.shift();
+        
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
@@ -77,11 +84,13 @@ function genMap(buf, k) {
         const timeMs = (i / sampleRate) * 1000;
 
         if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.02) {
+            
             let currentGap = minGapBase;
             if (instantEnergy > localAvg * 1.8) currentGap *= 0.6; 
             if (instantEnergy > localAvg * 2.5) currentGap *= 0.5; 
 
             if (timeMs - lastNoteTime >= currentGap) {
+                
                 if (patternCounter <= 0 || Math.random() > 0.9) {
                     const r = Math.random();
                     if (r < 0.30) patternType = 0; 
@@ -134,6 +143,7 @@ function genMap(buf, k) {
                 lastLane = lane;
                 patternCounter--;
 
+                // Acordes
                 if ((k >= 4 && cfg.den >= 6) && instantEnergy > localAvg * 2.2) {
                     for (let l = 0; l < k; l++) {
                         if (Math.abs(l - lane) > 1 && timeMs >= laneFreeTime[l] + 20) {
@@ -176,8 +186,10 @@ function initReceptors(k) {
     }
 }
 
+// === CARGA Y GESTIÓN DE ERRORES ===
 async function prepareAndPlaySong(k) {
-    if (!curSongData) return;
+    if (!curSongData) return notify("Selecciona una canción", "error");
+
     let songInRam = ramSongs.find(s => s.id === curSongData.id);
     document.getElementById('loading-overlay').style.display = 'flex';
     document.getElementById('loading-text').innerText = "Cargando...";
@@ -186,13 +198,19 @@ async function prepareAndPlaySong(k) {
         try {
             unlockAudio();
             const response = await fetch(curSongData.audioURL);
+            if(!response.ok) throw new Error("Error red");
+            
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
             const map = genMap(audioBuffer, k);
+            
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map, kVersion: k };
             ramSongs.push(songInRam);
             if (ramSongs.length > 5) ramSongs.shift();
+
         } catch (e) {
+            console.error(e);
+            notify("Error cargando canción: " + e.message, "error");
             document.getElementById('loading-overlay').style.display = 'none';
             return;
         }
@@ -202,75 +220,82 @@ async function prepareAndPlaySong(k) {
             songInRam.kVersion = k;
         }
     }
+
     document.getElementById('loading-overlay').style.display = 'none';
     playSongInternal(songInRam);
 }
 
 function playSongInternal(s) {
-    document.getElementById('track').innerHTML = '';
-    st.notes = JSON.parse(JSON.stringify(s.map));
-    st.spawned = [];
-    st.sc = 0; st.cmb = 0; st.hp = 50; st.stats = { s: 0, g: 0, b: 0, m: 0 };
-    st.keys = new Array(keys).fill(0);
-    st.maxScorePossible = 0;
-    st.ranked = document.getElementById('chk-ranked').checked;
-    st.lastPause = 0; 
-    songFinished = false; 
-    st.songDuration = s.buf.duration;
+    try {
+        document.getElementById('track').innerHTML = '';
+        st.notes = JSON.parse(JSON.stringify(s.map));
+        st.spawned = [];
+        st.sc = 0; st.cmb = 0; st.hp = 50; st.stats = { s: 0, g: 0, b: 0, m: 0 };
+        st.keys = new Array(keys).fill(0);
+        st.maxScorePossible = 0;
+        st.ranked = document.getElementById('chk-ranked').checked;
+        st.lastPause = 0; 
+        songFinished = false; 
+        st.songDuration = s.buf.duration;
 
-    if (isMultiplayer) document.getElementById('vs-hud').style.display = 'flex';
-    else document.getElementById('vs-hud').style.display = 'none';
-    
-    document.getElementById('menu-container').classList.add('hidden');
-    document.getElementById('game-layer').style.display = 'block';
-    document.getElementById('hud').style.display = 'flex';
+        if (isMultiplayer) document.getElementById('vs-hud').style.display = 'flex';
+        else document.getElementById('vs-hud').style.display = 'none';
+        
+        document.getElementById('menu-container').classList.add('hidden');
+        document.getElementById('game-layer').style.display = 'block';
+        document.getElementById('hud').style.display = 'flex';
 
-    initReceptors(keys);
-    updHUD();
+        initReceptors(keys);
+        updHUD();
 
-    // === FALLING START ===
-    const cd = document.getElementById('countdown');
-    let c = 3; cd.innerHTML = c;
+        // === START ===
+        const cd = document.getElementById('countdown');
+        let c = 3; cd.innerHTML = c;
 
-    st.startTime = performance.now() + 3000;
-    st.t0 = null;
-    st.act = true;
-    st.paused = false;
+        // ACTIVAMOS EL JUEGO INMEDIATAMENTE PARA QUE CAIGAN LAS NOTAS
+        st.startTime = performance.now() + 3000;
+        st.t0 = null;
+        st.act = true; // IMPORTANTE: Esto permite que togglePause funcione
+        st.paused = false;
 
-    // Loop inicial (silencioso)
-    requestAnimationFrame(loop);
+        requestAnimationFrame(loop);
 
-    const iv = setInterval(async () => {
-        c--;
-        if (c > 0) {
-            cd.innerHTML = c;
-        } else {
-            clearInterval(iv);
-            cd.innerHTML = "GO!";
-            setTimeout(() => cd.innerHTML = "", 500);
+        const iv = setInterval(async () => {
+            c--;
+            if (c > 0) {
+                cd.innerHTML = c;
+            } else {
+                clearInterval(iv);
+                cd.innerHTML = "GO!";
+                setTimeout(() => cd.innerHTML = "", 500);
 
-            if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
-            
-            try {
-                st.src = st.ctx.createBufferSource();
-                st.src.buffer = s.buf;
-                const gain = st.ctx.createGain();
-                gain.gain.value = cfg.vol;
-                st.src.connect(gain);
-                gain.connect(st.ctx.destination);
-                st.t0 = st.ctx.currentTime;
-                st.src.start(0);
-                st.src.onended = () => { songFinished = true; end(false); };
-            } catch(e) { console.error("Error audio start", e); }
-        }
-    }, 1000);
+                if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
+                
+                try {
+                    st.src = st.ctx.createBufferSource();
+                    st.src.buffer = s.buf;
+                    const gain = st.ctx.createGain();
+                    gain.gain.value = cfg.vol;
+                    st.src.connect(gain);
+                    gain.connect(st.ctx.destination);
+                    
+                    st.t0 = st.ctx.currentTime;
+                    st.src.start(0);
+                    st.src.onended = () => { songFinished = true; end(false); };
+                } catch(e) { console.error("Audio start err", e); }
+            }
+        }, 1000);
+    } catch(e) {
+        console.error("Play error:", e);
+        notify("Error al iniciar juego", "error");
+        toMenu();
+    }
 }
 
 function formatTime(s) { const m = Math.floor(s / 60); const sc = Math.floor(s % 60); return `${m}:${sc.toString().padStart(2, '0')}`; }
 
 function loop() {
-    // Si la pausa está activa, NO PEDIMOS NUEVO FRAME y salimos
-    if (st.paused || !st.act) return;
+    if (!st.act || st.paused) return;
 
     let now;
     if (st.t0 !== null && st.ctx && st.ctx.state === 'running') now = (st.ctx.currentTime - st.t0) * 1000;
@@ -286,7 +311,6 @@ function loop() {
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
     const w = 100 / keys;
 
-    // SPAWN
     for (let i = 0; i < st.notes.length; i++) {
         const n = st.notes[i];
         if (n.s) continue;
@@ -317,7 +341,6 @@ function loop() {
         } else break;
     }
 
-    // MOVEMENT
     for (let i = st.spawned.length - 1; i >= 0; i--) {
         const n = st.spawned[i];
         if (!n.el) { st.spawned.splice(i, 1); continue; }
@@ -346,61 +369,55 @@ function loop() {
         }
     }
     
-    // Solo continuar si NO está pausado
     if (!st.paused) requestAnimationFrame(loop);
 }
 
-// === FIX DE PAUSA (SEGURIDAD) ===
+// === PAUSA ARREGLADA ===
 function togglePause() {
-    if (!st.act) return;
+    // Permitir pausa si hay notas, incluso si st.act es dudoso, para debugging
+    if (!st.act && st.notes.length === 0) return;
     
-    // Cambiar estado primero
     st.paused = !st.paused;
     
     if (st.paused) {
-        // Pausar
         st.lastPause = performance.now();
         
-        // 1. Mostrar UI Inmediatamente
+        // 1. Mostrar menú visual PRIMERO
         document.getElementById('modal-pause').style.display = 'flex';
         document.getElementById('p-sick').innerText = st.stats.s;
         document.getElementById('p-good').innerText = st.stats.g;
         document.getElementById('p-bad').innerText = st.stats.b;
         document.getElementById('p-miss').innerText = st.stats.m;
         
-        // 2. Suspender Audio (Puede tardar, por eso va después)
+        // 2. Suspender audio después (si falla no bloquea la UI)
         if (st.ctx && st.ctx.state === 'running') {
-            st.ctx.suspend().catch(e => console.log(e));
+            st.ctx.suspend().catch(e => console.warn(e));
         }
     } else {
-        // Reanudar
         resumeGame();
     }
 }
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
+    if (st.ctx) st.ctx.resume().catch(e => console.warn(e));
     
-    // Reanudar Audio
-    if (st.ctx && st.ctx.state === 'suspended') {
-        st.ctx.resume().catch(e => console.log(e));
-    }
-    
-    // Ajustar reloj
     if (st.lastPause) {
         const dur = performance.now() - st.lastPause;
         st.startTime += dur;
         st.lastPause = 0;
     }
-    
     st.paused = false;
-    // Reiniciar Loop Visual
     requestAnimationFrame(loop);
 }
 
-// === INPUTS (SAFE) ===
+// === INPUTS ===
 function onKd(e) {
-    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "Escape") { 
+        e.preventDefault(); 
+        togglePause(); 
+        return; 
+    }
     if (["Tab", "Alt", "Control", "Shift"].includes(e.key)) return;
 
     if (remapMode !== null && cfg.modes[remapMode]) {
@@ -410,17 +427,16 @@ function onKd(e) {
         return;
     }
 
-    if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, true);
+    if (!e.repeat) {
+        // Safe check
+        const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
+        if (idx !== undefined && idx !== -1) hit(idx, true);
     }
 }
 
 function onKu(e) {
-    if(cfg && cfg.modes && cfg.modes[keys]) {
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, false);
-    }
+    const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
+    if (idx !== undefined && idx !== -1) hit(idx, false);
 }
 
 function hit(l, p) {
