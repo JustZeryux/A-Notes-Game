@@ -1,6 +1,6 @@
 /* === AUTH SYSTEM === */
 
-// Configurar persistencia para evitar desconexiones
+// Configurar persistencia
 if(firebase.auth) {
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
         .catch((error) => console.error("Error persistencia:", error));
@@ -13,6 +13,44 @@ function checkUpdate() {
              notifyInteractive("update_note", "¡ACTUALIZACIÓN!", "Nueva versión disponible. Recarga la página.", 10000);
         }
     });
+}
+
+// Función principal que recupera tu sesión al abrir la página
+async function loadData() {
+    // 1. Ver si hay un usuario guardado en el navegador
+    const storedName = localStorage.getItem(LAST_KEY);
+    
+    if (storedName && storedName !== "Guest") {
+        console.log("Intentando recuperar sesión de:", storedName);
+        if(!db) return; // Si Firebase no está listo, esperar
+        
+        try {
+            // 2. Descargar datos frescos de la nube
+            const doc = await db.collection("users").doc(storedName).get();
+            if (doc.exists) {
+                const data = doc.data();
+                // Asegurar compatibilidad
+                if(data.sp === undefined) data.sp = 0;
+                if(data.scores === undefined) data.scores = {};
+                
+                user = { ...user, ...data };
+                console.log("Sesión recuperada exitosamente");
+                updUI(); // Actualizar interfaz visualmente
+            } else {
+                // Si el usuario no existe en la nube (borrado), cerrar sesión local
+                logout();
+            }
+        } catch (e) {
+            console.error("Error al cargar datos:", e);
+            notify("Error de conexión al cargar perfil", "error");
+        }
+    } else {
+        // Cargar ajustes locales si es Guest (Volumen, velocidad, etc)
+        const localCfg = localStorage.getItem(DB_KEY + "Guest_CFG");
+        if(localCfg) cfg = JSON.parse(localCfg);
+        applyCfg();
+        updUI();
+    }
 }
 
 function loginGoogle() {
@@ -32,12 +70,10 @@ async function handleAuthUser(name, isGoogle) {
         const doc = await docRef.get();
 
         if(doc.exists) {
-            let data = doc.data();
-            if(data.sp === undefined) data.sp = 0;
-            if(data.scores === undefined) data.scores = {};
-            user = {...user, ...data};
+            // Usuario existe, loguear
             finishLogin(name);
         } else {
+            // Usuario nuevo, crear
             const newUser = {
                 name: name, 
                 pass: isGoogle ? "google-auth" : null,
@@ -50,9 +86,8 @@ async function handleAuthUser(name, isGoogle) {
             await docRef.set(newUser);
             await db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
             
-            user = newUser;
             notify("Bienvenido " + name, "success");
-            setTimeout(() => finishLogin(name), 1500);
+            finishLogin(name);
         }
     } catch (e) {
         console.error(e);
@@ -72,7 +107,6 @@ function login() {
             if(data.pass === "google-auth") {
                 notify("Usa el botón de Google", "error");
             } else if(data.pass === p) {
-                user = {...user, ...data};
                 finishLogin(u);
             } else {
                 notify("Contraseña incorrecta", "error");
@@ -105,15 +139,18 @@ async function createLocalUser(name, pass) {
         };
         await db.collection("users").doc(name).set(newUser);
         await db.collection("leaderboard").doc(name).set({name:name, pp:0, score:0, lvl:1});
-        user = newUser;
+        
         notify("Registrado con éxito", "success");
-        setTimeout(() => finishLogin(name), 1000);
+        finishLogin(name);
     } catch(e) { notify("Error al registrar", "error"); }
 }
 
 function finishLogin(name) {
+    // Guardar el nombre en localStorage para que 'loadData' lo encuentre al recargar
     localStorage.setItem(LAST_KEY, name);
-    location.reload();
+    setTimeout(() => {
+        location.reload(); 
+    }, 500); // Pequeña espera para asegurar que localStorage se guardó
 }
 
 function logout(){ 
