@@ -256,7 +256,7 @@ function closeNotification(id) {
     if(card) { card.classList.add('closing'); setTimeout(()=>card.remove(), 300); }
 }
 
-// --- RENDER MENU CON SCORES Y CARGA GLOBAL ---
+// --- RENDER MENU CON SCORES ---
 let globalSongsListener = null;
 
 function renderMenu(filter="") {
@@ -283,6 +283,7 @@ function renderMenu(filter="") {
                 
                 const bgStyle = s.imageURL ? `background-image:url(${s.imageURL})` : `background-image:linear-gradient(135deg,hsl(${(songId.length*40)%360},60%,20%),black)`;
                 
+                // Mostrar Score y Rango si existen
                 let scoreTag = '';
                 if(user.scores && user.scores[songId]) {
                     const us = user.scores[songId];
@@ -306,7 +307,7 @@ function renderMenu(filter="") {
                 c.onclick = () => { 
                     curSongData = { id: songId, ...s }; 
                     openModal('diff'); 
-                    document.getElementById('create-lobby-opts').style.display = 'none'; 
+                    document.getElementById('create-lobby-opts').style.display = 'none'; // Ocultar crear lobby en modo solo
                 };
                 grid.appendChild(c);
             });
@@ -328,9 +329,9 @@ function autoFillTitle(input) {
     }
 }
 
-// === SUBIDA GLOBAL ===
+// === SUBIDA GLOBAL (GUEST ALLOWED) ===
 async function startGlobalUpload() {
-    if(user.name === "Guest") return notify("Debes iniciar sesión", "error");
+    // SE ELIMINÓ EL CHECK DE GUEST
     if(!storage || !db) return notify("Error de conexión a Firebase", "error");
 
     const titleInp = document.getElementById('up-title');
@@ -371,7 +372,8 @@ async function startGlobalUpload() {
         status.innerText = "Guardando...";
         await db.collection("globalSongs").doc(songId).set({
             title: title,
-            uploader: user.name,
+            // Si es Guest, usamos "Anónimo" o el nombre de usuario
+            uploader: user.name === "Guest" ? "Anónimo" : user.name,
             audioURL: audioURL,
             imageURL: imageURL,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
