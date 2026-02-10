@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (FULL EXPERIENCE V5 + CONSOLE FIXES) === */
+/* === AUDIO & ENGINE (V6: PEAK SYNC + INSTANT PAUSE) === */
 
 function unlockAudio() {
     if (!st.ctx) {
@@ -27,117 +27,147 @@ function playHit() {
     }
 }
 
-// NOTA: playHover se movió a ui.js para evitar el error "not defined"
-
+// === NORMALIZACIÓN INTELIGENTE ===
 function normalizeAudio(filteredData) {
     let max = 0;
-    for (let i = 0; i < filteredData.length; i++) {
+    // Muestreo rápido para encontrar pico
+    for (let i = 0; i < filteredData.length; i += 10) {
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
+    
     const multiplier = 0.95 / max;
+    // Solo normalizamos si el volumen es bajo
     if (multiplier > 1.1) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
     }
     return filteredData;
 }
 
-// === GENERADOR V5 (Patrones Completos) ===
+// === GENERADOR V6 (PEAK DETECTION - MEJOR SYNC) ===
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
 
-    const windowSize = 1024;
-    const step = Math.floor(sampleRate / 75); 
+    // Ventana de análisis (aprox 23ms)
+    const windowSize = 1024; 
+    // Paso más pequeño para mayor precisión en el tiempo
+    const step = Math.floor(sampleRate / 100); 
 
     let laneFreeTime = new Array(k).fill(0);
     let lastNoteTime = -2000;
     let lastLane = 0;
     
-    // Estados de Patrón
-    let patternState = 0; // 0:Random, 1:EscaleraDer, 2:EscaleraIzq, 3:Trill
+    // Control de Patrones
+    let patternState = 0; 
     let patternCount = 0;
 
+    // Historial para detectar Picos Locales
     let energyHistory = [];
-    const historySize = 40;
+    // Miramos atrás y adelante para encontrar el pico exacto
+    const lookback = 5; 
 
-    const thresholdFactor = 1.35 - (cfg.den * 0.04);
-    const minGap = Math.max(90, 500 - (cfg.den * 45));
+    // Ajuste de dificultad
+    // Menor den = Factor más alto (menos notas)
+    const thresholdFactor = 1.4 - (cfg.den * 0.05); 
+    const minGap = Math.max(80, 500 - (cfg.den * 45));
 
     for (let i = 0; i < data.length - windowSize; i += step) {
+        // 1. Calcular RMS (Energía)
         let sum = 0;
         for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
         const instantEnergy = Math.sqrt(sum / windowSize);
 
-        energyHistory.push(instantEnergy);
-        if (energyHistory.length > historySize) energyHistory.shift();
-        let localAvg = 0;
-        for (let e of energyHistory) localAvg += e;
-        localAvg /= energyHistory.length;
+        energyHistory.push({ t: i, e: instantEnergy });
 
-        const timeMs = (i / sampleRate) * 1000;
-
-        if (instantEnergy > localAvg * thresholdFactor && instantEnergy > 0.01) {
+        // Necesitamos suficiente historial para comparar
+        if (energyHistory.length > lookback * 2) {
+            const current = energyHistory[energyHistory.length - 1 - lookback]; // El del medio
             
-            let dynamicGap = minGap;
-            if (instantEnergy > localAvg * 2.0) dynamicGap *= 0.65; 
+            // Calcular promedio local del entorno
+            let localAvg = 0;
+            for(let h of energyHistory) localAvg += h.e;
+            localAvg /= energyHistory.length;
 
-            if (timeMs - lastNoteTime > dynamicGap) {
-                
-                if (patternCount <= 0 || Math.random() > 0.85) {
-                    const r = Math.random();
-                    if (r < 0.4) patternState = 0; 
-                    else if (r < 0.6) patternState = 1; 
-                    else if (r < 0.8) patternState = 2; 
-                    else patternState = 3; 
-                    patternCount = Math.floor(Math.random() * 4) + 3;
-                }
+            // Eliminamos el más viejo para ahorrar memoria
+            energyHistory.shift();
 
-                let type = 'tap';
-                let len = 0;
-                if ((instantEnergy > localAvg * 1.5 && Math.random() > 0.7) || (patternState > 0 && Math.random() > 0.8)) {
-                    type = 'hold';
-                    len = Math.min(800, Math.random() * 300 + 100);
-                }
+            // 2. DETECCIÓN DE PICO (PEAK)
+            // Una nota es un pico si es mayor que sus vecinos Y mayor que el promedio
+            const isPeak = current.e > localAvg * thresholdFactor 
+                           && current.e > energyHistory[energyHistory.length-2].e // Mayor que el siguiente (aprox)
+                           && current.e > energyHistory[0].e; // Mayor que el anterior
 
-                let selectedLane = -1;
-                if (patternState === 1) selectedLane = (lastLane + 1) % k;
-                else if (patternState === 2) selectedLane = (lastLane - 1 + k) % k;
-                else if (patternState === 3) selectedLane = (lastLane + 1) % 2 + (lastLane >= 2 ? 2 : 0);
-                else {
-                    let attempts = 0;
-                    while (attempts < 5) {
-                        selectedLane = Math.floor(Math.random() * k);
-                        if (selectedLane !== lastLane) break;
-                        attempts++;
+            if (isPeak && current.e > 0.02) {
+                // Corregir el tiempo: Centrar la nota en la ventana
+                const timeMs = (current.t / sampleRate) * 1000;
+
+                // Gap Dinámico (Permitir ráfagas si es muy fuerte)
+                let dynamicGap = minGap;
+                if (current.e > localAvg * 2.2) dynamicGap *= 0.6; 
+
+                if (timeMs - lastNoteTime > dynamicGap) {
+                    
+                    // Lógica de Patrones (Escaleras, etc.)
+                    if (patternCount <= 0 || Math.random() > 0.9) {
+                        const r = Math.random();
+                        if (r < 0.3) patternState = 0; // Random
+                        else if (r < 0.55) patternState = 1; // Escalera Der
+                        else if (r < 0.8) patternState = 2; // Escalera Izq
+                        else patternState = 3; // Trill
+                        patternCount = Math.floor(Math.random() * 5) + 3;
                     }
-                }
 
-                if (timeMs < laneFreeTime[selectedLane] + 20) {
-                    for(let x=0; x<k; x++) {
-                        if(timeMs >= laneFreeTime[x] + 20) {
-                            selectedLane = x;
-                            break;
+                    let type = 'tap';
+                    let len = 0;
+                    // Holds en picos muy altos y sostenidos
+                    if ((current.e > localAvg * 1.8 && Math.random() > 0.65)) {
+                        type = 'hold';
+                        len = Math.min(600, Math.random() * 300 + 100);
+                    }
+
+                    // Selección de carril
+                    let selectedLane = -1;
+                    if (patternState === 1) selectedLane = (lastLane + 1) % k;
+                    else if (patternState === 2) selectedLane = (lastLane - 1 + k) % k;
+                    else if (patternState === 3) selectedLane = (lastLane + 1) % 2 + (lastLane >= 2 ? 2 : 0);
+                    else {
+                        let attempts = 0;
+                        while (attempts < 8) {
+                            selectedLane = Math.floor(Math.random() * k);
+                            // Evitar repetición excesiva (Jackhammer)
+                            if (selectedLane !== lastLane) break;
+                            attempts++;
                         }
                     }
-                }
 
-                map.push({ t: timeMs, l: selectedLane, type: type, len: len, h: false });
-                laneFreeTime[selectedLane] = timeMs + len;
-                lastNoteTime = timeMs;
-                lastLane = selectedLane;
-                patternCount--;
+                    // Evitar superposición (Overlap)
+                    if (timeMs < laneFreeTime[selectedLane] + 30) {
+                        for(let x=0; x<k; x++) {
+                            if(timeMs >= laneFreeTime[x] + 30) {
+                                selectedLane = x;
+                                break;
+                            }
+                        }
+                    }
 
-                // Acordes
-                if ((k >= 4 && cfg.den >= 6) && instantEnergy > localAvg * 2.2) {
-                    for (let l = 0; l < k; l++) {
-                        if (Math.abs(l - selectedLane) > 1 && timeMs >= laneFreeTime[l] + 20) {
-                            map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
-                            laneFreeTime[l] = timeMs;
-                            break;
+                    map.push({ t: timeMs, l: selectedLane, type: type, len: len, h: false });
+                    laneFreeTime[selectedLane] = timeMs + len;
+                    lastNoteTime = timeMs;
+                    lastLane = selectedLane;
+                    patternCount--;
+
+                    // Acordes (Dobles) en golpes muy fuertes
+                    if ((k >= 4 && cfg.den >= 5) && current.e > localAvg * 2.5) {
+                        for (let l = 0; l < k; l++) {
+                            if (Math.abs(l - selectedLane) > 1 && timeMs >= laneFreeTime[l] + 30) {
+                                map.push({ t: timeMs, l: l, type: 'tap', len: 0, h: false });
+                                laneFreeTime[l] = timeMs;
+                                break;
+                            }
                         }
                     }
                 }
@@ -174,6 +204,7 @@ function initReceptors(k) {
     }
 }
 
+// === CACHÉ DE CANCIONES ===
 async function prepareAndPlaySong(k) {
     if (!curSongData) return;
 
@@ -198,6 +229,7 @@ async function prepareAndPlaySong(k) {
             return;
         }
     } else {
+        // Regenerar mapa si cambiamos dificultad
         if (songInRam.kVersion !== k) {
             songInRam.map = genMap(songInRam.buf, k);
             songInRam.kVersion = k;
@@ -234,12 +266,14 @@ function playSongInternal(s) {
     const cd = document.getElementById('countdown');
     let c = 3; cd.innerHTML = c;
 
+    // Reloj negativo: las notas spawnean 3s antes del audio
     st.startTime = performance.now() + 3000;
     st.t0 = null;
     st.act = true;
     st.paused = false;
 
-    loop();
+    // Arrancar loop visual ya
+    requestAnimationFrame(loop);
 
     const iv = setInterval(async () => {
         c--;
@@ -250,6 +284,7 @@ function playSongInternal(s) {
             cd.innerHTML = "GO!";
             setTimeout(() => cd.innerHTML = "", 500);
 
+            // Iniciar Audio
             if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
             st.src = st.ctx.createBufferSource();
             st.src.buffer = s.buf;
@@ -257,6 +292,8 @@ function playSongInternal(s) {
             gain.gain.value = cfg.vol;
             st.src.connect(gain);
             gain.connect(st.ctx.destination);
+            
+            // Sync
             st.t0 = st.ctx.currentTime;
             st.src.start(0);
             st.src.onended = () => { songFinished = true; end(false); };
@@ -266,7 +303,9 @@ function playSongInternal(s) {
 
 function formatTime(s) { const m = Math.floor(s / 60); const sc = Math.floor(s % 60); return `${m}:${sc.toString().padStart(2, '0')}`; }
 
+// === LOOP PRINCIPAL ===
 function loop() {
+    // Check critico: Si está pausado o inactivo, NO continuar el frame
     if (!st.act || st.paused) return;
 
     let now;
@@ -283,11 +322,13 @@ function loop() {
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
     const w = 100 / keys;
 
+    // Spawn Logic (Funciona en tiempo negativo para Falling Start)
     for (let i = 0; i < st.notes.length; i++) {
         const n = st.notes[i];
         if (n.s) continue;
         if (n.t < now - 200) { n.s = true; continue; }
 
+        // Spawn anticipado
         if (n.t - now < 1500) {
             const el = document.createElement('div');
             const dirClass = cfg.down ? 'hold-down' : 'hold-up';
@@ -313,6 +354,7 @@ function loop() {
         } else break;
     }
 
+    // Movement
     for (let i = st.spawned.length - 1; i >= 0; i--) {
         const n = st.spawned[i];
         if (!n.el) { st.spawned.splice(i, 1); continue; }
@@ -340,14 +382,65 @@ function loop() {
             n.el.remove(); st.spawned.splice(i, 1);
         }
     }
+    
+    // Si no está pausado, pedir siguiente frame
+    if (!st.paused) requestAnimationFrame(loop);
+}
+
+// === FIX DE PAUSA INSTANTÁNEA ===
+function togglePause() {
+    if (!st.act) return;
+    
+    st.paused = !st.paused;
+    
+    if (st.paused) {
+        // PAUSA ACTIVADA
+        st.lastPause = performance.now();
+        
+        // 1. Mostrar menú INMEDIATAMENTE
+        document.getElementById('modal-pause').style.display = 'flex';
+        document.getElementById('p-sick').innerText = st.stats.s;
+        document.getElementById('p-good').innerText = st.stats.g;
+        document.getElementById('p-bad').innerText = st.stats.b;
+        document.getElementById('p-miss').innerText = st.stats.m;
+        
+        // 2. Suspender audio si es posible (Async, no bloquea visual)
+        if (st.ctx && st.ctx.state === 'running') st.ctx.suspend();
+        
+    } else {
+        // RESUME
+        resumeGame();
+    }
+}
+
+function resumeGame() {
+    document.getElementById('modal-pause').style.display = 'none';
+    
+    if (st.ctx) st.ctx.resume();
+    
+    // Ajustar el reloj para descontar el tiempo que estuvimos pausados
+    if (st.lastPause) {
+        const dur = performance.now() - st.lastPause;
+        st.startTime += dur;
+        st.lastPause = 0;
+    }
+    
+    st.paused = false;
+    // Reiniciar loop
     requestAnimationFrame(loop);
 }
 
-// === FIX ERROR TOLOWERCASE ===
+// === INPUTS ===
 function onKd(e) {
-    if (e.key === "Escape") { togglePause(); return; }
+    // EVITAR EL LAG: Si es Escape, pausar y NO procesar más lógica
+    if (e.key === "Escape") { 
+        e.preventDefault(); 
+        togglePause(); 
+        return; 
+    }
     if (["Tab", "Alt", "Control", "Shift"].includes(e.key)) return;
 
+    // Config de teclas
     if (remapMode !== null && cfg.modes[remapMode]) {
         cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase();
         renderLaneConfig(remapMode);
@@ -356,7 +449,6 @@ function onKd(e) {
     }
 
     if (!e.repeat) {
-        // AGREGADO ?. para evitar crash si modes[keys] no existe aún
         const idx = cfg.modes[keys]?.findIndex(l => l.k === e.key.toLowerCase());
         if (idx !== undefined && idx !== -1) hit(idx, true);
     }
@@ -372,7 +464,7 @@ function hit(l, p) {
     const r = document.getElementById(`rec-${l}`);
     const flash = document.getElementById(`flash-${l}`);
 
-    if (p) { // Key Down
+    if (p) {
         st.keys[l] = 1;
         if (r) r.classList.add('pressed');
         if (flash) {
@@ -418,7 +510,7 @@ function hit(l, p) {
             st.hp -= 2;
             updHUD();
         }
-    } else { // Key Up
+    } else {
         st.keys[l] = 0;
         if (r) r.classList.remove('pressed');
     }
@@ -460,46 +552,6 @@ function showJudge(t, c) {
     j.style.color = c;
     document.body.appendChild(j);
     setTimeout(() => j.remove(), 400);
-}
-
-function updHUD() {
-    document.getElementById('g-score').innerText = st.sc.toLocaleString();
-    if (isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(st.sc);
-    else if (conn && conn.open) conn.send({ type: 'score', val: st.sc });
-    document.getElementById('g-combo').innerText = st.cmb;
-    const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 100;
-    document.getElementById('g-acc').innerText = acc + "%";
-    document.getElementById('health-fill').style.height = st.hp + "%";
-    document.getElementById('h-sick').innerText = st.stats.s;
-    document.getElementById('h-good').innerText = st.stats.g;
-    document.getElementById('h-bad').innerText = st.stats.b;
-    document.getElementById('h-miss').innerText = st.stats.m;
-}
-
-function togglePause() {
-    if (!st.act) return;
-    st.paused = !st.paused;
-    if (st.paused) {
-        st.lastPause = performance.now();
-        if (st.ctx) st.ctx.suspend();
-        document.getElementById('modal-pause').style.display = 'flex';
-        document.getElementById('p-sick').innerText = st.stats.s;
-        document.getElementById('p-good').innerText = st.stats.g;
-        document.getElementById('p-bad').innerText = st.stats.b;
-        document.getElementById('p-miss').innerText = st.stats.m;
-    } else resumeGame();
-}
-
-function resumeGame() {
-    document.getElementById('modal-pause').style.display = 'none';
-    if (st.ctx) st.ctx.resume();
-    if (st.lastPause) {
-        const dur = performance.now() - st.lastPause;
-        st.startTime += dur;
-        st.lastPause = 0;
-    }
-    st.paused = false;
-    loop();
 }
 
 function end(died) {
