@@ -1,87 +1,70 @@
-/* === MAIN INITIALIZATION (MODO DIAGNÓSTICO) === */
+/* === MAIN INITIALIZATION (FIXED STARTUP) === */
 
-// 1. Cazador de Errores Global
+// Cazador de errores global para debug
 window.onerror = function(message, source, lineno, colno, error) {
-    alert("❌ ERROR DETECTADO:\n" + message + "\n\nEn archivo: " + source + "\nLínea: " + lineno);
-    return true; // Esto evita que se spamee la consola
+    console.error("Error Global:", message, "en línea", lineno);
+    // No usamos alert para no bloquear el hilo principal si es un error menor
+    return false; 
 };
 
 window.onload = async () => { 
-    // 2. Verificar que las librerías cargaron
+    console.log("Iniciando sistema...");
+
+    // Verificar si las librerías críticas cargaron
     if (typeof firebase === 'undefined') {
-        alert("❌ ERROR CRÍTICO: Firebase no cargó. Revisa tu internet o los scripts en index.html");
-        return;
-    }
-    if (typeof user === 'undefined' || typeof cfg === 'undefined') {
-        alert("❌ ERROR CRÍTICO: globals.js tiene un error de sintaxis o no cargó.");
+        alert("Error: Firebase no cargó. Revisa tu conexión.");
         return;
     }
 
-    // 3. Iniciar el juego
-    console.log("Iniciando sistema...");
+    // Esperar un momento breve para asegurar que globals.js se procesó
+    if (typeof user === 'undefined' || typeof cfg === 'undefined') {
+        console.warn("Variables globales tardando en cargar...");
+        await new Promise(r => setTimeout(r, 100)); // Espera 100ms
+    }
+
     try {
-        if(typeof loadData === 'function') await loadData(); 
+        // 1. Cargar Datos del Usuario (Auth)
+        if(typeof loadData === 'function') {
+            await loadData(); 
+        } else {
+            console.error("Falta auth.js");
+        }
+        
+        // 2. Iniciar Sistemas Secundarios
         if(typeof initOnline === 'function') initOnline(); 
         
+        // Listener para desbloquear audio con clic
         document.addEventListener('click', unlockAudio); 
+        document.addEventListener('keydown', unlockAudio); // También con teclas
         
+        // 3. Renderizar Menú Inicial
         if(typeof renderMenu === 'function') renderMenu(); 
         if(typeof checkUpdate === 'function') checkUpdate();
         
-        // PRESENCE SYSTEM (HEARTBEAT)
+        // 4. Sistema de Presencia (Online status)
         setInterval(() => {
-            if(user && user.name !== "Guest" && db) {
+            if(typeof user !== 'undefined' && user.name !== "Guest" && db) {
                 db.collection("users").doc(user.name).update({
                     lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
                     online: true
-                }).catch(e => console.warn("Offline"));
+                }).catch(e => {}); // Silencioso
             }
         }, 10000); 
         
         if(typeof setupNotificationsListener === 'function') setupNotificationsListener();
-        
+
+        console.log("Sistema iniciado correctamente.");
+
     } catch (e) {
-        alert("❌ Error al iniciar: " + e.message);
-        console.error(e);
+        console.error("Error en main.js:", e);
+        alert("Error al iniciar el juego: " + e.message);
     }
 };
 
-// Listeners globales protegidos
+// Listeners globales de teclado (Puente a game.js)
 window.addEventListener('keydown', (e) => { 
     try { if(typeof onKd === 'function') onKd(e); } catch(err){ console.error(err); } 
 }); 
 window.addEventListener('keyup', (e) => { 
     try { if(typeof onKu === 'function') onKu(e); } catch(err){ console.error(err); } 
 });
-window.onload = async () => { 
-    // Verificar si globals.js cargó correctamente
-    if (typeof user === 'undefined' || typeof cfg === 'undefined') {
-        alert("Error Crítico: globals.js no se cargó o tiene un error de sintaxis. Revisa la consola (F12).");
-        return;
-    }
-
-    // Si todo está bien, iniciar
-    if(typeof loadData === 'function') await loadData(); 
-    
-    if(typeof initOnline === 'function') initOnline(); 
-    document.addEventListener('click', unlockAudio); 
-    
-    if(typeof renderMenu === 'function') renderMenu(); 
-    if(typeof checkUpdate === 'function') checkUpdate();
-    
-    // PRESENCE SYSTEM (HEARTBEAT)
-    setInterval(() => {
-        if(user && user.name !== "Guest" && db) {
-            db.collection("users").doc(user.name).update({
-                lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-                online: true
-            }).catch(e => console.log("Presencia offline"));
-        }
-    }, 10000); 
-    
-    if(typeof setupNotificationsListener === 'function') setupNotificationsListener();
-};
-
-// Listeners globales
-window.addEventListener('keydown', (e) => { if(typeof onKd === 'function') onKd(e); }); 
-window.addEventListener('keyup', (e) => { if(typeof onKu === 'function') onKu(e); });
