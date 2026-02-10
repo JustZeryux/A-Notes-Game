@@ -1,28 +1,42 @@
-// --- CONFIGURACIÓN DE FIREBASE (SOLO FIRESTORE Y AUTH) ---
+// js/globals.js
+
+// 🔴 IMPORTANTE: PEGA AQUÍ TU CONFIGURACIÓN REAL DE FIREBASE 🔴
 const firebaseConfig = {
-    apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
+    apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8", // <--- TU API KEY REAL
     authDomain: "a-notes-game.firebaseapp.com",
     projectId: "a-notes-game",
-    storageBucket: "a-notes-game.firebasestorage.app", // No se usa, pero se deja para evitar errores legacy
+    storageBucket: "a-notes-game.appspot.com", 
     messagingSenderId: "149492857447",
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
-let DB = null;
+let db = null;
+// let storage = null; // YA NO USAMOS STORAGE (Usamos Uploadcare)
 
+// Inicialización FORZADA (Sin 'if' que bloquee)
 try {
-    if(firebaseConfig.apiKey !== "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8") {
-        firebase.initializeApp(firebaseConfig);
+    if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        } else {
+            firebase.app(); 
+        }
+        
         db = firebase.firestore();
-        // storage = firebase.storage(); // COMENTADO: Usamos Uploadcare
-        console.log("Firebase (DB) Conectado");
+        console.log("✅ Firebase Base de Datos Conectada");
+    } else {
+        console.error("❌ La librería de Firebase no se cargó en el HTML");
     }
-} catch(e) { console.error("Error Firebase:", e); }
+} catch(e) { 
+    console.error("❌ Error inicializando Firebase:", e);
+    alert("Error de conexión. Revisa la consola.");
+}
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
-const CURRENT_VERSION = 99; 
+const CURRENT_VERSION = 100; 
 
+// Helpers para configuración de teclas
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
     const cols = ['#00FFFF','#12FA05','#F9393F','#FFD700','#BD00FF','#0055FF','#FF8800','#FFFFFF','#AAAAAA'];
@@ -38,11 +52,13 @@ let cfg = {
 
 let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
 
+// Variables de juego
 let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
 let ctx=null, hitBuf=null;
 let songFinished = false; 
 let curSongData = null; 
 
+// Online
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
 let onlineState = { myPick: null, oppPick: null };
 let currentChatRoom = null, chatListener = null;
