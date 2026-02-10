@@ -1,4 +1,4 @@
-/* === AUTH SYSTEM (V3 - COMPLETE) === */
+/* === AUTH SYSTEM (V3 FINAL) === */
 
 if(firebase.auth) {
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
@@ -9,7 +9,7 @@ function checkUpdate() {
     if(!db) return;
     db.collection("system").doc("status").get().then(doc => {
         if(doc.exists && doc.data().latestVersion > CURRENT_VERSION) {
-             notifyInteractive("update_note", "¡ACTUALIZACIÓN!", "Nueva versión disponible. Por favor recarga.", 10000);
+             notifyInteractive("update_note", "¡ACTUALIZACIÓN!", "Nueva versión disponible. Recarga.", 10000);
         }
     });
 }
@@ -79,7 +79,7 @@ function finishLoad() {
     if(typeof renderMenu === 'function') renderMenu();
 }
 
-// === GOOGLE LOGIN (NUEVA LÓGICA CON MODAL) ===
+// === GOOGLE LOGIN ===
 function loginGoogle() {
     if(!db) return notify("Error: DB no conectada", "error");
     const provider = new firebase.auth.GoogleAuthProvider();
@@ -99,7 +99,6 @@ function loginGoogle() {
         // Si no existe, abrir modal para elegir nombre
         window.tempGoogleUser = u;
         document.getElementById('modal-finish-reg').style.display = 'flex';
-        // (No recargamos aún)
     }).catch(e => notify("Error Google: " + e.message, "error"));
 }
 
@@ -126,7 +125,6 @@ async function finishGoogleRegistration() {
     location.reload();
 }
 
-// === GESTIÓN DE CUENTA ===
 function linkGoogleAccount() {
     if(!firebase.auth().currentUser) {
         const provider = new firebase.auth.GoogleAuthProvider();
@@ -166,7 +164,6 @@ async function changeUsername() {
     setTimeout(() => location.reload(), 1500);
 }
 
-// === LOGIN NORMAL ===
 function login() { const u = document.getElementById('l-user').value.trim(); const p = document.getElementById('l-pass').value.trim(); if(!u||!p)return notify("Datos?","error"); db.collection("users").doc(u).get().then(d=>{if(d.exists){if(d.data().pass===p){localStorage.setItem(LAST_KEY,u);location.reload();}else notify("Pass mal","error");}else notify("No existe","error");}); }
 function register() { const u = document.getElementById('l-user').value.trim(); const p = document.getElementById('l-pass').value.trim(); if(!u||!p)return; if(/[^a-zA-Z0-9]/.test(u))return notify("Solo letras/nums","error"); db.collection("users").doc(u).get().then(d=>{if(d.exists)notify("Ya existe","error");else createLocalUser(u,p);});}
 async function createLocalUser(n,p) { await db.collection("users").doc(n).set({name:n,pass:p,xp:0,lvl:1,score:0,friends:[],online:true,scores:{}}); await db.collection("leaderboard").doc(n).set({name:n,pp:0,score:0,lvl:1}); localStorage.setItem(LAST_KEY,n); location.reload(); }
