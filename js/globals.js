@@ -1,50 +1,29 @@
-// js/globals.js
-
-// --- 1. CONFIGURACIÓN DE FIREBASE ---
-// Asegúrate de no borrar ninguna coma (,) al final de las líneas.
+// --- CONFIGURACIÓN DE FIREBASE (SOLO FIRESTORE Y AUTH) ---
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
     authDomain: "a-notes-game.firebaseapp.com",
     projectId: "a-notes-game",
-    // Intenta con esta dirección primero. Si falla, cambia a "a-notes-game.appspot.com"
-    storageBucket: "a-notes-game.firebasestorage.app", 
+    storageBucket: "a-notes-game.firebasestorage.app", // No se usa, pero se deja para evitar errores legacy
     messagingSenderId: "149492857447",
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
-// --- 2. VARIABLES GLOBALES (Definirlas antes de usarlas) ---
 let db = null;
-let storage = null; 
-let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
-let cfg = { 
-    spd:22, den:5, vol:0.5, hvol:0.6, down:false, vivid:true, shake:true, off:0, trackOp:10, judgeY:40, judgeX:50, judgeS:7, judgeVis:true,
-    modes: { 4: [], 6: [], 7: [], 9: [] } // Se llena abajo
-};
+let storage = null; // No usado con Uploadcare, pero definido para evitar crash
 
-// --- 3. INICIALIZACIÓN SEGURA ---
 try {
-    // Verificamos si Firebase fue cargado en el HTML
-    if (typeof firebase !== 'undefined') {
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+    if(firebaseConfig.apiKey !== "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8") {
+        firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        storage = firebase.storage();
-        console.log("✅ Firebase (DB + Storage) Conectado correctamente.");
-    } else {
-        console.error("❌ ERROR CRÍTICO: La librería de Firebase no se cargó en el HTML.");
+        // storage = firebase.storage(); // COMENTADO: Usamos Uploadcare
+        console.log("Firebase (DB) Conectado");
     }
-} catch(e) { 
-    console.error("⚠️ Error inicializando Firebase:", e);
-    // No detenemos el juego, solo avisamos
-}
+} catch(e) { console.error("Error Firebase:", e); }
 
-// --- 4. CONFIGURACIÓN DEL JUEGO ---
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
-const CURRENT_VERSION = 98; 
+const CURRENT_VERSION = 99; 
 
-// Helpers de Configuración
 function createLanes(k) {
     const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
     const cols = ['#00FFFF','#12FA05','#F9393F','#FFD700','#BD00FF','#0055FF','#FF8800','#FFFFFF','#AAAAAA'];
@@ -53,19 +32,18 @@ function createLanes(k) {
     return arr;
 }
 
-// Rellenar modos
-cfg.modes[4] = createLanes(4);
-cfg.modes[6] = createLanes(6);
-cfg.modes[7] = createLanes(7);
-cfg.modes[9] = createLanes(9);
+let cfg = { 
+    spd:22, den:5, vol:0.5, hvol:0.6, down:false, vivid:true, shake:true, off:0, trackOp:10, judgeY:40, judgeX:50, judgeS:7, judgeVis:true,
+    modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
+};
 
-// Variables de Estado del Juego
+let user = { name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{} };
+
 let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
 let ctx=null, hitBuf=null;
 let songFinished = false; 
 let curSongData = null; 
 
-// Online & Lobby
 let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
 let onlineState = { myPick: null, oppPick: null };
 let currentChatRoom = null, chatListener = null;
