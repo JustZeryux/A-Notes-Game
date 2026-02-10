@@ -378,12 +378,18 @@
     <div id="modal-pause" class="modal-overlay">
         <div class="modal-panel login-box">
             <div class="m-title">PAUSA</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.3rem; margin-bottom:20px;">
-                <div style="color:var(--sick)">SICK: <span id="p-sick">0</span></div>
-                <div style="color:var(--good)">GOOD: <span id="p-good">0</span></div>
-                <div style="color:var(--bad)">BAD: <span id="p-bad">0</span></div>
-                <div style="color:var(--miss)">MISS: <span id="p-miss">0</span></div>
+            
+            <div style="font-size: 3rem; font-weight: 900; color: var(--blue); margin-bottom: 20px; text-shadow: 0 0 20px var(--blue);">
+                ACC: <span id="p-acc">100%</span>
             </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px; font-weight:bold;">
+                <div style="color:var(--sick)">SICK: <span id="p-sick" style="color:white">0</span></div>
+                <div style="color:var(--good)">GOOD: <span id="p-good" style="color:white">0</span></div>
+                <div style="color:var(--bad)">BAD: <span id="p-bad" style="color:white">0</span></div>
+                <div style="color:var(--miss)">MISS: <span id="p-miss" style="color:white">0</span></div>
+            </div>
+
             <button class="action" onclick="resumeGame()">CONTINUAR</button>
             <button class="action secondary" onclick="toMenu()">SALIR AL MENU</button>
         </div>
