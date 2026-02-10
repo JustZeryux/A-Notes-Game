@@ -608,22 +608,25 @@ function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
 
 /* === GAME LOGIC (HUD & RESULTS FIX) === */
 
+/* === GAME LOGIC (XP & SAVE FIX) === */
+
 function updHUD() {
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
     
-    // COMBO GIGANTE
+    // COMBO GIGANTE Y FC
     const comboEl = document.getElementById('g-combo');
-    if (st.cmb > 0) {
-        comboEl.innerText = st.cmb;
-        comboEl.style.opacity = '1';
-        comboEl.classList.remove('pulse'); 
-        void comboEl.offsetWidth; 
-        comboEl.classList.add('pulse');
-    } else {
-        comboEl.style.opacity = '0';
+    if(comboEl) {
+        if (st.cmb > 0) {
+            comboEl.innerText = st.cmb;
+            comboEl.style.opacity = '1';
+            comboEl.classList.remove('pulse'); 
+            void comboEl.offsetWidth; 
+            comboEl.classList.add('pulse');
+        } else {
+            comboEl.style.opacity = '0';
+        }
     }
 
-    // FC STATUS
     const fcEl = document.getElementById('hud-fc');
     if(fcEl && st.fcStatus) {
         fcEl.innerText = cfg.showFC ? st.fcStatus : "";
@@ -645,21 +648,17 @@ function updHUD() {
     document.getElementById('h-good').innerText = st.stats.g;
     document.getElementById('h-bad').innerText = st.stats.b;
     document.getElementById('h-miss').innerText = st.stats.m;
-    
     document.getElementById('health-fill').style.height = st.hp + '%';
     
     if (isMultiplayer) sendLobbyScore(st.sc);
 }
-
-// FIX: Pantalla de resultados (Bug: "al entrar")
-// ... (resto del código de game.js) ...
 
 function end(died) {
     st.act = false;
     if (st.src) try { st.src.stop() } catch (e) { }
     document.getElementById('game-layer').style.display = 'none';
     const modal = document.getElementById('modal-res');
-    if(modal) modal.style.display = 'flex'; // Solo mostrar aquí, no antes
+    modal.style.display = 'flex';
     
     const acc = st.maxScorePossible > 0 ? Math.round((st.sc / st.maxScorePossible) * 100) : 0;
     
@@ -678,6 +677,7 @@ function end(died) {
     document.getElementById('res-score').innerText = st.sc.toLocaleString();
     document.getElementById('res-acc').innerText = acc + "%";
     
+    // FIX: Cálculo de XP y Guardado
     if (!died && songFinished && user.name !== "Guest" && curSongData) {
         const xpGain = Math.floor(st.sc / 250);
         user.xp += xpGain;
@@ -693,7 +693,7 @@ function end(died) {
         if (user.xp >= xpReq) {
             user.xp -= xpReq;
             user.lvl++;
-            notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success", 5000);
+            notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success");
         }
         
         if (st.ranked) {
@@ -704,8 +704,15 @@ function end(died) {
             document.getElementById('pp-gain-loss').innerText = "0 PP";
         }
         
+        // Guardar score en objeto
+        if(!user.scores) user.scores = {};
+        if(!user.scores[curSongData.id] || st.sc > user.scores[curSongData.id].score) {
+            user.scores[curSongData.id] = { score: st.sc, rank: r, acc: acc };
+        }
+
         save();
         updateFirebaseScore();
+        
         document.getElementById('res-xp').innerText = xpGain;
         document.getElementById('res-sp').innerText = spGain;
     } else {
