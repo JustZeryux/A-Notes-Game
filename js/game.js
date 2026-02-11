@@ -54,25 +54,75 @@ function playMiss() {
 // 2. VISUALES (SKIN & COLORS FIX)
 // ==========================================
 // Esta función es global para que el Preview en ui.js también la use
-window.getNoteVisuals = function(laneIndex, skinId) {
-    if (!window.cfg || !window.cfg.modes[window.keys]) return { color: "white", shape: window.PATHS.circle, filter: "" };
-    
+const SKIN_PATHS = {
+    // Triángulo agresivo para Demon
+    demon: "M 50 5 L 95 95 L 5 95 Z", 
+    // Anillo para Angel
+    angel: "M 50 50 m -35 0 a 35,35 0 1,0 70,0 a 35,35 0 1,0 -70,0", 
+    // Cruz para Sniper
+    sniper: "M 45 0 L 55 0 L 55 45 L 100 45 L 100 55 L 55 55 L 55 100 L 45 100 L 45 55 L 0 55 L 0 45 L 45 45 Z",
+    // Estrella ninja
+    shuriken: "M 50 0 L 65 35 L 100 50 L 65 65 L 50 100 L 35 65 L 0 50 L 35 35 Z"
+};
+
+// HELPER: Obtener Configuración Visual de la Nota (Color + Shape)
+function getNoteVisuals(laneIndex, currentSkin) {
+    // 1. Configuración por defecto (Custom del usuario)
     let conf = window.cfg.modes[window.keys][laneIndex];
     let color = conf.c;
-    let shape = window.PATHS[conf.s] || window.PATHS.circle;
-    let filter = `drop-shadow(0 0 5px ${color})`;
+    let shape = PATHS[conf.s] || PATHS['circle'];
+    let svgFilter = `drop-shadow(0 0 5px ${color})`;
+    let extraHTML = ""; // Para halos, cuernos extra, etc.
 
-    if (skinId && skinId !== 'default' && window.SHOP_ITEMS) {
-        const item = window.SHOP_ITEMS.find(x => x.id === skinId);
-        if (item) {
-            if (item.shape && window.SKIN_PATHS[item.shape]) shape = window.SKIN_PATHS[item.shape];
-            if (item.fixed) color = item.color;
-            else if (item.id === 'skin_neon') color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
-            filter = `drop-shadow(0 0 10px ${color})`;
+    // 2. OVERRIDES POR SKIN
+    if (currentSkin && currentSkin !== 'default') {
+        switch (currentSkin) {
+            case 'skin_neon':
+                color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
+                svgFilter = `drop-shadow(0 0 10px ${color})`;
+                break;
+            case 'skin_gold':
+                color = '#FFD700';
+                svgFilter = `drop-shadow(0 0 8px gold)`;
+                break;
+            case 'skin_dark':
+                color = '#FFFFFF'; // Blanco sobre negro
+                break;
+                
+            case 'skin_demon':
+                color = '#FF0000'; // Rojo Fijo
+                shape = SKIN_PATHS.demon;
+                // Efecto extra: Borde negro
+                svgFilter = `drop-shadow(0 0 10px red)`;
+                break;
+
+            case 'skin_angel':
+                color = (laneIndex % 2 === 0) ? '#00FFFF' : '#FFFFFF';
+                shape = SKIN_PATHS.angel;
+                // Efecto extra: Halo brillante
+                svgFilter = `drop-shadow(0 0 15px white)`;
+                break;
+
+            case 'skin_sniper':
+                // Mantiene color custom (No sobrescribimos 'color')
+                shape = SKIN_PATHS.sniper;
+                break;
+
+            case 'skin_shuriken':
+                // Mantiene color custom
+                shape = SKIN_PATHS.shuriken;
+                break;
+                
+            case 'skin_plasma':
+                color = '#BD00FF';
+                shape = PATHS.circle;
+                svgFilter = `drop-shadow(0 0 20px #BD00FF)`;
+                break;
         }
     }
-    return { color, shape, filter };
-};
+    
+    return { color, shape, filter: svgFilter, extra: extraHTML };
+}
 // ==========================================
 // 3. GENERADOR DE MAPAS (ANTI-SPAM)
 // ==========================================
@@ -187,14 +237,30 @@ function initReceptors(k) {
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
     const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
-
-    for (let i = 0; i < k; i++) {
-        const viz = window.getNoteVisuals(i, skin);
+for (let i = 0; i < k; i++) {
+        // Obtener visuales basados en la skin
+        const viz = getNoteVisuals(i, skin);
+        
         const l = document.createElement('div');
-        l.className = 'lane-flash'; l.id = `flash-${i}`;
+        l.className = 'lane-flash';
+        l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', viz.color);
+        l.style.setProperty('--c', viz.color); // Color correcto para el flash
         elTrack.appendChild(l);
+
+        const r = document.createElement('div');
+        r.className = `arrow-wrapper receptor`;
+        r.id = `rec-${i}`;
+        r.style.left = (i * (100 / k)) + '%';
+        r.style.top = y + 'px';
+        r.style.setProperty('--active-c', viz.color); // Color correcto para el brillo al pulsar
+        
+        // Renderizar forma
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
+            <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
+        </svg>`;
+        
+        elTrack.appendChild(r);
 
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`; r.id = `rec-${i}`;
@@ -330,9 +396,8 @@ function loop() {
 
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
-    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
+const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
-    // SPAWNING
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
@@ -343,22 +408,25 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // OBTENER VISUALES CORRECTOS
-            const viz = window.getNoteVisuals(n.l, skin);
+            // OBTENER DATOS DE LA SKIN
+            const viz = getNoteVisuals(n.l, skin);
 
+            // SVG Construction
             let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
                 <path d="${viz.shape}" fill="${viz.color}" stroke="white" stroke-width="2"/>
             </svg>`;
             
-            // Rotación especial Shuriken
-            if (skin === 'skin_shuriken') el.classList.add('rotating-note');
+            // Rotación para shuriken
+            if (skin === 'skin_shuriken') {
+                el.classList.add('rotating-note'); // Definir en CSS
+            }
 
             if (n.type === 'hold') {
                 const h = (n.len / 1000) * (window.cfg.spd * 40); 
                 svg += `<div class="sustain-trail" style="height:${h}px; background:${viz.color}; opacity:${window.cfg.noteOp/100}"></div>`;
             }
 
-            el.innerHTML = svg;
+            el.innerHTML = svg + viz.extra;
             if(elTrack) elTrack.appendChild(el);
             n.el = el;
             n.s = true;
