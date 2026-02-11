@@ -1,13 +1,16 @@
-/* === AUDIO & ENGINE (MASTER V100 - FIXED) === */
+/* === AUDIO & ENGINE (MASTER V101 - FINAL STABLE) === */
 
 let elTrack = null;
 let mlContainer = null;
 
-// === 1. AUDIO SYSTEM ===
+// ==========================================
+// 1. SISTEMA DE AUDIO (ROBUSTO)
+// ==========================================
 function unlockAudio() {
     if (!window.st.ctx) {
         try {
             window.st.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            // Buffer vacío para "calentar" el engine
             const b = window.st.ctx.createBuffer(1, 1, 22050);
             const s = window.st.ctx.createBufferSource();
             s.buffer = b;
@@ -21,11 +24,13 @@ function unlockAudio() {
 
 function genSounds() {
     if(!window.st.ctx) return;
+    // Hit Sound (Seno corto y percusivo)
     const b1 = window.st.ctx.createBuffer(1, 2000, 44100);
     const d1 = b1.getChannelData(0);
     for (let i = 0; i < d1.length; i++) d1[i] = Math.sin(i * 0.5) * Math.exp(-i / 300);
     window.hitBuf = b1;
 
+    // Miss Sound (Ruido blanco)
     const b2 = window.st.ctx.createBuffer(1, 4000, 44100);
     const d2 = b2.getChannelData(0);
     for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() - 0.5) * 0.5 * Math.exp(-i / 500);
@@ -54,14 +59,16 @@ function playMiss() {
     }
 }
 
-// === 2. GENERADOR MAPAS ===
+// ==========================================
+// 2. GENERADOR DE MAPAS (ANTI-SPAM)
+// ==========================================
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // Leer config global
+    // Configuración de Densidad
     let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
     const thresholdBase = 1.5 - (safeDen * 0.08); 
     const minStep = Math.max(90, 260 - (safeDen * 22)); 
@@ -75,6 +82,7 @@ function genMap(buf, k) {
     let laneFreeTimes = new Array(k).fill(0);
     let consecutiveSameLane = 0; 
 
+    // Patrones
     let currentPattern = 0;
     let patternDuration = 0;
     let patternDir = 1;
@@ -94,13 +102,16 @@ function genMap(buf, k) {
         const timeMs = (i / sampleRate) * 1000;
         if (timeMs < 1500) continue;
 
+        // Detección de golpe
         if (instantEnergy > localAvg * thresholdBase && (timeMs - lastTime > minStep)) {
+            
+            // Cambio de patrón aleatorio
             if (patternDuration <= 0) {
                 const r = Math.random();
-                if (r < 0.35) currentPattern = 1; 
-                else if (r < 0.45) currentPattern = 2; 
-                else if (r < 0.7) currentPattern = 3; 
-                else currentPattern = 0; 
+                if (r < 0.35) currentPattern = 1; // Stream
+                else if (r < 0.45) currentPattern = 2; // Jack
+                else if (r < 0.7) currentPattern = 3; // Trill
+                else currentPattern = 0; // Random
                 patternDuration = Math.floor(Math.random() * 6) + 3;
                 patternDir = Math.random() > 0.5 ? 1 : -1;
             }
@@ -111,6 +122,7 @@ function genMap(buf, k) {
             else if (currentPattern === 3) targetLane = (lastLane + 2) % k;
             else targetLane = Math.floor(Math.random() * k);
 
+            // Anti-Jackhammer (Máximo 2 notas seguidas en mismo carril)
             if (targetLane === lastLane) {
                 consecutiveSameLane++;
                 if (consecutiveSameLane >= 2) {
@@ -120,6 +132,7 @@ function genMap(buf, k) {
                 }
             } else { consecutiveSameLane = 0; }
 
+            // Buscar carril libre
             let finalLane = -1;
             if (timeMs >= laneFreeTimes[targetLane]) finalLane = targetLane;
             else {
@@ -131,15 +144,18 @@ function genMap(buf, k) {
             if (finalLane !== -1) {
                 let isHold = false;
                 let holdLen = 0;
+                // Probabilidad de nota larga
                 if (instantEnergy > localAvg * 1.6 && Math.random() > 0.7) {
                     isHold = true;
                     holdLen = Math.min(600, Math.random() * 300 + 100);
                 }
+
                 map.push({ t: timeMs, l: finalLane, type: isHold?'hold':'tap', len: holdLen, h:false, scoreGiven:false });
                 laneFreeTimes[finalLane] = timeMs + holdLen + 50; 
                 lastTime = timeMs;
                 lastLane = finalLane;
 
+                // Dobles (Chords)
                 if (instantEnergy > localAvg * 2.2 && safeDen >= 6) {
                     let secondLaneTarget = (finalLane + Math.floor(k/2)) % k;
                     if (timeMs >= laneFreeTimes[secondLaneTarget] && secondLaneTarget !== finalLane) {
@@ -154,13 +170,15 @@ function genMap(buf, k) {
     return map;
 }
 
-// === 3. PREPARACIÓN ===
+// ==========================================
+// 3. PREPARACIÓN E INICIO
+// ==========================================
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
     elTrack.innerHTML = '';
     
-    // Aplicar Config
+    // Aplicar FOV
     const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
     elTrack.style.transform = `rotateX(${fov}deg)`;
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
@@ -169,6 +187,7 @@ function initReceptors(k) {
     window.elReceptors = []; 
     
     for (let i = 0; i < k; i++) {
+        // Flash visual
         const l = document.createElement('div');
         l.className = 'lane-flash';
         l.id = `flash-${i}`;
@@ -176,6 +195,7 @@ function initReceptors(k) {
         l.style.setProperty('--c', window.cfg.modes[k][i].c);
         elTrack.appendChild(l);
 
+        // Receptor
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`;
         r.id = `rec-${i}`;
@@ -184,7 +204,7 @@ function initReceptors(k) {
         r.style.setProperty('--active-c', window.cfg.modes[k][i].c);
         
         let strokeColor = "white";
-        // Skin Check
+        // Check Skin
         if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
              if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
              else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
@@ -199,7 +219,7 @@ function initReceptors(k) {
     }
 }
 
-// --- GLOBAL EXPORTS PARA ONLINE.JS (CRÍTICO) ---
+// Función global accesible por Online.js
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
@@ -207,10 +227,11 @@ window.prepareAndPlaySong = async function(k) {
 
     try {
         unlockAudio();
+        // Verificar RAM
         let songInRam = window.ramSongs.find(s => s.id === window.curSongData.id);
         const currentDen = window.cfg.den || 5;
 
-        // Regenerar si cambió dificultad o teclas
+        // Si cambió config o teclas, regenerar
         if (songInRam && (songInRam.kVersion !== k || songInRam.genDen !== currentDen)) {
             window.ramSongs = window.ramSongs.filter(s => s.id !== window.curSongData.id); 
             songInRam = null; 
@@ -225,7 +246,7 @@ window.prepareAndPlaySong = async function(k) {
             window.ramSongs.push(songInRam);
         }
         
-        // Espera Online
+        // Espera de Multiplayer
         if(window.isMultiplayer) {
             document.getElementById('loading-text').innerText = "Esperando jugadores...";
             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded();
@@ -233,10 +254,9 @@ window.prepareAndPlaySong = async function(k) {
             if(loader) loader.style.display = 'none';
             playSongInternal(songInRam);
         }
-        
     } catch (e) {
         console.error(e);
-        notify("Error: " + e.message, "error");
+        notify("Error carga: " + e.message, "error");
         if(loader) loader.style.display = 'none';
     }
 };
@@ -247,20 +267,20 @@ window.playSongInternal = function(s) {
     }
     if(!s) return;
 
-    // UI Cleanup
+    // Limpiar UI
     const loader = document.getElementById('loading-overlay');
     if(loader) loader.style.display = 'none';
     const syncOv = document.getElementById('sync-overlay');
     if(syncOv) syncOv.style.display = 'none'; 
 
-    // Reset Estado
+    // Reset Estado Juego
     window.st.act = true;
     window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
     window.st.spawned = [];
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
     
-    // Max Score Calc
+    // Calcular Puntaje Máximo Real
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => {
         window.st.trueMaxScore += 350; 
@@ -274,11 +294,15 @@ window.playSongInternal = function(s) {
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.fcStatus = "GFC";
 
-    // Visibilidad Capas
+    // Vistas
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
-    document.getElementById('modal-res').style.display = 'none';
-    document.getElementById('modal-pause').style.display = 'none';
+    
+    // Forzar ocultar modales previos
+    ['modal-res', 'modal-pause'].forEach(id => {
+        const m = document.getElementById(id);
+        if(m) m.style.display = 'none';
+    });
 
     if(window.isMultiplayer) initMultiLeaderboard();
     else if(document.getElementById('multi-leaderboard')) document.getElementById('multi-leaderboard').style.display = 'none';
@@ -286,7 +310,7 @@ window.playSongInternal = function(s) {
     initReceptors(window.keys);
     updHUD();
 
-    // Countdown
+    // Cuenta regresiva
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex';
     cd.innerText = "3";
@@ -314,11 +338,14 @@ window.playSongInternal = function(s) {
     }, 1000);
 }
 
+// ==========================================
+// 4. BUCLE DE JUEGO (RENDER LOOP)
+// ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     
-    // Progress Bar
+    // Barra Progreso
     if (window.st.songDuration > 0) {
         const cur = Math.max(0, now / 1000); 
         const pct = Math.min(100, (cur / window.st.songDuration) * 100);
@@ -329,7 +356,7 @@ function loop() {
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // SPAWNING
+    // A) SPAWNING
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
@@ -340,7 +367,7 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // Prioridad Color: Skin > Config
+            // PRIORIDAD COLOR: Config > Default (Skin sobreescribe si existe)
             let conf = window.cfg.modes[window.keys][n.l];
             let color = conf.c; 
             
@@ -367,12 +394,13 @@ function loop() {
         } else break;
     }
 
-    // MOVEMENT
+    // B) MOVEMENT
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if (!n.el) { window.st.spawned.splice(i, 1); continue; }
 
         const timeDiff = n.t - now + window.cfg.off;
+        // Velocidad controlada por cfg.spd
         const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
         let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
         
@@ -404,7 +432,9 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === SPLASH FX ===
+// ==========================================
+// 5. VISUALES & INPUT
+// ==========================================
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
@@ -417,6 +447,8 @@ function createSplash(l) {
     
     const s = document.createElement('div');
     s.className = 'splash-wrapper';
+    
+    // Posición exacta heredada del receptor
     s.style.left = r.style.left;
     s.style.top = r.style.top;
     
@@ -429,7 +461,6 @@ function createSplash(l) {
     setTimeout(() => s.remove(), 400);
 }
 
-// === INPUTS ===
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
@@ -451,7 +482,7 @@ function hit(l, p) {
     
     if (p) {
         window.st.keys[l] = 1;
-        if(r) r.classList.add('pressed'); // CSS Activado
+        if(r) r.classList.add('pressed'); 
         if(flash && window.cfg.laneFlash) { 
             flash.style.opacity = 0.5; 
             setTimeout(() => flash.style.opacity=0, 100); 
@@ -510,6 +541,7 @@ function updHUD() {
     if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
     document.getElementById('health-fill').style.height = window.st.hp + "%";
     
+    // Calcular Accuracy real vs jugado
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
@@ -524,7 +556,9 @@ function updHUD() {
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
 
-// === MULTIPLAYER ===
+// ==========================================
+// 6. MULTIPLAYER LEADERBOARD
+// ==========================================
 function initMultiLeaderboard() {
     if (!document.getElementById('multi-leaderboard')) {
         mlContainer = document.createElement('div');
@@ -559,7 +593,9 @@ window.updateMultiLeaderboardUI = function(scores) {
     });
 };
 
-// === RESULTADOS ===
+// ==========================================
+// 7. PANTALLAS FINALES Y CONTROL (FIX AUDIO)
+// ==========================================
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
@@ -574,6 +610,7 @@ function end(died) {
     if(modal) {
         modal.style.display = 'flex';
         const panel = modal.querySelector('.modal-panel');
+        // Cálculo final sobre el TOTAL de la canción
         const totalMax = window.st.trueMaxScore || 1;
         const finalAcc = Math.round((window.st.sc / totalMax) * 100);
         let r="D", c="red";
@@ -657,22 +694,19 @@ function resumeGame() {
     loop();
 }
 
-// === FIX: SALIR SIN BUG DE AUDIO ===
 function toMenu() {
-    // 1. Detener Audio
+    // CORTE DE AUDIO AGRESIVO
     if(window.st.src) {
-        try { window.st.src.stop(); } catch(e){}
+        try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
         window.st.src = null;
     }
-    // 2. Limpiar Estado
+    if(window.st.ctx) window.st.ctx.suspend(); // Pausar motor completo
+    
     window.st.act = false;
     window.st.paused = false;
     
-    // 3. Cambiar Vista (SPA style, no reload)
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
-    
-    // 4. Ocultar modales
     document.getElementById('modal-res').style.display = 'none';
     document.getElementById('modal-pause').style.display = 'none';
 }
