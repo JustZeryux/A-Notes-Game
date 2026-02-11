@@ -1264,20 +1264,42 @@ function openShop() {
             const owned = user.inventory && user.inventory.includes(item.id);
             const div = document.createElement('div');
             div.className = 'shop-item';
-            if (owned) div.style.borderColor = "var(--good)";
+            if (owned) {
+                div.style.borderColor = "var(--good)";
+                div.style.background = "#1a221a"; // Fondo verdoso sutil si ya lo tienes
+            }
             
-            // Etiqueta de tipo de color
             const typeTag = item.type === 'skin' 
-                ? (item.fixed ? '<span class="tag-fix">COLOR FIJO</span>' : '<span class="tag-cust">CUSTOM COLOR</span>') 
-                : '';
+                ? (item.fixed ? '<span class="tag-fix">COLOR FIJO</span>' : '<span class="tag-cust">TU COLOR</span>') 
+                : '<span class="tag-ui">UI</span>';
+
+            // GENERAR PREVIEW VISUAL
+            let iconHTML = '';
+            
+            if (item.type === 'skin') {
+                // Obtener la forma correcta desde globals
+                const pathData = SKIN_PATHS[item.shape] || SKIN_PATHS.circle;
+                const displayColor = item.fixed ? item.color : 'white'; // Blanco para representar "Tu Color"
+                
+                // SVG Miniatura
+                iconHTML = `
+                    <div class="shop-preview-box">
+                        <svg viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${displayColor}); width:60px; height:60px;">
+                            <path d="${pathData}" fill="${displayColor}" stroke="white" stroke-width="3" />
+                        </svg>
+                    </div>`;
+            } else {
+                // Preview para UI (Marcos)
+                iconHTML = `<div class="shop-preview-box" style="border: 3px solid ${item.color}; border-radius:10px;"></div>`;
+            }
 
             div.innerHTML = `
-                <div class="shop-icon" style="background-color:${item.color || '#333'}; box-shadow:0 0 15px ${item.color}"></div>
+                ${iconHTML}
                 <div class="shop-name">${item.name}</div>
                 <div class="shop-desc">${item.desc}</div>
                 ${typeTag}
                 <div class="shop-price" style="${owned ? 'color:var(--good)' : ''}">
-                    ${owned ? '✔ EN INVENTARIO' : item.price + ' SP'}
+                    ${owned ? '✔ EN INVENTARIO' : item.price.toLocaleString() + ' SP'}
                 </div>
                 ${!owned ? `<button class="btn-small btn-add" onclick="buyItem('${item.id}',${item.price})">COMPRAR</button>` : ''}
             `;
