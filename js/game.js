@@ -183,46 +183,36 @@ function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
     elTrack.innerHTML = '';
-    
-    const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
+    const fov = window.cfg.fov || 0;
     elTrack.style.transform = `rotateX(${fov}deg)`;
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
-
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
-    window.elReceptors = []; 
     
     const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     for (let i = 0; i < k; i++) {
-        // OBTENEMOS EL COLOR REAL DE LA SKIN PARA ESTE CARRIL
-        const viz = getNoteVisuals(i, skin);
+        // Obtener visuales para sincronizar el Click Glow con la Skin
+        const viz = window.getNoteVisuals(i, skin);
         
-        // Flash del carril (Click Glow)
+        // Glow del Carril
         const l = document.createElement('div');
-        l.className = 'lane-flash';
-        l.id = `flash-${i}`;
+        l.className = 'lane-flash'; l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        // ASIGNAMOS EL COLOR DE LA SKIN AL FLASH
-        l.style.setProperty('--c', viz.color); 
+        l.style.setProperty('--c', viz.color); // FIX: Toma el color de la skin o config
         elTrack.appendChild(l);
 
         // Receptor
         const r = document.createElement('div');
-        r.className = `arrow-wrapper receptor`;
-        r.id = `rec-${i}`;
-        r.style.left = (i * (100 / k)) + '%';
-        r.style.top = y + 'px';
-        // ASIGNAMOS EL COLOR DE LA SKIN AL RECEPTOR PARA EL BRILLO
-        r.style.setProperty('--active-c', viz.color); 
+        r.className = `arrow-wrapper receptor`; r.id = `rec-${i}`;
+        r.style.left = (i * (100 / k)) + '%'; r.style.top = y + 'px';
+        r.style.setProperty('--active-c', viz.color); // FIX: Brillo al pulsar
         
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100">
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
             <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
         </svg>`;
         elTrack.appendChild(r);
-        window.elReceptors.push(r);
     }
 }
-
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
