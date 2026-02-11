@@ -1,4 +1,4 @@
-/* === GLOBAL CONFIG & VARIABLES (STABLE) === */
+/* === GLOBAL CONFIG & VARIABLES (CORREGIDO) === */
 
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
@@ -36,15 +36,16 @@ function createLanes(k) {
     return arr;
 }
 
-// Configuración por defecto (Evita errores de undefined)
+// Configuración por defecto (CON EL FOV NUEVO AGREGADO)
 let cfg = { 
     spd: 22, den: 5, down: false, middleScroll: false, off: 0,
     vivid: true, shake: true, trackOp: 10, noteOp: 100,
     hideHud: false, judgeVis: true, judgeY: 40, judgeX: 50, judgeS: 7, 
     vol: 0.5, hvol: 0.6, missVol: 0.4, hitSound: true, missSound: true,
     showMs: true, showMean: true, showFC: true,
-    fov: 0, // <--- NUEVO: Field of View
+    fov: 0, // <--- CAMPO IMPORTANTE PARA EL 3D
     modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
+};
 
 let user = { 
     name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, 
@@ -76,9 +77,8 @@ const PATHS = {
     square: "M 15,15 L 85,15 L 85,85 L 15,85 Z",
     diamond: "M 50,10 L 90,50 L 50,90 L 10,50 Z"
 };
-// ==========================================
+
 // SISTEMA DE NOTIFICACIONES GLOBAL
-// ==========================================
 function notify(msg, type="info", duration=4000) {
     const area = document.getElementById('notification-area');
     if(!area) return console.log(msg); 
