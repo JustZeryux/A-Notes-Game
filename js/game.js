@@ -457,16 +457,18 @@ window.onKu = function(e) {
 };
 
 function hit(l, p) {
-    if (!window.st.act || window.st.paused) return;
+if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
     const flash = document.getElementById(`flash-${l}`);
     
     if (p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
+        
+        // El flash ahora usará automáticamente el color --c que seteamos en initReceptors
         if(flash && window.cfg.laneFlash) { 
             flash.style.opacity = 0.5; 
-            setTimeout(() => flash.style.opacity=0, 100); 
+            setTimeout(() => { if(flash) flash.style.opacity = 0; }, 100); 
         }
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
