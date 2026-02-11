@@ -140,10 +140,6 @@ window.leaveLobbyData = function() {
     currentLobbyId = null;
     isMultiplayer = false;
 };
-         currentLobbyId = null;
-         isMultiplayer = false;
-    }
-};
 
 window.sendLobbyScore = function(score) {
     if(!currentLobbyId || !user.name) return;
