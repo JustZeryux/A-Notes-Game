@@ -494,23 +494,89 @@ function openFriends() {
     });
     openModal('friends');
 }
+function openHostPanel(songData) {
+    if(!songData) return;
+    curSongData = songData; // Asegurar que la canción actual es esta
+    
+    const modal = document.getElementById('modal-host');
+    const panel = modal.querySelector('.modal-panel');
+    panel.className = "modal-panel host-panel-compact";
+    
+    let bgStyle = songData.imageURL ? `background-image:url(${songData.imageURL})` : 'background: linear-gradient(to right, #222, #111)';
 
-function showFriendProfile(name) {
-    if(!name) return;
-    // Cargar datos frescos
-    db.collection("users").doc(name).get().then(doc => {
+    panel.innerHTML = `
+        <div class="hp-header" style="${bgStyle}">
+            <div class="hp-title-info">
+                <div class="hp-song-title">${songData.title}</div>
+                <div class="hp-meta">By ${songData.uploader}</div>
+            </div>
+        </div>
+        <div class="hp-body">
+            <div class="hp-config-col">
+                <div>
+                    <div class="hp-section-title">Modos Permitidos</div>
+                    <div class="hp-checkbox-group">
+                        <label class="hp-chk-label"><input type="checkbox" id="chk-4k" checked> <span>4K</span></label>
+                        <label class="hp-chk-label"><input type="checkbox" id="chk-6k" checked> <span>6K</span></label>
+                        <label class="hp-chk-label"><input type="checkbox" id="chk-7k" checked> <span>7K</span></label>
+                    </div>
+                </div>
+                <div>
+                    <div class="hp-section-title">Densidad IA (Dificultad)</div>
+                    ${renderRange('Densidad', 'lobbyDen', 1, 10)}
+                </div>
+                 <div>
+                    <div class="hp-section-title">Apuesta (Ranked)</div>
+                     ${renderToggle('Ranked Match (PP Bet)', 'lobbyRanked')}
+                </div>
+            </div>
+            <div class="hp-players-col">
+                <div class="hp-section-title">Jugadores (<span id="hp-count">1</span>/8)</div>
+                <div id="hp-players-list">
+                    <div class="hp-player-row is-host">
+                        <div class="hp-p-av" style="background-image:url(${user.avatarData||''})"></div>
+                        <div class="hp-p-name">${user.name} (Host)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="hp-footer">
+            <button class="action secondary" style="width:auto; padding:12px 25px;" onclick="closeModal('host'); leaveLobby();">CANCELAR</button>
+            <button class="action btn-add" style="width:auto; padding:12px 35px;" onclick="startLobbyMatch()">COMENZAR PARTIDA</button>
+        </div>
+    `;
+    
+    // Valores por defecto para el lobby
+    cfg.lobbyDen = 5;
+    cfg.lobbyRanked = false;
+    applyCfg(); // Para actualizar los sliders visualmente
+
+    modal.style.display = 'flex';
+    createLobby(songData.id); // Crear el lobby en Firebase
+}
+
+function showFriendProfile(targetName) {
+    if(!targetName) return;
+    setText('fp-name', targetName);
+    setText('fp-lvl', "Cargando...");
+    document.getElementById('fp-av').style.backgroundImage = '';
+    
+    db.collection("users").doc(targetName).get().then(doc => {
         if(doc.exists) {
             const d = doc.data();
-            setText('fp-name', name);
             setText('fp-lvl', "LVL " + (d.lvl || 1));
             setText('fp-score', (d.score || 0).toLocaleString());
-            const av = document.getElementById('fp-av');
-            if(av) av.style.backgroundImage = d.avatarData ? `url(${d.avatarData})` : '';
+            if(d.avatarData) document.getElementById('fp-av').style.backgroundImage = `url(${d.avatarData})`;
             
             const btn = document.getElementById('btn-challenge');
             if(btn) {
                 btn.disabled = false;
-                btn.onclick = () => { challengeFriend(name); closeModal('friend-profile'); };
+                // El desafío usa una versión simplificada del host
+                btn.onclick = () => { 
+                    closeModal('friend-profile');
+                    notify("Función de desafío directo en desarrollo. Usa el Host normal por ahora.", "info");
+                    // TODO: Implementar challengeDirecto(targetName)
+                };
             }
             closeModal('friends');
             openModal('friend-profile');
