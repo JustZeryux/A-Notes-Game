@@ -55,31 +55,24 @@ function playMiss() {
 // ==========================================
 // Esta función es global para que el Preview en ui.js también la use
 window.getNoteVisuals = function(laneIndex, skinId) {
+    if (!window.cfg || !window.cfg.modes[window.keys]) return { color: "white", shape: window.PATHS.circle, filter: "" };
+    
     let conf = window.cfg.modes[window.keys][laneIndex];
-    let color = conf.c; // Prioridad 1: Configuración del usuario (Tus colores/Blanco)
+    let color = conf.c;
     let shape = window.PATHS[conf.s] || window.PATHS.circle;
     let filter = `drop-shadow(0 0 5px ${color})`;
 
-    // Solo si hay una skin equipada que no sea la default
-    if (skinId && skinId !== 'default') {
+    if (skinId && skinId !== 'default' && window.SHOP_ITEMS) {
         const item = window.SHOP_ITEMS.find(x => x.id === skinId);
         if (item) {
-            // Cambiar forma si la skin tiene una definida
             if (item.shape && window.SKIN_PATHS[item.shape]) shape = window.SKIN_PATHS[item.shape];
-            
-            // Cambiar color solo si la skin es de color "fixed" (Demon, Angel, Gold, etc)
-            if (item.fixed) {
-                color = item.color;
-            } else if (item.id === 'skin_neon') {
-                // Caso especial Neon alternado
-                color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
-            }
+            if (item.fixed) color = item.color;
+            else if (item.id === 'skin_neon') color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
             filter = `drop-shadow(0 0 10px ${color})`;
         }
     }
     return { color, shape, filter };
 };
-
 // ==========================================
 // 3. GENERADOR DE MAPAS (ANTI-SPAM)
 // ==========================================
@@ -188,41 +181,30 @@ function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
     elTrack.innerHTML = '';
-    
-    const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
+    const fov = window.cfg.fov || 0;
     elTrack.style.transform = `rotateX(${fov}deg)`;
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
-
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
-    
     const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     for (let i = 0; i < k; i++) {
-        // Obtener visuales de la skin para sincronizar Receptores y Brillo
         const viz = window.getNoteVisuals(i, skin);
-        
-        // Flash del Carril (Click Glow)
         const l = document.createElement('div');
         l.className = 'lane-flash'; l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', viz.color); // FIX: Ahora toma el color de la skin o config
+        l.style.setProperty('--c', viz.color);
         elTrack.appendChild(l);
 
-        // Receptor
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`; r.id = `rec-${i}`;
         r.style.left = (i * (100 / k)) + '%'; r.style.top = y + 'px';
-        r.style.setProperty('--active-c', viz.color); // FIX: Brillo al pulsar
-        
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
-            <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
-        </svg>`;
+        r.style.setProperty('--active-c', viz.color);
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}"><path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" /></svg>`;
         elTrack.appendChild(r);
         window.elReceptors.push(r);
     }
 }
-
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
