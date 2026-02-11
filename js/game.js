@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER V80 - VISUALS & SYNC) === */
+/* === AUDIO & ENGINE (MASTER V81 - CRASH FIX) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -164,20 +164,16 @@ function initReceptors(k) {
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
 
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
-    window.elReceptors = []; // Guardar referencias
+    window.elReceptors = []; 
     
     for (let i = 0; i < k; i++) {
-        // Flash del carril
         const l = document.createElement('div');
         l.className = 'lane-flash';
         l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        
-        // BUGFIX COLOR: Asignar color explícitamente desde config
         l.style.setProperty('--c', window.cfg.modes[k][i].c);
         elTrack.appendChild(l);
 
-        // Receptor
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`;
         r.id = `rec-${i}`;
@@ -185,7 +181,6 @@ function initReceptors(k) {
         r.style.top = y + 'px';
         
         let strokeColor = "white";
-        // Solo sobrescribir si hay skin equipada
         if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
              if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
              else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
@@ -200,7 +195,8 @@ function initReceptors(k) {
     }
 }
 
-async function prepareAndPlaySong(k) {
+// --- FIX CRÍTICO: ACCESIBILIDAD GLOBAL PARA ONLINE.JS ---
+window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
     if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Cargando..."; }
@@ -224,12 +220,9 @@ async function prepareAndPlaySong(k) {
             window.ramSongs.push(songInRam);
         }
         
-        // === ONLINE SYNC WAIT ===
         if(window.isMultiplayer) {
             document.getElementById('loading-text').innerText = "Esperando jugadores...";
-            // Enviamos señal de que cargamos
             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded();
-            // Esperamos a que online.js llame a playSongInternal
         } else {
             if(loader) loader.style.display = 'none';
             playSongInternal(songInRam);
@@ -240,18 +233,22 @@ async function prepareAndPlaySong(k) {
         notify("Error: " + e.message, "error");
         if(loader) loader.style.display = 'none';
     }
-}
+};
 
-// Accesible globalmente para Online.js
 window.playSongInternal = function(s) {
-    // Si no pasaron song, buscar en ram (para multiplayer)
     if(!s && window.isMultiplayer && window.curSongData) {
         s = window.ramSongs.find(x => x.id === window.curSongData.id);
     }
     if(!s) return;
 
-    document.getElementById('loading-overlay').style.display = 'none';
-    document.getElementById('sync-overlay').style.display = 'none';
+    // === FIX DEL CRASH "NULL STYLE" ===
+    const loader = document.getElementById('loading-overlay');
+    if(loader) loader.style.display = 'none';
+    
+    // Verificamos si existe antes de acceder a style (IMPORTANTE)
+    const syncOv = document.getElementById('sync-overlay');
+    if(syncOv) syncOv.style.display = 'none'; 
+    // ==================================
 
     window.st.act = true;
     window.st.paused = false;
@@ -259,7 +256,6 @@ window.playSongInternal = function(s) {
     window.st.spawned = [];
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
     
-    // Rank Calc
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => {
         window.st.trueMaxScore += 350; 
@@ -273,13 +269,15 @@ window.playSongInternal = function(s) {
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.fcStatus = "GFC";
 
-    // UI Reset
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
-    document.getElementById('modal-res').style.display = 'none';
-    document.getElementById('modal-pause').style.display = 'none';
+    
+    // Cerrar modales por seguridad
+    ['modal-res', 'modal-pause'].forEach(id => {
+        const m = document.getElementById(id);
+        if(m) m.style.display = 'none';
+    });
 
-    // Init Leaderboard
     if(window.isMultiplayer) initMultiLeaderboard();
     else if(document.getElementById('multi-leaderboard')) document.getElementById('multi-leaderboard').style.display = 'none';
 
@@ -339,11 +337,9 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // BUGFIX COLOR: Prioridad -> Skin -> Config -> Default
             let conf = window.cfg.modes[window.keys][n.l];
-            let color = conf.c; // Por defecto usa el de config
+            let color = conf.c; 
             
-            // Si hay skin especial, sobrescribir
             if (window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
                 const s = window.user.equipped.skin;
                 if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
@@ -404,7 +400,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === VISUALS: SPLASH SYSTEM (V80) ===
+// === VISUALS: SPLASH SYSTEM ===
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
@@ -417,11 +413,10 @@ function createSplash(l) {
     
     const s = document.createElement('div');
     s.className = 'splash-wrapper';
-    // Posicionar exactamente en el receptor
     s.style.left = r.style.left;
     s.style.top = r.style.top;
+    s.style.position = 'absolute'; // Asegurar posición
     
-    // Crear el elemento interno según el tipo
     const inner = document.createElement('div');
     inner.className = `splash-${type}`;
     inner.style.setProperty('--c', color);
@@ -432,7 +427,7 @@ function createSplash(l) {
     setTimeout(() => s.remove(), 400);
 }
 
-// === INPUTS & HIT LOGIC ===
+// === INPUTS ===
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
@@ -456,7 +451,6 @@ function hit(l, p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
         
-        // BUGFIX LANE FLASH (Solo si está activado)
         if(flash && window.cfg.laneFlash) { 
             flash.style.opacity = 0.5; 
             setTimeout(() => flash.style.opacity=0, 100); 
@@ -470,7 +464,7 @@ function hit(l, p) {
             let score=50, text="BAD", color="yellow";
             if(diff<45){ 
                 text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; 
-                createSplash(l); // Trigger Splash
+                createSplash(l); 
             }
             else if(diff<90){ 
                 text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; 
@@ -515,8 +509,8 @@ function updHUD() {
     if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
     document.getElementById('health-fill').style.height = window.st.hp + "%";
     
-    const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
+    const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
     document.getElementById('g-acc').innerText = acc + "%";
 
@@ -526,11 +520,10 @@ function updHUD() {
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
     
-    // ENVIAR SCORE ONLINE
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
 
-// === MULTIPLAYER LEADERBOARD ANIMADO ===
+// === MULTIPLAYER LEADERBOARD ===
 function initMultiLeaderboard() {
     if (!document.getElementById('multi-leaderboard')) {
         mlContainer = document.createElement('div');
@@ -539,64 +532,49 @@ function initMultiLeaderboard() {
     }
     mlContainer.style.display = 'flex';
     mlContainer.innerHTML = ''; 
-    // Empezar lista con el usuario actual
     window.multiScores = [{ name: window.user.name, score: 0, avatar: window.user.avatarData }];
     updateMultiLeaderboardUI(window.multiScores);
 }
 
 window.updateMultiLeaderboardUI = function(scores) {
     if (!mlContainer) return;
-    
-    // Ordenar de mayor a menor
     scores.sort((a, b) => b.score - a.score);
-    
-    // Actualizar DOM
-    // Estrategia: Actualizar valores si existe, crear si no, mover con CSS top
     const existingNodes = Array.from(mlContainer.children);
     
     scores.forEach((p, index) => {
         let row = existingNodes.find(node => node.dataset.name === p.name);
-        const topPos = index * 65; // 60px height + 5px gap
+        const topPos = index * 65; 
         
         if (!row) {
             row = document.createElement('div');
             row.className = `ml-row ${p.name === window.user.name ? 'is-me' : ''}`;
             row.dataset.name = p.name;
-            row.style.top = topPos + 'px'; // Posición inicial
+            row.style.top = topPos + 'px';
             row.innerHTML = `
                 <div class="ml-pos">#${index+1}</div>
                 <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
-                <div class="ml-info">
-                    <div class="ml-name">${p.name}</div>
-                    <div class="ml-score">0</div>
-                </div>
+                <div class="ml-info"><div class="ml-name">${p.name}</div><div class="ml-score">0</div></div>
             `;
             mlContainer.appendChild(row);
         } else {
-            // Animar movimiento
             row.style.top = topPos + 'px';
-            // Actualizar datos
             row.querySelector('.ml-score').innerText = p.score.toLocaleString();
             row.querySelector('.ml-pos').innerText = `#${index+1}`;
-            row.setAttribute('data-rank', index+1);
         }
     });
 };
 
+// === FIN DEL JUEGO ===
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     document.getElementById('game-layer').style.display = 'none';
     
-    // Si es multiplayer, mostrar pantalla de ganador o perdedor
     if(window.isMultiplayer) {
-        // Enviar score final
-        if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true); // true = final
-        // Esperar a que online.js muestre la pantalla de victoria
+        if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
         return; 
     }
 
-    // Lógica normal de Singleplayer...
     const modal = document.getElementById('modal-res');
     if(modal) {
         modal.style.display = 'flex';
@@ -612,7 +590,7 @@ function end(died) {
             else if (finalAcc >= 70) { r="C"; c="orange" }
         } else { r="F"; c="red"; }
         
-        let xpGain = 0;
+        let xpGain = 0, ppGain = 0;
         if (!died && window.user.name !== "Guest") {
             xpGain = Math.floor(window.st.sc / 250);
             window.user.xp += xpGain;
@@ -629,9 +607,7 @@ function end(died) {
                     <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
                 </div>
             </div>
-            <div class="res-grid">
-                <div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div>
-            </div>
+            <div class="res-grid"><div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div></div>
             <div style="margin-top:30px; display:flex; gap:10px;">
                 <button class="action" onclick="toMenu()">CONTINUAR</button>
                 <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
@@ -640,7 +616,9 @@ function end(died) {
     }
 }
 
-// ... togglePause, resumeGame, toMenu ... (Mantener igual)
+window.restartSong = function() {
+    prepareAndPlaySong(window.keys);
+};
 
 function togglePause() {
     if(!window.st.act) return;
@@ -654,12 +632,6 @@ function togglePause() {
             panel.innerHTML = `
                 <div class="m-title">PAUSA</div>
                 <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
-                    <div style="color:var(--sick)">SICK: <span>${window.st.stats.s}</span></div>
-                    <div style="color:var(--good)">GOOD: <span>${window.st.stats.g}</span></div>
-                    <div style="color:var(--bad)">BAD: <span>${window.st.stats.b}</span></div>
-                    <div style="color:var(--miss)">MISS: <span>${window.st.stats.m}</span></div>
-                </div>
                 <button class="action" onclick="resumeGame()">CONTINUAR</button>
                 <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
                 <button class="action secondary" onclick="toMenu()">SALIR</button>
@@ -671,13 +643,10 @@ function togglePause() {
 }
 
 function resumeGame() {
-    const modal = document.getElementById('modal-pause');
-    if(modal) modal.style.display = 'none'; 
+    document.getElementById('modal-pause').style.display = 'none';
     window.st.paused = false;
     if(window.st.ctx) window.st.ctx.resume();
     loop();
 }
 
-function toMenu() {
-    location.reload(); 
-}
+function toMenu() { location.reload(); }
