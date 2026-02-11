@@ -1,25 +1,27 @@
+/* === UI LOGIC & INTERACTION (MASTER VERSION V13) === */
+
+// === 1. HELPERS & SISTEMA DE NOTIFICACIONES ===
+
 function notify(msg, type="info", duration=4000) {
     const area = document.getElementById('notification-area');
-    if(!area) return console.log(msg);
+    if(!area) return console.log(msg); // Fallback
     
     const card = document.createElement('div');
     card.className = 'notify-card';
+    
+    // Colores por tipo
     if(type==="error") card.style.borderLeftColor = "#F9393F";
     else if(type==="success") card.style.borderLeftColor = "#12FA05";
+    else card.style.borderLeftColor = "#44ccff";
     
     card.innerHTML = `
         <div class="notify-title">${type.toUpperCase()}</div>
         <div class="notify-body">${msg}</div>
-        <div class="notify-progress" style="height:3px; background:rgba(255,255,255,0.5); width:100%; position:absolute; bottom:0; left:0; transition:width ${duration}ms linear;"></div>
     `;
+    
     area.appendChild(card);
     
-    // Animar barra
-    setTimeout(() => {
-        const bar = card.querySelector('.notify-progress');
-        if(bar) bar.style.width = '0%';
-    }, 50);
-
+    // Animación de salida
     setTimeout(() => {
         card.style.animation = "slideOut 0.3s forwards";
         setTimeout(() => card.remove(), 300);
@@ -44,16 +46,18 @@ function playHover(){
 function setText(id, val) { const el = document.getElementById(id); if(el) el.innerText = val; }
 function setStyle(id, prop, val) { const el = document.getElementById(id); if(el) el.style[prop] = val; }
 
-// === 2. UPDATE UI (CORE) ===
+// === 2. ACTUALIZACIÓN DE LA INTERFAZ (CORE) ===
+
 function updUI() {
     if(!user || !cfg) return;
 
-    // Checks
+    // Inicializar valores si faltan
     if(cfg.middleScroll === undefined) cfg.middleScroll = false;
     if(cfg.trackOp === undefined) cfg.trackOp = 10;
     if(cfg.noteOp === undefined) cfg.noteOp = 100;
     if(cfg.noteScale === undefined) cfg.noteScale = 1;
 
+    // Textos del Perfil
     setText('m-name', user.name);
     setText('p-name', user.name);
     setText('ig-name', user.name);
@@ -66,6 +70,7 @@ function updUI() {
     setText('m-rank', "LVL " + user.lvl);
     setText('p-lvl-txt', "LVL " + user.lvl);
     
+    // Barra de XP
     let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
     if(user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
     xpReq = Math.floor(xpReq);
@@ -73,6 +78,7 @@ function updUI() {
     setStyle('p-xp-bar', 'width', pct + "%");
     setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
     
+    // Avatar y Fondo
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
         setStyle('m-av', 'backgroundImage', url); setText('m-av', ""); 
@@ -83,8 +89,14 @@ function updUI() {
         if(bg) { bg.src = user.bg; bg.style.opacity = 0.3; }
     }
 
+    // Actualizar Rango Global si no se ha cargado
+    const rankEl = document.getElementById('p-global-rank');
+    if(rankEl && rankEl.innerText === "#--") updateGlobalRank();
+
+    // Aplicar variables CSS
     applyCfg();
 
+    // HUD EN JUEGO (Indicadores FC, Mean, Combo)
     if (typeof st !== 'undefined') {
         const fcEl = document.getElementById('hud-fc');
         const meanEl = document.getElementById('hud-mean');
@@ -92,15 +104,22 @@ function updUI() {
         
         if (fcEl) {
             fcEl.innerText = (cfg.showFC && st.fcStatus) ? st.fcStatus : "";
-            fcEl.style.color = (st.fcStatus==="PFC"?"cyan":(st.fcStatus==="GFC"?"gold":(st.fcStatus==="FC"?"lime":"red")));
+            // Colores del FC
+            if(st.fcStatus==="PFC") fcEl.style.color = "cyan";
+            else if(st.fcStatus==="GFC") fcEl.style.color = "gold";
+            else if(st.fcStatus==="FC") fcEl.style.color = "#12FA05";
+            else fcEl.style.color = "#F9393F";
         }
+        
         if (meanEl) {
             meanEl.innerText = (cfg.showMean && st.hitCount > 0) ? (st.totalOffset / st.hitCount).toFixed(2) + "ms" : "";
         }
+        
         if (comboEl) {
             if (st.cmb > 0) {
                 comboEl.innerText = st.cmb;
                 comboEl.style.opacity = '1';
+                // Reset animation hack
                 comboEl.classList.remove('pulse'); 
                 void comboEl.offsetWidth; 
                 comboEl.classList.add('pulse');
@@ -110,6 +129,7 @@ function updUI() {
         }
     }
 
+    // Mostrar/Ocultar paneles de Login
     const isGoogle = user.pass === "google-auth";
     const locSet = document.getElementById('local-acc-settings');
     const gooSet = document.getElementById('google-acc-settings');
@@ -117,7 +137,19 @@ function updUI() {
     if(gooSet) gooSet.style.display = isGoogle ? 'block' : 'none';
 }
 
+function updateGlobalRank() {
+    if(!db || user.name === "Guest") return;
+    db.collection("leaderboard").orderBy("pp", "desc").limit(100).get().then(snap => {
+        let rank = "#100+";
+        snap.docs.forEach((doc, index) => {
+            if(doc.id === user.name) rank = "#" + (index + 1);
+        });
+        setText('p-global-rank', rank);
+    }).catch(()=>{});
+}
+
 function applyCfg() {
+    // Variables CSS globales para que el estilo reaccione
     document.documentElement.style.setProperty('--track-alpha', (cfg.trackOp || 10) / 100); 
     document.documentElement.style.setProperty('--note-op', (cfg.noteOp || 100) / 100);
     document.documentElement.style.setProperty('--note-scale', cfg.noteScale || 1);
@@ -133,11 +165,13 @@ function applyCfg() {
     }
 }
 
-// === 3. SETTINGS MENU (3 COLUMNS) ===
+// === 3. MENÚ DE AJUSTES (ESTILO MODERNO 3 COLUMNAS) ===
+
 function openSettingsMenu() {
     const modal = document.getElementById('modal-settings');
     if(!modal) return;
     
+    // Aseguramos que tenga la clase ancha
     const panel = modal.querySelector('.modal-panel');
     panel.className = "modal-panel settings-panel";
     
@@ -154,18 +188,19 @@ function openSettingsMenu() {
                 <button class="set-tab-btn active" onclick="switchSetTab('gameplay')">🎮 GAMEPLAY</button>
                 <button class="set-tab-btn" onclick="switchSetTab('visuals')">🎨 VISUALS</button>
                 <button class="set-tab-btn" onclick="switchSetTab('audio')">🔊 AUDIO</button>
-                <button class="set-tab-btn" onclick="switchSetTab('controls')">⌨️ CONTROLS</button>
+                <button class="set-tab-btn" onclick="switchSetTab('controls')">⌨️ CONTROLES</button>
             </div>
             <div class="settings-content" id="set-content-area"></div>
             <div class="settings-preview">
                 <div class="preview-title">VISTA PREVIA</div>
                 <div class="preview-box" id="preview-box"></div>
+                <div style="margin-top:15px; color:#666; font-size:0.8rem; text-align:center;">Cambios en tiempo real</div>
             </div>
         </div>
     `;
     
     modal.style.display = 'flex';
-    switchSetTab('gameplay');
+    switchSetTab('gameplay'); // Cargar primera pestaña
 }
 
 function saveSettings() {
@@ -179,6 +214,7 @@ function switchSetTab(tab) {
     const content = document.getElementById('set-content-area');
     document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
     
+    // Activar botón visualmente
     const btns = document.querySelectorAll('.set-tab-btn');
     const idx = ['gameplay', 'visuals', 'audio', 'controls'].indexOf(tab);
     if(idx !== -1 && btns[idx]) btns[idx].classList.add('active');
@@ -186,24 +222,27 @@ function switchSetTab(tab) {
     let html = '';
     
     if (tab === 'gameplay') {
-        html += renderToggle('Middlescroll', 'middleScroll');
-        html += renderToggle('Downscroll', 'down');
-        html += renderRange('Velocidad', 'spd', 10, 40);
-        html += renderRange('Dificultad IA', 'den', 1, 10);
-        html += renderRange('Offset (ms)', 'off', -200, 200);
+        html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
+        html += renderToggle('Downscroll (Caída abajo)', 'down');
+        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 40);
+        html += renderRange('Dificultad IA (Random)', 'den', 1, 10);
+        html += renderRange('Offset Global (ms)', 'off', -200, 200);
     } 
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
         html += renderToggle('Screen Shake', 'shake');
         html += renderToggle('Mostrar Juez', 'judgeVis');
-        html += renderToggle('Mostrar FC', 'showFC');
+        html += renderToggle('Mostrar FC Status', 'showFC');
         html += renderToggle('Mostrar Mean MS', 'showMean');
-        html += renderRange('Opacidad Carril', 'trackOp', 0, 100);
-        html += renderRange('Opacidad Notas', 'noteOp', 10, 100);
-        html += renderRange('Tamaño Nota', 'noteScale', 0.5, 1.5, 0.1);
-        html += renderRange('Pos. Juez Y', 'judgeY', 0, 100);
-        html += `<div style="margin-top:20px;"><button class="btn-small btn-add" onclick="document.getElementById('bg-file').click()">🖼️ FONDO</button></div>`;
-        html += `<input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">`;
+        html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100);
+        html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100);
+        html += renderRange('Tamaño Nota (Escala)', 'noteScale', 0.5, 1.5, 0.1);
+        html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
+        html += renderRange('Posición Juez X', 'judgeX', 0, 100);
+        html += `<div style="margin-top:20px; border-top:1px solid #333; padding-top:15px;">
+            <button class="btn-small btn-add" style="width:100%" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO DE PANTALLA</button>
+            <input type="file" id="bg-file" accept="image/*" style="display:none" onchange="handleBg(this)">
+        </div>`;
     } 
     else if (tab === 'audio') {
         html += renderRange('Volumen Música', 'vol', 0, 100);
@@ -211,9 +250,11 @@ function switchSetTab(tab) {
         html += renderRange('Volumen Hits', 'hvol', 0, 100);
         html += renderToggle('Miss Sounds', 'missSound');
         html += renderRange('Volumen Miss', 'missVol', 0, 100);
-        html += `<div style="margin-top:20px;"><button class="action secondary" onclick="document.getElementById('hit-file').click()">🔊 HIT SOUND</button></div>`;
+        html += `<div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <button class="btn-small btn-add" onclick="document.getElementById('hit-file').click()">🔊 HIT SOUND</button>
+            <button class="btn-small btn-chat" onclick="document.getElementById('miss-file').click()">🔇 MISS SOUND</button>
+        </div>`;
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">`;
-        html += `<div style="margin-top:10px;"><button class="action secondary" onclick="document.getElementById('miss-file').click()">🔇 MISS SOUND</button></div>`;
         html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
     else if (tab === 'controls') {
@@ -224,39 +265,53 @@ function switchSetTab(tab) {
             <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
         </div>
         <div class="lane-cfg-box"><div id="lanes-container" class="lanes-view"></div></div>`;
+        // Renderizar carriles después de inyectar HTML
         setTimeout(() => renderLaneConfig(4), 50);
     }
 
     content.innerHTML = html;
-    updatePreview();
+    updatePreview(); // Actualizar la nota de ejemplo
 }
 
 function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
+    
+    // Obtener la configuración actual para la nota
+    // Usamos el carril 0 del modo 4K como ejemplo
     const sampleLane = cfg.modes[4][0];
     const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
     const scale = cfg.noteScale || 1;
     const opacity = (cfg.noteOp || 100) / 100;
     
     box.innerHTML = `
-        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity};">
-            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 10px ${sampleLane.c});">
+        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity}; transition: 0.1s;">
+            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 15px ${sampleLane.c});">
                 <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
             </svg>
         </div>
     `;
 }
 
+// Helpers para generar HTML de los ajustes
 function renderToggle(label, key) {
     const val = cfg[key];
-    return `<div class="set-row"><span class="set-label">${label}</span><button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button></div>`;
+    return `<div class="set-row">
+        <span class="set-label">${label}</span>
+        <button id="tog-${key}" class="toggle-switch ${val ? 'on' : 'off'}" onclick="toggleCfg('${key}')">${val ? 'ON' : 'OFF'}</button>
+    </div>`;
 }
 
 function renderRange(label, key, min, max, step=1) {
     let val = cfg[key];
     if (key.includes('vol')) val = Math.round((val||0.5) * 100);
-    return `<div class="set-row"><span class="set-label">${label}</span><div style="display:flex;gap:10px;align-items:center;"><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="updateCfgVal('${key}', this.value)"><div id="disp-${key}" class="num-input">${val}</div></div></div>`;
+    return `<div class="set-row">
+        <span class="set-label">${label}</span>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="updateCfgVal('${key}', this.value)">
+            <div id="disp-${key}" class="num-input">${val}</div>
+        </div>
+    </div>`;
 }
 
 function toggleCfg(key) {
@@ -273,14 +328,17 @@ function toggleCfg(key) {
 function updateCfgVal(key, val) {
     const disp = document.getElementById('disp-'+key);
     if(disp) disp.innerText = val;
+    
     if (key.includes('vol')) cfg[key] = val / 100;
     else if (key === 'noteScale') cfg[key] = parseFloat(val);
     else cfg[key] = parseInt(val);
+    
     applyCfg();
     updatePreview();
 }
 
-// === 4. GLOBAL HANDLER ===
+// === 4. HANDLERS GLOBALES (MODALES) ===
+// Asignamos a window para que el HTML pueda verlas
 window.openModal = function(id) {
     if (id === 'settings') {
         openSettingsMenu();
@@ -304,6 +362,7 @@ window.openModal = function(id) {
             if(curSongData.imageURL) {
                 cover.style.backgroundImage = `url(${curSongData.imageURL})`;
             } else {
+                // Color fallback si no hay imagen
                 let hash = 0;
                 for (let i = 0; i < curSongData.id.length; i++) hash = curSongData.id.charCodeAt(i) + ((hash << 5) - hash);
                 const hue = Math.abs(hash % 360);
@@ -315,10 +374,14 @@ window.openModal = function(id) {
 
 function closeModal(id){ document.getElementById('modal-'+id).style.display='none'; }
 
-// === 5. FUNCIONES GENERALES ===
+// === 5. CANCIONES Y MENÚ (CON REINTENTO) ===
 let globalSongsListener = null;
 function renderMenu(filter="") {
-    if(!db) { setTimeout(() => renderMenu(filter), 500); return; }
+    if(!db) {
+        // Si la DB no está lista, esperar y reintentar
+        setTimeout(() => renderMenu(filter), 500);
+        return;
+    }
     const grid = document.getElementById('song-grid');
     if(!grid) return;
 
@@ -326,7 +389,7 @@ function renderMenu(filter="") {
     
     globalSongsListener = db.collection("globalSongs").orderBy("createdAt", "desc").limit(50).onSnapshot(snapshot => {
         grid.innerHTML = '';
-        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666; text-align:center;">No hay canciones. ¡Sube una!</div>'; return; }
+        if(snapshot.empty) { grid.innerHTML = '<div style="color:#666; text-align:center; grid-column:1/-1;">No hay canciones globales. ¡Sube una!</div>'; return; }
         
         snapshot.forEach(doc => {
             const s = doc.data();
@@ -349,14 +412,14 @@ function renderMenu(filter="") {
             let scoreTag = '';
             if(user.scores && user.scores[songId]) {
                 const us = user.scores[songId];
-                scoreTag = `<span class="tag rank-tag" style="color:gold">${us.rank}</span>`;
+                scoreTag = `<span class="tag rank-tag" style="color:gold; margin-left:5px;">${us.rank}</span>`;
             }
 
             c.innerHTML = `
                 <div class="bc-bg" style="${bgStyle}"></div>
                 <div class="bc-info">
                     <div class="bc-title">${s.title}</div>
-                    <div class="bc-meta" style="font-size:0.8rem;color:#aaa;">${s.uploader} ${scoreTag}</div>
+                    <div class="bc-meta">Subido por: ${s.uploader} ${scoreTag}</div>
                 </div>`;
             c.onclick = () => { 
                 curSongData = { id: songId, ...s }; 
@@ -367,49 +430,95 @@ function renderMenu(filter="") {
     });
 }
 
+// === 6. AMIGOS & SOLICITUDES ===
 function openFriends() {
     if(user.name === "Guest") return notify("Inicia sesión primero", "error");
     if(!db) return notify("Error de conexión", "error");
-    const friL = document.getElementById('friend-list');
-    if(!friL) return;
+    
+    const reqList = document.getElementById('req-list');
+    const friList = document.getElementById('friend-list');
     
     db.collection("users").doc(user.name).onSnapshot(doc => {
+        if(!doc.exists) return;
         const data = doc.data();
-        friL.innerHTML = '';
-        if(data && data.friends && data.friends.length > 0) {
-            data.friends.forEach(f => {
-                db.collection("users").doc(f).get().then(fDoc => {
-                    if(!fDoc.exists) return;
-                    const fData = fDoc.data();
-                    const d = document.createElement('div'); 
-                    d.className = 'friend-row';
-                    d.onclick = function() { showFriendProfile(f, fData); };
-                    let avStyle = fData.avatarData ? `background-image:url(${fData.avatarData})` : '';
-                    d.innerHTML = `<div style="display:flex;align-items:center;"><div class="f-row-av" style="${avStyle}"></div><span class="friend-row-name">${f}</span></div>`;
-                    friL.appendChild(d);
+        
+        // Requests
+        if(reqList) {
+            reqList.innerHTML = '';
+            if(data.requests && data.requests.length > 0) {
+                data.requests.forEach(reqName => {
+                    const row = document.createElement('div');
+                    row.className = 'friend-row';
+                    row.style.borderColor = 'var(--accent)';
+                    row.innerHTML = `
+                        <span class="friend-row-name">${reqName}</span>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-small btn-acc" onclick="respondFriend('${reqName}', true)">✔</button>
+                            <button class="btn-small" style="background:#F9393F" onclick="respondFriend('${reqName}', false)">✕</button>
+                        </div>`;
+                    reqList.appendChild(row);
                 });
-            });
-        } else { friL.innerHTML = '<div style="padding:20px;color:#666;">Sin amigos aún.</div>'; }
+            } else {
+                reqList.innerHTML = '<div style="color:#666; font-size:0.8rem; padding:10px;">Sin solicitudes.</div>';
+            }
+        }
+
+        // Friends
+        if(friList) {
+            friList.innerHTML = '';
+            if(data.friends && data.friends.length > 0) {
+                data.friends.forEach(fName => {
+                    const row = document.createElement('div'); 
+                    row.className = 'friend-row';
+                    row.onclick = function() { showFriendProfile(fName); };
+                    row.innerHTML = `
+                        <div style="display:flex;align-items:center;">
+                            <div class="f-row-av" id="fav-${fName}"></div>
+                            <span class="friend-row-name">${fName}</span>
+                        </div>
+                    `;
+                    friList.appendChild(row);
+                    
+                    // Cargar avatar
+                    db.collection("users").doc(fName).get().then(fDoc => {
+                        if(fDoc.exists && fDoc.data().avatarData) {
+                            const av = document.getElementById(`fav-${fName}`);
+                            if(av) av.style.backgroundImage = `url(${fDoc.data().avatarData})`;
+                        }
+                    });
+                });
+            } else {
+                friList.innerHTML = '<div style="padding:20px;color:#666;">Sin amigos aún.</div>';
+            }
+        }
     });
     openModal('friends');
 }
 
-function showFriendProfile(name, data) {
-    selectedFriend = name;
-    setText('fp-name', name);
-    setText('fp-lvl', "LVL " + data.lvl);
-    setText('fp-score', data.score.toLocaleString());
-    const av = document.getElementById('fp-av');
-    if(av) av.style.backgroundImage = data.avatarData ? `url(${data.avatarData})` : '';
-    const btn = document.getElementById('btn-challenge');
-    if(btn) {
-        btn.disabled = false;
-        btn.onclick = () => { challengeFriend(name); closeModal('friend-profile'); };
-    }
-    closeModal('friends');
-    openModal('friend-profile');
+function showFriendProfile(name) {
+    if(!name) return;
+    // Cargar datos frescos
+    db.collection("users").doc(name).get().then(doc => {
+        if(doc.exists) {
+            const d = doc.data();
+            setText('fp-name', name);
+            setText('fp-lvl', "LVL " + (d.lvl || 1));
+            setText('fp-score', (d.score || 0).toLocaleString());
+            const av = document.getElementById('fp-av');
+            if(av) av.style.backgroundImage = d.avatarData ? `url(${d.avatarData})` : '';
+            
+            const btn = document.getElementById('btn-challenge');
+            if(btn) {
+                btn.disabled = false;
+                btn.onclick = () => { challengeFriend(name); closeModal('friend-profile'); };
+            }
+            closeModal('friends');
+            openModal('friend-profile');
+        }
+    });
 }
 
+// === 7. FUNCIONES VARIAS ===
 function changeSection(sec) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     const map = { 'songs': 'nav-songs', 'multi': 'nav-multi', 'shop': 'nav-shop', 'settings': 'nav-settings', 'rank': 'nav-rank', 'friends': 'nav-friends' };
@@ -451,6 +560,7 @@ function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>
 async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound cargado"); i.value = ""; } }
 async function loadMissSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); missBuf = await st.ctx.decodeAudioData(buf); notify("Miss Sound cargado"); i.value = ""; } }
 
+// === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
     const grid = document.getElementById('shop-items');
