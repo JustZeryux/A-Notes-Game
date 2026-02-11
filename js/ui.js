@@ -321,19 +321,32 @@ function switchSetTab(tab) {
 function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
-    const lane = cfg.modes[4][0];
-    const shape = (typeof PATHS !== 'undefined') ? (PATHS[lane.s] || PATHS['circle']) : "";
     
+    // Obtener configuración actual
+    const sampleLane = cfg.modes[4][0];
+    const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
+    const scale = cfg.noteScale || 1;
+    const opacity = (cfg.noteOp || 100) / 100;
+    const splashType = cfg.splashType || 'classic'; // Asegurar valor por defecto
+    
+    // Generar HTML
     box.innerHTML = `
-        <div class="preview-note" style="transform: scale(${cfg.noteScale||1});">
-            <svg viewBox="0 0 100 100" style="filter: drop-shadow(0 0 10px ${lane.c});">
-                <path d="${shape}" fill="${lane.c}" stroke="white" stroke-width="5" />
+        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity}; transition: 0.1s; position: relative; z-index: 2;">
+            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 15px ${sampleLane.c});">
+                <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
             </svg>
         </div>
-        <div class="splash-${cfg.splashType||'classic'}" style="position:absolute; --c:${lane.c}; animation-iteration-count:infinite; animation-duration:1s;"></div>
+        <div class="splash-${splashType}" style="
+            position: absolute; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            --c: ${sampleLane.c}; 
+            animation-iteration-count: infinite; 
+            animation-duration: 1.5s;
+            z-index: 1;
+        "></div>
     `;
 }
-
 // Helpers para generar HTML de los ajustes
 function renderToggle(label, key) {
     const val = cfg[key];
