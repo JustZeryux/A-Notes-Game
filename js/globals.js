@@ -1,4 +1,4 @@
-/* === GLOBAL CONFIG & VARIABLES (FIXED) === */
+/* === GLOBAL CONFIG & VARIABLES (FIXED V3) === */
 
 // 1. CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
@@ -11,7 +11,7 @@ const firebaseConfig = {
 };
 
 // 2. INICIALIZAR FIREBASE
-let db = null;
+var db = null; // Usamos var para asegurar acceso global
 try {
     if (typeof firebase !== 'undefined') {
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -25,7 +25,7 @@ try {
 
 const DB_KEY = "omega_u_"; 
 const LAST_KEY = "omega_last"; 
-const CURRENT_VERSION = 103; 
+const CURRENT_VERSION = 104; 
 
 // 3. ITEMS DE TIENDA
 const SHOP_ITEMS = [
@@ -50,7 +50,7 @@ function createLanes(k) {
         if(k===4) keyChar = k4[i];
         else if(k===6) keyChar = k6[i];
         else if(k===7) keyChar = k7[i];
-        else keyChar = k9[i];
+        else if(k===9) keyChar = k9[i];
 
         arr.push({
             k: keyChar || 'a', 
@@ -62,7 +62,8 @@ function createLanes(k) {
 }
 
 // 5. VARIABLES GLOBALES (ESTADO & CONFIG)
-let cfg = { 
+// Usamos window.cfg para forzar registro global
+window.cfg = { 
     spd: 22, 
     den: 5, 
     down: false, 
@@ -93,14 +94,17 @@ let cfg = {
         9: createLanes(9) 
     }
 };
+// Alias corto para uso interno
+var cfg = window.cfg;
 
-let user = { 
+window.user = { 
     name: "Guest", pass: "", avatar: null, avatarData: null, bg: null, 
     songs: [], pp: 0, sp: 0, plays: 0, score: 0, xp: 0, lvl: 1, scores: {},
     inventory: [], equipped: { skin: 'default', ui: 'default' }
 };
+var user = window.user;
 
-let st = { 
+window.st = { 
     act: false, paused: false, ctx: null, src: null, t0: 0, 
     notes: [], spawned: [], keys: [], 
     sc: 0, cmb: 0, maxCmb: 0, hp: 50, 
@@ -109,27 +113,28 @@ let st = {
     songDuration: 0, lastPause: 0,
     totalOffset: 0, hitCount: 0, fcStatus: "GFC", activeHolds: [] 
 };
+var st = window.st;
 
 // Variables de sistema
-let ramSongs = [];
-let curIdx = -1;
-let keys = 4;
-let remapMode = null;
-let remapIdx = null;
-let ctx = null;
-let hitBuf = null;
-let missBuf = null; 
-let songFinished = false; 
-let curSongData = null; 
+var ramSongs = [];
+var curIdx = -1;
+var keys = 4;
+var remapMode = null;
+var remapIdx = null;
+var ctx = null;
+var hitBuf = null;
+var missBuf = null; 
+var songFinished = false; 
+var curSongData = null; 
 
-let peer = null;
-let conn = null;
-let myPeerId = null;
-let opponentScore = 0;
-let isMultiplayer = false;
-let currentLobbyId = null;
-let isLobbyHost = false;
-let lobbyListener = null;
+var peer = null;
+var conn = null;
+var myPeerId = null;
+var opponentScore = 0;
+var isMultiplayer = false;
+var currentLobbyId = null;
+var isLobbyHost = false;
+var lobbyListener = null;
 
 const PATHS = {
     arrow: "M 20 20 L 50 50 L 80 20 L 80 40 L 50 70 L 20 40 Z",
@@ -139,7 +144,7 @@ const PATHS = {
 };
 
 // 6. SISTEMA DE NOTIFICACIONES
-function notify(msg, type="info", duration=4000) {
+window.notify = function(msg, type="info", duration=4000) {
     const area = document.getElementById('notification-area');
     if(!area) return console.log(msg); 
     
@@ -164,4 +169,4 @@ function notify(msg, type="info", duration=4000) {
         card.style.animation = "slideOut 0.3s forwards"; 
         setTimeout(() => card.remove(), 300); 
     }, duration);
-}
+};
