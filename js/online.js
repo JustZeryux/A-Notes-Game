@@ -61,45 +61,63 @@ window.createLobbyData = function(songId, config) {
     });
 };
 
-// Escuchar cambios en la sala
+// Reemplaza la función subscribeToLobby en online.js con esto:
+
 function subscribeToLobby(lobbyId) {
     if (lobbyListener) lobbyListener();
+    
     lobbyListener = db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
-        
+        // 1. Si la sala se borró
         if (!doc.exists) {
             leaveLobbyData();
             if(typeof closeModal === 'function') closeModal('host');
             return;
-            if (data.config) {
-        // Actualizar UI visualmente
-        const keyDisp = document.getElementById('lobby-display-keys');
-        const denDisp = document.getElementById('lobby-display-den');
-        
-        if (keyDisp) keyDisp.innerText = data.config.keys[0] + "K";
-        if (denDisp) denDisp.innerText = data.config.density;
-        
-        // Actualizar variables locales pa
         }
+
         const data = doc.data();
         
-        // Si el juego empieza
+        // 2. Si hay cambios de configuración (Aquí estaba tu error antes)
+        if (data.config) {
+            // Actualizar UI visualmente si los elementos existen
+            const keyDisp = document.getElementById('lobby-display-keys');
+            const denDisp = document.getElementById('lobby-display-den');
+            
+            if (keyDisp) keyDisp.innerText = (data.config.keys ? data.config.keys[0] : 4) + "K";
+            if (denDisp) denDisp.innerText = data.config.density;
+            
+            // Actualizar variables locales
+            if (typeof cfg !== 'undefined') cfg.den = data.config.density;
+        }
+        
+        // 3. Si el juego empieza
         if (data.status === 'playing') {
             if (!isMultiplayer) {
                 isMultiplayer = true;
-                cfg.den = data.config.density;
-                st.ranked = data.config.ranked;
+                if (typeof cfg !== 'undefined') cfg.den = data.config.density;
+                if (typeof st !== 'undefined') st.ranked = data.config.ranked;
+                
                 if(typeof closeModal === 'function') closeModal('host');
-                if(typeof startGame === 'function') startGame(data.config.keys[0]);
+                
+                // Iniciar juego con las teclas configuradas
+                const keysToPlay = (data.config && data.config.keys) ? data.config.keys[0] : 4;
+                if(typeof prepareAndPlaySong === 'function') {
+                    // Llamamos directo al motor, saltando la UI
+                    window.keys = keysToPlay; 
+                    prepareAndPlaySong(keysToPlay); 
+                }
+                
                 if(typeof notify === 'function') notify("¡PARTIDA INICIADA!", "success");
             }
             // Actualizar leaderboard
             if(typeof updateMultiLeaderboardUI === 'function') updateMultiLeaderboardUI(data.players);
         }
         
-        // Actualizar UI del panel de host
+        // 4. Actualizar UI del panel de host (Jugadores uniéndose)
         if (data.status === 'waiting' && typeof updateHostPanelUI === 'function') {
             updateHostPanelUI(data.players);
         }
+    }, error => {
+        console.error("Error lobby:", error);
     });
 }
 
