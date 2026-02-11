@@ -1,22 +1,52 @@
-/* === ONLINE SYSTEM === */
 function initOnline() {
+    if(typeof Peer === 'undefined') return;
     peer = new Peer(null, { secure: true }); 
     peer.on('open', (id) => {
         myPeerId = id;
-        if(db && user.name !== "Guest") {
-            db.collection("users").doc(user.name).set({ peerId: id, online: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        if(db && typeof user !== 'undefined' && user.name !== "Guest") {
+            db.collection("users").doc(user.name).set({ 
+                peerId: id, 
+                online: true, 
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp() 
+            }, { merge: true });
         }
     });
+    
+    // Auto-status loop
+    setInterval(() => {
+        if(db && typeof user !== 'undefined' && user.name !== "Guest") {
+            db.collection("users").doc(user.name).update({
+                lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+                online: true
+            }).catch(()=>{});
+        }
+    }, 15000);
 }
+
+// === SISTEMA DE AMIGOS ===
 
 function sendFriendRequest() {
     const target = document.getElementById('friend-inp').value.trim();
-    if(!target || target === user.name) return;
+    if(!target) return notify("Escribe un nombre", "error");
+    if(target === user.name) return notify("No puedes agregarte a ti mismo", "error");
+
     db.collection("users").doc(target).get().then(doc => {
         if(doc.exists) {
-            sendNotification(target, 'friend_req', 'Solicitud de Amistad', user.name + ' quiere ser tu amigo.');
-            notify("Solicitud enviada a " + target);
-        } else notify("Usuario no encontrado", "error");
+            const data = doc.data();
+            // Verificar si ya son amigos o si ya hay solicitud
+            if(data.friends && data.friends.includes(user.name)) return notify("Ya son amigos", "info");
+            if(data.requests && data.requests.includes(user.name)) return notify("Solicitud ya enviada", "info");
+
+            // Enviar Solicitud
+            db.collection("users").doc(target).update({
+                requests: firebase.firestore.FieldValue.arrayUnion(user.name)
+            }).then(() => {
+                notify(`Solicitud enviada a ${target}`, "success");
+                document.getElementById('friend-inp').value = "";
+            });
+        } else {
+            notify("Usuario no encontrado", "error");
+        }
     });
 }
 
