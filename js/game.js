@@ -194,14 +194,16 @@ function initReceptors(k) {
     const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     for (let i = 0; i < k; i++) {
+        // OBTENEMOS EL COLOR REAL DE LA SKIN PARA ESTE CARRIL
         const viz = getNoteVisuals(i, skin);
         
-        // Flash
+        // Flash del carril (Click Glow)
         const l = document.createElement('div');
         l.className = 'lane-flash';
         l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', viz.color);
+        // ASIGNAMOS EL COLOR DE LA SKIN AL FLASH
+        l.style.setProperty('--c', viz.color); 
         elTrack.appendChild(l);
 
         // Receptor
@@ -210,9 +212,10 @@ function initReceptors(k) {
         r.id = `rec-${i}`;
         r.style.left = (i * (100 / k)) + '%';
         r.style.top = y + 'px';
-        r.style.setProperty('--active-c', viz.color);
+        // ASIGNAMOS EL COLOR DE LA SKIN AL RECEPTOR PARA EL BRILLO
+        r.style.setProperty('--active-c', viz.color); 
         
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100">
             <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
         </svg>`;
         elTrack.appendChild(r);
