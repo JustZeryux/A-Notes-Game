@@ -28,21 +28,48 @@ const LAST_KEY = "omega_last";
 const CURRENT_VERSION = 104; 
 
 // 3. ITEMS DE TIENDA
-const SHOP_ITEMS = [
-    // SKINS BÁSICAS (Colores Fijos)
-    { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Estilo Cyberpunk brillante.', color: '#ff66aa', fixed: true },
-    { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado de lujo dorado.', color: '#FFD700', fixed: true },
-    { id: 'skin_dark', name: 'Modo Dark', price: 1000, type: 'skin', desc: 'Alto contraste monocromático.', color: '#444', fixed: true },
+¡Hecho! Tienes toda la razón, ver solo círculos de colores no te dice nada sobre si la skin es un Shuriken, un Demonio o una Mira.
+
+Para arreglar esto, he movido las definiciones de las formas (SVG Paths) a globals.js para que tanto el juego como la tienda puedan usarlas. Ahora la tienda renderizará la forma exacta de la nota.
+
+Aquí tienes la actualización V115 "Shop Preview".
+
+1. js/globals.js (Agregar Rutas de Skins)
+Agregamos SKIN_PATHS aquí para que la tienda sepa qué dibujar.
+
+JavaScript
+
+/* === GLOBAL CONFIG (V115 - SHARED PATHS) === */
+
+// ... (Firebase config y variables db, user, cfg siguen igual) ...
+
+// DICCIONARIO DE FORMAS DE SKINS (Global para Tienda y Juego)
+const SKIN_PATHS = {
+    // Básicos
+    circle: "M 50, 50 m -35, 0 a 35,35 0 1,0 70,0 a 35,35 0 1,0 -70,0",
     
-    // SKINS AVANZADAS (Formas Nuevas)
-    { id: 'skin_demon', name: 'Demon Spikes', price: 3500, type: 'skin', desc: 'Notas agresivas con cuernos. Color Fijo (Rojo).', color: '#FF0000', fixed: true },
-    { id: 'skin_angel', name: 'Holy Halo', price: 3500, type: 'skin', desc: 'Anillos divinos. Color Fijo (Azul/Blanco).', color: '#00FFFF', fixed: true },
-    { id: 'skin_shuriken', name: 'Ninja Star', price: 4000, type: 'skin', desc: 'Shurikens giratorios. Usa TUS colores.', color: '#FFF', fixed: false },
-    { id: 'skin_sniper', name: 'Crosshair', price: 3000, type: 'skin', desc: 'Miras tácticas. Usa TUS colores.', color: '#0F0', fixed: false },
-    { id: 'skin_plasma', name: 'Plasma Orb', price: 5000, type: 'skin', desc: 'Núcleo de energía inestable. Fijo (Violeta).', color: '#BD00FF', fixed: true },
+    // Skins Avanzadas
+    demon: "M 50 5 L 95 95 L 5 95 Z", // Triángulo agresivo
+    angel: "M 50 50 m -30 0 a 30,30 0 1,0 60,0 a 30,30 0 1,0 -60,0", // Anillo fino
+    sniper: "M 45 0 L 55 0 L 55 45 L 100 45 L 100 55 L 55 55 L 55 100 L 45 100 L 45 55 L 0 55 L 0 45 L 45 45 Z", // Cruz
+    shuriken: "M 50 0 L 65 35 L 100 50 L 65 65 L 50 100 L 35 65 L 0 50 L 35 35 Z" // Estrella
+};
+
+const SHOP_ITEMS = [
+    // SKINS BÁSICAS
+    { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Estilo Cyberpunk.', color: '#ff66aa', fixed: true, shape: 'circle' },
+    { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado dorado.', color: '#FFD700', fixed: true, shape: 'circle' },
+    { id: 'skin_dark', name: 'Modo Dark', price: 1000, type: 'skin', desc: 'Alto contraste.', color: '#444', fixed: true, shape: 'circle' },
+    
+    // SKINS AVANZADAS (Con forma definida)
+    { id: 'skin_demon', name: 'Demon Spikes', price: 3500, type: 'skin', desc: 'Notas agresivas.', color: '#FF0000', fixed: true, shape: 'demon' },
+    { id: 'skin_angel', name: 'Holy Halo', price: 3500, type: 'skin', desc: 'Anillos divinos.', color: '#00FFFF', fixed: true, shape: 'angel' },
+    { id: 'skin_shuriken', name: 'Ninja Star', price: 4000, type: 'skin', desc: 'Shurikens giratorios. (Tu Color)', color: '#FFF', fixed: false, shape: 'shuriken' },
+    { id: 'skin_sniper', name: 'Crosshair', price: 3000, type: 'skin', desc: 'Miras tácticas. (Tu Color)', color: '#0F0', fixed: false, shape: 'sniper' },
+    { id: 'skin_plasma', name: 'Plasma Orb', price: 5000, type: 'skin', desc: 'Núcleo de energía.', color: '#BD00FF', fixed: true, shape: 'circle' },
     
     // UI
-    { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista para avatar.', color: '#00FFFF', fixed: true }
+    { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista.', color: '#00FFFF', fixed: true }
 ];
 // 4. GENERADOR DE CARRILES (TECLAS)
 function createLanes(k) {
