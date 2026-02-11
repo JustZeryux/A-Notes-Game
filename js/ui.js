@@ -921,6 +921,180 @@ window.handleChatInput = function(e, target, input) {
         // db.collection('chats').add(...)
     }
 };
+
+// ==========================================
+// 12. SISTEMA DE CREACIÓN DE SALAS (FIXED)
+// ==========================================
+
+// Función puente para el Chat (llamada desde main.js)
+window.uiOpenChat = function(target) {
+    // Reutilizamos la lógica visual que tenías o creamos una básica
+    const id = `chat-${target || 'global'}`;
+    if(document.getElementById(id)) return;
+    const box = document.createElement('div');
+    box.id = id;
+    box.className = 'chat-window';
+    box.innerHTML = `<div class="cw-header" onclick="this.parentElement.remove()">${target || 'Chat Global'} (Cerrar)</div><div class="cw-body" style="height:200px; background:#000;"></div><input style="width:100%; padding:10px;" placeholder="Escribe...">`;
+    const cont = document.getElementById('chat-overlay-container');
+    if(cont) cont.appendChild(box);
+}
+
+// 1. Interceptar el inicio de juego (startGame)
+// Guardamos la función original por si acaso, pero redefinimos la global
+const originalStartGame = window.startGame;
+
+window.startGame = function(k) {
+    if (window.isCreatingLobby) {
+        // --- MODO CREACIÓN DE SALA ---
+        // En lugar de jugar, solo seleccionamos el modo
+        window.selectedLobbyKeys = k;
+        
+        // Feedback visual: Borde brillante en la tarjeta seleccionada
+        document.querySelectorAll('.diff-card').forEach(c => {
+            c.style.transform = "none";
+            c.style.boxShadow = "none";
+            c.style.border = "2px solid #333";
+        });
+        
+        // Encontrar la tarjeta clickeada (basado en el texto interno o evento)
+        // Como no tenemos referencia directa del elemento, buscamos por clase y contenido aproximado
+        const cards = document.querySelectorAll('.diff-card');
+        if(k===4 && cards[0]) cards[0].style.border = "4px solid #00FFFF";
+        if(k===6 && cards[1]) cards[1].style.border = "4px solid #12FA05";
+        if(k===7 && cards[2]) cards[2].style.border = "4px solid #FFD700";
+        if(k===9 && cards[3]) cards[3].style.border = "4px solid #F9393F";
+        
+        notify(`Modo ${k}K seleccionado`, "info");
+    } else {
+        // --- MODO SOLO (JUEGO NORMAL) ---
+        closeModal('diff');
+        prepareAndPlaySong(k);
+    }
+};
+
+// 2. Modificar la apertura del modal DIFF para inyectar controles de Lobby
+window.selectSongForLobby = function(id, data) {
+    curSongData = { id: id, ...data };
+    window.isCreatingLobby = true; // IMPORTANTE: Activamos el modo
+    closeModal('song-selector');
+    
+    // Abrimos el modal normal
+    openModal('diff');
+    
+    // Manipulamos el DOM del modal para mostrar opciones de sala
+    const optsDiv = document.getElementById('create-lobby-opts');
+    if(optsDiv) {
+        optsDiv.style.display = 'block';
+        
+        // INYECTAR CONTROLES DE DENSIDAD (SOLICITADO)
+        // Limpiamos contenido previo para no duplicar
+        optsDiv.innerHTML = `
+            <div style="background:#111; padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid #333;">
+                <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">CONFIGURACIÓN DE SALA</div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span>Dificultad (Densidad):</span>
+                    <input type="number" id="lobby-density-input" value="5" min="1" max="10" class="num-input" style="width:60px;">
+                </div>
+                
+                <div style="font-size:0.9rem; color:#888;">
+                    1. Selecciona teclas arriba (4K, 6K...)<br>
+                    2. Ajusta la dificultad.<br>
+                    3. Crea la sala.
+                </div>
+            </div>
+            <button class="action" onclick="confirmCreateLobby()">
+                ${window.lobbyTargetFriend ? '⚔️ DESAFIAR A ' + window.lobbyTargetFriend : 'CREAR SALA ONLINE'}
+            </button>
+        `;
+    }
+    
+    // Ocultar toggle de ranked si quieres forzarlo, o dejarlo
+    // Simular selección de 4K por defecto visualmente
+    setTimeout(() => window.startGame(4), 100);
+};
+
+// 3. Crear la sala realmente (Soluciona el "Creando sala..." infinito)
+window.confirmCreateLobby = function() {
+    if(!curSongData) return notify("Error: Sin canción", "error");
+    
+    const densityVal = document.getElementById('lobby-density-input') ? document.getElementById('lobby-density-input').value : 5;
+    const isRanked = document.getElementById('chk-ranked') ? document.getElementById('chk-ranked').checked : false;
+
+    const config = {
+        keys: [window.selectedLobbyKeys || 4], // El modo seleccionado visualmente
+        density: parseInt(densityVal),
+        ranked: isRanked
+    };
+
+    notify("Conectando con servidor...", "info");
+
+    // Llamada a Firebase (online.js)
+    if (window.createLobbyData) {
+        window.createLobbyData(curSongData.id, config)
+            .then((lobbyId) => {
+                notify("Sala creada con éxito", "success");
+                closeModal('diff');
+                
+                // Si es un desafío a amigo, enviarle la invitación
+                if(window.lobbyTargetFriend) {
+                    sendChallengeNotification(window.lobbyTargetFriend, lobbyId, curSongData.title);
+                }
+
+                // Abrir el panel de host
+                if(window.openHostPanel) {
+                    window.openHostPanel(curSongData); 
+                } else {
+                    // Fallback si openHostPanel falló al cargar
+                    document.getElementById('modal-host').style.display = 'flex';
+                }
+                
+                // Resetear estado
+                window.isCreatingLobby = false;
+                window.lobbyTargetFriend = null;
+            })
+            .catch(err => {
+                console.error(err);
+                notify("Error al crear sala: " + err, "error");
+            });
+    } else {
+        notify("Error: online.js no cargó createLobbyData", "error");
+    }
+};
+
+// Helper para enviar notificación de desafío (Simulado o real si tienes el sistema)
+function sendChallengeNotification(target, lobbyId, songTitle) {
+    if(!db) return;
+    db.collection("users").doc(target).collection("notifications").add({
+        type: "challenge",
+        from: user.name,
+        lobbyId: lobbyId,
+        songName: songTitle,
+        body: `${user.name} te desafía en ${songTitle}!`,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    notify(`Invitación enviada a ${target}`, "success");
+}
+
+// Resetear el modo cuando se cierra el modal manualmente
+const originalCloseModal = window.closeModal;
+window.closeModal = function(id) {
+    if(id === 'diff') {
+        window.isCreatingLobby = false;
+        window.lobbyTargetFriend = null;
+        // Ocultar opciones de lobby para la próxima vez que se abra en modo solo
+        const opts = document.getElementById('create-lobby-opts');
+        if(opts) opts.style.display = 'none';
+        
+        // Restaurar estilos de tarjetas
+        document.querySelectorAll('.diff-card').forEach(c => {
+             c.style.border = "2px solid #333";
+        });
+    }
+    // Llamar a la función original de cierre (definida en el UI original)
+    document.getElementById('modal-'+id).style.display = 'none';
+};
+
 // === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
