@@ -667,6 +667,109 @@ function uploadAvatar(i){ if(i.files[0]){ const r=new FileReader(); r.onload=e=>
 async function loadHitSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); hitBuf = await st.ctx.decodeAudioData(buf); notify("Hit Sound cargado"); i.value = ""; } }
 async function loadMissSound(i){ if(i.files[0]){ const buf = await i.files[0].arrayBuffer(); missBuf = await st.ctx.decodeAudioData(buf); notify("Miss Sound cargado"); i.value = ""; } }
 
+// ==========================================
+// 9. LÓGICA DE SALAS ONLINE (MISSING CODE FIXED)
+// ==========================================
+
+// Abrir el navegador de salas (Corrige el error openLobbyBrowser)
+window.openLobbyBrowser = function() {
+    openModal('lobbies');
+    refreshLobbies();
+};
+
+// Actualizar la lista de salas disponibles
+window.refreshLobbies = function() {
+    const list = document.getElementById('lobby-list');
+    if (!list) return;
+    
+    list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Cargando salas...</div>';
+
+    if (!db) {
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--miss);">Error de conexión a la base de datos.</div>';
+        return;
+    }
+
+    // Buscar salas en estado 'waiting'
+    db.collection("lobbies").where("status", "==", "waiting").get()
+    .then(snapshot => {
+        list.innerHTML = '';
+        if (snapshot.empty) {
+            list.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No hay salas públicas. ¡Crea una!</div>';
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const div = document.createElement('div');
+            div.className = 'lobby-box';
+            
+            // Crear elemento visual de la sala
+            div.innerHTML = `
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div style="width:50px; height:50px; background:#333; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.5rem; color:#555;">VS</div>
+                    <div>
+                        <div style="font-weight:900; font-size:1.2rem; color:white;">${data.songTitle || 'Desconocido'}</div>
+                        <div style="color:var(--blue); font-size:0.9rem; font-weight:bold;">HOST: ${data.host}</div>
+                    </div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:900; font-size:1.5rem; color:white;">${data.players ? data.players.length : 1}/8</div>
+                    <div style="font-size:0.8rem; font-weight:bold; color:${data.config?.ranked ? 'var(--gold)' : '#666'}">${data.config?.ranked ? 'RANKED' : 'CASUAL'}</div>
+                </div>
+            `;
+            
+            // Al hacer click, unirse a la sala (función de online.js)
+            div.onclick = function() { 
+                if(window.joinLobbyData) window.joinLobbyData(doc.id); 
+            };
+            
+            list.appendChild(div);
+        });
+    })
+    .catch(error => {
+        console.error("Error cargando salas:", error);
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--miss);">Error al cargar lista.</div>';
+    });
+};
+
+// Abrir selector de canciones para crear sala
+window.openSongSelectorForLobby = function() {
+    closeModal('lobbies');
+    // Reutilizamos el selector de canciones normal pero cambiamos el comportamiento
+    // Nota: Necesitarás asegurarte que al hacer click en una canción en este modo, llame a openModal('diff')
+    // con una bandera especial para "crear sala".
+    
+    // Solución rápida: Abrir el selector normal
+    document.querySelector('.search-inp').focus();
+    notify("Elige una canción del menú principal para crear sala", "info");
+    document.getElementById('menu-container').classList.remove('hidden');
+};
+
+// Configurar el modal de dificultad para mostrar opción de crear sala
+// (Esto se conecta con tu HTML: id="create-lobby-opts")
+const originalDiffClick = window.openModal; // Guardar referencia si es necesario
+window.confirmCreateLobby = function() {
+    if(!curSongData) return;
+    
+    // Crear configuración de sala
+    const config = {
+        difficulty: 'Normal', // Puedes hacerlo dinámico
+        keys: [4], // Por defecto 4K, deberías capturar la selección del usuario
+        density: cfg.den || 5,
+        ranked: document.getElementById('chk-ranked').checked
+    };
+    
+    notify("Creando sala...", "info");
+    
+    // Llamar a online.js
+    if(window.createLobbyData) {
+        window.createLobbyData(curSongData.id, config).then(() => {
+            closeModal('diff');
+            openModal('host'); // Asumiendo que existe un modal 'host' o 'lobby-room'
+        });
+    }
+};
+
 // === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
