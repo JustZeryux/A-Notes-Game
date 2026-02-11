@@ -673,4 +673,3 @@ function resumeGame() {
     st.paused = false; requestAnimationFrame(loop);
 }
 function toMenu() { location.reload(); }
-function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
