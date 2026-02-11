@@ -261,6 +261,19 @@ function switchSetTab(tab) {
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
         html += renderToggle('Screen Shake', 'shake');
+        html += renderToggle('Lane Flash (Luz Carril)', 'laneFlash');
+    html += renderToggle('Mostrar Splash Hits', 'showSplash');
+    
+    html += `<div class="set-row">
+        <span class="set-label">Tipo de Splash</span>
+        <select class="log-inp" style="width:150px; padding:5px;" onchange="updateCfgVal('splashType', this.value)">
+            <option value="classic" ${cfg.splashType=='classic'?'selected':''}>Classic Ring</option>
+            <option value="fire" ${cfg.splashType=='fire'?'selected':''}>Fire Burst</option>
+            <option value="electric" ${cfg.splashType=='electric'?'selected':''}>Electric</option>
+            <option value="star" ${cfg.splashType=='star'?'selected':''}>Star Pop</option>
+            <option value="text" ${cfg.splashType=='text'?'selected':''}>Text HIT</option>
+        </select>
+    </div>`;
         html += renderRange('Tamaño Nota (Escala)', 'noteScale', 0.5, 1.5, 0.1);
         html += renderRange('Track FOV (Inclinación 3D)', 'fov', 0, 45); // <--- NUEVO
         html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
