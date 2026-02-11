@@ -433,79 +433,115 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 22px; heigh
     fill: rgba(255,255,255,0.2);
 }
 
-/* === NUEVOS SPLASHES (V100 - DISTINTOS) === */
+/* === FIX BOTONES RESULTADOS (IGUAL TAMAÑO) === */
+.modal-buttons-row {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+    width: 100%;
+}
+/* Forzar que los botones ocupen el 50% cada uno */
+.modal-buttons-row button {
+    flex: 1; 
+    margin: 0;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+/* === FIX RECEPTORES (ILUMINACIÓN) === */
+/* Asegura que la clase .pressed tenga prioridad y brillo */
+.receptor { 
+    z-index: 200; 
+    opacity: 0.8; 
+    transform: scale(var(--note-scale)); 
+    transition: transform 0.05s;
+}
+.receptor.pressed { 
+    opacity: 1 !important; 
+    transform: scale(0.9) !important; 
+    filter: brightness(2) drop-shadow(0 0 20px var(--active-c)) !important; 
+}
+.receptor.pressed path { 
+    stroke: var(--active-c) !important; 
+    fill: rgba(255,255,255,0.5) !important;
+}
+
+/* === FIX SPLASHES (GEOMETRÍA Y POSICIÓN) === */
 .splash-wrapper {
     position: absolute;
     pointer-events: none;
     z-index: 500;
-    width: 0; height: 0;
-    transform: translate(-50%, -50%); /* CENTRADO FIX */
-    display: flex; justify-content: center; align-items: center;
+    /* FIX: Darle tamaño para que no se aplaste a una línea */
+    width: 150px; 
+    height: 150px; 
+    /* Centrado perfecto sobre el receptor */
+    transform: translate(-50%, -50%); 
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
 }
 
-/* 1. CLASSIC: Anillo expansivo simple */
+/* 1. CLASSIC */
 .splash-classic {
-    width: 100px; height: 100px;
-    border: 6px solid var(--c);
+    width: 100%; height: 100%;
+    border: 5px solid var(--c);
     border-radius: 50%;
+    box-sizing: border-box; /* Importante */
     animation: sp-classic 0.3s ease-out forwards;
 }
 @keyframes sp-classic {
     0% { transform: scale(0.5); opacity: 1; border-width: 10px; }
-    100% { transform: scale(1.8); opacity: 0; border-width: 0; }
+    100% { transform: scale(1.5); opacity: 0; border-width: 0; }
 }
 
-/* 2. FIRE: Partículas subiendo */
+/* 2. FIRE */
 .splash-fire {
-    width: 20px; height: 20px;
+    width: 40px; height: 40px;
     background: var(--c);
-    box-shadow: 0 0 20px var(--c);
     border-radius: 50%;
+    box-shadow: 0 0 20px var(--c);
     animation: sp-fire 0.4s ease-out forwards;
 }
-.splash-fire::before, .splash-fire::after {
-    content:''; position:absolute; width:100%; height:100%; background:inherit; border-radius:50%;
-    animation: sp-fire-p 0.4s ease-out forwards;
+@keyframes sp-fire { 
+    0% { transform: scale(1); opacity: 1; } 
+    100% { transform: translateY(-50px) scale(2); opacity: 0; } 
 }
-.splash-fire::before { transform: translate(-15px, 10px); }
-.splash-fire::after { transform: translate(15px, 5px); }
-@keyframes sp-fire { 0% { opacity:1; transform: scale(1); } 100% { opacity:0; transform: translateY(-60px) scale(3); } }
 
-/* 3. ELECTRIC: Rayos rotando */
+/* 3. ELECTRIC */
 .splash-electric {
-    width: 140px; height: 140px;
-    border: 2px dashed var(--c);
+    width: 100%; height: 100%;
+    border: 4px dashed var(--c);
     border-radius: 50%;
-    box-shadow: 0 0 10px var(--c);
     animation: sp-elec 0.3s linear forwards;
 }
 @keyframes sp-elec { 
-    0% { transform: scale(0.8) rotate(0deg); opacity: 1; } 
+    0% { transform: scale(0.7) rotate(0deg); opacity: 1; } 
     100% { transform: scale(1.2) rotate(180deg); opacity: 0; } 
 }
 
-/* 4. STAR: Estrella girando */
+/* 4. STAR */
 .splash-star {
-    font-size: 0;
+    display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;
 }
 .splash-star::after {
     content: '★';
     font-size: 100px;
     color: var(--c);
     text-shadow: 0 0 20px white;
-    display: block;
-    animation: sp-star 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    animation: sp-star 0.4s ease-out forwards;
+    line-height: 0;
 }
 @keyframes sp-star { 
-    0% { transform: scale(0) rotate(-90deg); opacity: 1; } 
-    100% { transform: scale(1.5) rotate(0deg); opacity: 0; } 
+    0% { transform: scale(0) rotate(-45deg); opacity: 1; } 
+    100% { transform: scale(1.5) rotate(45deg); opacity: 0; } 
 }
 
-/* 5. TEXT: Texto "HIT" */
+/* 5. TEXT */
 .splash-text {
     font-size: 2rem; font-weight: 900; color: white;
     text-shadow: 2px 2px 0px var(--c);
     animation: sp-text 0.3s ease-out forwards;
+    white-space: nowrap;
 }
 .splash-text::after { content: 'HIT!'; }
 @keyframes sp-text { 
@@ -513,7 +549,6 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 22px; heigh
     50% { transform: scale(1.2); opacity: 1; } 
     100% { transform: scale(1); opacity: 0; } 
 }
-
 /* === LEADERBOARD ONLINE ANIMADO === */
 #multi-leaderboard {
     position: absolute; top: 100px; right: 20px; width: 300px;
