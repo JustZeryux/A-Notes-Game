@@ -450,6 +450,43 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 22px; heigh
     justify-content: center;
 }
 
+/* === UI TIENDA Y CONTROLES V110 === */
+
+/* Etiquetas en tienda */
+.shop-desc { font-size: 0.8rem; color: #aaa; margin-bottom: 8px; line-height: 1.2; height: 35px; overflow: hidden; }
+.tag-fix { background: #333; color: #aaa; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #555; }
+.tag-cust { background: rgba(0, 255, 255, 0.1); color: cyan; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; border: 1px solid cyan; }
+
+/* Selector de Skin en Ajustes */
+.skin-selector {
+    width: 100%;
+    padding: 15px;
+    background: #111;
+    border: 2px solid #333;
+    color: white;
+    font-family: 'Chakra Petch';
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 10px;
+    cursor: pointer;
+    outline: none;
+    transition: 0.2s;
+}
+.skin-selector:hover, .skin-selector:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 20px rgba(255,102,170,0.2);
+}
+.skin-selector option {
+    background: #000;
+    padding: 10px;
+}
+
+/* Efecto Shuriken giratorio */
+@keyframes spinNote { 0% { transform: scale(var(--note-scale)) rotate(0deg); } 100% { transform: scale(var(--note-scale)) rotate(360deg); } }
+.rotating-note .arrow-svg {
+    animation: spinNote 1s linear infinite;
+}
+
 /* === ARREGLO DE SPLASHES (Para que no sean líneas) === */
 .splash-wrapper {
     position: absolute;
