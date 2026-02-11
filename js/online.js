@@ -1,4 +1,4 @@
-fu/* === ONLINE SYSTEM (LOBBY, FRIENDS & CHALLENGES) === */
+/* === ONLINE SYSTEM (LOBBY, FRIENDS & CHALLENGES) === */
 
 let currentLobbyId = null;
 let lobbyListener = null;
@@ -95,9 +95,13 @@ window.joinLobby = function(lobbyId) {
         if(data.status !== "waiting") throw "La partida ya empezó.";
         if(data.players.length >= 8) throw "Sala llena.";
         
-        const playerData = { name: user.name, avatar: user.avatarData || '', status: 'joined' };
-        t.update(lobbyRef, { players: firebase.firestore.FieldValue.arrayUnion(playerData) });
-        return data; // Return data for next step
+        // Verificar si ya estoy en la lista
+        const alreadyIn = data.players.find(p => p.name === user.name);
+        if(!alreadyIn) {
+            const playerData = { name: user.name, avatar: user.avatarData || '', status: 'joined', score: 0 };
+            t.update(lobbyRef, { players: firebase.firestore.FieldValue.arrayUnion(playerData) });
+        }
+        return data; 
     }).then((data) => {
         currentLobbyId = lobbyId;
         closeModal('lobbies');
@@ -107,7 +111,12 @@ window.joinLobby = function(lobbyId) {
             if(sDoc.exists) {
                 curSongData = { id: sDoc.id, ...sDoc.data() };
                 openHostPanel(curSongData); // Reutilizamos panel de host pero modo cliente
-                document.getElementById('btn-start-match').style.display = 'none'; // Clientes no inician
+                
+                // Ocultar controles de host
+                setTimeout(() => {
+                    const btnStart = document.getElementById('btn-start-match');
+                    if(btnStart) btnStart.style.display = 'none';
+                }, 100);
             }
         });
         listenToLobby(lobbyId);
@@ -129,7 +138,7 @@ window.createLobby = function(songId, isPrivate = false) {
         songId: songId,
         songTitle: curSongData.title,
         status: 'waiting',
-        players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready' }],
+        players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready', score: 0 }],
         config: {
             density: cfg.lobbyDen || 5,
             ranked: cfg.lobbyRanked || false,
@@ -145,7 +154,7 @@ window.createLobby = function(songId, isPrivate = false) {
         if(!isPrivate) notify("Sala creada. Esperando jugadores...");
     });
     
-    return currentLobbyId; // Return para promesas (challenge)
+    return currentLobbyId; 
 };
 
 function listenToLobby(lobbyId) {
@@ -155,17 +164,26 @@ function listenToLobby(lobbyId) {
         const data = doc.data();
         
         // Si inicia la partida
-        if (data.status === 'playing' && !isMultiplayer) {
-            isMultiplayer = true;
-            cfg.den = data.config.density;
-            st.ranked = data.config.ranked;
-            closeModal('host');
-            startGame(data.config.keys[0]); // Iniciar con la primera key permitida
-            notify("¡PARTIDA INICIADA!");
+        if (data.status === 'playing') {
+            if (!isMultiplayer) {
+                isMultiplayer = true;
+                cfg.den = data.config.density;
+                st.ranked = data.config.ranked;
+                closeModal('host');
+                startGame(data.config.keys[0]); // Iniciar con la primera key permitida
+                notify("¡PARTIDA INICIADA!");
+            }
+            
+            // Actualizar scores en tiempo real durante la partida
+            if(isMultiplayer && typeof updateMultiLeaderboardUI === 'function') {
+                updateMultiLeaderboardUI(data.players);
+            }
         }
         
-        // Actualizar lista visual en el panel
-        if(typeof updateHostPanelUI === 'function') updateHostPanelUI(data.players);
+        // Actualizar lista visual en el panel si estamos esperando
+        if (data.status === 'waiting' && typeof updateHostPanelUI === 'function') {
+            updateHostPanelUI(data.players);
+        }
     });
 }
 
@@ -177,9 +195,22 @@ window.startLobbyMatch = function() {
 window.leaveLobby = function() {
     if (currentLobbyId) {
         if (lobbyListener) lobbyListener();
-        // Si soy host, borro la sala. Si soy cliente, me salgo.
-        // Simplificado: por ahora borramos referencia local.
-        // En prod: db remove player from array.
+        
+        // Sacarme de la lista de jugadores
+        if(user.name) {
+             const lobbyRef = db.collection("lobbies").doc(currentLobbyId);
+             lobbyRef.get().then(doc => {
+                 if(doc.exists) {
+                     const players = doc.data().players.filter(p => p.name !== user.name);
+                     if(players.length === 0) {
+                         lobbyRef.delete(); // Borrar si vacío
+                     } else {
+                         lobbyRef.update({ players: players });
+                     }
+                 }
+             });
+        }
+        
         currentLobbyId = null;
         isMultiplayer = false;
         closeModal('host');
@@ -188,7 +219,7 @@ window.leaveLobby = function() {
 
 // === DESAFIOS (CHALLENGE SYSTEM) ===
 window.challengeFriend = function(targetName) {
-    if(!curSongData) return notify("Selecciona una canción primero (Ve a Canciones Globales)", "error");
+    if(!curSongData) return notify("Selecciona una canción primero", "error");
     
     notify(`Desafiando a ${targetName}...`, "info");
     
@@ -198,7 +229,7 @@ window.challengeFriend = function(targetName) {
         songId: curSongData.id,
         songTitle: curSongData.title,
         status: 'waiting',
-        players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready' }],
+        players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready', score: 0 }],
         config: { density: 5, ranked: false, keys: [4], private: true },
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
@@ -218,7 +249,7 @@ window.challengeFriend = function(targetName) {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        notify("Desafío enviado. Esperando a que se una.");
+        notify("Desafío enviado. Esperando...");
     });
 };
 
@@ -231,7 +262,7 @@ function notifyChallenge(from, lobbyId, songName) {
         <div class="notify-title">⚔️ DESAFÍO DE ${from}</div>
         <div class="notify-body">Canción: ${songName}</div>
         <div class="notify-actions">
-            <button class="btn-small btn-acc" onclick="joinLobby('${lobbyId}')">ACEPTAR</button>
+            <button class="btn-small btn-acc" onclick="joinLobby('${lobbyId}'); this.parentElement.parentElement.remove()">ACEPTAR</button>
             <button class="btn-small" style="background:#F9393F" onclick="this.parentElement.parentElement.remove()">IGNORAR</button>
         </div>
     `;
@@ -263,5 +294,27 @@ window.respondFriend = function(targetName, accept) {
 
 // === LIVE SCORE ===
 window.sendLobbyScore = function(score) {
-    // Implementación futura: Escribir en subcolección 'scores' del lobby
+    if(!currentLobbyId || !user.name) return;
+    
+    // Actualizar mi score en el array de players del lobby
+    // Esto es pesado para Firestore (muchas escrituras), idealmente usar Realtime DB
+    // Lo limitamos a cada 2 segundos
+    const now = Date.now();
+    if(!window.lastScoreUpdate || now - window.lastScoreUpdate > 2000) {
+        window.lastScoreUpdate = now;
+        
+        const lobbyRef = db.collection("lobbies").doc(currentLobbyId);
+        db.runTransaction(async (t) => {
+            const doc = await t.get(lobbyRef);
+            if(!doc.exists) return;
+            
+            const players = doc.data().players;
+            const myIdx = players.findIndex(p => p.name === user.name);
+            
+            if(myIdx !== -1) {
+                players[myIdx].score = score;
+                t.update(lobbyRef, { players: players });
+            }
+        });
+    }
 };
