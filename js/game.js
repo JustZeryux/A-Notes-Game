@@ -237,30 +237,14 @@ function initReceptors(k) {
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
     const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
-for (let i = 0; i < k; i++) {
-        // Obtener visuales basados en la skin
-        const viz = getNoteVisuals(i, skin);
-        
-        const l = document.createElement('div');
-        l.className = 'lane-flash';
-        l.id = `flash-${i}`;
-        l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', viz.color); // Color correcto para el flash
-        elTrack.appendChild(l);
 
-        const r = document.createElement('div');
-        r.className = `arrow-wrapper receptor`;
-        r.id = `rec-${i}`;
-        r.style.left = (i * (100 / k)) + '%';
-        r.style.top = y + 'px';
-        r.style.setProperty('--active-c', viz.color); // Color correcto para el brillo al pulsar
-        
-        // Renderizar forma
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
-            <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
-        </svg>`;
-        
-        elTrack.appendChild(r);
+    for (let i = 0; i < k; i++) {
+        const viz = window.getNoteVisuals(i, skin);
+        const l = document.createElement('div');
+        l.className = 'lane-flash'; l.id = `flash-${i}`;
+        l.style.left = (i * (100 / k)) + '%';
+        l.style.setProperty('--c', viz.color);
+        elTrack.appendChild(l);
 
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`; r.id = `rec-${i}`;
@@ -386,86 +370,47 @@ window.playSongInternal = function(s) {
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-    
     if (window.st.songDuration > 0) {
-        const cur = Math.max(0, now / 1000); 
-        const pct = Math.min(100, (cur / window.st.songDuration) * 100);
+        const pct = Math.min(100, ((now/1000) / window.st.songDuration) * 100);
         document.getElementById('top-progress-fill').style.width = pct + "%";
-        document.getElementById('top-progress-time').innerText = `${Math.floor(cur/60)}:${Math.floor(cur%60).toString().padStart(2,'0')}`;
+        document.getElementById('top-progress-time').innerText = `${Math.floor(now/60000)}:${Math.floor((now%60000)/1000).toString().padStart(2,'0')}`;
     }
-
-    const w = 100 / window.keys;
-    const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
-const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
+    const w = 100 / window.keys, yR = window.cfg.down ? window.innerHeight - 140 : 80;
+    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
         if (n.t - now < 1500) {
             const el = document.createElement('div');
-            const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
-            el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
-            el.style.left = (n.l * w) + '%';
-            el.style.width = w + '%';
+            el.className = `arrow-wrapper ${n.type==='hold'?'hold-note':''}`;
+            el.style.left = (n.l * w) + '%'; el.style.width = w + '%';
+            const viz = window.getNoteVisuals(n.l, skin);
+            el.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}"><path d="${viz.shape}" fill="${viz.color}" stroke="white" stroke-width="2"/></svg>`;
             
-            // OBTENER DATOS DE LA SKIN
-            const viz = getNoteVisuals(n.l, skin);
-
-            // SVG Construction
-            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
-                <path d="${viz.shape}" fill="${viz.color}" stroke="white" stroke-width="2"/>
-            </svg>`;
-            
-            // Rotación para shuriken
-            if (skin === 'skin_shuriken') {
-                el.classList.add('rotating-note'); // Definir en CSS
-            }
+            if (skin === 'skin_shuriken') el.classList.add('rotating-note');
 
             if (n.type === 'hold') {
                 const h = (n.len / 1000) * (window.cfg.spd * 40); 
-                svg += `<div class="sustain-trail" style="height:${h}px; background:${viz.color}; opacity:${window.cfg.noteOp/100}"></div>`;
+                el.innerHTML += `<div class="sustain-trail" style="height:${h}px; background:${viz.color}; opacity:${window.cfg.noteOp/100}"></div>`;
             }
-
-            el.innerHTML = svg + viz.extra;
-            if(elTrack) elTrack.appendChild(el);
-            n.el = el;
-            n.s = true;
-            window.st.spawned.push(n);
+            if(elTrack) elTrack.appendChild(el); n.el = el; n.s = true; window.st.spawned.push(n);
         } else break;
     }
-
-    // MOVEMENT
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
-        if (!n.el) { window.st.spawned.splice(i, 1); continue; }
-
-        const timeDiff = n.t - now + window.cfg.off;
-        const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
-        let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
-        
-        if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
-             n.el.style.top = finalY + 'px';
-        }
-
-        if (n.type === 'hold' && n.h) {
-             n.el.style.top = yReceptor + 'px';
-             const rem = (n.t + n.len) - now;
-             const tr = n.el.querySelector('.sustain-trail');
-             if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
-             
-             if (!window.st.keys[n.l] && rem > 50) miss(n); 
-             else { window.st.hp = Math.min(100, window.st.hp+0.05); updHUD(); }
-
-             if (now >= n.t + n.len) {
-                 window.st.sc += 100; 
-                 n.el.remove(); n.el = null; 
-             }
-        }
-
-        if (!n.h && timeDiff < -160) {
-            miss(n);
-            if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
-            window.st.spawned.splice(i, 1);
+        const dist = (n.t - now + window.cfg.off) / 1000 * (window.cfg.spd * 40);
+        let finalY = window.cfg.down ? (yR - dist) : (yR + dist);
+        if (n.type==='hold' && n.h) {
+            n.el.style.top = yR + 'px';
+            const rem = (n.t+n.len)-now;
+            const tr = n.el.querySelector('.sustain-trail');
+            if(tr) tr.style.height = Math.max(0, (rem/1000)*(window.cfg.spd*40)) + 'px';
+            if(!window.st.keys[n.l] && rem>50) miss(n); else { window.st.hp=Math.min(100,window.st.hp+0.05); updHUD(); }
+            if(now >= n.t+n.len){ window.st.sc+=100; if(n.el) n.el.remove(); window.st.spawned.splice(i,1); }
+        } else {
+            if(n.el) n.el.style.top = finalY + 'px';
+            if((n.t - now + window.cfg.off) < -160 && !n.h){ miss(n); if(n.el) n.el.remove(); window.st.spawned.splice(i,1); }
         }
     }
     requestAnimationFrame(loop);
