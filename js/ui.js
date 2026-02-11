@@ -303,14 +303,41 @@ function switchSetTab(tab) {
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="loadHitSound(this)">`;
         html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
-    else if (tab === 'controls') {
-        html += `<div class="kb-tabs">
+else if (tab === 'controls') {
+        // Generar opciones del selector
+        let skinOptions = `<option value="default">Default (Sin Skin)</option>`;
+        if (user.inventory) {
+            user.inventory.forEach(itemId => {
+                const item = SHOP_ITEMS.find(x => x.id === itemId);
+                if (item && item.type === 'skin') {
+                    const isEquipped = user.equipped && user.equipped.skin === item.id;
+                    skinOptions += `<option value="${item.id}" ${isEquipped ? 'selected' : ''}>${item.name}</option>`;
+                }
+            });
+        }
+
+        html += `
+        <div class="kb-tabs">
             <div class="kb-tab active" id="tab-4" onclick="renderLaneConfig(4)">4K</div>
             <div class="kb-tab" id="tab-6" onclick="renderLaneConfig(6)">6K</div>
             <div class="kb-tab" id="tab-7" onclick="renderLaneConfig(7)">7K</div>
             <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
         </div>
-        <div class="lane-cfg-box"><div id="lanes-container" class="lanes-view"></div></div>`;
+        
+        <div class="lane-cfg-box">
+            <div id="lanes-container" class="lanes-view"></div>
+            
+            <div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
+                <div style="font-weight:900; color:var(--accent); margin-bottom:10px; font-size:1.2rem;">🎨 SKIN DE NOTAS</div>
+                <select class="skin-selector" onchange="equipSkinFromSettings(this.value)">
+                    ${skinOptions}
+                </select>
+                <div style="color:#888; font-size:0.9rem; margin-top:10px; font-style:italic;">
+                    ⚠️ Si usas una skin "Color Fijo", los colores de arriba serán ignorados.
+                </div>
+            </div>
+        </div>`;
+        
         setTimeout(() => renderLaneConfig(4), 50);
     }
 
@@ -318,7 +345,15 @@ function switchSetTab(tab) {
     updatePreview(); 
 }
 
-// ... (resto de funciones) ...
+window.equipSkinFromSettings = function(skinId) {
+    if (!user.equipped) user.equipped = {};
+    user.equipped.skin = skinId;
+    save(); // Guardar en localStorage/Firebase
+    notify(skinId === 'default' ? "Skin desactivada" : "Skin equipada", "success");
+    // Forzar actualización visual si estamos en el menú
+    updatePreview(); 
+};
+function equipItem(id, type) { /* Obsoleto para skins, mantenido para UI frames si quieres */ }
 
 function updatePreview() {
     const box = document.getElementById('preview-box');
