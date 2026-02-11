@@ -1,9 +1,9 @@
-/* === AUDIO & ENGINE (MASTER V50 - ULTRA PRO) === */
+/* === AUDIO & ENGINE (MASTER V60 - RETRY & FIXES) === */
 
 // Cache
 let elTrack = null;
 
-// === 1. AUDIO SYSTEM (FIXED) ===
+// === 1. AUDIO SYSTEM ===
 function unlockAudio() {
     if (!window.st.ctx) {
         try {
@@ -21,13 +21,11 @@ function unlockAudio() {
 
 function genSounds() {
     if(!window.st.ctx) return;
-    // Hit: Seco y corto (300ms decay)
     const b1 = window.st.ctx.createBuffer(1, 2000, 44100);
     const d1 = b1.getChannelData(0);
     for (let i = 0; i < d1.length; i++) d1[i] = Math.sin(i * 0.5) * Math.exp(-i / 300);
     window.hitBuf = b1;
 
-    // Miss: Ruido blanco
     const b2 = window.st.ctx.createBuffer(1, 4000, 44100);
     const d2 = b2.getChannelData(0);
     for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() - 0.5) * 0.5 * Math.exp(-i / 500);
@@ -56,28 +54,27 @@ function playMiss() {
     }
 }
 
-// === 2. GENERADOR ULTRA PRO (NO OVERLAP) ===
+// === 2. GENERADOR TUNING (RESPETA CONFIGURACIÓN) ===
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // Configuración
+    // Leer configuración actual
     let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
-    const thresholdBase = 1.4 - (safeDen * 0.05); 
-    const minStep = Math.max(60, 180 - (safeDen * 12)); 
     
-    // Análisis
+    // Ajustar dificultad: Si den es bajo, aumentamos mucho el umbral para filtrar notas
+    // Si den es alto (10), bajamos el umbral para detectar todo
+    const thresholdBase = 1.5 - (safeDen * 0.08); 
+    const minStep = Math.max(80, 250 - (safeDen * 20)); // Tiempo mínimo entre notas
+    
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 100); 
     
     let lastTime = 0;
     let lastLane = 0;
     let energyHistory = [];
-    
-    // === FIX DE SUPERPOSICIÓN: RASTREO DE TIEMPO LIBRE POR CARRIL ===
-    // laneFreeTimes[i] guarda el milisegundo en el que el carril 'i' queda libre
     let laneFreeTimes = new Array(k).fill(0);
 
     // Patrones
@@ -100,72 +97,56 @@ function genMap(buf, k) {
         const timeMs = (i / sampleRate) * 1000;
         if (timeMs < 1500) continue;
 
-        // Detección de golpe
+        // Detección
         if (instantEnergy > localAvg * thresholdBase && (timeMs - lastTime > minStep)) {
             
-            // Decidir patrón
+            // Lógica de Patrones
             if (patternDuration <= 0) {
                 const r = Math.random();
-                if (r < 0.4) currentPattern = 1; // Stream
-                else if (r < 0.6) currentPattern = 2; // Jack
-                else if (r < 0.8) currentPattern = 3; // Trill
+                if (r < 0.3) currentPattern = 1; // Stream
+                else if (r < 0.5) currentPattern = 2; // Jack
+                else if (r < 0.7) currentPattern = 3; // Trill
                 else currentPattern = 0; // Random
                 patternDuration = Math.floor(Math.random() * 8) + 4;
                 patternDir = Math.random() > 0.5 ? 1 : -1;
             }
 
-            // Seleccionar carril ideal según patrón
             let targetLane = 0;
             if (currentPattern === 1) targetLane = (lastLane + patternDir + k) % k;
             else if (currentPattern === 2) targetLane = lastLane;
             else if (currentPattern === 3) targetLane = (lastLane + 2) % k;
             else targetLane = Math.floor(Math.random() * k);
 
-            // === CRÍTICO: BUSCAR CARRIL LIBRE SI EL TARGET ESTÁ OCUPADO ===
-            // Si el carril deseado tiene una nota larga activa, buscar otro
+            // Buscar carril libre
             let finalLane = -1;
-            
-            // Intentar el target primero
-            if (timeMs >= laneFreeTimes[targetLane]) {
-                finalLane = targetLane;
-            } else {
-                // Si está ocupado, buscar cualquier otro libre
+            if (timeMs >= laneFreeTimes[targetLane]) finalLane = targetLane;
+            else {
                 const freeLanes = [];
-                for(let l=0; l<k; l++) {
-                    if(timeMs >= laneFreeTimes[l]) freeLanes.push(l);
-                }
-                if(freeLanes.length > 0) {
-                    finalLane = freeLanes[Math.floor(Math.random() * freeLanes.length)];
-                }
+                for(let l=0; l<k; l++) if(timeMs >= laneFreeTimes[l]) freeLanes.push(l);
+                if(freeLanes.length > 0) finalLane = freeLanes[Math.floor(Math.random()*freeLanes.length)];
             }
 
-            // Si encontramos carril válido
             if (finalLane !== -1) {
                 let isHold = false;
                 let holdLen = 0;
                 
-                // Probabilidad de nota larga
-                if (instantEnergy > localAvg * 1.5 && Math.random() > 0.65) {
+                // Menos probabilidad de hold en densidades bajas
+                if (instantEnergy > localAvg * 1.5 && Math.random() > (0.8 - (safeDen * 0.02))) {
                     isHold = true;
                     holdLen = Math.min(800, Math.random() * 400 + 100);
                 }
 
                 map.push({ t: timeMs, l: finalLane, type: isHold?'hold':'tap', len: holdLen, h:false, scoreGiven:false });
-                
-                // MARCAR CARRIL COMO OCUPADO
-                // + 20ms de buffer para que no se peguen visualmente
-                laneFreeTimes[finalLane] = timeMs + holdLen + 30; 
-                
+                laneFreeTimes[finalLane] = timeMs + holdLen + 40; 
                 lastTime = timeMs;
                 lastLane = finalLane;
 
-                // --- DOBLES/TRIPLES (CHORDS) ---
-                // Solo si el golpe es fuerte y hay espacio
-                if (instantEnergy > localAvg * 1.8 && safeDen >= 5) {
+                // Dobles (Chords) - Solo si densidad > 5
+                if (instantEnergy > localAvg * 2.0 && safeDen >= 6) {
                     let secondLaneTarget = (finalLane + Math.floor(k/2)) % k;
                     if (timeMs >= laneFreeTimes[secondLaneTarget] && secondLaneTarget !== finalLane) {
                         map.push({ t: timeMs, l: secondLaneTarget, type: 'tap', len: 0, h:false, scoreGiven:false });
-                        laneFreeTimes[secondLaneTarget] = timeMs + 30;
+                        laneFreeTimes[secondLaneTarget] = timeMs + 40;
                     }
                 }
             }
@@ -175,7 +156,7 @@ function genMap(buf, k) {
     return map;
 }
 
-// === 3. INICIO Y LOOP ===
+// === 3. INICIO Y RE-GENERACIÓN (FIX IMPOSIBLE) ===
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
@@ -201,12 +182,8 @@ function initReceptors(k) {
         r.style.left = (i * (100 / k)) + '%';
         r.style.top = y + 'px';
         
-        // Color del receptor según skin
         let strokeColor = "white";
-        if(window.user && window.user.equipped) {
-             if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
-             else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
-        }
+        if(window.user && window.user.equipped && window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
 
         let conf = window.cfg.modes[k][i];
         let shape = PATHS[conf.s] || PATHS['circle'];
@@ -219,22 +196,40 @@ function initReceptors(k) {
 async function prepareAndPlaySong(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Generando..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Cargando..."; }
 
     try {
         unlockAudio();
         
         let songInRam = window.ramSongs.find(s => s.id === window.curSongData.id);
+        const currentDen = window.cfg.den || 5;
+
+        // FIX: Si la canción existe pero la densidad cambió, BORRAMOS la vieja y regeneramos
+        if (songInRam && (songInRam.kVersion !== k || songInRam.genDen !== currentDen)) {
+            console.log("Configuración cambiada. Regenerando mapa...");
+            window.ramSongs = window.ramSongs.filter(s => s.id !== window.curSongData.id); // Borrar
+            songInRam = null; // Forzar regeneración
+        }
+
         if (!songInRam) {
             const response = await fetch(window.curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
+            
+            document.getElementById('loading-text').innerText = "Generando mapa...";
+            await new Promise(r => setTimeout(r, 10));
+
             const map = genMap(audioBuffer, k);
-            songInRam = { id: window.curSongData.id, buf: audioBuffer, map: map, kVersion: k };
+            
+            // Guardamos la densidad con la que se generó para comparar después
+            songInRam = { 
+                id: window.curSongData.id, 
+                buf: audioBuffer, 
+                map: map, 
+                kVersion: k,
+                genDen: currentDen // <-- CRÍTICO
+            };
             window.ramSongs.push(songInRam);
-        } else if (songInRam.kVersion !== k) {
-            songInRam.map = genMap(songInRam.buf, k);
-            songInRam.kVersion = k;
         }
         
         if(loader) loader.style.display = 'none';
@@ -245,6 +240,13 @@ async function prepareAndPlaySong(k) {
         if(loader) loader.style.display = 'none';
     }
 }
+
+// NUEVA FUNCIÓN: REINTENTAR
+window.restartSong = function() {
+    // Simplemente volvemos a llamar a prepareAndPlaySong con las mismas teclas
+    // Como ya está en RAM, será instantáneo.
+    prepareAndPlaySong(window.keys);
+};
 
 function playSongInternal(s) {
     window.st.act = true;
@@ -262,9 +264,9 @@ function playSongInternal(s) {
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
     
-    // Asegurar que el modal de pausa y resultados estén ocultos al iniciar
-    document.getElementById('modal-pause').style.display = 'none';
+    // Cerrar modales previos
     document.getElementById('modal-res').style.display = 'none';
+    document.getElementById('modal-pause').style.display = 'none';
 
     initReceptors(window.keys);
     updHUD();
@@ -297,21 +299,36 @@ function playSongInternal(s) {
     }, 1000);
 }
 
+// === 4. LOOP CON FIX DE TIEMPO ===
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     
-    // Progreso
+    // FIX CONTADOR DE TIEMPO
     if (window.st.songDuration > 0) {
-        const pct = (now / 1000) / window.st.songDuration * 100;
+        const dur = window.st.songDuration;
+        const cur = Math.max(0, now / 1000); // Evitar negativos
+        
+        // Calcular porcentaje
+        const pct = Math.min(100, (cur / dur) * 100);
         const bar = document.getElementById('top-progress-fill');
         if(bar) bar.style.width = pct + "%";
+
+        // Formatear Texto (0:00 / 0:00)
+        const timeText = document.getElementById('top-progress-time');
+        if(timeText) {
+            const curM = Math.floor(cur / 60);
+            const curS = Math.floor(cur % 60).toString().padStart(2, '0');
+            const durM = Math.floor(dur / 60);
+            const durS = Math.floor(dur % 60).toString().padStart(2, '0');
+            timeText.innerText = `${curM}:${curS} / ${durM}:${durS}`;
+        }
     }
 
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // --- SPAWNING CON COLORES CORREGIDOS ---
+    // --- SPAWNING ---
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
@@ -322,11 +339,9 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // CONFIG DE COLOR (PRIORIDAD: SKIN > CONFIG > DEFAULT)
             let conf = window.cfg.modes[window.keys][n.l];
             let color = conf.c;
             
-            // APLICAR SKIN SI EXISTE
             if (window.user && window.user.equipped && window.user.equipped.skin) {
                 const s = window.user.equipped.skin;
                 if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
@@ -335,7 +350,6 @@ function loop() {
             }
 
             let shape = PATHS[conf.s] || PATHS['circle'];
-            
             let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shape}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
             
             if (n.type === 'hold') {
@@ -370,7 +384,7 @@ function loop() {
              const tr = n.el.querySelector('.sustain-trail');
              if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
              
-             if (!window.st.keys[n.l] && rem > 50) miss(n); // Soltó antes
+             if (!window.st.keys[n.l] && rem > 50) miss(n); 
              else { window.st.hp = Math.min(100, window.st.hp+0.05); updHUD(); }
 
              if (now >= n.t + n.len) {
@@ -388,7 +402,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === 4. INPUTS ===
+// === 5. INPUTS ===
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
@@ -469,7 +483,7 @@ function updHUD() {
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
 
-// === 5. PANTALLA DE RESULTADOS MEJORADA (HTML INJECTION) ===
+// === 6. PANTALLA RESULTADOS (CON BOTÓN REINTENTAR) ===
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
@@ -478,7 +492,6 @@ function end(died) {
     const modal = document.getElementById('modal-res');
     if(modal) {
         modal.style.display = 'flex';
-        // Limpiamos el panel original y ponemos el diseño nuevo
         const panel = modal.querySelector('.modal-panel');
         
         const acc = window.st.maxScorePossible > 0 ? Math.round((window.st.sc / window.st.maxScorePossible) * 100) : 0;
@@ -503,7 +516,6 @@ function end(died) {
             if(typeof updateFirebaseScore === 'function') updateFirebaseScore();
         }
 
-        // === INYECCIÓN DE HTML PRO ===
         panel.innerHTML = `
             <div class="m-title">RESULTADOS</div>
             <div style="display:flex; justify-content:center; align-items:center; gap:30px;">
@@ -529,10 +541,10 @@ function end(died) {
 
             <div style="margin-top:30px; display:flex; gap:10px;">
                 <button class="action" onclick="toMenu()">CONTINUAR</button>
+                <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
             </div>
         `;
         
-        // Activar animación de barra XP después de un momento
         setTimeout(() => {
             const bar = document.getElementById('anim-xp-bar');
             if(bar) bar.style.width = '100%';
@@ -540,16 +552,31 @@ function end(died) {
     }
 }
 
-// === 6. MENÚS ARREGLADOS (DOM DIRECTO) ===
+// === 7. PAUSE MENU (CON BOTÓN REINTENTAR) ===
 function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
     if(window.st.paused) {
         if(window.st.ctx) window.st.ctx.suspend();
-        if(modal) modal.style.display = 'flex';
-        // Actualizar stats de pausa
-        document.getElementById('p-acc').innerText = document.getElementById('g-acc').innerText;
+        if(modal) {
+            modal.style.display = 'flex';
+            // Inyectar HTML actualizado al pausar
+            const panel = modal.querySelector('.modal-panel');
+            panel.innerHTML = `
+                <div class="m-title">PAUSA</div>
+                <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
+                    <div style="color:var(--sick)">SICK: <span>${window.st.stats.s}</span></div>
+                    <div style="color:var(--good)">GOOD: <span>${window.st.stats.g}</span></div>
+                    <div style="color:var(--bad)">BAD: <span>${window.st.stats.b}</span></div>
+                    <div style="color:var(--miss)">MISS: <span>${window.st.stats.m}</span></div>
+                </div>
+                <button class="action" onclick="resumeGame()">CONTINUAR</button>
+                <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
+                <button class="action secondary" onclick="toMenu()">SALIR</button>
+            `;
+        }
     } else {
         resumeGame();
     }
@@ -557,13 +584,12 @@ function togglePause() {
 
 function resumeGame() {
     const modal = document.getElementById('modal-pause');
-    if(modal) modal.style.display = 'none'; // Forzar ocultar
+    if(modal) modal.style.display = 'none'; 
     window.st.paused = false;
     if(window.st.ctx) window.st.ctx.resume();
     loop();
 }
 
 function toMenu() {
-    // Forzar recarga completa para limpiar memoria y estados
     location.reload(); 
 }
