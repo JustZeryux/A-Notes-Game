@@ -124,3 +124,49 @@ window.respondFriend = function(targetName, accept) {
             if(typeof notify === 'function') notify("Error: " + e.message, "error");
         });
 };
+
+// ==========================================
+// VARIABLES GLOBALES DE ESTADO (FIX LOBBY)
+// ==========================================
+window.isCreatingLobby = false;   // ¿Estamos creando sala?
+window.selectedLobbyKeys = 4;     // Teclas seleccionadas por defecto
+window.lobbyTargetFriend = null;  // Amigo a desafiar (si aplica)
+
+// ==========================================
+// FUNCIONES DE AMIGOS (MOVIDAS A MAIN PARA SEGURIDAD)
+// ==========================================
+
+window.challengeFriend = function(friendName) {
+    console.log("Desafiando a:", friendName);
+    window.lobbyTargetFriend = friendName; // Guardamos a quién desafiamos
+    window.isCreatingLobby = true;         // Activamos modo creación
+    
+    // Cerramos perfil y abrimos selector
+    if(typeof closeModal === 'function') {
+        closeModal('friend-profile');
+        closeModal('friends');
+    }
+    
+    // Abrimos el selector de canciones (definido en ui.js)
+    if(typeof openSongSelectorForLobby === 'function') {
+        openSongSelectorForLobby();
+    } else {
+        alert("Error: El selector de canciones no está cargado.");
+    }
+};
+
+window.openFloatingChat = function(targetUser) {
+    // Si la función UI no cargó, mostramos aviso
+    if(typeof window.uiOpenChat === 'function') {
+        window.uiOpenChat(targetUser);
+    } else {
+        console.log("Abriendo chat visual simple para:", targetUser);
+        // Fallback simple si ui.js falla
+        const container = document.getElementById('chat-overlay-container');
+        if(!container) return;
+        const div = document.createElement('div');
+        div.className = 'chat-window';
+        div.innerHTML = `<div class="cw-header">${targetUser || 'Global'} <span style="float:right" onclick="this.parentElement.remove()">x</span></div><div class="cw-body">Chat no disponible por error de carga UI.</div>`;
+        container.appendChild(div);
+    }
+};
