@@ -683,12 +683,9 @@ window.togglePause = function() {
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
     if(window.st.paused) {
-        window.st.pauseTime = performance.now(); 
-        if(window.st.ctx) window.st.ctx.suspend();
-        
+        window.st.pauseTime = performance.now(); if(window.st.ctx) window.st.ctx.suspend();
         if(modal) {
-            modal.style.display = 'flex';
-            const panel = modal.querySelector('.modal-panel');
+            modal.style.display = 'flex'; const panel = modal.querySelector('.modal-panel');
             panel.innerHTML = `
                 <div class="m-title">PAUSA</div>
                 <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
@@ -700,33 +697,28 @@ window.togglePause = function() {
                 </div>
                 <div class="modal-buttons-row">
                     <button class="action" onclick="resumeGame()">CONTINUAR</button>
-                    <button class="action secondary" onclick="window.restartSong()">REINTENTAR</button>
+                    <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
                     <button class="action secondary" onclick="toMenu()">MENU</button>
-                </div>
-            `;
+                </div>`;
         }
-    } else {
-        resumeGame();
-    }
+    } else { resumeGame(); }
 };
 
-window.resumeGame = function() {
+function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
     if(window.st.pauseTime) {
-        const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
-        window.st.t0 += pauseDuration; 
-        window.st.pauseTime = null;
+        const pauseDuration = (performance.now() - window.st.pauseTime) / 1000; window.st.t0 += pauseDuration; window.st.pauseTime = null;
     }
-    window.st.paused = false;
-    if(window.st.ctx) window.st.ctx.resume();
-    loop();
-};
+    window.st.paused = false; if(window.st.ctx) window.st.ctx.resume(); loop();
+}
 
 window.toMenu = function() {
-    if(window.st.src) {
-        try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
-        window.st.src = null;
-    }
+    if(window.st.src) { try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){} window.st.src = null; }
+    if(window.st.ctx) window.st.ctx.suspend();
+    window.st.act = false; window.st.paused = false; window.songFinished = false;
+    document.getElementById('game-layer').style.display = 'none'; document.getElementById('menu-container').classList.remove('hidden');
+    document.getElementById('modal-res').style.display = 'none'; document.getElementById('modal-pause').style.display = 'none';
+};
     if(window.st.ctx) window.st.ctx.suspend();
     window.st.act = false;
     window.st.paused = false;
