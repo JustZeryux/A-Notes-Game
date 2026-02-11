@@ -1,9 +1,11 @@
-/* === AUDIO & ENGINE (INPUT FIX V14) === */
+/* === AUDIO & ENGINE (FULL MASTER V18) === */
 
-// Cache de elementos
+// Cache de elementos para evitar lag
 let elTrack = null;
 let elReceptors = [];
+let mlContainer = null; // Multiplayer Leaderboard Container
 
+// === AUDIO SYSTEM ===
 function unlockAudio() {
     if (!st.ctx) {
         try {
@@ -55,6 +57,7 @@ function playMiss() {
     }
 }
 
+// === MAP GENERATOR (OPTIMIZED) ===
 function normalizeAudio(filteredData) {
     let max = 0;
     for (let i = 0; i < filteredData.length; i += 500) { 
@@ -70,12 +73,12 @@ function normalizeAudio(filteredData) {
 }
 
 function genMap(buf, k) {
-    const data = buf.getChannelData(0); // Usar raw buffer para velocidad
+    const data = buf.getChannelData(0);
     const map = [];
     const sampleRate = buf.sampleRate;
     let density = cfg.den || 5; 
     
-    // Step optimizado para evitar lag
+    // Step optimizado para evitar lag (mayor step = menos cpu)
     const step = Math.floor(sampleRate / (60 + (density * 10))); 
     const windowSize = 1024;
     
@@ -107,12 +110,14 @@ function genMap(buf, k) {
             if (timeMs - lastNoteTime >= minGap) {
                 let lane = Math.floor(Math.random() * k);
                 
+                // Anti-Jackhammer
                 if (lane === lastLane && Math.random() > 0.3) {
                     lane = (lane + 1) % k;
                 }
 
                 let type = 'tap';
                 let len = 0;
+                // Detectar Hold
                 if (instantEnergy > localAvg * 1.5 && Math.random() > 0.6) { 
                     type = 'hold';
                     len = Math.min(800, Math.random() * 400 + 100);
@@ -130,16 +135,19 @@ function genMap(buf, k) {
     return map;
 }
 
+// === GAMEPLAY INITIALIZATION ===
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     elTrack.innerHTML = '';
+    
     if(cfg.middleScroll) elTrack.classList.add('middle-scroll');
     else elTrack.classList.remove('middle-scroll');
 
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
     
     elReceptors = [];
-    // Flashes
+
+    // Lane Flashes
     for (let i = 0; i < k; i++) {
         const l = document.createElement('div');
         l.className = 'lane-flash';
@@ -148,7 +156,8 @@ function initReceptors(k) {
         l.style.setProperty('--c', cfg.modes[k][i].c);
         elTrack.appendChild(l);
     }
-    // Receptors
+    
+    // Receptors Arrows
     const y = cfg.down ? window.innerHeight - 140 : 80;
     for (let i = 0; i < k; i++) {
         const conf = cfg.modes[k][i];
@@ -198,74 +207,8 @@ async function prepareAndPlaySong(k) {
         toMenu(); 
     }
 }
-let mlContainer = null;
 
-function initMultiLeaderboard() {
-    if (!isMultiplayer) return;
-    
-    // Crear contenedor si no existe (CSS: #multi-leaderboard)
-    if (!document.getElementById('multi-leaderboard')) {
-        mlContainer = document.createElement('div');
-        mlContainer.id = 'multi-leaderboard';
-        document.body.appendChild(mlContainer);
-    }
-    mlContainer.style.display = 'flex';
-
-// Función llamada desde online.js cuando cambian los puntajes
-function updateMultiLeaderboardUI(scores) {
-    if (!mlContainer) return;
-    
-    // Mapear elementos existentes para animaciones
-    const existingRows = {};
-    Array.from(mlContainer.children).forEach(row => {
-        existingRows[row.dataset.name] = row;
-    });
-
-    scores.forEach((p, index) => {
-        let row = existingRows[p.name];
-        const newTop = index * 50; // 50px altura por fila aprox (ajustar según CSS)
-        
-        if (!row) {
-            // Crear nueva fila
-            row = document.createElement('div');
-            row.className = `ml-row ${p.name === user.name ? 'is-me' : ''}`;
-            row.dataset.name = p.name;
-            row.style.top = `${newTop}px`; // Posición inicial absoluta
-            row.innerHTML = `
-                <div class="ml-rank">#${index + 1}</div>
-                <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
-                <div class="ml-info">
-                    <div class="ml-name">${p.name}</div>
-                    <div class="ml-score">${p.score.toLocaleString()}</div>
-                </div>`;
-            mlContainer.appendChild(row);
-        } else {
-            // Actualizar fila existente y animar posición
-            const currentTop = parseInt(row.style.top || 0);
-            
-            // Detectar cambio de rango para clases de animación (opcional para efectos extra)
-            if (currentTop > newTop) { // Subiendo
-                row.classList.add('swapping-up');
-                setTimeout(() => row.classList.remove('swapping-up'), 300);
-            } else if (currentTop < newTop) { // Bajando
-                row.classList.add('swapping-down');
-                setTimeout(() => row.classList.remove('swapping-down'), 300);
-            }
-            
-            row.style.top = `${newTop}px`;
-            row.querySelector('.ml-rank').innerText = `#${index + 1}`;
-            row.querySelector('.ml-score').innerText = p.score.toLocaleString();
-        }
-        // Marcar como procesado para no borrarlo
-        delete existingRows[p.name];
-    });
-
-    // Eliminar jugadores que salieron
-    for (const name in existingRows) {
-        existingRows[name].remove();
-    }
-}
-
+// === MAIN GAME LOOP & LOGIC ===
 function playSongInternal(s) {
     try {
         document.getElementById('track').innerHTML = '';
@@ -279,11 +222,7 @@ function playSongInternal(s) {
         songFinished = false; 
         st.songDuration = s.buf.duration;
 
-        
-        if (isMultiplayer) document.getElementById('vs-hud').style.display = 'flex';
-        else document.getElementById('vs-hud').style.display = 'none';
-
-        document.getElementById('vs-hud').style.display = 'none';
+        // Multiplayer Leaderboard UI
         if (isMultiplayer) {
             initMultiLeaderboard();
         } else {
@@ -293,13 +232,16 @@ function playSongInternal(s) {
         document.getElementById('menu-container').classList.add('hidden');
         document.getElementById('game-layer').style.display = 'block';
         document.getElementById('hud').style.display = cfg.hideHud ? 'none' : 'flex';
-        const cEl = document.getElementById('g-combo'); if(cEl) cEl.style.opacity = '0'; 
+        
+        const cEl = document.getElementById('g-combo');
+        if(cEl) cEl.style.opacity = '0'; 
 
         initReceptors(keys);
         updHUD();
 
         const cd = document.getElementById('countdown');
         let c = 3; cd.innerHTML = c;
+
         st.startTime = 0; st.t0 = null; st.act = true; st.paused = false;
 
         const iv = setInterval(async () => {
@@ -310,7 +252,9 @@ function playSongInternal(s) {
                 clearInterval(iv);
                 cd.innerHTML = "GO!";
                 setTimeout(() => cd.innerHTML = "", 500);
+
                 if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
+                
                 try {
                     st.src = st.ctx.createBufferSource();
                     st.src.buffer = s.buf;
@@ -318,6 +262,7 @@ function playSongInternal(s) {
                     gain.gain.value = cfg.vol;
                     st.src.connect(gain);
                     gain.connect(st.ctx.destination);
+                    
                     st.t0 = st.ctx.currentTime;
                     st.startTime = performance.now(); 
                     st.src.start(0);
@@ -326,11 +271,15 @@ function playSongInternal(s) {
                 } catch(e) { console.error(e); }
             }
         }, 1000);
-    } catch(e) { console.error(e); toMenu(); }
+    } catch(e) {
+        console.error(e);
+        toMenu();
+    }
 }
 
 function loop() {
     if (!st.act || st.paused) return;
+
     let now;
     if (st.t0 !== null && st.ctx && st.ctx.state === 'running') now = (st.ctx.currentTime - st.t0) * 1000;
     else now = performance.now() - st.startTime;
@@ -345,12 +294,13 @@ function loop() {
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
     const w = 100 / keys;
 
-    // SPAWNING
+    // SPAWNING (Batch processing to prevent lag)
     let spawnedCount = 0;
     for (let i = 0; i < st.notes.length; i++) {
         const n = st.notes[i];
         if (n.s) continue;
         if (n.t < now - 200) { n.s = true; continue; }
+
         if (n.t - now < 1500) {
             const el = document.createElement('div');
             const dirClass = cfg.down ? 'hold-down' : 'hold-up';
@@ -374,25 +324,33 @@ function loop() {
             n.el = el;
             st.spawned.push(n);
             n.s = true;
+            
             spawnedCount++;
             if(spawnedCount > 8) break; 
         } else break; 
     }
 
-    // UPDATE
+    // UPDATE POSITIONS
     for (let i = st.spawned.length - 1; i >= 0; i--) {
         const n = st.spawned[i];
         if (!n.el) { st.spawned.splice(i, 1); continue; }
+
         const diff = n.t - now + cfg.off;
         const dist = (diff / 1000) * cfg.spd * 60;
         let finalY = cfg.down ? (yReceptor - dist) : (yReceptor + dist);
 
         if (n.type === 'hold' && n.h) { 
             n.el.style.top = yReceptor + 'px';
+            
             if (!st.keys[n.l] && !n.scoreGiven) {
                 const remaining = (n.t + n.len) - now;
-                if (remaining > 50) { miss(n, true); n.el.style.opacity = 0.3; n.scoreGiven = true; }
+                if (remaining > 50) { 
+                    miss(n, true); 
+                    n.el.style.opacity = 0.3; 
+                    n.scoreGiven = true;
+                }
             }
+
             if (st.keys[n.l]) {
                 const rem = (n.t + n.len) - now;
                 const tr = n.el.querySelector('.sustain-trail');
@@ -400,42 +358,47 @@ function loop() {
                 st.hp = Math.min(100, st.hp + 0.05);
                 updHUD(); 
             }
+
             if (now >= n.t + n.len && !n.scoreGiven) {
-                st.sc += 100; n.scoreGiven = true; n.el.remove(); st.spawned.splice(i, 1);
+                st.sc += 100; 
+                n.scoreGiven = true;
+                n.el.remove();
+                st.spawned.splice(i, 1);
             }
+
         } else if (!n.h) {
             n.el.style.top = finalY + 'px';
             if (diff < -160) {
-                miss(n, false); n.h = true; n.scoreGiven = true;
+                miss(n, false); 
+                n.h = true; n.scoreGiven = true;
                 n.el.style.opacity = 0.4;
                 setTimeout(() => { if (n.el) n.el.remove() }, 200);
                 st.spawned.splice(i, 1);
             }
         }
     }
+    
     requestAnimationFrame(loop);
 }
 
-// === INPUT SYSTEM (CON FIX DE REMAPEO) ===
+// === INPUT SYSTEM (REMAP FIXED) ===
 function onKd(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     
-    // 1. LÓGICA DE REMAPEO RESTAURADA
-    // Esto es lo que faltaba y causaba que no pudieras setear teclas
+    // MODO REMAPEO DE TECLAS (CRÍTICO)
     if (typeof remapMode !== 'undefined' && remapMode !== null) {
         if(cfg.modes[remapMode]) {
             if(["Shift", "Control", "Alt", "Meta", "Tab"].includes(e.key)) return;
             cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase();
-            renderLaneConfig(remapMode); // Refrescar UI
+            renderLaneConfig(remapMode); 
             remapMode = null; 
             remapIdx = null;
-            save(); // Guardar cambios
+            save(); // Guardar
             if(typeof notify === 'function') notify("Tecla guardada: " + e.key.toUpperCase(), "success");
         }
         return;
     }
 
-    // 2. Lógica de Juego
     if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
         const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
         if (idx !== -1) hit(idx, true);
@@ -499,23 +462,16 @@ function hit(l, p) {
 
 function miss(n, isHoldBreak) {
     showJudge("MISS", "var(--miss)");
-    st.stats.m++;
-    st.cmb = 0;
-    st.hp -= 10;
-    st.maxScorePossible += 350;
+    st.stats.m++; st.cmb = 0; st.hp -= 10; st.maxScorePossible += 350;
     st.fcStatus = "SD";
-    playMiss();
-    
-    // FIX: NO-FAIL EN MULTIJUGADOR
+    playMiss(); updHUD();
     if (st.hp <= 0) {
-        if (isMultiplayer) {
-            st.hp = 1; // Mantener vivo con 1% de vida
-        } else {
-            end(true); // Morir en singleplayer
-        }
+        if(isMultiplayer) st.hp = 1; // No fail en multi
+        else end(true);
     }
-    updHUD();
 }
+
+// === EFFECTS & HUD ===
 function createSplash(l) {
     if(!elTrack) return;
     const r = document.getElementById(`rec-${l}`);
@@ -548,17 +504,25 @@ function showJudge(t, c) {
 function updHUD() {
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
     
+    // Combo
     const comboEl = document.getElementById('g-combo');
     if (st.cmb > 0) {
         comboEl.innerText = st.cmb;
         comboEl.style.opacity = '1';
-        comboEl.classList.remove('pulse'); void comboEl.offsetWidth; comboEl.classList.add('pulse');
-    } else { comboEl.style.opacity = '0'; }
+        comboEl.classList.remove('pulse'); 
+        void comboEl.offsetWidth; 
+        comboEl.classList.add('pulse');
+    } else {
+        comboEl.style.opacity = '0';
+    }
 
     const fcEl = document.getElementById('hud-fc');
-    if(fcEl) {
+    if(fcEl && st.fcStatus) {
         fcEl.innerText = cfg.showFC ? st.fcStatus : "";
-        fcEl.style.color = (st.fcStatus==="PFC"?"cyan":(st.fcStatus==="GFC"?"gold":(st.fcStatus==="FC"?"lime":"red")));
+        if(st.fcStatus === "PFC") fcEl.style.color = "cyan";
+        else if(st.fcStatus === "GFC") fcEl.style.color = "gold";
+        else if(st.fcStatus === "FC") fcEl.style.color = "lime";
+        else fcEl.style.color = "red";
     }
 
     const meanEl = document.getElementById('hud-mean');
@@ -573,19 +537,66 @@ function updHUD() {
     document.getElementById('h-miss').innerText = st.stats.m;
     document.getElementById('health-fill').style.height = st.hp + '%';
     
-    // Enviar puntuación en tiempo real si es multi
-    if (isMultiplayer && user.name) {
-        // Simulamos actualización local inmediata para fluidez
-        updateMultiScores({ name: user.name, score: st.sc, avatar: user.avatarData });
-        // Enviar a la red (implementación real pendiente en online.js)
-        sendLobbyScore(st.sc);
-    }
+    if (isMultiplayer) sendLobbyScore(st.sc);
 }
 
+// === MULTIPLAYER LEADERBOARD IN-GAME ===
+function initMultiLeaderboard() {
+    if (!isMultiplayer) return;
+    
+    if (!document.getElementById('multi-leaderboard')) {
+        mlContainer = document.createElement('div');
+        mlContainer.id = 'multi-leaderboard';
+        document.body.appendChild(mlContainer);
+    }
+    mlContainer.style.display = 'flex';
+    mlContainer.innerHTML = ''; 
+    multiScores = [{ name: user.name, score: 0, avatar: user.avatarData }];
+    updateMultiLeaderboardUI(multiScores);
+}
+
+window.updateMultiLeaderboardUI = function(scores) {
+    if (!mlContainer) return;
+    scores.sort((a, b) => b.score - a.score);
+    const existingRows = {};
+    Array.from(mlContainer.children).forEach(row => { existingRows[row.dataset.name] = row; });
+
+    scores.forEach((p, index) => {
+        let row = existingRows[p.name];
+        const newTop = index * 55; 
+        
+        if (!row) {
+            row = document.createElement('div');
+            row.className = `ml-row ${p.name === user.name ? 'is-me' : ''}`;
+            row.dataset.name = p.name;
+            row.style.top = `${newTop}px`;
+            row.style.position = 'absolute';
+            row.style.width = '100%';
+            row.innerHTML = `
+                <div class="ml-rank">#${index + 1}</div>
+                <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
+                <div class="ml-info">
+                    <div class="ml-name">${p.name}</div>
+                    <div class="ml-score">${p.score.toLocaleString()}</div>
+                </div>`;
+            mlContainer.appendChild(row);
+        } else {
+            row.style.top = `${newTop}px`;
+            row.querySelector('.ml-rank').innerText = `#${index + 1}`;
+            row.querySelector('.ml-score').innerText = p.score.toLocaleString();
+        }
+        delete existingRows[p.name];
+    });
+    for (const name in existingRows) { existingRows[name].remove(); }
+};
+
+// === RESULTS SCREEN (XP & SAVE) ===
 function end(died) {
     st.act = false;
     if (st.src) try { st.src.stop() } catch (e) { }
     document.getElementById('game-layer').style.display = 'none';
+    
+    // Solo mostrar resultados si no reiniciamos o salimos forzados
     const modal = document.getElementById('modal-res');
     if(modal) modal.style.display = 'flex';
     
@@ -599,6 +610,7 @@ function end(died) {
         else if (acc >= 70) { r = "C"; c = "orange" }
         else { r = "D"; c = "red" }
     }
+    
     document.getElementById('res-rank').innerText = r;
     document.getElementById('res-rank').style.color = c;
     document.getElementById('res-score').innerText = st.sc.toLocaleString();
@@ -611,19 +623,30 @@ function end(died) {
         user.sp = (user.sp || 0) + spGain;
         user.score += st.sc;
         user.plays++;
-        let xpReq = 1000 * Math.pow(1.05, user.lvl - 1);
+        
+        let xpReq = 1000 * Math.pow(user.lvl >= 10 ? 1.02 : 1.05, user.lvl - 1);
         if (user.lvl >= 10) xpReq = 1000 * Math.pow(1.02, user.lvl - 1);
         xpReq = Math.floor(xpReq);
-        if (user.xp >= xpReq) { user.xp -= xpReq; user.lvl++; notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success"); }
+        
+        if (user.xp >= xpReq) {
+            user.xp -= xpReq;
+            user.lvl++;
+            notify("¡NIVEL " + user.lvl + " ALCANZADO!", "success");
+        }
+        
         if (st.ranked) {
             const ppG = (acc > 90) ? Math.floor(st.sc / 5000) : 0;
             user.pp += ppG;
             document.getElementById('pp-gain-loss').innerText = `+${ppG} PP`;
-        } else document.getElementById('pp-gain-loss').innerText = "0 PP";
+        } else {
+            document.getElementById('pp-gain-loss').innerText = "0 PP";
+        }
+        
         if(!user.scores) user.scores = {};
         if(!user.scores[curSongData.id] || st.sc > user.scores[curSongData.id].score) {
             user.scores[curSongData.id] = { score: st.sc, rank: r, acc: acc };
         }
+
         save();
         updateFirebaseScore();
         document.getElementById('res-xp').innerText = xpGain;
