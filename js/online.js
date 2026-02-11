@@ -1,5 +1,4 @@
-/* === ONLINE SYSTEM (V20 STABLE - FIXED SINTAX) === */
-
+/* === ONLINE SYSTEM (V20 STABLE) === */
 let currentLobbyId = null;
 let lobbyListener = null;
 
@@ -29,7 +28,6 @@ function initOnline() {
 
 window.createLobbyData = function(songId, config) {
     if (!db || user.name === "Guest") return Promise.reject("Inicia sesión");
-
     const lobbyData = {
         host: user.name,
         songId: songId,
@@ -39,7 +37,6 @@ window.createLobbyData = function(songId, config) {
         config: config,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-
     return db.collection("lobbies").add(lobbyData).then(docRef => {
         currentLobbyId = docRef.id;
         subscribeToLobby(currentLobbyId);
@@ -56,14 +53,15 @@ function subscribeToLobby(lobbyId) {
             return;
         }
         const data = doc.data();
+        
+        // Sincronizar UI de configuración
+        if (data.config) {
+            const keyDisp = document.getElementById('hp-mode-disp');
+            const denDisp = document.getElementById('hp-den-disp');
+            if (keyDisp) keyDisp.innerText = data.config.keys[0] + "K";
+            if (denDisp) denDisp.innerText = data.config.density;
+        }
 
-        // Actualizar UI de Configuración
-        const keyDisp = document.getElementById('lobby-display-keys');
-        const denDisp = document.getElementById('lobby-display-den');
-        if (keyDisp && data.config) keyDisp.innerText = data.config.keys[0] + "K";
-        if (denDisp && data.config) denDisp.innerText = data.config.density;
-
-        // Si el juego empieza
         if (data.status === 'playing' && !isMultiplayer) {
             isMultiplayer = true;
             cfg.den = data.config.density;
