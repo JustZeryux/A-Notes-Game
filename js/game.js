@@ -1,40 +1,38 @@
-/* === AUDIO & ENGINE (MASTER FULL V140 - TOTAL RESTORATION) === */
+/* === AUDIO & ENGINE (MASTER V81 - CRASH FIX) === */
 
 let elTrack = null;
 let mlContainer = null;
 
-// ==========================================
-// 1. SISTEMA DE AUDIO (PRECISO)
-// ==========================================
-window.unlockAudio = function() {
+// === 1. AUDIO SYSTEM ===
+function unlockAudio() {
     if (!window.st.ctx) {
         try {
             window.st.ctx = new (window.AudioContext || window.webkitAudioContext)();
             const b = window.st.ctx.createBuffer(1, 1, 22050);
             const s = window.st.ctx.createBufferSource();
-            s.buffer = b; s.connect(window.st.ctx.destination); s.start(0);
+            s.buffer = b;
+            s.connect(window.st.ctx.destination);
+            s.start(0);
             genSounds();
         } catch(e) { console.error("Audio Error:", e); }
     }
     if (window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
-};
+}
 
 function genSounds() {
     if(!window.st.ctx) return;
-    // Hit Sound (Click corto)
     const b1 = window.st.ctx.createBuffer(1, 2000, 44100);
     const d1 = b1.getChannelData(0);
     for (let i = 0; i < d1.length; i++) d1[i] = Math.sin(i * 0.5) * Math.exp(-i / 300);
     window.hitBuf = b1;
 
-    // Miss Sound (Ruido)
     const b2 = window.st.ctx.createBuffer(1, 4000, 44100);
     const d2 = b2.getChannelData(0);
     for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() - 0.5) * 0.5 * Math.exp(-i / 500);
     window.missBuf = b2;
 }
 
-window.playHit = function() {
+function playHit() {
     if (window.hitBuf && window.cfg.hitSound && window.st.ctx) {
         const s = window.st.ctx.createBufferSource();
         s.buffer = window.hitBuf;
@@ -43,9 +41,9 @@ window.playHit = function() {
         s.connect(g); g.connect(window.st.ctx.destination);
         s.start(0);
     }
-};
+}
 
-window.playMiss = function() {
+function playMiss() {
     if (window.missBuf && window.cfg.missSound && window.st.ctx) {
         const s = window.st.ctx.createBufferSource();
         s.buffer = window.missBuf;
@@ -54,42 +52,9 @@ window.playMiss = function() {
         s.connect(g); g.connect(window.st.ctx.destination);
         s.start(0);
     }
-};
+}
 
-// ==========================================
-// 2. VISUALS & SKINS (SINCRO TOTAL)
-// ==========================================
-window.getNoteVisuals = function(laneIndex, skinId) {
-    // 1. Configuración por defecto (Tus colores de Ajustes)
-    let conf = window.cfg.modes[window.keys][laneIndex];
-    let color = conf.c; 
-    let shape = window.PATHS[conf.s] || window.PATHS['circle'];
-    let svgFilter = `drop-shadow(0 0 5px ${color})`;
-    let extraHTML = "";
-
-    // 2. Aplicar Skin si existe
-    if (skinId && skinId !== 'default' && window.SHOP_ITEMS) {
-        const item = window.SHOP_ITEMS.find(x => x.id === skinId);
-        if (item) {
-            // Forma de la Skin
-            if (item.shape && window.SKIN_PATHS[item.shape]) {
-                shape = window.SKIN_PATHS[item.shape];
-            }
-            // Color de la Skin (Solo si es Fijo)
-            if (item.fixed) {
-                color = item.color;
-            } else if (item.id === 'skin_neon') {
-                color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
-            }
-            svgFilter = `drop-shadow(0 0 10px ${color})`;
-        }
-    }
-    return { color, shape, filter: svgFilter, extra: extraHTML };
-};
-
-// ==========================================
-// 3. GENERADOR DE MAPAS (ANTI-SPAM)
-// ==========================================
+// === 2. GENERADOR MAPAS ===
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
@@ -188,9 +153,7 @@ function genMap(buf, k) {
     return map;
 }
 
-// ==========================================
-// 4. MOTOR DE INICIALIZACIÓN
-// ==========================================
+// === 3. PREPARACIÓN ===
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
@@ -203,44 +166,43 @@ function initReceptors(k) {
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
     
-    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
-
     for (let i = 0; i < k; i++) {
-        // Obtener visuales basados en la skin para sincronizar Glow y Receptor
-        const viz = window.getNoteVisuals(i, skin);
-        
-        // Flash del carril (Lane Flash)
         const l = document.createElement('div');
         l.className = 'lane-flash';
         l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', viz.color); // Color dinámico según skin
+        l.style.setProperty('--c', window.cfg.modes[k][i].c);
         elTrack.appendChild(l);
 
-        // Receptor (La base donde caen las notas)
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`;
         r.id = `rec-${i}`;
         r.style.left = (i * (100 / k)) + '%';
         r.style.top = y + 'px';
-        r.style.setProperty('--active-c', viz.color); // Brillo al pulsar según skin
         
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
-            <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
-        </svg>`;
+        let strokeColor = "white";
+        if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
+             if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
+             else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
+        }
+
+        let conf = window.cfg.modes[k][i];
+        let shape = PATHS[conf.s] || PATHS['circle'];
         
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shape}" stroke="${strokeColor}" fill="none" stroke-width="4"/></svg>`;
         elTrack.appendChild(r);
         window.elReceptors.push(r);
     }
 }
 
+// --- FIX CRÍTICO: ACCESIBILIDAD GLOBAL PARA ONLINE.JS ---
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Cargando Audio..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Cargando..."; }
 
     try {
-        window.unlockAudio();
+        unlockAudio();
         let songInRam = window.ramSongs.find(s => s.id === window.curSongData.id);
         const currentDen = window.cfg.den || 5;
 
@@ -263,11 +225,12 @@ window.prepareAndPlaySong = async function(k) {
             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded();
         } else {
             if(loader) loader.style.display = 'none';
-            window.playSongInternal(songInRam);
+            playSongInternal(songInRam);
         }
+        
     } catch (e) {
         console.error(e);
-        notify("Error carga: " + e.message, "error");
+        notify("Error: " + e.message, "error");
         if(loader) loader.style.display = 'none';
     }
 };
@@ -278,9 +241,14 @@ window.playSongInternal = function(s) {
     }
     if(!s) return;
 
-    document.getElementById('loading-overlay').style.display = 'none';
+    // === FIX DEL CRASH "NULL STYLE" ===
+    const loader = document.getElementById('loading-overlay');
+    if(loader) loader.style.display = 'none';
+    
+    // Verificamos si existe antes de acceder a style (IMPORTANTE)
     const syncOv = document.getElementById('sync-overlay');
     if(syncOv) syncOv.style.display = 'none'; 
+    // ==================================
 
     window.st.act = true;
     window.st.paused = false;
@@ -300,12 +268,11 @@ window.playSongInternal = function(s) {
     window.keys = s.kVersion;
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.fcStatus = "GFC";
-    window.st.hitCount = 0;
-    window.st.totalOffset = 0;
 
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
     
+    // Cerrar modales por seguridad
     ['modal-res', 'modal-pause'].forEach(id => {
         const m = document.getElementById(id);
         if(m) m.style.display = 'none';
@@ -320,6 +287,7 @@ window.playSongInternal = function(s) {
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex';
     cd.innerText = "3";
+    
     let count = 3;
     const iv = setInterval(() => {
         count--;
@@ -335,7 +303,6 @@ window.playSongInternal = function(s) {
                 const g = window.st.ctx.createGain();
                 g.gain.value = window.cfg.vol;
                 window.st.src.connect(g); g.connect(window.st.ctx.destination);
-                
                 window.st.t0 = window.st.ctx.currentTime;
                 window.st.src.start(0);
                 window.st.src.onended = () => { window.songFinished = true; end(false); };
@@ -343,11 +310,8 @@ window.playSongInternal = function(s) {
             } catch(err) { console.error(err); }
         }
     }, 1000);
-};
+}
 
-// ==========================================
-// 5. BUCLE DE JUEGO (700 LÍNEAS DE LÓGICA)
-// ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
@@ -361,7 +325,6 @@ function loop() {
 
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
-    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     // SPAWNING
     for (let i = 0; i < window.st.notes.length; i++) {
@@ -374,22 +337,25 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // OBTENER DATOS DE LA SKIN (FIX COLOR BLANCO AQUÍ)
-            const viz = window.getNoteVisuals(n.l, skin);
-
-            // SVG Construction
-            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
-                <path d="${viz.shape}" fill="${viz.color}" stroke="white" stroke-width="2"/>
-            </svg>`;
+            let conf = window.cfg.modes[window.keys][n.l];
+            let color = conf.c; 
             
-            if (skin === 'skin_shuriken') el.classList.add('rotating-note');
-
-            if (n.type === 'hold') {
-                const h = (n.len / 1000) * (window.cfg.spd * 40); 
-                svg += `<div class="sustain-trail" style="height:${h}px; background:${viz.color}; opacity:${window.cfg.noteOp/100}"></div>`;
+            if (window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
+                const s = window.user.equipped.skin;
+                if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
+                else if (s === 'skin_gold') color = '#FFD700';
+                else if (s === 'skin_dark') color = '#FFFFFF';
             }
 
-            el.innerHTML = svg + viz.extra;
+            let shape = PATHS[conf.s] || PATHS['circle'];
+            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shape}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+            
+            if (n.type === 'hold') {
+                const h = (n.len / 1000) * (window.cfg.spd * 40); 
+                svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${window.cfg.noteOp/100}"></div>`;
+            }
+
+            el.innerHTML = svg;
             if(elTrack) elTrack.appendChild(el);
             n.el = el;
             n.s = true;
@@ -397,7 +363,7 @@ function loop() {
         } else break;
     }
 
-    // MOVEMENT & COLLISION
+    // MOVEMENT
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if (!n.el) { window.st.spawned.splice(i, 1); continue; }
@@ -422,11 +388,9 @@ function loop() {
              if (now >= n.t + n.len) {
                  window.st.sc += 100; 
                  n.el.remove(); n.el = null; 
-                 window.st.spawned.splice(i, 1);
              }
         }
 
-        // Lógica de Miss por tiempo (se pasó de largo)
         if (!n.h && timeDiff < -160) {
             miss(n);
             if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
@@ -436,35 +400,36 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === VISUALES: SPLASH ===
+// === VISUALS: SPLASH SYSTEM ===
 function createSplash(l) {
-    if(!window.cfg.showSplash || !elTrack) return;
+    if(!window.cfg.showSplash) return;
+    if(!elTrack) return;
+    
     const r = document.getElementById(`rec-${l}`);
     if(!r) return;
     
     const type = window.cfg.splashType || 'classic';
-    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
-    const viz = window.getNoteVisuals(l, skin);
+    const color = window.cfg.modes[window.keys][l].c;
     
     const s = document.createElement('div');
     s.className = 'splash-wrapper';
     s.style.left = r.style.left;
     s.style.top = r.style.top;
+    s.style.position = 'absolute'; // Asegurar posición
     
     const inner = document.createElement('div');
     inner.className = `splash-${type}`;
-    inner.style.setProperty('--c', viz.color);
+    inner.style.setProperty('--c', color);
     
     s.appendChild(inner);
     elTrack.appendChild(s);
+    
     setTimeout(() => s.remove(), 400);
 }
 
-// ==========================================
-// 6. INPUTS & JUDGEMENT
-// ==========================================
+// === INPUTS ===
 window.onKd = function(e) {
-    if (e.key === "Escape") { e.preventDefault(); window.togglePause(); return; }
+    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
         const idx = window.cfg.modes[window.keys].findIndex(l => l.k === e.key.toLowerCase());
         if (idx !== -1) hit(idx, true);
@@ -485,9 +450,10 @@ function hit(l, p) {
     if (p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
+        
         if(flash && window.cfg.laneFlash) { 
             flash.style.opacity = 0.5; 
-            setTimeout(() => { if(flash) flash.style.opacity = 0; }, 100); 
+            setTimeout(() => flash.style.opacity=0, 100); 
         }
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
@@ -495,9 +461,6 @@ function hit(l, p) {
 
         if (n) {
             const diff = Math.abs(n.t - now);
-            window.st.hitCount++;
-            window.st.totalOffset += (n.t - now);
-
             let score=50, text="BAD", color="yellow";
             if(diff<45){ 
                 text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; 
@@ -515,7 +478,7 @@ function hit(l, p) {
             window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             window.st.hp = Math.min(100, window.st.hp+2);
             
-            showJudge(text, color); window.playHit(); updHUD();
+            showJudge(text, color); playHit(); updHUD();
             n.h = true; 
             if (n.type === 'tap' && n.el) n.el.style.opacity = 0;
         }
@@ -528,7 +491,7 @@ function hit(l, p) {
 function miss(n) {
     showJudge("MISS", "#F9393F");
     window.st.stats.m++; window.st.cmb=0; window.st.hp-=10; window.st.fcStatus="SD";
-    window.playMiss(); updHUD();
+    playMiss(); updHUD();
     if(n.el) n.el.style.opacity = 0;
     if(window.st.hp <= 0 && !window.isMultiplayer) end(true);
 }
@@ -541,23 +504,15 @@ function showJudge(text, color) {
 }
 
 function updHUD() {
-    const scoreEl = document.getElementById('g-score');
-    if(scoreEl) scoreEl.innerText = window.st.sc.toLocaleString();
-
-    const comboEl = document.getElementById('g-combo');
-    if(comboEl) {
-        if(window.st.cmb > 0) { comboEl.innerText = window.st.cmb; comboEl.style.opacity=1; } else comboEl.style.opacity=0;
-    }
-
-    const healthEl = document.getElementById('health-fill');
-    if(healthEl) healthEl.style.height = window.st.hp + "%";
+    document.getElementById('g-score').innerText = window.st.sc.toLocaleString();
+    const cEl = document.getElementById('g-combo');
+    if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
+    document.getElementById('health-fill').style.height = window.st.hp + "%";
     
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
-    
-    const accEl = document.getElementById('g-acc');
-    if(accEl) accEl.innerText = acc + "%";
+    document.getElementById('g-acc').innerText = acc + "%";
 
     const fcEl = document.getElementById('hud-fc');
     if(fcEl) {
@@ -565,17 +520,12 @@ function updHUD() {
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
     
-    if(window.isMultiplayer && typeof window.sendLobbyScore === 'function') {
-        window.sendLobbyScore(window.st.sc);
-    }
+    if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
 
-// ==========================================
-// 7. MULTIPLAYER SUPPORT
-// ==========================================
+// === MULTIPLAYER LEADERBOARD ===
 function initMultiLeaderboard() {
-    mlContainer = document.getElementById('multi-leaderboard');
-    if (!mlContainer) {
+    if (!document.getElementById('multi-leaderboard')) {
         mlContainer = document.createElement('div');
         mlContainer.id = 'multi-leaderboard';
         document.body.appendChild(mlContainer);
@@ -583,42 +533,45 @@ function initMultiLeaderboard() {
     mlContainer.style.display = 'flex';
     mlContainer.innerHTML = ''; 
     window.multiScores = [{ name: window.user.name, score: 0, avatar: window.user.avatarData }];
-    window.updateMultiLeaderboardUI(window.multiScores);
+    updateMultiLeaderboardUI(window.multiScores);
 }
 
 window.updateMultiLeaderboardUI = function(scores) {
     if (!mlContainer) return;
     scores.sort((a, b) => b.score - a.score);
     const existingNodes = Array.from(mlContainer.children);
+    
     scores.forEach((p, index) => {
         let row = existingNodes.find(node => node.dataset.name === p.name);
         const topPos = index * 65; 
+        
         if (!row) {
             row = document.createElement('div');
             row.className = `ml-row ${p.name === window.user.name ? 'is-me' : ''}`;
             row.dataset.name = p.name;
             row.style.top = topPos + 'px';
-            row.innerHTML = `<div class="ml-pos">#${index+1}</div><div class="ml-av" style="background-image:url(${p.avatar||''})"></div><div class="ml-info"><div class="ml-name">${p.name}</div><div class="ml-score">0</div></div>`;
+            row.innerHTML = `
+                <div class="ml-pos">#${index+1}</div>
+                <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
+                <div class="ml-info"><div class="ml-name">${p.name}</div><div class="ml-score">0</div></div>
+            `;
             mlContainer.appendChild(row);
         } else {
             row.style.top = topPos + 'px';
             row.querySelector('.ml-score').innerText = p.score.toLocaleString();
             row.querySelector('.ml-pos').innerText = `#${index+1}`;
-            row.dataset.rank = index + 1;
         }
     });
 };
 
-// ==========================================
-// 8. RESULTADOS, PAUSA Y SALIDA
-// ==========================================
+// === FIN DEL JUEGO ===
 function end(died) {
     window.st.act = false;
-    if(window.st.src) try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
+    if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     document.getElementById('game-layer').style.display = 'none';
     
-    if(window.isMultiplayer && typeof window.sendLobbyScore === 'function') {
-        window.sendLobbyScore(window.st.sc, true);
+    if(window.isMultiplayer) {
+        if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
         return; 
     }
 
@@ -637,16 +590,10 @@ function end(died) {
             else if (finalAcc >= 70) { r="C"; c="orange" }
         } else { r="F"; c="red"; }
         
-        let xpGain = 0, ppGain = 0, spGain = 0;
+        let xpGain = 0, ppGain = 0;
         if (!died && window.user.name !== "Guest") {
             xpGain = Math.floor(window.st.sc / 250);
-            spGain = Math.floor(window.st.sc / 500);
             window.user.xp += xpGain;
-            window.user.sp += spGain;
-            if(window.st.ranked) {
-                if(finalAcc > 90) ppGain = Math.floor((window.st.sc / 5000) * ((finalAcc-90)/10)); 
-                window.user.pp += ppGain;
-            }
             if(typeof save === 'function') save();
             if(typeof updateFirebaseScore === 'function') updateFirebaseScore();
         }
@@ -660,75 +607,46 @@ function end(died) {
                     <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
                 </div>
             </div>
-            <div class="res-grid">
-                <div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div>
-                <div class="res-card pp-card"><div class="res-label">PP</div><div class="res-val" style="color:var(--gold)">+${ppGain}</div></div>
-            </div>
-            <div class="modal-buttons-row">
-                <button class="action secondary" onclick="toMenu()">MENU</button>
-                <button class="action secondary" onclick="window.restartSong()">REINTENTAR</button>
+            <div class="res-grid"><div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div></div>
+            <div style="margin-top:30px; display:flex; gap:10px;">
+                <button class="action" onclick="toMenu()">CONTINUAR</button>
+                <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
             </div>
         `;
     }
 }
 
 window.restartSong = function() {
-    if(window.st.src) { try { window.st.src.stop(); window.st.src.disconnect(); }catch(e){} }
-    window.st.act = false;
-    window.prepareAndPlaySong(window.keys); 
+    prepareAndPlaySong(window.keys);
 };
 
-window.togglePause = function() {
+function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
     if(window.st.paused) {
-        window.st.pauseTime = performance.now(); if(window.st.ctx) window.st.ctx.suspend();
+        if(window.st.ctx) window.st.ctx.suspend();
         if(modal) {
-            modal.style.display = 'flex'; const panel = modal.querySelector('.modal-panel');
+            modal.style.display = 'flex';
+            const panel = modal.querySelector('.modal-panel');
             panel.innerHTML = `
                 <div class="m-title">PAUSA</div>
                 <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
-                    <div style="color:var(--sick)">SICK: <span>${window.st.stats.s}</span></div>
-                    <div style="color:var(--good)">GOOD: <span>${window.st.stats.g}</span></div>
-                    <div style="color:var(--bad)">BAD: <span>${window.st.stats.b}</span></div>
-                    <div style="color:var(--miss)">MISS: <span>${window.st.stats.m}</span></div>
-                </div>
-                <div class="modal-buttons-row">
-                    <button class="action" onclick="resumeGame()">CONTINUAR</button>
-                    <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
-                    <button class="action secondary" onclick="toMenu()">MENU</button>
-                </div>`;
+                <button class="action" onclick="resumeGame()">CONTINUAR</button>
+                <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
+                <button class="action secondary" onclick="toMenu()">SALIR</button>
+            `;
         }
-    } else { resumeGame(); }
-};
+    } else {
+        resumeGame();
+    }
+}
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
-    if(window.st.pauseTime) {
-        const pauseDuration = (performance.now() - window.st.pauseTime) / 1000; window.st.t0 += pauseDuration; window.st.pauseTime = null;
-    }
-    window.st.paused = false; if(window.st.ctx) window.st.ctx.resume(); loop();
+    window.st.paused = false;
+    if(window.st.ctx) window.st.ctx.resume();
+    loop();
 }
 
-window.toMenu = function() {
-    if(window.st.src) { try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){} window.st.src = null; }
-    if(window.st.ctx) window.st.ctx.suspend();
-    window.st.act = false; window.st.paused = false; window.songFinished = false;
-    document.getElementById('game-layer').style.display = 'none'; document.getElementById('menu-container').classList.remove('hidden');
-    document.getElementById('modal-res').style.display = 'none'; document.getElementById('modal-pause').style.display = 'none';
-};
-    if(window.st.ctx) window.st.ctx.suspend();
-    window.st.act = false;
-    window.st.paused = false;
-    window.songFinished = false;
-    document.getElementById('game-layer').style.display = 'none';
-    document.getElementById('menu-container').classList.remove('hidden');
-    document.getElementById('modal-res').style.display = 'none';
-    document.getElementById('modal-pause').style.display = 'none';
-};
-
-// Vínculos de teclado definitivos
-window.onkeydown = window.onKd;
-window.onkeyup = window.onKu;
+function toMenu() { location.reload(); }
