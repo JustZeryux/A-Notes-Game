@@ -1,18 +1,18 @@
-/* === AUDIO & ENGINE (MASTER V115) === */
+/* === AUDIO & ENGINE (MASTER V120 - STABLE & SYNCED) === */
 
 let elTrack = null;
 let mlContainer = null;
 
-// === 1. AUDIO SYSTEM ===
+// ==========================================
+// 1. SISTEMA DE AUDIO (PRECISO)
+// ==========================================
 function unlockAudio() {
     if (!window.st.ctx) {
         try {
             window.st.ctx = new (window.AudioContext || window.webkitAudioContext)();
             const b = window.st.ctx.createBuffer(1, 1, 22050);
             const s = window.st.ctx.createBufferSource();
-            s.buffer = b;
-            s.connect(window.st.ctx.destination);
-            s.start(0);
+            s.buffer = b; s.connect(window.st.ctx.destination); s.start(0);
             genSounds();
         } catch(e) { console.error("Audio Error:", e); }
     }
@@ -36,10 +36,8 @@ function playHit() {
     if (window.hitBuf && window.cfg.hitSound && window.st.ctx) {
         const s = window.st.ctx.createBufferSource();
         s.buffer = window.hitBuf;
-        const g = window.st.ctx.createGain();
-        g.gain.value = window.cfg.hvol;
-        s.connect(g); g.connect(window.st.ctx.destination);
-        s.start(0);
+        const g = window.st.ctx.createGain(); g.gain.value = window.cfg.hvol;
+        s.connect(g); g.connect(window.st.ctx.destination); s.start(0);
     }
 }
 
@@ -47,14 +45,44 @@ function playMiss() {
     if (window.missBuf && window.cfg.missSound && window.st.ctx) {
         const s = window.st.ctx.createBufferSource();
         s.buffer = window.missBuf;
-        const g = window.st.ctx.createGain();
-        g.gain.value = window.cfg.missVol;
-        s.connect(g); g.connect(window.st.ctx.destination);
-        s.start(0);
+        const g = window.st.ctx.createGain(); g.gain.value = window.cfg.missVol;
+        s.connect(g); g.connect(window.st.ctx.destination); s.start(0);
     }
 }
 
-// === 2. GENERADOR MAPAS ===
+// ==========================================
+// 2. VISUALES (SKIN & COLORS FIX)
+// ==========================================
+// Esta función es global para que el Preview en ui.js también la use
+window.getNoteVisuals = function(laneIndex, skinId) {
+    let conf = window.cfg.modes[window.keys][laneIndex];
+    let color = conf.c; // Prioridad 1: Configuración del usuario (Tus colores/Blanco)
+    let shape = window.PATHS[conf.s] || window.PATHS.circle;
+    let filter = `drop-shadow(0 0 5px ${color})`;
+
+    // Solo si hay una skin equipada que no sea la default
+    if (skinId && skinId !== 'default') {
+        const item = window.SHOP_ITEMS.find(x => x.id === skinId);
+        if (item) {
+            // Cambiar forma si la skin tiene una definida
+            if (item.shape && window.SKIN_PATHS[item.shape]) shape = window.SKIN_PATHS[item.shape];
+            
+            // Cambiar color solo si la skin es de color "fixed" (Demon, Angel, Gold, etc)
+            if (item.fixed) {
+                color = item.color;
+            } else if (item.id === 'skin_neon') {
+                // Caso especial Neon alternado
+                color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
+            }
+            filter = `drop-shadow(0 0 10px ${color})`;
+        }
+    }
+    return { color, shape, filter };
+};
+
+// ==========================================
+// 3. GENERADOR DE MAPAS (ANTI-SPAM)
+// ==========================================
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
@@ -64,6 +92,7 @@ function genMap(buf, k) {
     let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
     const thresholdBase = 1.5 - (safeDen * 0.08); 
     const minStep = Math.max(90, 260 - (safeDen * 22)); 
+    
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 100); 
     
@@ -72,6 +101,7 @@ function genMap(buf, k) {
     let energyHistory = [];
     let laneFreeTimes = new Array(k).fill(0);
     let consecutiveSameLane = 0; 
+
     let currentPattern = 0;
     let patternDuration = 0;
     let patternDir = 1;
@@ -80,11 +110,14 @@ function genMap(buf, k) {
         let sum = 0;
         for (let j = 0; j < windowSize; j += 16) sum += Math.abs(data[i + j]);
         const instantEnergy = sum / (windowSize / 16);
+        
         energyHistory.push(instantEnergy);
         if (energyHistory.length > 40) energyHistory.shift();
+        
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
+        
         const timeMs = (i / sampleRate) * 1000;
         if (timeMs < 1500) continue;
 
@@ -98,6 +131,7 @@ function genMap(buf, k) {
                 patternDuration = Math.floor(Math.random() * 6) + 3;
                 patternDir = Math.random() > 0.5 ? 1 : -1;
             }
+
             let targetLane = 0;
             if (currentPattern === 1) targetLane = (lastLane + patternDir + k) % k;
             else if (currentPattern === 2) targetLane = lastLane;
@@ -147,58 +181,32 @@ function genMap(buf, k) {
     return map;
 }
 
-// === HELPER: VISUALES DE SKIN ===
-function getNoteVisuals(laneIndex, currentSkin) {
-    let conf = window.cfg.modes[window.keys][laneIndex];
-    let color = conf.c;
-    let shape = window.PATHS[conf.s] || window.PATHS.circle;
-    let filter = `drop-shadow(0 0 5px ${color})`;
-    
-    // Si la skin es válida y no es default
-    if (currentSkin && currentSkin !== 'default') {
-        // Buscar info de la skin en SHOP_ITEMS
-        const item = window.SHOP_ITEMS.find(x => x.id === currentSkin);
-        if (item) {
-            // Forma
-            if (item.shape && window.SKIN_PATHS[item.shape]) {
-                shape = window.SKIN_PATHS[item.shape];
-            }
-            // Color (Solo si es 'fixed')
-            if (item.fixed) {
-                color = item.color;
-            } else if (item.id === 'skin_neon') {
-                // Caso especial Neón (alternado)
-                color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
-            }
-            
-            // Efectos extra
-            filter = `drop-shadow(0 0 10px ${color})`;
-        }
-    }
-    return { color, shape, filter };
-}
-
-// === 3. PREPARACIÓN ===
+// ==========================================
+// 4. MOTOR DE INICIALIZACIÓN (INIT FIX)
+// ==========================================
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
     elTrack.innerHTML = '';
-    const fov = window.cfg.fov || 0;
+    
+    const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
     elTrack.style.transform = `rotateX(${fov}deg)`;
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
+
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
+    window.elReceptors = []; 
     
     const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     for (let i = 0; i < k; i++) {
-        // Obtener visuales para sincronizar el Click Glow con la Skin
+        // Obtener visuales de la skin para sincronizar Receptores y Brillo
         const viz = window.getNoteVisuals(i, skin);
         
-        // Glow del Carril
+        // Flash del Carril (Click Glow)
         const l = document.createElement('div');
         l.className = 'lane-flash'; l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', viz.color); // FIX: Toma el color de la skin o config
+        l.style.setProperty('--c', viz.color); // FIX: Ahora toma el color de la skin o config
         elTrack.appendChild(l);
 
         // Receptor
@@ -211,8 +219,10 @@ function initReceptors(k) {
             <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
         </svg>`;
         elTrack.appendChild(r);
+        window.elReceptors.push(r);
     }
 }
+
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
@@ -252,8 +262,11 @@ window.prepareAndPlaySong = async function(k) {
 };
 
 window.playSongInternal = function(s) {
+    if(!s && window.isMultiplayer && window.curSongData) {
+        s = window.ramSongs.find(x => x.id === window.curSongData.id);
+    }
     if(!s) return;
-    
+
     document.getElementById('loading-overlay').style.display = 'none';
     const syncOv = document.getElementById('sync-overlay');
     if(syncOv) syncOv.style.display = 'none'; 
@@ -319,7 +332,9 @@ window.playSongInternal = function(s) {
     }, 1000);
 }
 
-// === 4. LOOP (VISUALES UNIFICADOS) ===
+// ==========================================
+// 5. BUCLE PRINCIPAL (RENDER LOOP)
+// ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
@@ -347,7 +362,7 @@ function loop() {
             el.style.width = w + '%';
             
             // OBTENER VISUALES CORRECTOS
-            const viz = getNoteVisuals(n.l, skin);
+            const viz = window.getNoteVisuals(n.l, skin);
 
             let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
                 <path d="${viz.shape}" fill="${viz.color}" stroke="white" stroke-width="2"/>
@@ -406,7 +421,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === VISUALS ===
+// === VISUALES ===
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
@@ -424,14 +439,20 @@ function createSplash(l) {
     
     const inner = document.createElement('div');
     inner.className = `splash-${type}`;
-    inner.style.setProperty('--c', color);
+    
+    // USAR EL COLOR CALCULADO DE LA SKIN/CONFIG
+    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
+    const viz = window.getNoteVisuals(l, skin);
+    inner.style.setProperty('--c', viz.color);
     
     s.appendChild(inner);
     elTrack.appendChild(s);
     setTimeout(() => s.remove(), 400);
 }
 
-// === INPUTS ===
+// ==========================================
+// 6. INPUTS (TECLADO)
+// ==========================================
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
@@ -447,15 +468,13 @@ window.onKu = function(e) {
 };
 
 function hit(l, p) {
-if (!window.st.act || window.st.paused) return;
+    if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
     const flash = document.getElementById(`flash-${l}`);
     
     if (p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
-        
-        // El flash ahora usará automáticamente el color --c que seteamos en initReceptors
         if(flash && window.cfg.laneFlash) { 
             flash.style.opacity = 0.5; 
             setTimeout(() => { if(flash) flash.style.opacity = 0; }, 100); 
@@ -563,7 +582,9 @@ window.updateMultiLeaderboardUI = function(scores) {
     });
 };
 
-// === RESULTADOS Y SALIDA ===
+// ==========================================
+// 7. RESULTADOS, PAUSA Y SALIDA
+// ==========================================
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
@@ -624,12 +645,12 @@ function end(died) {
 
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
-function togglePause() {
+window.togglePause = function() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
     if(window.st.paused) {
-        window.st.pauseTime = performance.now();
+        window.st.pauseTime = performance.now(); 
         if(window.st.ctx) window.st.ctx.suspend();
         
         if(modal) {
@@ -654,11 +675,10 @@ function togglePause() {
     } else {
         resumeGame();
     }
-}
+};
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
-    // FIX DE TIEMPO
     if(window.st.pauseTime) {
         const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
         window.st.t0 += pauseDuration; 
@@ -669,19 +689,21 @@ function resumeGame() {
     loop();
 }
 
-function toMenu() {
+window.toMenu = function() {
     if(window.st.src) {
         try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
         window.st.src = null;
     }
     if(window.st.ctx) window.st.ctx.suspend();
-    
     window.st.act = false;
     window.st.paused = false;
     window.songFinished = false;
-    
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
     document.getElementById('modal-res').style.display = 'none';
     document.getElementById('modal-pause').style.display = 'none';
-}
+};
+
+// Re-vincular eventos de teclado
+window.onkeydown = window.onKd;
+window.onkeyup = window.onKu;
