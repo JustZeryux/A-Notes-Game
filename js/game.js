@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (LAG FIX V13) === */
+/* === AUDIO & ENGINE (INPUT FIX V14) === */
 
 // Cache de elementos
 let elTrack = null;
@@ -55,10 +55,8 @@ function playMiss() {
     }
 }
 
-// OPTIMIZACIÓN: Muestreo más agresivo para reducir carga de CPU
 function normalizeAudio(filteredData) {
     let max = 0;
-    // Saltamos de 500 en 500 para encontrar el pico rápido
     for (let i = 0; i < filteredData.length; i += 500) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
@@ -71,19 +69,13 @@ function normalizeAudio(filteredData) {
     return filteredData;
 }
 
-// === GENERADOR DE MAPAS (LAG FIX) ===
 function genMap(buf, k) {
-    const rawData = buf.getChannelData(0);
-    // No normalizar todo el array si es gigante, solo si es necesario.
-    // Usamos el buffer directo para velocidad.
-    const data = rawData; 
-    
+    const data = buf.getChannelData(0); // Usar raw buffer para velocidad
     const map = [];
     const sampleRate = buf.sampleRate;
     let density = cfg.den || 5; 
     
-    // STEP GIGANTE: Procesamos menos muestras para eliminar el LAG.
-    // Antes era /40, ahora /100. Menos precisión microscópica, pero 0 lag.
+    // Step optimizado para evitar lag
     const step = Math.floor(sampleRate / (60 + (density * 10))); 
     const windowSize = 1024;
     
@@ -96,9 +88,7 @@ function genMap(buf, k) {
     const minGap = Math.max(100, 450 - (density * 35)); 
 
     for (let i = 0; i < data.length - windowSize; i += step) {
-        // Cálculo de energía simplificado (RMS)
         let sum = 0;
-        // Muestreamos solo 1 de cada 8 valores dentro de la ventana (Super rápido)
         for (let j = 0; j < windowSize; j+=8) {
             const v = data[i + j];
             sum += v * v;
@@ -108,36 +98,29 @@ function genMap(buf, k) {
         energyHistory.push(instantEnergy);
         if (energyHistory.length > historySize) energyHistory.shift();
         
-        // Promedio local rápido
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
         
         if (instantEnergy > localAvg * thresholdBase && instantEnergy > 0.05) {
             const timeMs = (i / sampleRate) * 1000;
-            
             if (timeMs - lastNoteTime >= minGap) {
                 let lane = Math.floor(Math.random() * k);
                 
-                // Anti-Jackhammer simple (evitar notas repetidas en mismo carril demasiado seguido)
                 if (lane === lastLane && Math.random() > 0.3) {
                     lane = (lane + 1) % k;
                 }
 
                 let type = 'tap';
                 let len = 0;
-                
-                // Detectar Hold (Simplificado: Sin mirar al futuro, solo energía actual fuerte)
                 if (instantEnergy > localAvg * 1.5 && Math.random() > 0.6) { 
                     type = 'hold';
                     len = Math.min(800, Math.random() * 400 + 100);
                 }
 
-                // Evitar superposición
                 if (timeMs < laneFreeTime[lane] + 20) continue; 
 
                 map.push({ t: timeMs, l: lane, type: type, len: len, h: false, scoreGiven: false });
-                
                 laneFreeTime[lane] = timeMs + len + 20; 
                 lastNoteTime = timeMs;
                 lastLane = lane;
@@ -150,14 +133,12 @@ function genMap(buf, k) {
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     elTrack.innerHTML = '';
-    
     if(cfg.middleScroll) elTrack.classList.add('middle-scroll');
     else elTrack.classList.remove('middle-scroll');
 
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
     
     elReceptors = [];
-
     // Flashes
     for (let i = 0; i < k; i++) {
         const l = document.createElement('div');
@@ -167,7 +148,6 @@ function initReceptors(k) {
         l.style.setProperty('--c', cfg.modes[k][i].c);
         elTrack.appendChild(l);
     }
-    
     // Receptors
     const y = cfg.down ? window.innerHeight - 140 : 80;
     for (let i = 0; i < k; i++) {
@@ -188,7 +168,7 @@ function initReceptors(k) {
 async function prepareAndPlaySong(k) {
     if (!curSongData) return notify("Error: No hay canción seleccionada", "error");
     document.getElementById('loading-overlay').style.display = 'flex';
-    document.getElementById('loading-text').innerText = "Procesando...";
+    document.getElementById('loading-text').innerText = "Cargando audio...";
     try {
         unlockAudio(); 
         let songInRam = ramSongs.find(s => s.id === curSongData.id);
@@ -196,10 +176,8 @@ async function prepareAndPlaySong(k) {
             const response = await fetch(curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await st.ctx.decodeAudioData(arrayBuffer);
-            
-            // Timeout para que el UI renderice el texto de carga antes de congelarse brevemente
+            document.getElementById('loading-text').innerText = "Generando mapa...";
             await new Promise(r => setTimeout(r, 50)); 
-            
             const map = genMap(audioBuffer, k);
             songInRam = { id: curSongData.id, buf: audioBuffer, map: map, kVersion: k };
             ramSongs.push(songInRam);
@@ -230,8 +208,7 @@ function playSongInternal(s) {
         st.keys = new Array(keys).fill(0);
         st.maxScorePossible = 0;
         st.ranked = document.getElementById('chk-ranked').checked;
-        st.lastPause = 0; 
-        st.totalOffset = 0; st.hitCount = 0; st.fcStatus = "GFC";
+        st.lastPause = 0; st.totalOffset = 0; st.hitCount = 0; st.fcStatus = "GFC";
         songFinished = false; 
         st.songDuration = s.buf.duration;
 
@@ -241,16 +218,13 @@ function playSongInternal(s) {
         document.getElementById('menu-container').classList.add('hidden');
         document.getElementById('game-layer').style.display = 'block';
         document.getElementById('hud').style.display = cfg.hideHud ? 'none' : 'flex';
-        
-        const cEl = document.getElementById('g-combo');
-        if(cEl) cEl.style.opacity = '0'; 
+        const cEl = document.getElementById('g-combo'); if(cEl) cEl.style.opacity = '0'; 
 
         initReceptors(keys);
         updHUD();
 
         const cd = document.getElementById('countdown');
         let c = 3; cd.innerHTML = c;
-
         st.startTime = 0; st.t0 = null; st.act = true; st.paused = false;
 
         const iv = setInterval(async () => {
@@ -261,9 +235,7 @@ function playSongInternal(s) {
                 clearInterval(iv);
                 cd.innerHTML = "GO!";
                 setTimeout(() => cd.innerHTML = "", 500);
-
                 if (st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
-                
                 try {
                     st.src = st.ctx.createBufferSource();
                     st.src.buffer = s.buf;
@@ -271,7 +243,6 @@ function playSongInternal(s) {
                     gain.gain.value = cfg.vol;
                     st.src.connect(gain);
                     gain.connect(st.ctx.destination);
-                    
                     st.t0 = st.ctx.currentTime;
                     st.startTime = performance.now(); 
                     st.src.start(0);
@@ -280,15 +251,11 @@ function playSongInternal(s) {
                 } catch(e) { console.error(e); }
             }
         }, 1000);
-    } catch(e) {
-        console.error(e);
-        toMenu();
-    }
+    } catch(e) { console.error(e); toMenu(); }
 }
 
 function loop() {
     if (!st.act || st.paused) return;
-
     let now;
     if (st.t0 !== null && st.ctx && st.ctx.state === 'running') now = (st.ctx.currentTime - st.t0) * 1000;
     else now = performance.now() - st.startTime;
@@ -303,13 +270,12 @@ function loop() {
     const yReceptor = cfg.down ? window.innerHeight - 140 : 80;
     const w = 100 / keys;
 
-    // SPAWNING LIMITADO (Performance)
+    // SPAWNING
     let spawnedCount = 0;
     for (let i = 0; i < st.notes.length; i++) {
         const n = st.notes[i];
         if (n.s) continue;
         if (n.t < now - 200) { n.s = true; continue; }
-
         if (n.t - now < 1500) {
             const el = document.createElement('div');
             const dirClass = cfg.down ? 'hold-down' : 'hold-up';
@@ -333,9 +299,8 @@ function loop() {
             n.el = el;
             st.spawned.push(n);
             n.s = true;
-            
             spawnedCount++;
-            if(spawnedCount > 8) break; // Límite de spawn por frame para evitar tirones
+            if(spawnedCount > 8) break; 
         } else break; 
     }
 
@@ -343,23 +308,16 @@ function loop() {
     for (let i = st.spawned.length - 1; i >= 0; i--) {
         const n = st.spawned[i];
         if (!n.el) { st.spawned.splice(i, 1); continue; }
-
         const diff = n.t - now + cfg.off;
         const dist = (diff / 1000) * cfg.spd * 60;
         let finalY = cfg.down ? (yReceptor - dist) : (yReceptor + dist);
 
         if (n.type === 'hold' && n.h) { 
             n.el.style.top = yReceptor + 'px';
-            
             if (!st.keys[n.l] && !n.scoreGiven) {
                 const remaining = (n.t + n.len) - now;
-                if (remaining > 50) { 
-                    miss(n, true); 
-                    n.el.style.opacity = 0.3; 
-                    n.scoreGiven = true;
-                }
+                if (remaining > 50) { miss(n, true); n.el.style.opacity = 0.3; n.scoreGiven = true; }
             }
-
             if (st.keys[n.l]) {
                 const rem = (n.t + n.len) - now;
                 const tr = n.el.querySelector('.sustain-trail');
@@ -367,27 +325,53 @@ function loop() {
                 st.hp = Math.min(100, st.hp + 0.05);
                 updHUD(); 
             }
-
             if (now >= n.t + n.len && !n.scoreGiven) {
-                st.sc += 100; 
-                n.scoreGiven = true;
-                n.el.remove();
-                st.spawned.splice(i, 1);
+                st.sc += 100; n.scoreGiven = true; n.el.remove(); st.spawned.splice(i, 1);
             }
-
         } else if (!n.h) {
             n.el.style.top = finalY + 'px';
             if (diff < -160) {
-                miss(n, false); 
-                n.h = true; n.scoreGiven = true;
+                miss(n, false); n.h = true; n.scoreGiven = true;
                 n.el.style.opacity = 0.4;
                 setTimeout(() => { if (n.el) n.el.remove() }, 200);
                 st.spawned.splice(i, 1);
             }
         }
     }
-    
     requestAnimationFrame(loop);
+}
+
+// === INPUT SYSTEM (CON FIX DE REMAPEO) ===
+function onKd(e) {
+    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
+    
+    // 1. LÓGICA DE REMAPEO RESTAURADA
+    // Esto es lo que faltaba y causaba que no pudieras setear teclas
+    if (typeof remapMode !== 'undefined' && remapMode !== null) {
+        if(cfg.modes[remapMode]) {
+            if(["Shift", "Control", "Alt", "Meta", "Tab"].includes(e.key)) return;
+            cfg.modes[remapMode][remapIdx].k = e.key.toLowerCase();
+            renderLaneConfig(remapMode); // Refrescar UI
+            remapMode = null; 
+            remapIdx = null;
+            save(); // Guardar cambios
+            if(typeof notify === 'function') notify("Tecla guardada: " + e.key.toUpperCase(), "success");
+        }
+        return;
+    }
+
+    // 2. Lógica de Juego
+    if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
+        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
+        if (idx !== -1) hit(idx, true);
+    }
+}
+
+function onKu(e) {
+    if(cfg && cfg.modes && cfg.modes[keys]) {
+        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
+        if (idx !== -1) hit(idx, false);
+    }
 }
 
 function hit(l, p) {
@@ -478,7 +462,6 @@ function showJudge(t, c) {
 function updHUD() {
     document.getElementById('g-score').innerText = st.sc.toLocaleString();
     
-    // Combo Gigante
     const comboEl = document.getElementById('g-combo');
     if (st.cmb > 0) {
         comboEl.innerText = st.cmb;
@@ -573,19 +556,6 @@ function resumeGame() {
     if (st.ctx) st.ctx.resume().catch(e=>{});
     if (st.lastPause) { st.startTime += (performance.now() - st.lastPause); st.lastPause = 0; }
     st.paused = false; requestAnimationFrame(loop);
-}
-function onKd(e) {
-    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
-    if (!e.repeat && cfg && cfg.modes && cfg.modes[keys]) {
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, true);
-    }
-}
-function onKu(e) {
-    if(cfg && cfg.modes && cfg.modes[keys]) {
-        const idx = cfg.modes[keys].findIndex(l => l.k === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, false);
-    }
 }
 function toMenu() { location.reload(); }
 function startGame(k) { keys = k; closeModal('diff'); prepareAndPlaySong(k); }
