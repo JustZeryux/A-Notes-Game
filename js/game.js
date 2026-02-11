@@ -1,11 +1,9 @@
-/* === AUDIO & ENGINE (MASTER FINAL V105 - STABLE) === */
+/* === AUDIO & ENGINE (MASTER V115) === */
 
 let elTrack = null;
 let mlContainer = null;
 
-// ==========================================
-// 1. SISTEMA DE AUDIO
-// ==========================================
+// === 1. AUDIO SYSTEM ===
 function unlockAudio() {
     if (!window.st.ctx) {
         try {
@@ -23,13 +21,11 @@ function unlockAudio() {
 
 function genSounds() {
     if(!window.st.ctx) return;
-    // Hit Sound (Click corto)
     const b1 = window.st.ctx.createBuffer(1, 2000, 44100);
     const d1 = b1.getChannelData(0);
     for (let i = 0; i < d1.length; i++) d1[i] = Math.sin(i * 0.5) * Math.exp(-i / 300);
     window.hitBuf = b1;
 
-    // Miss Sound (Ruido)
     const b2 = window.st.ctx.createBuffer(1, 4000, 44100);
     const d2 = b2.getChannelData(0);
     for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() - 0.5) * 0.5 * Math.exp(-i / 500);
@@ -58,9 +54,7 @@ function playMiss() {
     }
 }
 
-// ==========================================
-// 2. GENERADOR DE MAPAS (ANTI-SPAM)
-// ==========================================
+// === 2. GENERADOR MAPAS ===
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
@@ -70,7 +64,6 @@ function genMap(buf, k) {
     let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
     const thresholdBase = 1.5 - (safeDen * 0.08); 
     const minStep = Math.max(90, 260 - (safeDen * 22)); 
-    
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 100); 
     
@@ -79,7 +72,6 @@ function genMap(buf, k) {
     let energyHistory = [];
     let laneFreeTimes = new Array(k).fill(0);
     let consecutiveSameLane = 0; 
-
     let currentPattern = 0;
     let patternDuration = 0;
     let patternDir = 1;
@@ -88,14 +80,11 @@ function genMap(buf, k) {
         let sum = 0;
         for (let j = 0; j < windowSize; j += 16) sum += Math.abs(data[i + j]);
         const instantEnergy = sum / (windowSize / 16);
-        
         energyHistory.push(instantEnergy);
         if (energyHistory.length > 40) energyHistory.shift();
-        
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
-        
         const timeMs = (i / sampleRate) * 1000;
         if (timeMs < 1500) continue;
 
@@ -109,7 +98,6 @@ function genMap(buf, k) {
                 patternDuration = Math.floor(Math.random() * 6) + 3;
                 patternDir = Math.random() > 0.5 ? 1 : -1;
             }
-
             let targetLane = 0;
             if (currentPattern === 1) targetLane = (lastLane + patternDir + k) % k;
             else if (currentPattern === 2) targetLane = lastLane;
@@ -159,9 +147,38 @@ function genMap(buf, k) {
     return map;
 }
 
-// ==========================================
-// 3. INICIO Y RE-GENERACIÓN
-// ==========================================
+// === HELPER: VISUALES DE SKIN ===
+function getNoteVisuals(laneIndex, currentSkin) {
+    let conf = window.cfg.modes[window.keys][laneIndex];
+    let color = conf.c;
+    let shape = window.PATHS[conf.s] || window.PATHS.circle;
+    let filter = `drop-shadow(0 0 5px ${color})`;
+    
+    // Si la skin es válida y no es default
+    if (currentSkin && currentSkin !== 'default') {
+        // Buscar info de la skin en SHOP_ITEMS
+        const item = window.SHOP_ITEMS.find(x => x.id === currentSkin);
+        if (item) {
+            // Forma
+            if (item.shape && window.SKIN_PATHS[item.shape]) {
+                shape = window.SKIN_PATHS[item.shape];
+            }
+            // Color (Solo si es 'fixed')
+            if (item.fixed) {
+                color = item.color;
+            } else if (item.id === 'skin_neon') {
+                // Caso especial Neón (alternado)
+                color = (laneIndex % 2 === 0) ? '#ff66aa' : '#00FFFF';
+            }
+            
+            // Efectos extra
+            filter = `drop-shadow(0 0 10px ${color})`;
+        }
+    }
+    return { color, shape, filter };
+}
+
+// === 3. PREPARACIÓN ===
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
@@ -174,32 +191,30 @@ function initReceptors(k) {
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
     
+    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
+
     for (let i = 0; i < k; i++) {
+        const viz = getNoteVisuals(i, skin);
+        
+        // Flash
         const l = document.createElement('div');
         l.className = 'lane-flash';
         l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        l.style.setProperty('--c', window.cfg.modes[k][i].c);
+        l.style.setProperty('--c', viz.color);
         elTrack.appendChild(l);
 
+        // Receptor
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`;
         r.id = `rec-${i}`;
         r.style.left = (i * (100 / k)) + '%';
         r.style.top = y + 'px';
-        r.style.setProperty('--active-c', window.cfg.modes[k][i].c);
+        r.style.setProperty('--active-c', viz.color);
         
-        let strokeColor = "white";
-        // Check Skin
-        if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
-             if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
-             else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
-        }
-
-        let conf = window.cfg.modes[k][i];
-        let shape = PATHS[conf.s] || PATHS['circle'];
-        
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shape}" stroke="${strokeColor}" fill="none" stroke-width="4"/></svg>`;
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
+            <path class="arrow-path" d="${viz.shape}" stroke="white" stroke-width="4" fill="transparent" />
+        </svg>`;
         elTrack.appendChild(r);
         window.elReceptors.push(r);
     }
@@ -244,13 +259,9 @@ window.prepareAndPlaySong = async function(k) {
 };
 
 window.playSongInternal = function(s) {
-    if(!s && window.isMultiplayer && window.curSongData) {
-        s = window.ramSongs.find(x => x.id === window.curSongData.id);
-    }
     if(!s) return;
-
-    const loader = document.getElementById('loading-overlay');
-    if(loader) loader.style.display = 'none';
+    
+    document.getElementById('loading-overlay').style.display = 'none';
     const syncOv = document.getElementById('sync-overlay');
     if(syncOv) syncOv.style.display = 'none'; 
 
@@ -315,9 +326,7 @@ window.playSongInternal = function(s) {
     }, 1000);
 }
 
-// ==========================================
-// 4. BUCLE DE JUEGO (CORREGIDO)
-// ==========================================
+// === 4. LOOP (VISUALES UNIFICADOS) ===
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
@@ -331,6 +340,7 @@ function loop() {
 
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+    const skin = (window.user && window.user.equipped) ? window.user.equipped.skin : 'default';
 
     // SPAWNING
     for (let i = 0; i < window.st.notes.length; i++) {
@@ -343,24 +353,19 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // PRIORIDAD COLOR: Configuración > Default
-            // La skin solo sobrescribe si NO es default
-            let conf = window.cfg.modes[window.keys][n.l];
-            let color = conf.c; 
-            
-            if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
-                const s = window.user.equipped.skin;
-                if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
-                else if (s === 'skin_gold') color = '#FFD700';
-                else if (s === 'skin_dark') color = '#FFFFFF';
-            }
+            // OBTENER VISUALES CORRECTOS
+            const viz = getNoteVisuals(n.l, skin);
 
-            let shape = PATHS[conf.s] || PATHS['circle'];
-            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shape}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${viz.filter}">
+                <path d="${viz.shape}" fill="${viz.color}" stroke="white" stroke-width="2"/>
+            </svg>`;
             
+            // Rotación especial Shuriken
+            if (skin === 'skin_shuriken') el.classList.add('rotating-note');
+
             if (n.type === 'hold') {
                 const h = (n.len / 1000) * (window.cfg.spd * 40); 
-                svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${window.cfg.noteOp/100}"></div>`;
+                svg += `<div class="sustain-trail" style="height:${h}px; background:${viz.color}; opacity:${window.cfg.noteOp/100}"></div>`;
             }
 
             el.innerHTML = svg;
@@ -408,7 +413,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === VISUALS: SPLASH CORRECTO ===
+// === VISUALS ===
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
@@ -421,8 +426,6 @@ function createSplash(l) {
     
     const s = document.createElement('div');
     s.className = 'splash-wrapper';
-    
-    // Posición exacta
     s.style.left = r.style.left;
     s.style.top = r.style.top;
     
@@ -515,21 +518,57 @@ function updHUD() {
     const cEl = document.getElementById('g-combo');
     if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
     document.getElementById('health-fill').style.height = window.st.hp + "%";
+    
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
     document.getElementById('g-acc').innerText = acc + "%";
+
     const fcEl = document.getElementById('hud-fc');
     if(fcEl) {
         fcEl.innerText = window.cfg.showFC ? window.st.fcStatus : "";
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
+    
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
 
-// ==========================================
-// 5. RESULTADOS & MENU (CORREGIDO)
-// ==========================================
+// === MULTIPLAYER ===
+function initMultiLeaderboard() {
+    if (!document.getElementById('multi-leaderboard')) {
+        mlContainer = document.createElement('div');
+        mlContainer.id = 'multi-leaderboard';
+        document.body.appendChild(mlContainer);
+    }
+    mlContainer.style.display = 'flex';
+    mlContainer.innerHTML = ''; 
+    window.multiScores = [{ name: window.user.name, score: 0, avatar: window.user.avatarData }];
+    updateMultiLeaderboardUI(window.multiScores);
+}
+
+window.updateMultiLeaderboardUI = function(scores) {
+    if (!mlContainer) return;
+    scores.sort((a, b) => b.score - a.score);
+    const existingNodes = Array.from(mlContainer.children);
+    scores.forEach((p, index) => {
+        let row = existingNodes.find(node => node.dataset.name === p.name);
+        const topPos = index * 65; 
+        if (!row) {
+            row = document.createElement('div');
+            row.className = `ml-row ${p.name === window.user.name ? 'is-me' : ''}`;
+            row.dataset.name = p.name;
+            row.style.top = topPos + 'px';
+            row.innerHTML = `<div class="ml-pos">#${index+1}</div><div class="ml-av" style="background-image:url(${p.avatar||''})"></div><div class="ml-info"><div class="ml-name">${p.name}</div><div class="ml-score">0</div></div>`;
+            mlContainer.appendChild(row);
+        } else {
+            row.style.top = topPos + 'px';
+            row.querySelector('.ml-score').innerText = p.score.toLocaleString();
+            row.querySelector('.ml-pos').innerText = `#${index+1}`;
+        }
+    });
+};
+
+// === RESULTADOS Y SALIDA ===
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
@@ -590,13 +629,12 @@ function end(died) {
 
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
-// === PAUSA CON FIX DE TIEMPO ===
 function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
     if(window.st.paused) {
-        window.st.pauseTime = performance.now(); // Marca tiempo
+        window.st.pauseTime = performance.now();
         if(window.st.ctx) window.st.ctx.suspend();
         
         if(modal) {
@@ -625,40 +663,30 @@ function togglePause() {
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
-    
-    // COMPENSAR EL TIEMPO PERDIDO EN PAUSA
+    // FIX DE TIEMPO
     if(window.st.pauseTime) {
         const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
-        window.st.t0 += pauseDuration; // Movemos el tiempo 0 hacia adelante
+        window.st.t0 += pauseDuration; 
         window.st.pauseTime = null;
     }
-
     window.st.paused = false;
     if(window.st.ctx) window.st.ctx.resume();
     loop();
 }
 
-// === SALIDA LIMPIA (SIN AUDIO DOBLE) ===
 function toMenu() {
-    // 1. Matar fuente de audio
     if(window.st.src) {
         try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
         window.st.src = null;
     }
-    // 2. Suspender contexto global
     if(window.st.ctx) window.st.ctx.suspend();
     
-    // 3. Resetear flags
     window.st.act = false;
     window.st.paused = false;
     window.songFinished = false;
     
-    // 4. Cambiar pantalla
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
     document.getElementById('modal-res').style.display = 'none';
     document.getElementById('modal-pause').style.display = 'none';
 }
-
-function initMultiLeaderboard() { /* (Se mantiene igual que V101) */ }
-window.updateMultiLeaderboardUI = function(scores) { /* (Igual) */ }
