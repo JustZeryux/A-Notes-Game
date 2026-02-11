@@ -183,8 +183,12 @@ function applyCfg() {
     document.documentElement.style.setProperty('--judge-scale', (cfg.judgeS || 7)/10); 
     document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0);
 
-    const track = document.getElementById('track');
+const track = document.getElementById('track');
     if (track) {
+        const fov = cfg.fov || 0;
+        track.style.transform = `rotateX(${fov}deg)`;
+        track.style.perspective = `${800 - (fov*10)}px`;
+        
         if (cfg.middleScroll) track.classList.add('middle-scroll');
         else track.classList.remove('middle-scroll');
     }
@@ -257,6 +261,9 @@ function switchSetTab(tab) {
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
         html += renderToggle('Screen Shake', 'shake');
+        html += renderRange('Tamaño Nota (Escala)', 'noteScale', 0.5, 1.5, 0.1);
+        html += renderRange('Track FOV (Inclinación 3D)', 'fov', 0, 45); // <--- NUEVO
+        html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
         html += renderToggle('Mostrar Juez', 'judgeVis');
         html += renderToggle('Mostrar FC Status', 'showFC');
         html += renderToggle('Mostrar Mean MS', 'showMean');
@@ -986,23 +993,27 @@ window.openFloatingChat = function(targetUser) {
     closeModal('friends');
 };
 
-// Manejador simple para enviar mensajes (Solo visual por ahora)
 window.handleChatInput = function(e, target, input) {
     if(e.key === 'Enter' && input.value.trim() !== "") {
-        const body = document.getElementById(`cw-body-${target}`);
-        const msg = document.createElement('div');
-        msg.className = 'cw-msg';
-        msg.innerHTML = `<b style="color:var(--blue)">Yo:</b> ${input.value}`;
-        body.appendChild(msg);
-        body.scrollTop = body.scrollHeight; // Auto scroll
+        const txt = input.value.trim();
+        const chatWindowId = target ? `cw-body-${target}` : `chat-global`; // Ajusta según tu ID
         
+        // Buscar el cuerpo del chat para feedback visual inmediato (Opcional si usas listener)
+        // Pero lo importante es enviar a la DB:
+        if(db) {
+            db.collection("chats").add({
+                msg: txt,
+                user: user.name,
+                target: target || "global",
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                console.log("Mensaje enviado");
+            }).catch(err => notify("Error chat: " + err, "error"));
+        }
+
         input.value = "";
-        
-        // Aquí iría la lógica real de Firebase para enviar mensaje
-        // db.collection('chats').add(...)
     }
 };
-
 // ==========================================
 // 12. SISTEMA DE CREACIÓN DE SALAS (FIXED)
 // ==========================================
