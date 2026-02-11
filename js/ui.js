@@ -4,38 +4,45 @@
 // 1. HELPERS & NOTIFICACIONES
 // ==========================================
 
-function notify(msg, type="info", duration=4000) {
+// ==========================================
+// 3. NOTIFICACIONES PERSISTENTES (DESAFÍOS)
+// ==========================================
+
+window.notifyChallenge = function(fromUser, lobbyId, songName) {
     const area = document.getElementById('notification-area');
-    if(!area) return console.log(msg); // Fallback
-    
+    if(!area) return;
+
     const card = document.createElement('div');
     card.className = 'notify-card';
-    
-    // Colores por tipo
-    if(type==="error") card.style.borderLeftColor = "#F9393F";
-    else if(type==="success") card.style.borderLeftColor = "#12FA05";
-    else card.style.borderLeftColor = "#44ccff";
-    
+    card.style.borderLeftColor = "var(--gold)"; // Color especial
+    card.style.animation = "slideIn 0.3s forwards"; // Sin slideOut automático
+
     card.innerHTML = `
-        <div class="notify-title">${type.toUpperCase()}</div>
-        <div class="notify-body">${msg}</div>
-        <div class="notify-progress" style="height:3px; background:rgba(255,255,255,0.5); width:100%; position:absolute; bottom:0; left:0; transition:width ${duration}ms linear;"></div>
+        <div class="notify-title">⚔️ DESAFÍO DE ${fromUser}</div>
+        <div class="notify-body">
+            Te invita a jugar <b>${songName}</b>.
+        </div>
+        <div class="notify-actions">
+            <button class="btn-small btn-acc" onclick="acceptChallenge('${lobbyId}', this)">ACEPTAR</button>
+            <button class="btn-small" style="background:#444;" onclick="this.parentElement.parentElement.remove()">IGNORAR</button>
+        </div>
     `;
-    
+
     area.appendChild(card);
     
-    // Animar barra de tiempo
-    setTimeout(() => {
-        const bar = card.querySelector('.notify-progress');
-        if(bar) bar.style.width = '0%';
-    }, 50);
+    // Sonido de notificación si quieres
+    playHover(); 
+};
 
-    // Animación de salida
-    setTimeout(() => {
-        card.style.animation = "slideOut 0.3s forwards";
-        setTimeout(() => card.remove(), 300);
-    }, duration);
-}
+window.acceptChallenge = function(lobbyId, btnElement) {
+    if(window.joinLobbyData) {
+        btnElement.innerText = "UNIENDO...";
+        window.joinLobbyData(lobbyId).then(() => {
+            // Eliminar la notificación al unirse
+            btnElement.parentElement.parentElement.remove();
+        });
+    }
+};
 
 function playHover(){ 
     if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
@@ -572,52 +579,122 @@ window.updateHostPanelUI = function(players) {
     }
 };
 
-window.openHostPanel = function(songData) {
-    if(!songData) return;
-    curSongData = songData; 
-    
+// ==========================================
+// 2. NUEVO PANEL DE HOST (CON AJUSTES)
+// ==========================================
+
+window.openHostPanel = function(songData, isClient = false) {
+    curSongData = songData;
+    // Aseguramos que el juego NO esté corriendo
+    if(typeof st !== 'undefined') st.act = false; 
+    document.getElementById('game-layer').style.display = 'none';
+
     const modal = document.getElementById('modal-host');
     const panel = modal.querySelector('.modal-panel');
-    panel.className = "modal-panel host-panel-compact";
     
-    let bgStyle = songData.imageURL ? `background-image:url(${songData.imageURL})` : 'background: linear-gradient(to right, #222, #111)';
+    // Si soy el host, muestro controles. Si soy cliente, solo veo info.
+    const iamHost = !isClient;
+    window.isLobbyHost = iamHost;
+
+    const bgStyle = songData.imageURL ? `background-image:url(${songData.imageURL})` : 'background:#222';
 
     panel.innerHTML = `
-        <div class="hp-header" style="${bgStyle}">
-            <div class="hp-title-info">
-                <div class="hp-song-title">${songData.title}</div>
-                <div class="hp-meta">By ${songData.uploader}</div>
+        <div class="hp-header" style="${bgStyle}; height:180px; position:relative;">
+            <div style="position:absolute; bottom:0; left:0; width:100%; padding:20px; background:linear-gradient(to top, #000, transparent);">
+                <div style="font-size:2rem; font-weight:900;">${songData.title}</div>
+                <div style="color:#ccc;">Host: <span id="lobby-host-name">...</span></div>
             </div>
         </div>
-        <div class="hp-body">
-            <div class="hp-config-col">
-                <div>
-                    <div class="hp-section-title">Modos Permitidos</div>
-                    <div class="hp-checkbox-group">
-                        <label class="hp-chk-label"><input type="checkbox" id="chk-4k" checked disabled> <span>4K</span></label>
-                        <label class="hp-chk-label"><input type="checkbox" id="chk-6k" disabled> <span>6K</span></label>
-                    </div>
-                </div>
-                <div>
-                    <div class="hp-section-title">Dificultad IA</div>
-                    <div class="set-row">
-                        <span class="set-label">Densidad</span>
-                        <div class="num-input" style="width:100%">${cfg.lobbyDen || 5}</div>
-                    </div>
-                </div>
+
+        <div class="hp-body" style="display:flex; gap:20px; padding:20px;">
+            <div style="flex:1;">
+                <div class="hp-section-title">JUGADORES (<span id="hp-count">1</span>/8)</div>
+                <div id="hp-players-list" style="background:#111; height:250px; overflow-y:auto; border-radius:10px; padding:10px; border:1px solid #333;"></div>
             </div>
-            <div class="hp-players-col">
-                <div class="hp-section-title">Jugadores (<span id="hp-count">1</span>/8)</div>
-                <div id="hp-players-list"></div>
+
+            <div style="width:250px; display:flex; flex-direction:column; gap:15px;">
+                <div class="hp-section-title">CONFIGURACIÓN DE PISTA</div>
+                
+                <div style="background:#151515; padding:15px; border-radius:10px; border:1px solid #333;">
+                    <div style="margin-bottom:10px;">
+                        <span style="color:#888; font-size:0.8rem;">MODO (TECLAS)</span>
+                        <div id="lobby-display-keys" style="font-size:1.5rem; font-weight:900; color:var(--blue);">4K</div>
+                    </div>
+                    <div>
+                        <span style="color:#888; font-size:0.8rem;">DIFICULTAD (DENSIDAD)</span>
+                        <div id="lobby-display-den" style="font-size:1.5rem; font-weight:900; color:var(--good);">5</div>
+                    </div>
+                    <div style="margin-top:10px; font-size:0.8rem; color:${cfg.ranked ? 'gold' : '#666'}">
+                        ${cfg.ranked ? '🏆 RANKED' : '🎲 CASUAL'}
+                    </div>
+                </div>
+
+                ${iamHost ? `
+                <button class="action secondary" onclick="toggleLobbySettings()" style="font-size:0.9rem;">
+                    ⚙️ MODIFICAR REGLAS
+                </button>
+                ` : '<div style="color:#666; font-size:0.8rem; text-align:center;">Esperando al host...</div>'}
             </div>
         </div>
-        <div class="hp-footer">
-            <button class="action secondary" style="width:auto; padding:12px 25px;" onclick="closeModal('host'); leaveLobby();">SALIR</button>
-            <button id="btn-start-match" class="action btn-add" style="width:auto; padding:12px 35px; display:none;" onclick="startLobbyMatch()">COMENZAR</button>
+
+        <div id="lobby-settings-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10; align-items:center; justify-content:center;">
+            <div style="background:#111; padding:30px; border-radius:15px; border:1px solid var(--accent); width:400px; text-align:center;">
+                <h3>CONFIGURAR SALA</h3>
+                
+                <div style="margin:20px 0;">
+                    <label>Modo de Teclas:</label>
+                    <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
+                        <button class="btn-small" onclick="updateLobbyConfigLocal('keys', 4)">4K</button>
+                        <button class="btn-small" onclick="updateLobbyConfigLocal('keys', 6)">6K</button>
+                        <button class="btn-small" onclick="updateLobbyConfigLocal('keys', 7)">7K</button>
+                    </div>
+                </div>
+
+                <div style="margin:20px 0;">
+                    <label>Densidad (1-10):</label><br>
+                    <input type="range" min="1" max="10" id="host-den-slider" oninput="document.getElementById('lbl-den').innerText=this.value">
+                    <span id="lbl-den" style="font-weight:bold; font-size:1.2rem;">5</span>
+                </div>
+
+                <button class="action btn-add" onclick="saveLobbySettings()">GUARDAR CAMBIOS</button>
+                <button class="action secondary" style="margin-top:10px;" onclick="toggleLobbySettings()">CANCELAR</button>
+            </div>
+        </div>
+
+        <div class="hp-footer" style="padding:20px; border-top:1px solid #333; display:flex; justify-content:flex-end; gap:15px; background:#080808;">
+            <button class="action secondary" style="width:auto;" onclick="leaveLobby()">SALIR</button>
+            ${iamHost ? `<button id="btn-start-lobby" class="action btn-acc" style="width:auto; padding:0 40px;" onclick="startLobbyMatch()">COMENZAR PARTIDA</button>` : ''}
         </div>
     `;
-    
+
     modal.style.display = 'flex';
+};
+
+// Toggle visual del menú de ajustes dentro del lobby
+window.toggleLobbySettings = function() {
+    const el = document.getElementById('lobby-settings-overlay');
+    if(el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+};
+
+// Actualizar variable local antes de guardar
+let tempLobbyConfig = { keys: 4, density: 5 };
+window.updateLobbyConfigLocal = function(key, val) {
+    if(key === 'keys') tempLobbyConfig.keys = val;
+    notify(`Seleccionado: ${val}${key==='keys'?'K':''}`, "info");
+};
+
+// Enviar cambios a Firebase
+window.saveLobbySettings = function() {
+    if(!currentLobbyId || !db) return;
+    const den = document.getElementById('host-den-slider').value;
+    
+    db.collection("lobbies").doc(currentLobbyId).update({
+        "config.keys": [tempLobbyConfig.keys],
+        "config.density": parseInt(den)
+    }).then(() => {
+        notify("Configuración de sala actualizada", "success");
+        toggleLobbySettings();
+    });
 };
 
 // ==========================================
@@ -943,33 +1020,40 @@ window.uiOpenChat = function(target) {
 // Guardamos la función original por si acaso, pero redefinimos la global
 const originalStartGame = window.startGame;
 
+// ==========================================
+// 1. FIX: EVITAR INICIO AUTOMÁTICO
+// ==========================================
+
+// Sobrescribimos startGame para controlar el flujo
 window.startGame = function(k) {
+    console.log("Intento de iniciar modo:", k, "Creando Lobby:", window.isCreatingLobby);
+
+    // SI ESTAMOS CREANDO UNA SALA, SOLO SELECCIONAMOS, NO JUGAMOS
     if (window.isCreatingLobby) {
-        // --- MODO CREACIÓN DE SALA ---
-        // En lugar de jugar, solo seleccionamos el modo
         window.selectedLobbyKeys = k;
         
-        // Feedback visual: Borde brillante en la tarjeta seleccionada
+        // Efecto visual de selección
         document.querySelectorAll('.diff-card').forEach(c => {
-            c.style.transform = "none";
-            c.style.boxShadow = "none";
             c.style.border = "2px solid #333";
+            c.style.transform = "scale(1)";
         });
         
-        // Encontrar la tarjeta clickeada (basado en el texto interno o evento)
-        // Como no tenemos referencia directa del elemento, buscamos por clase y contenido aproximado
+        // Buscar la tarjeta clickeada para iluminarla
+        // (Buscamos por texto interno porque no tienen ID único en el HTML original)
         const cards = document.querySelectorAll('.diff-card');
-        if(k===4 && cards[0]) cards[0].style.border = "4px solid #00FFFF";
-        if(k===6 && cards[1]) cards[1].style.border = "4px solid #12FA05";
-        if(k===7 && cards[2]) cards[2].style.border = "4px solid #FFD700";
-        if(k===9 && cards[3]) cards[3].style.border = "4px solid #F9393F";
+        const indexMap = {4:0, 6:1, 7:2, 9:3};
+        if(cards[indexMap[k]]) {
+            cards[indexMap[k]].style.border = "4px solid var(--accent)";
+            cards[indexMap[k]].style.transform = "scale(1.05)";
+        }
         
-        notify(`Modo ${k}K seleccionado`, "info");
-    } else {
-        // --- MODO SOLO (JUEGO NORMAL) ---
-        closeModal('diff');
-        prepareAndPlaySong(k);
+        notify(`Modo ${k}K seleccionado para la sala`, "info");
+        return; // <--- ESTE RETURN ES CRÍTICO PARA NO INICIAR EL JUEGO
     }
+
+    // SI NO ESTAMOS CREANDO SALA, JUGAMOS SOLO (Cierra modal y arranca)
+    closeModal('diff');
+    prepareAndPlaySong(k);
 };
 
 // 2. Modificar la apertura del modal DIFF para inyectar controles de Lobby
