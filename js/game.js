@@ -203,19 +203,13 @@ let mlContainer = null;
 function initMultiLeaderboard() {
     if (!isMultiplayer) return;
     
-    // Crear contenedor si no existe
+    // Crear contenedor si no existe (CSS: #multi-leaderboard)
     if (!document.getElementById('multi-leaderboard')) {
         mlContainer = document.createElement('div');
         mlContainer.id = 'multi-leaderboard';
         document.body.appendChild(mlContainer);
     }
     mlContainer.style.display = 'flex';
-    mlContainer.innerHTML = ''; // Limpiar
-    
-    // Inicializar con el jugador actual
-    multiScores = [{ name: user.name, score: 0, avatar: user.avatarData }];
-    updateMultiLeaderboardUI(multiScores);
-}
 
 // Función llamada desde online.js cuando cambian los puntajes
 function updateMultiLeaderboardUI(scores) {
