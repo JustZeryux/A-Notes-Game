@@ -553,121 +553,126 @@ function showFriendProfile(name) {
 // ==========================================
 
 // Función expuesta a window para que online.js pueda usarla
-window.updateHostPanelUI = function(players) {
+// ==========================================
+// PANEL DE HOST CON SISTEMA READY
+// ==========================================
+
+// 1. Abrir el panel (Configuración inicial)
+window.openHostPanel = function(songData, isClient = false) {
+    if(!songData) return;
+    curSongData = songData; 
+    
+    // Asegurar que el juego está detenido
+    if(typeof st !== 'undefined') st.act = false;
+    document.getElementById('game-layer').style.display = 'none';
+
+    const modal = document.getElementById('modal-host');
+    const panel = modal.querySelector('.modal-panel');
+    panel.className = "modal-panel host-panel-compact";
+    
+    // Si soy cliente, muestro boton de Ready. Si soy host, boton de Start.
+    const iamHost = !isClient;
+    window.isLobbyHost = iamHost;
+
+    const bgStyle = songData.imageURL ? `background-image:url(${songData.imageURL})` : 'background: #222';
+
+    panel.innerHTML = `
+        <div class="hp-header" style="${bgStyle}">
+            <div class="hp-title-info">
+                <div class="hp-song-title">${songData.title}</div>
+                <div class="hp-meta">By ${songData.uploader}</div>
+            </div>
+        </div>
+        <div class="hp-body">
+            <div class="hp-config-col">
+                <div class="hp-section-title">CONFIGURACIÓN</div>
+                <div class="set-row">
+                    <span>Modo</span>
+                    <strong style="color:var(--blue)" id="hp-mode-disp">4K</strong>
+                </div>
+                <div class="set-row">
+                    <span>Dificultad</span>
+                    <strong style="color:var(--good)" id="hp-den-disp">5</strong>
+                </div>
+            </div>
+            <div class="hp-players-col">
+                <div class="hp-section-title">JUGADORES (<span id="hp-count">1</span>/8)</div>
+                <div id="hp-players-list"></div>
+            </div>
+        </div>
+        <div class="hp-footer">
+            <button class="action secondary" style="width:auto; padding:12px 25px;" onclick="closeModal('host'); leaveLobbyData();">SALIR</button>
+            
+            ${iamHost 
+                ? `<button id="btn-start-match" class="action btn-add" style="width:auto; padding:12px 35px; opacity:0.5; pointer-events:none;" onclick="startLobbyMatchData()">ESPERANDO...</button>` 
+                : `<button id="btn-ready-toggle" class="action" style="width:auto; padding:12px 35px; background:#444;" onclick="toggleReadyData()">NO LISTO</button>`
+            }
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+};
+
+// 2. Actualizar lista de jugadores y estados (Se llama cada vez que alguien cambia)
+window.updateHostPanelUI = function(players, hostName) {
     const list = document.getElementById('hp-players-list');
     const count = document.getElementById('hp-count');
     const btnStart = document.getElementById('btn-start-match');
+    const btnReady = document.getElementById('btn-ready-toggle');
     
     if(!list || !count) return;
     
     count.innerText = players.length;
     list.innerHTML = '';
     
+    let allReady = true;
+    let meReady = false;
+
     players.forEach(p => {
-        const isHost = (p.name === players[0].name); 
+        const isHost = (p.name === hostName);
+        const isReady = p.status === 'ready';
+        
+        if(!isReady) allReady = false;
+        if(p.name === user.name && isReady) meReady = true;
+
+        const statusColor = isReady ? 'var(--good)' : '#666';
+        const statusText = isReady ? 'LISTO' : 'ESPERANDO';
+
         list.innerHTML += `
-            <div class="hp-player-row ${isHost ? 'is-host' : ''}">
+            <div class="hp-player-row ${isHost ? 'is-host' : ''}" style="border-left: 4px solid ${statusColor};">
                 <div class="hp-p-av" style="background-image:url(${p.avatar||''})"></div>
                 <div class="hp-p-name">${p.name} ${isHost ? '<span style="color:gold">★</span>' : ''}</div>
-                <div class="hp-p-status" style="color:lime">LISTO</div>
+                <div class="hp-p-status" style="color:${statusColor}; font-weight:900;">${statusText}</div>
             </div>`;
     });
 
+    // Lógica del botón de Host (Start)
     if(btnStart) {
-        if(players.length > 0 && players[0].name === user.name) btnStart.style.display = 'block';
-        else btnStart.style.display = 'none';
+        if(allReady && players.length > 1) { // Debe haber al menos 2 y todos listos
+            btnStart.style.opacity = '1';
+            btnStart.style.pointerEvents = 'auto';
+            btnStart.innerText = "COMENZAR PARTIDA";
+            btnStart.classList.add('pulse');
+        } else {
+            btnStart.style.opacity = '0.5';
+            btnStart.style.pointerEvents = 'none';
+            btnStart.innerText = players.length === 1 ? "ESPERANDO RIVAL..." : "ESPERANDO A TODOS...";
+            btnStart.classList.remove('pulse');
+        }
     }
-};
 
-// ==========================================
-// 2. NUEVO PANEL DE HOST (CON AJUSTES)
-// ==========================================
-
-window.openHostPanel = function(songData, isClient = false) {
-    curSongData = songData;
-    // Aseguramos que el juego NO esté corriendo
-    if(typeof st !== 'undefined') st.act = false; 
-    document.getElementById('game-layer').style.display = 'none';
-
-    const modal = document.getElementById('modal-host');
-    const panel = modal.querySelector('.modal-panel');
-    
-    // Si soy el host, muestro controles. Si soy cliente, solo veo info.
-    const iamHost = !isClient;
-    window.isLobbyHost = iamHost;
-
-    const bgStyle = songData.imageURL ? `background-image:url(${songData.imageURL})` : 'background:#222';
-
-    panel.innerHTML = `
-        <div class="hp-header" style="${bgStyle}; height:180px; position:relative;">
-            <div style="position:absolute; bottom:0; left:0; width:100%; padding:20px; background:linear-gradient(to top, #000, transparent);">
-                <div style="font-size:2rem; font-weight:900;">${songData.title}</div>
-                <div style="color:#ccc;">Host: <span id="lobby-host-name">...</span></div>
-            </div>
-        </div>
-
-        <div class="hp-body" style="display:flex; gap:20px; padding:20px;">
-            <div style="flex:1;">
-                <div class="hp-section-title">JUGADORES (<span id="hp-count">1</span>/8)</div>
-                <div id="hp-players-list" style="background:#111; height:250px; overflow-y:auto; border-radius:10px; padding:10px; border:1px solid #333;"></div>
-            </div>
-
-            <div style="width:250px; display:flex; flex-direction:column; gap:15px;">
-                <div class="hp-section-title">CONFIGURACIÓN DE PISTA</div>
-                
-                <div style="background:#151515; padding:15px; border-radius:10px; border:1px solid #333;">
-                    <div style="margin-bottom:10px;">
-                        <span style="color:#888; font-size:0.8rem;">MODO (TECLAS)</span>
-                        <div id="lobby-display-keys" style="font-size:1.5rem; font-weight:900; color:var(--blue);">4K</div>
-                    </div>
-                    <div>
-                        <span style="color:#888; font-size:0.8rem;">DIFICULTAD (DENSIDAD)</span>
-                        <div id="lobby-display-den" style="font-size:1.5rem; font-weight:900; color:var(--good);">5</div>
-                    </div>
-                    <div style="margin-top:10px; font-size:0.8rem; color:${cfg.ranked ? 'gold' : '#666'}">
-                        ${cfg.ranked ? '🏆 RANKED' : '🎲 CASUAL'}
-                    </div>
-                </div>
-
-                ${iamHost ? `
-                <button class="action secondary" onclick="toggleLobbySettings()" style="font-size:0.9rem;">
-                    ⚙️ MODIFICAR REGLAS
-                </button>
-                ` : '<div style="color:#666; font-size:0.8rem; text-align:center;">Esperando al host...</div>'}
-            </div>
-        </div>
-
-        <div id="lobby-settings-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10; align-items:center; justify-content:center;">
-            <div style="background:#111; padding:30px; border-radius:15px; border:1px solid var(--accent); width:400px; text-align:center;">
-                <h3>CONFIGURAR SALA</h3>
-                
-                <div style="margin:20px 0;">
-                    <label>Modo de Teclas:</label>
-                    <div style="display:flex; gap:10px; justify-content:center; margin-top:10px;">
-                        <button class="btn-small" onclick="updateLobbyConfigLocal('keys', 4)">4K</button>
-                        <button class="btn-small" onclick="updateLobbyConfigLocal('keys', 6)">6K</button>
-                        <button class="btn-small" onclick="updateLobbyConfigLocal('keys', 7)">7K</button>
-                    </div>
-                </div>
-
-                <div style="margin:20px 0;">
-                    <label>Densidad (1-10):</label><br>
-                    <input type="range" min="1" max="10" id="host-den-slider" oninput="document.getElementById('lbl-den').innerText=this.value">
-                    <span id="lbl-den" style="font-weight:bold; font-size:1.2rem;">5</span>
-                </div>
-
-                <button class="action btn-add" onclick="saveLobbySettings()">GUARDAR CAMBIOS</button>
-                <button class="action secondary" style="margin-top:10px;" onclick="toggleLobbySettings()">CANCELAR</button>
-            </div>
-        </div>
-
-        <div class="hp-footer" style="padding:20px; border-top:1px solid #333; display:flex; justify-content:flex-end; gap:15px; background:#080808;">
-            <button class="action secondary" style="width:auto;" onclick="leaveLobby()">SALIR</button>
-            ${iamHost ? `<button id="btn-start-lobby" class="action btn-acc" style="width:auto; padding:0 40px;" onclick="startLobbyMatch()">COMENZAR PARTIDA</button>` : ''}
-        </div>
-    `;
-
-    modal.style.display = 'flex';
+    // Lógica del botón de Cliente (Ready)
+    if(btnReady) {
+        if(meReady) {
+            btnReady.innerText = "¡ESTOY LISTO!";
+            btnReady.style.background = "var(--good)";
+            btnReady.style.color = "black";
+        } else {
+            btnReady.innerText = "MARCAR LISTO";
+            btnReady.style.background = "#444";
+            btnReady.style.color = "white";
+        }
+    }
 };
 
 // Toggle visual del menú de ajustes dentro del lobby
