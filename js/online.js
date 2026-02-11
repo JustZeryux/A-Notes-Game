@@ -1,26 +1,29 @@
-/* === ONLINE SYSTEM (MASTER V22) === */
-let currentLobbyId = null;
-let lobbyListener = null;
+/* === ONLINE SYSTEM (MASTER V23 - WINDOW BINDING) === */
+var currentLobbyId = null;
+var lobbyListener = null;
 
-function initOnline() {
+window.initOnline = function() {
     if(typeof Peer === 'undefined') return;
-    peer = new Peer(null, { secure: true }); 
-    peer.on('open', (id) => {
-        if(db && user.name !== "Guest") db.collection("users").doc(user.name).set({ peerId: id, online: true }, { merge: true });
-    });
-}
+    try {
+        peer = new Peer(null, { secure: true }); 
+        peer.on('open', (id) => {
+            if(db && user.name !== "Guest") db.collection("users").doc(user.name).set({ peerId: id, online: true }, { merge: true });
+        });
+    } catch(e) { console.log("PeerJS error:", e); }
+};
 
-// CREAR SALA
+// CREAR SALA (Asignado a window para arreglar error de referencia)
 window.createLobbyData = function(songId, config) {
-    if (!db || user.name === "Guest") return Promise.reject("Inicia sesión");
+    if (!db) return Promise.reject("Error DB: Firebase no inició");
+    if (user.name === "Guest") return Promise.reject("Debes iniciar sesión");
     
     const lobbyData = {
         host: user.name,
         songId: songId,
-        songTitle: curSongData.title || "Desconocido",
+        songTitle: curSongData ? curSongData.title : "Desconocido",
         status: 'waiting',
         players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready', score: 0 }],
-        config: config, // { keys: [4], density: 5, ranked: true }
+        config: config, 
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
@@ -31,8 +34,8 @@ window.createLobbyData = function(songId, config) {
     });
 };
 
-// UNIRSE A SALA
 window.joinLobbyData = function(lobbyId) {
+    if(!db) return;
     const lobbyRef = db.collection("lobbies").doc(lobbyId);
     
     return db.runTransaction(async (t) => {
@@ -54,20 +57,24 @@ window.joinLobbyData = function(lobbyId) {
         return data;
     }).then(data => {
         currentLobbyId = lobbyId;
-        // Cargar datos de canción
         db.collection("globalSongs").doc(data.songId).get().then(s => {
             if(s.exists) {
                 curSongData = { id: s.id, ...s.data() };
-                openHostPanel(curSongData, true); // true = soy cliente
+                // Aseguramos que openHostPanel exista antes de llamar
+                if(typeof window.openHostPanel === 'function') {
+                    window.openHostPanel(curSongData, true); 
+                }
             }
         });
         subscribeToLobby(lobbyId);
-    }).catch(e => notify(e, "error"));
+    }).catch(e => {
+        if(typeof notify === 'function') notify(e, "error");
+        else console.error(e);
+    });
 };
 
-// CAMBIAR ESTADO READY
 window.toggleReadyData = function() {
-    if(!currentLobbyId) return;
+    if(!currentLobbyId || !db) return;
     const ref = db.collection("lobbies").doc(currentLobbyId);
     ref.get().then(doc => {
         if(!doc.exists) return;
@@ -80,72 +87,63 @@ window.toggleReadyData = function() {
     });
 };
 
-// ESCUCHAR CAMBIOS EN LA SALA
 function subscribeToLobby(lobbyId) {
     if (lobbyListener) lobbyListener();
     lobbyListener = db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
         if (!doc.exists) { 
-            leaveLobbyData(); 
-            closeModal('host'); 
-            notify("La sala ha sido cerrada", "info");
+            window.leaveLobbyData(); 
+            if(typeof closeModal === 'function') closeModal('host'); 
+            if(typeof notify === 'function') notify("La sala ha sido cerrada", "info");
             return; 
         }
         
         const data = doc.data();
         
-        // Sincronizar UI de configuración
+        // Sync configs
         if (data.config) {
             if(document.getElementById('hp-mode-disp')) {
                 document.getElementById('hp-mode-disp').innerText = data.config.keys[0] + "K";
                 document.getElementById('hp-den-disp').innerText = data.config.density;
             }
-            // Actualizar config local para cuando empiece
-            cfg.den = data.config.density;
-            window.selectedLobbyKeys = data.config.keys[0];
+            if(window.cfg) {
+                window.cfg.den = data.config.density;
+                window.selectedLobbyKeys = data.config.keys[0];
+            }
         }
 
-        // Iniciar juego
         if (data.status === 'playing' && !isMultiplayer) {
             isMultiplayer = true; 
-            closeModal('host');
-            // Usar la key count de la sala
+            if(typeof closeModal === 'function') closeModal('host');
             const k = data.config.keys[0] || 4;
-            prepareAndPlaySong(k);
+            if(typeof prepareAndPlaySong === 'function') prepareAndPlaySong(k);
         }
         
-        if (data.status === 'waiting') {
+        if (data.status === 'waiting' && typeof updateHostPanelUI === 'function') {
             updateHostPanelUI(data.players, data.host);
         }
     });
 }
 
 window.startLobbyMatchData = function() {
-    if(currentLobbyId) db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
+    if(currentLobbyId && db) db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
 };
 
 window.leaveLobbyData = function() {
-    if (!currentLobbyId) return;
+    if (!currentLobbyId || !db) return;
     const ref = db.collection("lobbies").doc(currentLobbyId);
     ref.get().then(doc => {
         if(doc.exists) {
-            if(doc.data().host === user.name) {
-                ref.delete(); // Si soy host, borro sala
-            } else {
+            if(doc.data().host === user.name) ref.delete(); 
+            else {
                 const p = doc.data().players.filter(x => x.name !== user.name);
                 ref.update({ players: p });
             }
         }
     });
     currentLobbyId = null; isMultiplayer = false;
-    if(lobbyListener) lobbyListener(); // Desuscribir
+    if(lobbyListener) lobbyListener();
 };
 
-// Enviar puntaje en tiempo real
 window.sendLobbyScore = function(score) {
-    if(!currentLobbyId || !db) return;
-    // Optimización: Solo enviar cada 1000 puntos o al final para no saturar
-    if(score % 500 === 0) {
-        // Logica simplificada: Actualizar mi score en el array
-        // (En producción idealmente usarías una subcolección, pero esto funciona para 8 players)
-    }
+    // Implementación futura
 };
