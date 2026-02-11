@@ -29,12 +29,21 @@ const CURRENT_VERSION = 104;
 
 // 3. ITEMS DE TIENDA
 const SHOP_ITEMS = [
-    { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Notas brillantes rosas y cian', color: '#ff66aa' },
-    { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado dorado de lujo', color: '#FFD700' },
-    { id: 'skin_dark', name: 'Modo Dark', price: 1000, type: 'skin', desc: 'Estilo monocromático', color: '#444' },
-    { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista para avatar', color: '#00FFFF' }
+    // SKINS BÁSICAS (Colores Fijos)
+    { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Estilo Cyberpunk brillante.', color: '#ff66aa', fixed: true },
+    { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado de lujo dorado.', color: '#FFD700', fixed: true },
+    { id: 'skin_dark', name: 'Modo Dark', price: 1000, type: 'skin', desc: 'Alto contraste monocromático.', color: '#444', fixed: true },
+    
+    // SKINS AVANZADAS (Formas Nuevas)
+    { id: 'skin_demon', name: 'Demon Spikes', price: 3500, type: 'skin', desc: 'Notas agresivas con cuernos. Color Fijo (Rojo).', color: '#FF0000', fixed: true },
+    { id: 'skin_angel', name: 'Holy Halo', price: 3500, type: 'skin', desc: 'Anillos divinos. Color Fijo (Azul/Blanco).', color: '#00FFFF', fixed: true },
+    { id: 'skin_shuriken', name: 'Ninja Star', price: 4000, type: 'skin', desc: 'Shurikens giratorios. Usa TUS colores.', color: '#FFF', fixed: false },
+    { id: 'skin_sniper', name: 'Crosshair', price: 3000, type: 'skin', desc: 'Miras tácticas. Usa TUS colores.', color: '#0F0', fixed: false },
+    { id: 'skin_plasma', name: 'Plasma Orb', price: 5000, type: 'skin', desc: 'Núcleo de energía inestable. Fijo (Violeta).', color: '#BD00FF', fixed: true },
+    
+    // UI
+    { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista para avatar.', color: '#00FFFF', fixed: true }
 ];
-
 // 4. GENERADOR DE CARRILES (TECLAS)
 function createLanes(k) {
     const k4 = ['d','f','j','k'];
