@@ -1,6 +1,7 @@
-/* === AUDIO & ENGINE (MASTER V75 - RANK FIX & ANTI-SPAM) === */
+/* === AUDIO & ENGINE (MASTER V80 - VISUALS & SYNC) === */
 
 let elTrack = null;
+let mlContainer = null;
 
 // === 1. AUDIO SYSTEM ===
 function unlockAudio() {
@@ -53,7 +54,7 @@ function playMiss() {
     }
 }
 
-// === 2. GENERADOR (ANTI-SPAM JACKHAMMER) ===
+// === 2. GENERADOR MAPAS ===
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
@@ -61,10 +62,8 @@ function genMap(buf, k) {
     const sampleRate = buf.sampleRate;
     
     let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
-    
-    // Ajuste de umbral
     const thresholdBase = 1.5 - (safeDen * 0.08); 
-    const minStep = Math.max(90, 260 - (safeDen * 22)); // Aumenté el tiempo mínimo para evitar spam
+    const minStep = Math.max(90, 260 - (safeDen * 22)); 
     
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 100); 
@@ -73,9 +72,8 @@ function genMap(buf, k) {
     let lastLane = 0;
     let energyHistory = [];
     let laneFreeTimes = new Array(k).fill(0);
-    let consecutiveSameLane = 0; // Contador anti-spam
+    let consecutiveSameLane = 0; 
 
-    // Patrones
     let currentPattern = 0;
     let patternDuration = 0;
     let patternDir = 1;
@@ -96,14 +94,12 @@ function genMap(buf, k) {
         if (timeMs < 1500) continue;
 
         if (instantEnergy > localAvg * thresholdBase && (timeMs - lastTime > minStep)) {
-            
-            // Selección de patrón
             if (patternDuration <= 0) {
                 const r = Math.random();
-                if (r < 0.35) currentPattern = 1; // Stream
-                else if (r < 0.45) currentPattern = 2; // Jack (Reducido probabilidad)
-                else if (r < 0.7) currentPattern = 3; // Trill
-                else currentPattern = 0; // Random
+                if (r < 0.35) currentPattern = 1; 
+                else if (r < 0.45) currentPattern = 2; 
+                else if (r < 0.7) currentPattern = 3; 
+                else currentPattern = 0; 
                 patternDuration = Math.floor(Math.random() * 6) + 3;
                 patternDir = Math.random() > 0.5 ? 1 : -1;
             }
@@ -114,25 +110,18 @@ function genMap(buf, k) {
             else if (currentPattern === 3) targetLane = (lastLane + 2) % k;
             else targetLane = Math.floor(Math.random() * k);
 
-            // === LÓGICA ANTI-SPAM ESTRICTA ===
             if (targetLane === lastLane) {
                 consecutiveSameLane++;
-                // Si intenta poner más de 2 notas seguidas en el mismo carril, FORZAR CAMBIO
                 if (consecutiveSameLane >= 2) {
-                    targetLane = (targetLane + 1) % k; // Mover al siguiente carril
+                    targetLane = (targetLane + 1) % k; 
                     consecutiveSameLane = 0;
-                    currentPattern = 0; // Romper patrón de jack
+                    currentPattern = 0; 
                 }
-            } else {
-                consecutiveSameLane = 0;
-            }
+            } else { consecutiveSameLane = 0; }
 
-            // Buscar carril libre (sin notas largas activas)
             let finalLane = -1;
-            if (timeMs >= laneFreeTimes[targetLane]) {
-                finalLane = targetLane;
-            } else {
-                // Si el target está ocupado, buscar otro aleatorio libre
+            if (timeMs >= laneFreeTimes[targetLane]) finalLane = targetLane;
+            else {
                 const freeLanes = [];
                 for(let l=0; l<k; l++) if(timeMs >= laneFreeTimes[l]) freeLanes.push(l);
                 if(freeLanes.length > 0) finalLane = freeLanes[Math.floor(Math.random()*freeLanes.length)];
@@ -141,18 +130,15 @@ function genMap(buf, k) {
             if (finalLane !== -1) {
                 let isHold = false;
                 let holdLen = 0;
-                
                 if (instantEnergy > localAvg * 1.6 && Math.random() > 0.7) {
                     isHold = true;
                     holdLen = Math.min(600, Math.random() * 300 + 100);
                 }
-
                 map.push({ t: timeMs, l: finalLane, type: isHold?'hold':'tap', len: holdLen, h:false, scoreGiven:false });
                 laneFreeTimes[finalLane] = timeMs + holdLen + 50; 
                 lastTime = timeMs;
                 lastLane = finalLane;
 
-                // Dobles controlados
                 if (instantEnergy > localAvg * 2.2 && safeDen >= 6) {
                     let secondLaneTarget = (finalLane + Math.floor(k/2)) % k;
                     if (timeMs >= laneFreeTimes[secondLaneTarget] && secondLaneTarget !== finalLane) {
@@ -178,15 +164,20 @@ function initReceptors(k) {
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
 
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
+    window.elReceptors = []; // Guardar referencias
     
     for (let i = 0; i < k; i++) {
+        // Flash del carril
         const l = document.createElement('div');
         l.className = 'lane-flash';
         l.id = `flash-${i}`;
         l.style.left = (i * (100 / k)) + '%';
-        if(window.cfg.modes[k]) l.style.setProperty('--c', window.cfg.modes[k][i].c);
+        
+        // BUGFIX COLOR: Asignar color explícitamente desde config
+        l.style.setProperty('--c', window.cfg.modes[k][i].c);
         elTrack.appendChild(l);
 
+        // Receptor
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`;
         r.id = `rec-${i}`;
@@ -194,13 +185,18 @@ function initReceptors(k) {
         r.style.top = y + 'px';
         
         let strokeColor = "white";
-        if(window.user && window.user.equipped && window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
+        // Solo sobrescribir si hay skin equipada
+        if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
+             if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
+             else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
+        }
 
         let conf = window.cfg.modes[k][i];
         let shape = PATHS[conf.s] || PATHS['circle'];
         
         r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shape}" stroke="${strokeColor}" fill="none" stroke-width="4"/></svg>`;
         elTrack.appendChild(r);
+        window.elReceptors.push(r);
     }
 }
 
@@ -211,11 +207,9 @@ async function prepareAndPlaySong(k) {
 
     try {
         unlockAudio();
-        
         let songInRam = window.ramSongs.find(s => s.id === window.curSongData.id);
         const currentDen = window.cfg.den || 5;
 
-        // Regenerar si cambió dificultad o teclas
         if (songInRam && (songInRam.kVersion !== k || songInRam.genDen !== currentDen)) {
             window.ramSongs = window.ramSongs.filter(s => s.id !== window.curSongData.id); 
             songInRam = null; 
@@ -225,18 +219,22 @@ async function prepareAndPlaySong(k) {
             const response = await fetch(window.curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
-            
-            document.getElementById('loading-text').innerText = "Generando mapa...";
-            await new Promise(r => setTimeout(r, 10));
-
             const map = genMap(audioBuffer, k);
-            
             songInRam = { id: window.curSongData.id, buf: audioBuffer, map: map, kVersion: k, genDen: currentDen };
             window.ramSongs.push(songInRam);
         }
         
-        if(loader) loader.style.display = 'none';
-        playSongInternal(songInRam);
+        // === ONLINE SYNC WAIT ===
+        if(window.isMultiplayer) {
+            document.getElementById('loading-text').innerText = "Esperando jugadores...";
+            // Enviamos señal de que cargamos
+            if(window.notifyLobbyLoaded) window.notifyLobbyLoaded();
+            // Esperamos a que online.js llame a playSongInternal
+        } else {
+            if(loader) loader.style.display = 'none';
+            playSongInternal(songInRam);
+        }
+        
     } catch (e) {
         console.error(e);
         notify("Error: " + e.message, "error");
@@ -244,53 +242,47 @@ async function prepareAndPlaySong(k) {
     }
 }
 
-// === FIX: REINTENTO INSTANTÁNEO ===
-window.restartSong = function() {
-    // 1. Resetear UI visualmente INMEDIATAMENTE
-    const bar = document.getElementById('top-progress-fill');
-    const timeText = document.getElementById('top-progress-time');
-    if(bar) bar.style.width = '0%';
-    if(timeText) timeText.innerText = '0:00 / 0:00';
-    document.getElementById('health-fill').style.height = '50%';
-    document.getElementById('g-score').innerText = '0';
-    document.getElementById('g-acc').innerText = '100%';
-    
-    // 2. Cerrar modales
-    document.getElementById('modal-res').style.display = 'none';
-    document.getElementById('modal-pause').style.display = 'none';
+// Accesible globalmente para Online.js
+window.playSongInternal = function(s) {
+    // Si no pasaron song, buscar en ram (para multiplayer)
+    if(!s && window.isMultiplayer && window.curSongData) {
+        s = window.ramSongs.find(x => x.id === window.curSongData.id);
+    }
+    if(!s) return;
 
-    // 3. Llamar lógica
-    prepareAndPlaySong(window.keys);
-};
+    document.getElementById('loading-overlay').style.display = 'none';
+    document.getElementById('sync-overlay').style.display = 'none';
 
-// === LÓGICA DE JUEGO & CÁLCULO DE RANK REAL ===
-function playSongInternal(s) {
     window.st.act = true;
     window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
     window.st.spawned = [];
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
     
-    // === FIX RANK: CALCULAR PUNTAJE TOTAL DE LA CANCIÓN ===
-    // Cada nota vale 350 pts (SICK). Si fallas una, pierdes esos 350 potenciales.
-    // Hold Notes: 350 (inicio) + 100 (fin). Simplificamos: 1 nota = 350 pts base para accuracy.
+    // Rank Calc
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => {
-        window.st.trueMaxScore += 350; // Puntos por hit perfecto
-        if(n.type === 'hold') window.st.trueMaxScore += 100; // Bonus por hold completo
+        window.st.trueMaxScore += 350; 
+        if(n.type === 'hold') window.st.trueMaxScore += 100;
     });
-    // ======================================================
 
-    window.st.maxScorePossible = 0; // Esto solo es para tracking visual progresivo
+    window.st.maxScorePossible = 0; 
     window.st.keys = new Array(window.keys).fill(0);
     window.st.songDuration = s.buf.duration;
     window.keys = s.kVersion;
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.fcStatus = "GFC";
 
+    // UI Reset
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
-    
+    document.getElementById('modal-res').style.display = 'none';
+    document.getElementById('modal-pause').style.display = 'none';
+
+    // Init Leaderboard
+    if(window.isMultiplayer) initMultiLeaderboard();
+    else if(document.getElementById('multi-leaderboard')) document.getElementById('multi-leaderboard').style.display = 'none';
+
     initReceptors(window.keys);
     updHUD();
 
@@ -327,20 +319,10 @@ function loop() {
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     
     if (window.st.songDuration > 0) {
-        const dur = window.st.songDuration;
         const cur = Math.max(0, now / 1000); 
-        const pct = Math.min(100, (cur / dur) * 100);
-        const bar = document.getElementById('top-progress-fill');
-        if(bar) bar.style.width = pct + "%";
-
-        const timeText = document.getElementById('top-progress-time');
-        if(timeText) {
-            const curM = Math.floor(cur / 60);
-            const curS = Math.floor(cur % 60).toString().padStart(2, '0');
-            const durM = Math.floor(dur / 60);
-            const durS = Math.floor(dur % 60).toString().padStart(2, '0');
-            timeText.innerText = `${curM}:${curS} / ${durM}:${durS}`;
-        }
+        const pct = Math.min(100, (cur / window.st.songDuration) * 100);
+        document.getElementById('top-progress-fill').style.width = pct + "%";
+        document.getElementById('top-progress-time').innerText = `${Math.floor(cur/60)}:${Math.floor(cur%60).toString().padStart(2,'0')}`;
     }
 
     const w = 100 / window.keys;
@@ -357,10 +339,12 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
+            // BUGFIX COLOR: Prioridad -> Skin -> Config -> Default
             let conf = window.cfg.modes[window.keys][n.l];
-            let color = conf.c;
+            let color = conf.c; // Por defecto usa el de config
             
-            if (window.user && window.user.equipped && window.user.equipped.skin) {
+            // Si hay skin especial, sobrescribir
+            if (window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
                 const s = window.user.equipped.skin;
                 if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
                 else if (s === 'skin_gold') color = '#FFD700';
@@ -420,7 +404,35 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === INPUTS ===
+// === VISUALS: SPLASH SYSTEM (V80) ===
+function createSplash(l) {
+    if(!window.cfg.showSplash) return;
+    if(!elTrack) return;
+    
+    const r = document.getElementById(`rec-${l}`);
+    if(!r) return;
+    
+    const type = window.cfg.splashType || 'classic';
+    const color = window.cfg.modes[window.keys][l].c;
+    
+    const s = document.createElement('div');
+    s.className = 'splash-wrapper';
+    // Posicionar exactamente en el receptor
+    s.style.left = r.style.left;
+    s.style.top = r.style.top;
+    
+    // Crear el elemento interno según el tipo
+    const inner = document.createElement('div');
+    inner.className = `splash-${type}`;
+    inner.style.setProperty('--c', color);
+    
+    s.appendChild(inner);
+    elTrack.appendChild(s);
+    
+    setTimeout(() => s.remove(), 400);
+}
+
+// === INPUTS & HIT LOGIC ===
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
@@ -439,10 +451,16 @@ function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
     const flash = document.getElementById(`flash-${l}`);
+    
     if (p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
-        if(flash) { flash.style.opacity = 0.5; setTimeout(()=>flash.style.opacity=0,100); }
+        
+        // BUGFIX LANE FLASH (Solo si está activado)
+        if(flash && window.cfg.laneFlash) { 
+            flash.style.opacity = 0.5; 
+            setTimeout(() => flash.style.opacity=0, 100); 
+        }
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
@@ -450,8 +468,14 @@ function hit(l, p) {
         if (n) {
             const diff = Math.abs(n.t - now);
             let score=50, text="BAD", color="yellow";
-            if(diff<45){ text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; }
-            else if(diff<90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; }
+            if(diff<45){ 
+                text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; 
+                createSplash(l); // Trigger Splash
+            }
+            else if(diff<90){ 
+                text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; 
+                createSplash(l);
+            }
             else { window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; }
 
             if(text==="BAD") window.st.fcStatus="SD";
@@ -479,6 +503,7 @@ function miss(n) {
 }
 
 function showJudge(text, color) {
+    if(!window.cfg.judgeVis) return;
     const j = document.createElement('div');
     j.className = 'judge-pop'; j.innerText = text; j.style.color = color;
     document.body.appendChild(j); setTimeout(() => j.remove(), 400);
@@ -490,8 +515,6 @@ function updHUD() {
     if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
     document.getElementById('health-fill').style.height = window.st.hp + "%";
     
-    // Calcular Accuracy basado en lo jugado hasta ahora (para feedback visual)
-    // Pero el Rank final se calculará distinto
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
@@ -502,24 +525,84 @@ function updHUD() {
         fcEl.innerText = window.cfg.showFC ? window.st.fcStatus : "";
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
+    
+    // ENVIAR SCORE ONLINE
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
+
+// === MULTIPLAYER LEADERBOARD ANIMADO ===
+function initMultiLeaderboard() {
+    if (!document.getElementById('multi-leaderboard')) {
+        mlContainer = document.createElement('div');
+        mlContainer.id = 'multi-leaderboard';
+        document.body.appendChild(mlContainer);
+    }
+    mlContainer.style.display = 'flex';
+    mlContainer.innerHTML = ''; 
+    // Empezar lista con el usuario actual
+    window.multiScores = [{ name: window.user.name, score: 0, avatar: window.user.avatarData }];
+    updateMultiLeaderboardUI(window.multiScores);
+}
+
+window.updateMultiLeaderboardUI = function(scores) {
+    if (!mlContainer) return;
+    
+    // Ordenar de mayor a menor
+    scores.sort((a, b) => b.score - a.score);
+    
+    // Actualizar DOM
+    // Estrategia: Actualizar valores si existe, crear si no, mover con CSS top
+    const existingNodes = Array.from(mlContainer.children);
+    
+    scores.forEach((p, index) => {
+        let row = existingNodes.find(node => node.dataset.name === p.name);
+        const topPos = index * 65; // 60px height + 5px gap
+        
+        if (!row) {
+            row = document.createElement('div');
+            row.className = `ml-row ${p.name === window.user.name ? 'is-me' : ''}`;
+            row.dataset.name = p.name;
+            row.style.top = topPos + 'px'; // Posición inicial
+            row.innerHTML = `
+                <div class="ml-pos">#${index+1}</div>
+                <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
+                <div class="ml-info">
+                    <div class="ml-name">${p.name}</div>
+                    <div class="ml-score">0</div>
+                </div>
+            `;
+            mlContainer.appendChild(row);
+        } else {
+            // Animar movimiento
+            row.style.top = topPos + 'px';
+            // Actualizar datos
+            row.querySelector('.ml-score').innerText = p.score.toLocaleString();
+            row.querySelector('.ml-pos').innerText = `#${index+1}`;
+            row.setAttribute('data-rank', index+1);
+        }
+    });
+};
 
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     document.getElementById('game-layer').style.display = 'none';
     
+    // Si es multiplayer, mostrar pantalla de ganador o perdedor
+    if(window.isMultiplayer) {
+        // Enviar score final
+        if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true); // true = final
+        // Esperar a que online.js muestre la pantalla de victoria
+        return; 
+    }
+
+    // Lógica normal de Singleplayer...
     const modal = document.getElementById('modal-res');
     if(modal) {
         modal.style.display = 'flex';
         const panel = modal.querySelector('.modal-panel');
-        
-        // === CÁLCULO DE RANK REAL (SOBRE EL TOTAL DE LA CANCIÓN) ===
-        // Si trueMaxScore es 0 (error), usar 1 para evitar división por cero
         const totalMax = window.st.trueMaxScore || 1;
         const finalAcc = Math.round((window.st.sc / totalMax) * 100);
-        
         let r="D", c="red";
         if (!died) {
             if (finalAcc >= 98) { r="SS"; c="cyan" }
@@ -527,17 +610,12 @@ function end(died) {
             else if (finalAcc >= 90) { r="A"; c="lime" }
             else if (finalAcc >= 80) { r="B"; c="yellow" }
             else if (finalAcc >= 70) { r="C"; c="orange" }
-            else { r="D"; c="red" } // Si sacas menos de 70% es D (incluso si no moriste)
         } else { r="F"; c="red"; }
         
-        let xpGain = 0, ppGain = 0;
+        let xpGain = 0;
         if (!died && window.user.name !== "Guest") {
             xpGain = Math.floor(window.st.sc / 250);
             window.user.xp += xpGain;
-            if (window.st.ranked) {
-                ppGain = (finalAcc > 90) ? Math.floor(window.st.sc / 5000) : 0;
-                window.user.pp += ppGain;
-            }
             if(typeof save === 'function') save();
             if(typeof updateFirebaseScore === 'function') updateFirebaseScore();
         }
@@ -546,37 +624,23 @@ function end(died) {
             <div class="m-title">RESULTADOS</div>
             <div style="display:flex; justify-content:center; align-items:center; gap:30px;">
                 <div class="rank-big" style="color:${c}">${r}</div>
-                <div style="text-align:left;">
+                <div>
                     <div style="font-size:3rem; font-weight:900;">${window.st.sc.toLocaleString()}</div>
                     <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
-                    <div style="color:#aaa;">MAX COMBO: <span style="color:white">${window.st.maxCmb}</span></div>
                 </div>
             </div>
-            
             <div class="res-grid">
-                <div class="res-card xp-card">
-                    <div class="res-label">Experiencia</div>
-                    <div class="res-val" style="color:var(--blue)">+${xpGain} XP</div>
-                    <div class="xp-gain-bar-bg"><div class="xp-gain-fill" style="width:0%" id="anim-xp-bar"></div></div>
-                </div>
-                <div class="res-card pp-card">
-                    <div class="res-label">Performance</div>
-                    <div class="res-val" style="color:var(--gold)">+${ppGain} PP</div>
-                </div>
+                <div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div>
             </div>
-
             <div style="margin-top:30px; display:flex; gap:10px;">
                 <button class="action" onclick="toMenu()">CONTINUAR</button>
                 <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
             </div>
         `;
-        
-        setTimeout(() => {
-            const bar = document.getElementById('anim-xp-bar');
-            if(bar) bar.style.width = '100%';
-        }, 100);
     }
 }
+
+// ... togglePause, resumeGame, toMenu ... (Mantener igual)
 
 function togglePause() {
     if(!window.st.act) return;
