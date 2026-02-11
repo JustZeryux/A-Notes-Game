@@ -1227,15 +1227,24 @@ function openShop() {
         grid.innerHTML = '';
         SHOP_ITEMS.forEach(item => {
             const owned = user.inventory && user.inventory.includes(item.id);
-            const equipped = user.equipped && user.equipped[item.type] === item.id;
             const div = document.createElement('div');
             div.className = 'shop-item';
-            if (owned) div.style.borderColor = "var(--blue)";
+            if (owned) div.style.borderColor = "var(--good)";
+            
+            // Etiqueta de tipo de color
+            const typeTag = item.type === 'skin' 
+                ? (item.fixed ? '<span class="tag-fix">COLOR FIJO</span>' : '<span class="tag-cust">CUSTOM COLOR</span>') 
+                : '';
+
             div.innerHTML = `
-                <div class="shop-icon" style="background-color:${item.color || '#333'}"></div>
+                <div class="shop-icon" style="background-color:${item.color || '#333'}; box-shadow:0 0 15px ${item.color}"></div>
                 <div class="shop-name">${item.name}</div>
-                <div class="shop-price">${owned ? 'ADQUIRIDO' : item.price + ' SP'}</div>
-                <button class="btn-small ${owned?'btn-chat':'btn-add'}" onclick="${owned ? `equipItem('${item.id}','${item.type}')` : `buyItem('${item.id}',${item.price})`}">${owned ? (equipped?'EQUIPADO':'EQUIPAR') : 'COMPRAR'}</button>
+                <div class="shop-desc">${item.desc}</div>
+                ${typeTag}
+                <div class="shop-price" style="${owned ? 'color:var(--good)' : ''}">
+                    ${owned ? '✔ EN INVENTARIO' : item.price + ' SP'}
+                </div>
+                ${!owned ? `<button class="btn-small btn-add" onclick="buyItem('${item.id}',${item.price})">COMPRAR</button>` : ''}
             `;
             grid.appendChild(div);
         });
