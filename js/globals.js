@@ -76,3 +76,26 @@ const PATHS = {
     square: "M 15,15 L 85,15 L 85,85 L 15,85 Z",
     diamond: "M 50,10 L 90,50 L 50,90 L 10,50 Z"
 };
+// ==========================================
+// SISTEMA DE NOTIFICACIONES GLOBAL
+// ==========================================
+function notify(msg, type="info", duration=4000) {
+    const area = document.getElementById('notification-area');
+    if(!area) return console.log(msg); 
+    
+    const card = document.createElement('div');
+    card.className = 'notify-card';
+    if(type==="error") card.style.borderLeftColor = "#F9393F";
+    else if(type==="success") card.style.borderLeftColor = "#12FA05";
+    else card.style.borderLeftColor = "#44ccff";
+    
+    card.innerHTML = `
+        <div class="notify-title">${type.toUpperCase()}</div>
+        <div class="notify-body">${msg}</div>
+        <div class="notify-progress" style="height:3px; background:rgba(255,255,255,0.5); width:100%; position:absolute; bottom:0; left:0; transition:width ${duration}ms linear;"></div>
+    `;
+    
+    area.appendChild(card);
+    setTimeout(() => { const bar = card.querySelector('.notify-progress'); if(bar) bar.style.width = '0%'; }, 50);
+    setTimeout(() => { card.style.animation = "slideOut 0.3s forwards"; setTimeout(() => card.remove(), 300); }, duration);
+}
