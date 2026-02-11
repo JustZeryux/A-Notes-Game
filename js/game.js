@@ -62,8 +62,10 @@ function genMap(buf, k) {
     
     // Ajuste de sensibilidad basado en la densidad elegida (1-10)
     // Densidad 10 = Muy sensible (muchas notas), Densidad 1 = Poco sensible
-    const sensitivity = 1.8 - (cfg.den * 0.12); 
-    const minStep = Math.max(70, 220 - (cfg.den * 18)); // Milisegundos mínimos entre notas
+  // Usar 5 por defecto si cfg.den no existe (Evita que el mapa salga vacío)
+const safeDensity = (typeof cfg !== 'undefined' && cfg.den) ? cfg.den : 5;
+const sensitivity = 1.8 - (safeDensity * 0.12); 
+const minStep = Math.max(70, 220 - (safeDensity * 18));
     
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 80); // Muestreo
