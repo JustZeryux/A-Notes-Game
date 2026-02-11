@@ -657,13 +657,24 @@ function end(died) {
 }
 
 function togglePause() {
+    // Si no hay juego activo, no hacer nada
     if (!st.act && st.spawned.length === 0) return;
+    
     st.paused = !st.paused;
+    
     if (st.paused) {
         st.lastPause = performance.now();
         document.getElementById('modal-pause').style.display = 'flex';
-        if (st.ctx && st.ctx.state === 'running') st.ctx.suspend().catch(e=>{});
-    } else resumeGame();
+        
+        // PAUSA SEGURA: Suspender contexto de audio
+        if (st.ctx && st.ctx.state === 'running') {
+            st.ctx.suspend().then(() => {
+                console.log("Audio pausado correctamente");
+            }).catch(err => console.error("Error al pausar audio:", err));
+        }
+    } else {
+        resumeGame();
+    }
 }
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
