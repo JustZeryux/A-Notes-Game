@@ -78,6 +78,13 @@ window.cfg = {
     judgeY: 40, 
     judgeX: 50, 
     judgeS: 7, 
+    
+    // === NUEVOS AJUSTES VISUALES ===
+    laneFlash: true,       // Iluminar carril al pulsar
+    showSplash: true,      // Mostrar efecto al dar nota
+    splashType: 'classic', // Tipos: classic, fire, electric, star, text
+    // ===============================
+
     vol: 0.5, 
     hvol: 0.6, 
     missVol: 0.4, 
