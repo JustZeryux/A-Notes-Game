@@ -321,19 +321,16 @@ function switchSetTab(tab) {
 function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
-    
-    // Obtener la configuración actual para la nota
-    const sampleLane = cfg.modes[4][0];
-    const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
-    const scale = cfg.noteScale || 1;
-    const opacity = (cfg.noteOp || 100) / 100;
+    const lane = cfg.modes[4][0];
+    const shape = (typeof PATHS !== 'undefined') ? (PATHS[lane.s] || PATHS['circle']) : "";
     
     box.innerHTML = `
-        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity}; transition: 0.1s;">
-            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 15px ${sampleLane.c});">
-                <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
+        <div class="preview-note" style="transform: scale(${cfg.noteScale||1});">
+            <svg viewBox="0 0 100 100" style="filter: drop-shadow(0 0 10px ${lane.c});">
+                <path d="${shape}" fill="${lane.c}" stroke="white" stroke-width="5" />
             </svg>
         </div>
+        <div class="splash-${cfg.splashType||'classic'}" style="position:absolute; --c:${lane.c}; animation-iteration-count:infinite; animation-duration:1s;"></div>
     `;
 }
 
