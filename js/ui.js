@@ -430,7 +430,6 @@ function renderMenu(filter="") {
     });
 }
 
-// === 6. AMIGOS & SOLICITUDES ===
 function openFriends() {
     if(user.name === "Guest") return notify("Inicia sesión primero", "error");
     if(!db) return notify("Error de conexión", "error");
@@ -442,19 +441,20 @@ function openFriends() {
         if(!doc.exists) return;
         const data = doc.data();
         
-        // Requests
+        // 1. Solicitudes
         if(reqList) {
             reqList.innerHTML = '';
             if(data.requests && data.requests.length > 0) {
                 data.requests.forEach(reqName => {
                     const row = document.createElement('div');
                     row.className = 'friend-row';
-                    row.style.borderColor = 'var(--accent)';
+                    // Usamos onclick inline con comillas simples escapadas si fuera necesario, 
+                    // pero nombres de usuario simples no dan problema.
                     row.innerHTML = `
-                        <span class="friend-row-name">${reqName}</span>
-                        <div style="display:flex; gap:5px;">
-                            <button class="btn-small btn-acc" onclick="respondFriend('${reqName}', true)">✔</button>
-                            <button class="btn-small" style="background:#F9393F" onclick="respondFriend('${reqName}', false)">✕</button>
+                        <span class="friend-row-name" style="color:white">${reqName}</span>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn-small btn-acc" onclick="window.respondFriend('${reqName}', true)">✔</button>
+                            <button class="btn-small" style="background:#F9393F" onclick="window.respondFriend('${reqName}', false)">✕</button>
                         </div>`;
                     reqList.appendChild(row);
                 });
@@ -463,6 +463,118 @@ function openFriends() {
             }
         }
 
+        // 2. Amigos
+        if(friList) {
+            friList.innerHTML = '';
+            if(data.friends && data.friends.length > 0) {
+                data.friends.forEach(fName => {
+                    const row = document.createElement('div'); 
+                    row.className = 'friend-row';
+                    row.onclick = function() { showFriendProfile(fName); };
+                    row.innerHTML = `
+                        <div style="display:flex;align-items:center;">
+                            <div class="f-row-av" id="fav-${fName}"></div>
+                            <span class="friend-row-name">${fName}</span>
+                        </div>
+                    `;
+                    friList.appendChild(row);
+                    // Cargar foto
+                    db.collection("users").doc(fName).get().then(fDoc => {
+                        if(fDoc.exists && fDoc.data().avatarData) {
+                            const av = document.getElementById(`fav-${fName}`);
+                            if(av) av.style.backgroundImage = `url(${fDoc.data().avatarData})`;
+                        }
+                    });
+                });
+            } else {
+                friList.innerHTML = '<div style="padding:20px;color:#666;">Sin amigos aún.</div>';
+            }
+        }
+    });
+    
+    openModal('friends');
+}
+
+// === ACTUALIZACIÓN DEL PANEL DE HOST (DESDE ONLINE.JS) ===
+window.updateHostPanelUI = function(players) {
+    const list = document.getElementById('hp-players-list');
+    const count = document.getElementById('hp-count');
+    const btnStart = document.getElementById('btn-start-match');
+    
+    if(!list || !count) return;
+    
+    count.innerText = players.length;
+    list.innerHTML = '';
+    
+    players.forEach(p => {
+        const isHost = (p.name === players[0].name); // Asumimos el primero es host
+        list.innerHTML += `
+            <div class="hp-player-row ${isHost ? 'is-host' : ''}">
+                <div class="hp-p-av" style="background-image:url(${p.avatar||''})"></div>
+                <div class="hp-p-name">${p.name} ${isHost ? '<span style="color:gold">★</span>' : ''}</div>
+                <div class="hp-p-status" style="color:lime">LISTO</div>
+            </div>`;
+    });
+
+    // Solo el host ve el botón de iniciar
+    if(btnStart) {
+        // Chequeo simple: si soy el primero de la lista, soy host
+        if(players.length > 0 && players[0].name === user.name) {
+            btnStart.style.display = 'block';
+        } else {
+            btnStart.style.display = 'none';
+        }
+    }
+};
+
+// Función para abrir el panel (Host o Cliente)
+window.openHostPanel = function(songData) {
+    if(!songData) return;
+    curSongData = songData; 
+    
+    const modal = document.getElementById('modal-host');
+    const panel = modal.querySelector('.modal-panel');
+    panel.className = "modal-panel host-panel-compact";
+    
+    let bgStyle = songData.imageURL ? `background-image:url(${songData.imageURL})` : 'background: linear-gradient(to right, #222, #111)';
+
+    panel.innerHTML = `
+        <div class="hp-header" style="${bgStyle}">
+            <div class="hp-title-info">
+                <div class="hp-song-title">${songData.title}</div>
+                <div class="hp-meta">By ${songData.uploader}</div>
+            </div>
+        </div>
+        <div class="hp-body">
+            <div class="hp-config-col">
+                <div>
+                    <div class="hp-section-title">Modos Permitidos</div>
+                    <div class="hp-checkbox-group">
+                        <label class="hp-chk-label"><input type="checkbox" id="chk-4k" checked disabled> <span>4K</span></label>
+                        <label class="hp-chk-label"><input type="checkbox" id="chk-6k" disabled> <span>6K</span></label>
+                    </div>
+                </div>
+                <div>
+                    <div class="hp-section-title">Dificultad IA</div>
+                    <div class="set-row">
+                        <span class="set-label">Densidad</span>
+                        <div class="num-input" style="width:100%">${cfg.lobbyDen || 5}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="hp-players-col">
+                <div class="hp-section-title">Jugadores (<span id="hp-count">1</span>/8)</div>
+                <div id="hp-players-list"></div>
+            </div>
+        </div>
+        <div class="hp-footer">
+            <button class="action secondary" style="width:auto; padding:12px 25px;" onclick="closeModal('host'); leaveLobby();">SALIR</button>
+            <button id="btn-start-match" class="action btn-add" style="width:auto; padding:12px 35px; display:none;" onclick="startLobbyMatch()">COMENZAR</button>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
+};
         // Friends
         if(friList) {
             friList.innerHTML = '';
