@@ -552,7 +552,6 @@ function showFriendProfile(name) {
 // 7. PANEL DE HOST (COMPACTO Y VISUAL)
 // ==========================================
 
-// Función expuesta a window para que online.js pueda usarla
 // ==========================================
 // PANEL DE HOST CON SISTEMA READY
 // ==========================================
@@ -614,90 +613,52 @@ window.openHostPanel = function(songData, isClient = false) {
 };
 
 // 2. Actualizar lista de jugadores y estados (Se llama cada vez que alguien cambia)
-window.openHostPanel = function(songData, isClient = false) {
-    curSongData = songData;
-    if(typeof st !== 'undefined') st.act = false; 
-    document.getElementById('game-layer').style.display = 'none';
-
-    const modal = document.getElementById('modal-host');
-    const panel = modal.querySelector('.modal-panel');
-    panel.className = "modal-panel host-panel-compact";
-    
-    const iamHost = !isClient;
-    window.isLobbyHost = iamHost;
-
-    panel.innerHTML = `
-        <div class="hp-header" style="background-image:url(${songData.imageURL||''})">
-            <div class="hp-title-info">
-                <div class="hp-song-title">${songData.title}</div>
-                <div class="hp-meta">By ${songData.uploader}</div>
-            </div>
-        </div>
-        <div class="hp-body">
-            <div class="hp-config-col">
-                <div class="hp-section-title">CONFIGURACIÓN</div>
-                <div class="set-row"><span>Modo</span><strong id="hp-mode-disp">4K</strong></div>
-                <div class="set-row"><span>Dificultad</span><strong id="hp-den-disp">5</strong></div>
-                ${iamHost ? `<button class="action secondary" onclick="toggleLobbySettings()">⚙️ AJUSTAR REGLAS</button>` : ''}
-            </div>
-            <div class="hp-players-col">
-                <div class="hp-section-title">JUGADORES (<span id="hp-count">1</span>/8)</div>
-                <div id="hp-players-list"></div>
-            </div>
-        </div>
-        <div id="lobby-settings-overlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:100; align-items:center; justify-content:center; flex-direction:column;">
-            <h3>REGLAS DE LA SALA</h3>
-            <div style="margin:20px;">
-                <label>Dificultad (1-10):</label><br>
-                <input type="range" min="1" max="10" id="host-den-slider" oninput="setText('lbl-den', this.value)">
-                <span id="lbl-den">5</span>
-            </div>
-            <button class="action btn-add" style="width:200px" onclick="saveLobbySettings()">GUARDAR</button>
-            <button class="action secondary" style="width:200px" onclick="toggleLobbySettings()">CERRAR</button>
-        </div>
-        <div class="hp-footer">
-            <button class="action secondary" style="width:auto;" onclick="closeModal('host'); leaveLobbyData();">SALIR</button>
-            ${iamHost 
-                ? `<button id="btn-start-match" class="action btn-add" style="width:auto; opacity:0.5; pointer-events:none;" onclick="startLobbyMatchData()">ESPERANDO...</button>` 
-                : `<button id="btn-ready-toggle" class="action btn-acc" style="width:auto;" onclick="toggleReadyData()">MARCAR LISTO</button>`}
-        </div>
-    `;
-    modal.style.display = 'flex';
-};
-
 window.updateHostPanelUI = function(players, hostName) {
     const list = document.getElementById('hp-players-list');
+    const count = document.getElementById('hp-count');
     const btnStart = document.getElementById('btn-start-match');
     const btnReady = document.getElementById('btn-ready-toggle');
-    if(!list) return;
-
+    
+    if(!list || !count) return;
+    
+    count.innerText = players.length;
     list.innerHTML = '';
-    let everyoneReady = true;
+    
+    let allReady = true;
     let meReady = false;
 
     players.forEach(p => {
-        const ready = p.status === 'ready';
-        if(!ready) everyoneReady = false;
-        if(p.name === user.name && ready) meReady = true;
+        const isHost = (p.name === hostName);
+        const isReady = p.status === 'ready';
+        
+        if(!isReady) allReady = false;
+        if(p.name === user.name && isReady) meReady = true;
+
+        const statusColor = isReady ? 'var(--good)' : '#666';
+        const statusText = isReady ? 'LISTO' : 'ESPERANDO';
 
         list.innerHTML += `
-            <div class="hp-player-row" style="border-left: 4px solid ${ready?'#12FA05':'#F9393F'}">
-                <div class="hp-p-name">${p.name} ${p.name===hostName?'★':''}</div>
-                <div style="color:${ready?'#12FA05':'#666'}">${ready?'LISTO':'ESPERANDO'}</div>
+            <div class="hp-player-row ${isHost ? 'is-host' : ''}" style="border-left: 4px solid ${statusColor};">
+                <div class="hp-p-av" style="background-image:url(${p.avatar||''})"></div>
+                <div class="hp-p-name">${p.name} ${isHost ? '<span style="color:gold">★</span>' : ''}</div>
+                <div class="hp-p-status" style="color:${statusColor}; font-weight:900;">${statusText}</div>
             </div>`;
     });
 
+    // Lógica del botón de Host (Start)
     if(btnStart) {
-        const canStart = everyoneReady && players.length > 1;
-        btnStart.style.opacity = canStart ? "1" : "0.5";
-        btnStart.style.pointerEvents = canStart ? "auto" : "none";
-        btnStart.innerText = canStart ? "COMENZAR PARTIDA" : "ESPERANDO JUGADORES...";
+        if(allReady && players.length > 1) { // Debe haber al menos 2 y todos listos
+            btnStart.style.opacity = '1';
+            btnStart.style.pointerEvents = 'auto';
+            btnStart.innerText = "COMENZAR PARTIDA";
+            btnStart.classList.add('pulse');
+        } else {
+            btnStart.style.opacity = '0.5';
+            btnStart.style.pointerEvents = 'none';
+            btnStart.innerText = players.length === 1 ? "ESPERANDO RIVAL..." : "ESPERANDO A TODOS...";
+            btnStart.classList.remove('pulse');
+        }
     }
-    if(btnReady) {
-        btnReady.innerText = meReady ? "¡ESTOY LISTO!" : "MARCAR LISTO";
-        btnReady.style.background = meReady ? "#12FA05" : "#444";
-    }
-};
 
     // Lógica del botón de Cliente (Ready)
     if(btnReady) {
