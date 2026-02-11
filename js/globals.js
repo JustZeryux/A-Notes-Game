@@ -43,8 +43,8 @@ let cfg = {
     hideHud: false, judgeVis: true, judgeY: 40, judgeX: 50, judgeS: 7, 
     vol: 0.5, hvol: 0.6, missVol: 0.4, hitSound: true, missSound: true,
     showMs: true, showMean: true, showFC: true,
+    fov: 0, // <--- NUEVO: Field of View
     modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
-};
 
 let user = { 
     name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, 
