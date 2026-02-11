@@ -198,6 +198,79 @@ async function prepareAndPlaySong(k) {
         toMenu(); 
     }
 }
+let mlContainer = null;
+
+function initMultiLeaderboard() {
+    if (!isMultiplayer) return;
+    
+    // Crear contenedor si no existe
+    if (!document.getElementById('multi-leaderboard')) {
+        mlContainer = document.createElement('div');
+        mlContainer.id = 'multi-leaderboard';
+        document.body.appendChild(mlContainer);
+    }
+    mlContainer.style.display = 'flex';
+    mlContainer.innerHTML = ''; // Limpiar
+    
+    // Inicializar con el jugador actual
+    multiScores = [{ name: user.name, score: 0, avatar: user.avatarData }];
+    updateMultiLeaderboardUI(multiScores);
+}
+
+// Función llamada desde online.js cuando cambian los puntajes
+function updateMultiLeaderboardUI(scores) {
+    if (!mlContainer) return;
+    
+    // Mapear elementos existentes para animaciones
+    const existingRows = {};
+    Array.from(mlContainer.children).forEach(row => {
+        existingRows[row.dataset.name] = row;
+    });
+
+    scores.forEach((p, index) => {
+        let row = existingRows[p.name];
+        const newTop = index * 50; // 50px altura por fila aprox (ajustar según CSS)
+        
+        if (!row) {
+            // Crear nueva fila
+            row = document.createElement('div');
+            row.className = `ml-row ${p.name === user.name ? 'is-me' : ''}`;
+            row.dataset.name = p.name;
+            row.style.top = `${newTop}px`; // Posición inicial absoluta
+            row.innerHTML = `
+                <div class="ml-rank">#${index + 1}</div>
+                <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
+                <div class="ml-info">
+                    <div class="ml-name">${p.name}</div>
+                    <div class="ml-score">${p.score.toLocaleString()}</div>
+                </div>`;
+            mlContainer.appendChild(row);
+        } else {
+            // Actualizar fila existente y animar posición
+            const currentTop = parseInt(row.style.top || 0);
+            
+            // Detectar cambio de rango para clases de animación (opcional para efectos extra)
+            if (currentTop > newTop) { // Subiendo
+                row.classList.add('swapping-up');
+                setTimeout(() => row.classList.remove('swapping-up'), 300);
+            } else if (currentTop < newTop) { // Bajando
+                row.classList.add('swapping-down');
+                setTimeout(() => row.classList.remove('swapping-down'), 300);
+            }
+            
+            row.style.top = `${newTop}px`;
+            row.querySelector('.ml-rank').innerText = `#${index + 1}`;
+            row.querySelector('.ml-score').innerText = p.score.toLocaleString();
+        }
+        // Marcar como procesado para no borrarlo
+        delete existingRows[p.name];
+    });
+
+    // Eliminar jugadores que salieron
+    for (const name in existingRows) {
+        existingRows[name].remove();
+    }
+}
 
 function playSongInternal(s) {
     try {
@@ -212,8 +285,16 @@ function playSongInternal(s) {
         songFinished = false; 
         st.songDuration = s.buf.duration;
 
+        
         if (isMultiplayer) document.getElementById('vs-hud').style.display = 'flex';
         else document.getElementById('vs-hud').style.display = 'none';
+
+        document.getElementById('vs-hud').style.display = 'none';
+        if (isMultiplayer) {
+            initMultiLeaderboard();
+        } else {
+            if(mlContainer) mlContainer.style.display = 'none';
+        }
         
         document.getElementById('menu-container').classList.add('hidden');
         document.getElementById('game-layer').style.display = 'block';
@@ -424,12 +505,23 @@ function hit(l, p) {
 
 function miss(n, isHoldBreak) {
     showJudge("MISS", "var(--miss)");
-    st.stats.m++; st.cmb = 0; st.hp -= 10; st.maxScorePossible += 350;
+    st.stats.m++;
+    st.cmb = 0;
+    st.hp -= 10;
+    st.maxScorePossible += 350;
     st.fcStatus = "SD";
-    playMiss(); updHUD();
-    if (st.hp <= 0) end(true);
+    playMiss();
+    
+    // FIX: NO-FAIL EN MULTIJUGADOR
+    if (st.hp <= 0) {
+        if (isMultiplayer) {
+            st.hp = 1; // Mantener vivo con 1% de vida
+        } else {
+            end(true); // Morir en singleplayer
+        }
+    }
+    updHUD();
 }
-
 function createSplash(l) {
     if(!elTrack) return;
     const r = document.getElementById(`rec-${l}`);
@@ -487,7 +579,13 @@ function updHUD() {
     document.getElementById('h-miss').innerText = st.stats.m;
     document.getElementById('health-fill').style.height = st.hp + '%';
     
-    if (isMultiplayer) sendLobbyScore(st.sc);
+    // Enviar puntuación en tiempo real si es multi
+    if (isMultiplayer && user.name) {
+        // Simulamos actualización local inmediata para fluidez
+        updateMultiScores({ name: user.name, score: st.sc, avatar: user.avatarData });
+        // Enviar a la red (implementación real pendiente en online.js)
+        sendLobbyScore(st.sc);
+    }
 }
 
 function end(died) {
