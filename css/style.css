@@ -108,9 +108,27 @@ button.secondary:hover { border-color: white; transform: none; background: #222;
 #ig-av { width: 50px; height: 50px; border-radius: 50%; background: #333; background-size: cover; border: 2px solid white; }
 #ig-name { font-weight: 900; font-size: 1.4rem; text-shadow: 0 2px 5px black; color: white; }
 
-#track { position: relative; width: 100%; max-width: 800px; height: 100%; margin: 0 auto; background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); border-left: 2px solid rgba(255,255,255,0.1); border-right: 2px solid rgba(255,255,255,0.1); transition: all 0.3s; }
-#track.middle-scroll { max-width: 650px; position: absolute; left: 50%; transform: translateX(-50%); border: none; background: rgba(0,0,0, var(--track-alpha)); }
-
+#track { 
+    position: relative; 
+    width: 100%; 
+    max-width: 800px; 
+    height: 100%; 
+    margin: 0 auto; 
+    background: linear-gradient(to bottom, transparent, rgba(255,255,255, var(--track-alpha))); 
+    border-left: 2px solid rgba(255,255,255,0.1); 
+    border-right: 2px solid rgba(255,255,255,0.1); 
+    transition: transform 0.1s; /* Transición suave para FOV */
+    transform-style: preserve-3d; /* Importante para 3D */
+    perspective: 800px; /* Perspectiva base */
+}
+#track.middle-scroll { 
+    max-width: 650px; 
+    position: absolute; 
+    left: 50%; 
+    transform: translateX(-50%) rotateX(0deg); /* Reset inicial */
+    border: none; 
+    background: rgba(0,0,0, var(--track-alpha)); 
+}
 /* COMBO GIGANTE */
 #combo-container { position: absolute; top: 45%; right: 15%; transform: translateY(-50%); text-align: center; z-index: 400; pointer-events: none; display: flex; flex-direction: column; align-items: center; }
 .combo-val { font-size: 9rem; font-weight: 900; line-height: 0.9; color: white; text-shadow: 0 0 40px rgba(68, 204, 255, 0.5), 5px 5px 0px #000; font-family: 'Chakra Petch'; transition: transform 0.05s; }
