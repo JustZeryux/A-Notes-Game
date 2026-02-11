@@ -1,5 +1,6 @@
-/* === GLOBAL CONFIG & VARIABLES (CORREGIDO) === */
+/* === GLOBAL CONFIG & VARIABLES (FIXED) === */
 
+// 1. CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
     authDomain: "a-notes-game.firebaseapp.com",
@@ -9,18 +10,24 @@ const firebaseConfig = {
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
+// 2. INICIALIZAR FIREBASE
 let db = null;
 try {
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    else firebase.app();
-    db = firebase.firestore();
-} catch(e) { console.error("Error Firebase:", e); }
+    if (typeof firebase !== 'undefined') {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        else firebase.app();
+        db = firebase.firestore();
+        console.log("Firebase inicializado correctamente.");
+    }
+} catch(e) { 
+    console.error("Error crítico Firebase:", e); 
+}
 
-const DB_KEY="omega_u_"; 
-const LAST_KEY="omega_last"; 
-const CURRENT_VERSION = 102; 
+const DB_KEY = "omega_u_"; 
+const LAST_KEY = "omega_last"; 
+const CURRENT_VERSION = 103; 
 
-// Items de la tienda
+// 3. ITEMS DE TIENDA
 const SHOP_ITEMS = [
     { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Notas brillantes rosas y cian', color: '#ff66aa' },
     { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado dorado de lujo', color: '#FFD700' },
@@ -28,48 +35,101 @@ const SHOP_ITEMS = [
     { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista para avatar', color: '#00FFFF' }
 ];
 
+// 4. GENERADOR DE CARRILES (TECLAS)
 function createLanes(k) {
-    const k4=['d','f','j','k'], k6=['s','d','f','j','k','l'], k7=['s','d','f',' ','j','k','l'], k9=['a','s','d','f',' ','h','j','k','l'];
+    const k4 = ['d','f','j','k'];
+    const k6 = ['s','d','f','j','k','l'];
+    const k7 = ['s','d','f',' ','j','k','l'];
+    const k9 = ['a','s','d','f',' ','h','j','k','l'];
+    
     const cols = ['#00FFFF','#12FA05','#F9393F','#FFD700','#BD00FF','#0055FF','#FF8800','#FFFFFF','#AAAAAA'];
     const arr = [];
-    for(let i=0; i<k; i++) arr.push({k: (k===4?k4: (k===6?k6:(k===7?k7:k9)))[i] || 'a', c: cols[i%9], s:'circle'});
+    
+    for(let i=0; i<k; i++) {
+        let keyChar = 'a';
+        if(k===4) keyChar = k4[i];
+        else if(k===6) keyChar = k6[i];
+        else if(k===7) keyChar = k7[i];
+        else keyChar = k9[i];
+
+        arr.push({
+            k: keyChar || 'a', 
+            c: cols[i % 9], 
+            s: 'circle'
+        });
+    }
     return arr;
 }
 
-// Configuración por defecto (CON EL FOV NUEVO AGREGADO)
+// 5. VARIABLES GLOBALES (ESTADO & CONFIG)
 let cfg = { 
-    spd: 22, den: 5, down: false, middleScroll: false, off: 0,
-    vivid: true, shake: true, trackOp: 10, noteOp: 100,
-    hideHud: false, judgeVis: true, judgeY: 40, judgeX: 50, judgeS: 7, 
-    vol: 0.5, hvol: 0.6, missVol: 0.4, hitSound: true, missSound: true,
-    showMs: true, showMean: true, showFC: true,
-    fov: 0, // <--- CAMPO IMPORTANTE PARA EL 3D
-    modes: { 4: createLanes(4), 6: createLanes(6), 7: createLanes(7), 9: createLanes(9) }
+    spd: 22, 
+    den: 5, 
+    down: false, 
+    middleScroll: false, 
+    off: 0,
+    vivid: true, 
+    shake: true, 
+    trackOp: 10, 
+    noteOp: 100,
+    hideHud: false, 
+    judgeVis: true, 
+    judgeY: 40, 
+    judgeX: 50, 
+    judgeS: 7, 
+    vol: 0.5, 
+    hvol: 0.6, 
+    missVol: 0.4, 
+    hitSound: true, 
+    missSound: true,
+    showMs: true, 
+    showMean: true, 
+    showFC: true,
+    fov: 0,
+    modes: { 
+        4: createLanes(4), 
+        6: createLanes(6), 
+        7: createLanes(7), 
+        9: createLanes(9) 
+    }
 };
 
 let user = { 
-    name:"Guest", pass:"", avatar:null, avatarData:null, bg:null, 
-    songs:[], pp:0, sp:0, plays:0, score:0, xp:0, lvl:1, scores:{},
+    name: "Guest", pass: "", avatar: null, avatarData: null, bg: null, 
+    songs: [], pp: 0, sp: 0, plays: 0, score: 0, xp: 0, lvl: 1, scores: {},
     inventory: [], equipped: { skin: 'default', ui: 'default' }
 };
 
-let ramSongs=[], curIdx=-1, keys=4, remapMode=null, remapIdx=null;
-let ctx=null, hitBuf=null, missBuf=null; 
-let songFinished = false; 
-let curSongData = null; 
-
-let peer = null, conn = null, myPeerId = null, opponentScore = 0, isMultiplayer = false;
-let currentLobbyId = null; let isLobbyHost = false; let lobbyListener = null;
-
 let st = { 
-    act:false, paused:false, ctx:null, src:null, t0:0, 
-    notes:[], spawned:[], keys:[], 
-    sc:0, cmb:0, maxCmb:0, hp:50, 
-    stats:{ s:0, g:0, b:0, m:0 }, 
-    totalHits:0, maxScorePossible:0, ranked:false, startTime:0,
+    act: false, paused: false, ctx: null, src: null, t0: 0, 
+    notes: [], spawned: [], keys: [], 
+    sc: 0, cmb: 0, maxCmb: 0, hp: 50, 
+    stats: { s: 0, g: 0, b: 0, m: 0 }, 
+    totalHits: 0, maxScorePossible: 0, ranked: false, startTime: 0,
     songDuration: 0, lastPause: 0,
     totalOffset: 0, hitCount: 0, fcStatus: "GFC", activeHolds: [] 
 };
+
+// Variables de sistema
+let ramSongs = [];
+let curIdx = -1;
+let keys = 4;
+let remapMode = null;
+let remapIdx = null;
+let ctx = null;
+let hitBuf = null;
+let missBuf = null; 
+let songFinished = false; 
+let curSongData = null; 
+
+let peer = null;
+let conn = null;
+let myPeerId = null;
+let opponentScore = 0;
+let isMultiplayer = false;
+let currentLobbyId = null;
+let isLobbyHost = false;
+let lobbyListener = null;
 
 const PATHS = {
     arrow: "M 20 20 L 50 50 L 80 20 L 80 40 L 50 70 L 20 40 Z",
@@ -78,7 +138,7 @@ const PATHS = {
     diamond: "M 50,10 L 90,50 L 50,90 L 10,50 Z"
 };
 
-// SISTEMA DE NOTIFICACIONES GLOBAL
+// 6. SISTEMA DE NOTIFICACIONES
 function notify(msg, type="info", duration=4000) {
     const area = document.getElementById('notification-area');
     if(!area) return console.log(msg); 
@@ -96,6 +156,12 @@ function notify(msg, type="info", duration=4000) {
     `;
     
     area.appendChild(card);
-    setTimeout(() => { const bar = card.querySelector('.notify-progress'); if(bar) bar.style.width = '0%'; }, 50);
-    setTimeout(() => { card.style.animation = "slideOut 0.3s forwards"; setTimeout(() => card.remove(), 300); }, duration);
+    setTimeout(() => { 
+        const bar = card.querySelector('.notify-progress'); 
+        if(bar) bar.style.width = '0%'; 
+    }, 50);
+    setTimeout(() => { 
+        card.style.animation = "slideOut 0.3s forwards"; 
+        setTimeout(() => card.remove(), 300); 
+    }, duration);
 }
