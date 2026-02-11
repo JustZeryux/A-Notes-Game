@@ -68,3 +68,59 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => { 
     try { if(typeof onKu === 'function') onKu(e); } catch(err){ console.error(err); } 
 });
+
+// ==========================================
+// PARCHE DE SEGURIDAD PARA AMIGOS
+// ==========================================
+
+// Definimos la función globalmente para asegurar que el botón la encuentre
+window.respondFriend = function(targetName, accept) {
+    console.log("Procesando solicitud de amistad para:", targetName, "Aceptar:", accept);
+
+    // Verificaciones básicas
+    if (typeof user === 'undefined' || !user || user.name === "Guest") {
+        if(typeof notify === 'function') notify("Debes iniciar sesión", "error");
+        return;
+    }
+    if (!db) {
+        if(typeof notify === 'function') notify("Error de conexión a la base de datos", "error");
+        return;
+    }
+
+    const batch = db.batch();
+    const myRef = db.collection("users").doc(user.name);
+    const targetRef = db.collection("users").doc(targetName);
+
+    // 1. Quitar solicitud siempre (sea aceptar o rechazar)
+    batch.update(myRef, {
+        requests: firebase.firestore.FieldValue.arrayRemove(targetName)
+    });
+
+    if (accept) {
+        // 2. Si acepta, agregar a amigos en ambos perfiles (bidireccional)
+        batch.update(myRef, {
+            friends: firebase.firestore.FieldValue.arrayUnion(targetName)
+        });
+        batch.update(targetRef, {
+            friends: firebase.firestore.FieldValue.arrayUnion(user.name)
+        });
+        if(typeof notify === 'function') notify(`¡${targetName} agregado a amigos!`, "success");
+    } else {
+        if(typeof notify === 'function') notify("Solicitud rechazada", "info");
+    }
+
+    // Ejecutar cambios en Firebase
+    batch.commit()
+        .then(() => {
+            console.log("Solicitud procesada con éxito.");
+            // Recargar la lista de amigos si la función existe
+            if (typeof openFriends === 'function') {
+                // Pequeño delay para dar tiempo a Firebase
+                setTimeout(() => openFriends(), 500); 
+            }
+        })
+        .catch(e => {
+            console.error("Error al responder solicitud:", e);
+            if(typeof notify === 'function') notify("Error: " + e.message, "error");
+        });
+};
