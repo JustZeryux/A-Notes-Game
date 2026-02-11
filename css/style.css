@@ -179,7 +179,18 @@ button.secondary:hover { border-color: white; transform: none; background: #222;
 .receptor { z-index: 200; opacity: 0.9; transform: scale(var(--note-scale)); }
 .receptor.pressed { opacity: 1; transform: scale(calc(var(--note-scale) * 0.9)); }
 .receptor.pressed path { fill: var(--active-c); stroke: white; filter: drop-shadow(0 0 40px var(--active-c)); }
-.lane-flash { position: absolute; top:0; height:100%; width: var(--lane-width); background: linear-gradient(to bottom, transparent, var(--c)); opacity: 0; pointer-events: none; z-index: 100; mix-blend-mode: screen; transition: opacity 0.05s; }
+.lane-flash {
+    position: absolute;
+    top: 0;
+    width: var(--lane-width);
+    height: 100%;
+    /* Usar la variable --c que viene del color de la skin o config */
+    background: linear-gradient(to top, var(--c), transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.05s;
+    z-index: 10;
+}
 .lane-flash.active { opacity: 0.6; }
 .splash { position: absolute; width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--c); z-index: 300; pointer-events: none; animation: splash 0.3s ease-out forwards; top: -30px; opacity: 0; box-shadow: 0 0 30px var(--c); }
 @keyframes splash { 0% { transform: scale(0.5); opacity: 1; stroke-width: 10; } 100% { transform: scale(1.5); opacity: 0; stroke-width: 0; } }
