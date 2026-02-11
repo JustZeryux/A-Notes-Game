@@ -318,6 +318,8 @@ function switchSetTab(tab) {
     updatePreview(); 
 }
 
+// ... (resto de funciones) ...
+
 function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
@@ -330,21 +332,21 @@ function updatePreview() {
     const splashType = cfg.splashType || 'classic'; // Asegurar valor por defecto
     
     // Generar HTML
+    // Usamos el wrapper .splash-wrapper para simular el centrado
     box.innerHTML = `
         <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity}; transition: 0.1s; position: relative; z-index: 2;">
             <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 15px ${sampleLane.c});">
                 <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
             </svg>
         </div>
-        <div class="splash-${splashType}" style="
-            position: absolute; 
-            top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); 
-            --c: ${sampleLane.c}; 
-            animation-iteration-count: infinite; 
-            animation-duration: 1.5s;
-            z-index: 1;
-        "></div>
+        
+        <div class="splash-wrapper" style="position: absolute; top: 50%; left: 50%; z-index: 1;">
+            <div class="splash-${splashType}" style="
+                --c: ${sampleLane.c}; 
+                animation-iteration-count: infinite; 
+                animation-duration: 1.5s;
+            "></div>
+        </div>
     `;
 }
 // Helpers para generar HTML de los ajustes
