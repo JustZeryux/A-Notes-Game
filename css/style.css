@@ -402,3 +402,59 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 22px; heigh
 
 /* Fix para el menú de pausa que no se iba */
 #modal-pause { z-index: 9000; }
+
+/* === NUEVOS EFECTOS SPLASH (V80) === */
+.splash-wrapper { position: absolute; pointer-events: none; z-index: 400; display: flex; justify-content: center; align-items: center; width: 0; height: 0; }
+
+/* 1. CLASSIC (Anillo expansivo) */
+.splash-classic { width: 100px; height: 100px; border: 5px solid var(--c); border-radius: 50%; animation: sp-classic 0.3s ease-out forwards; opacity: 0; }
+@keyframes sp-classic { 0% { transform: scale(0.5); opacity: 1; border-width: 10px; } 100% { transform: scale(1.8); opacity: 0; border-width: 0; } }
+
+/* 2. FIRE (Explosión hacia arriba) */
+.splash-fire { width: 80px; height: 80px; background: radial-gradient(circle, var(--c), transparent); animation: sp-fire 0.3s ease-out forwards; filter: blur(4px); }
+@keyframes sp-fire { 0% { transform: scale(0.5) translateY(0); opacity: 1; } 100% { transform: scale(2) translateY(-50px); opacity: 0; } }
+
+/* 3. ELECTRIC (Rayos rotando) */
+.splash-electric { width: 120px; height: 120px; border: 2px dashed var(--c); border-radius: 50%; animation: sp-electric 0.3s linear forwards; box-shadow: 0 0 15px var(--c); }
+@keyframes sp-electric { 0% { transform: scale(0.8) rotate(0deg); opacity: 1; } 100% { transform: scale(1.2) rotate(180deg); opacity: 0; } }
+
+/* 4. STAR (Estrella girando) */
+.splash-star { font-size: 80px; color: var(--c); animation: sp-star 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; text-shadow: 0 0 20px var(--c); line-height: 0; }
+.splash-star::after { content: '★'; }
+@keyframes sp-star { 0% { transform: scale(0) rotate(0deg); opacity: 1; } 100% { transform: scale(1.5) rotate(90deg); opacity: 0; } }
+
+/* 5. TEXT (HIT!) */
+.splash-text { font-weight: 900; font-size: 2rem; color: var(--c); animation: sp-text 0.3s ease-out forwards; white-space: nowrap; text-shadow: 0 0 10px white; }
+.splash-text::after { content: 'HIT!'; }
+@keyframes sp-text { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+
+/* === LEADERBOARD ONLINE ANIMADO === */
+#multi-leaderboard {
+    position: absolute; top: 100px; right: 20px; width: 300px;
+    display: flex; flex-direction: column; gap: 8px; z-index: 800;
+}
+.ml-row {
+    display: flex; align-items: center; padding: 10px;
+    background: rgba(0,0,0,0.8); border: 1px solid #333;
+    border-radius: 8px; transition: top 0.5s ease-in-out, background 0.3s;
+    position: absolute; width: 100%; height: 60px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+.ml-row.is-me { border-color: var(--blue); background: rgba(68, 204, 255, 0.15); }
+.ml-pos { font-size: 1.5rem; font-weight: 900; width: 40px; text-align: center; color: #666; }
+.ml-row[data-rank="1"] .ml-pos { color: #FFD700; text-shadow: 0 0 10px #FFD700; }
+.ml-row[data-rank="2"] .ml-pos { color: #C0C0C0; }
+.ml-row[data-rank="3"] .ml-pos { color: #CD7F32; }
+
+.ml-av { width: 40px; height: 40px; border-radius: 50%; background-size: cover; background-color: #222; margin-right: 10px; border: 2px solid #444; }
+.ml-info { flex: 1; }
+.ml-name { font-weight: bold; font-size: 0.9rem; color: white; }
+.ml-score { font-weight: 900; font-size: 1.2rem; color: var(--blue); }
+
+/* Pantalla de espera para sincronización */
+#sync-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); z-index: 2000;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+}
+.sync-loader { width: 50px; height: 50px; border: 5px solid var(--blue); border-top-color: transparent; border-radius: 50%; animation: spin 1s infinite linear; }
