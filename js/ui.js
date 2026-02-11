@@ -769,7 +769,158 @@ window.confirmCreateLobby = function() {
         });
     }
 };
+// ==========================================
+// 10. SELECTOR DE CANCIONES COMPACTO (LOBBY)
+// ==========================================
 
+window.openSongSelectorForLobby = function() {
+    // 1. Cerramos el menú de salas si está abierto
+    closeModal('lobbies');
+    // 2. Abrimos el modal selector
+    openModal('song-selector');
+    // 3. Cargamos las canciones
+    renderLobbySongList();
+};
+
+window.renderLobbySongList = function(filter="") {
+    const grid = document.getElementById('lobby-song-grid');
+    if(!grid || !db) return;
+
+    grid.innerHTML = '<div style="color:#888; text-align:center;">Cargando canciones...</div>';
+
+    db.collection("globalSongs").orderBy("createdAt", "desc").limit(20).get().then(snapshot => {
+        grid.innerHTML = '';
+        if(snapshot.empty) {
+            grid.innerHTML = '<div style="padding:20px; text-align:center;">No hay canciones.</div>';
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            // Filtrado simple por texto
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
+
+            const div = document.createElement('div');
+            // Usamos un estilo de lista más compacto para este modal
+            div.style.cssText = "display:flex; align-items:center; gap:10px; background:#111; padding:10px; margin-bottom:5px; border-radius:8px; cursor:pointer; border:1px solid #333; transition:0.2s;";
+            div.onmouseover = function(){ this.style.borderColor = 'var(--accent)'; this.style.background = '#222'; };
+            div.onmouseout = function(){ this.style.borderColor = '#333'; this.style.background = '#111'; };
+            
+            // Imagen pequeña
+            const bg = s.imageURL ? `url(${s.imageURL})` : 'linear-gradient(45deg, #333, #000)';
+            
+            div.innerHTML = `
+                <div style="width:50px; height:50px; border-radius:6px; background:${bg}; background-size:cover; background-position:center; flex-shrink:0;"></div>
+                <div style="flex:1; overflow:hidden;">
+                    <div style="font-weight:900; color:white; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.title}</div>
+                    <div style="font-size:0.8rem; color:#888;">${s.uploader}</div>
+                </div>
+                <button class="btn-small btn-add">ELEGIR</button>
+            `;
+
+            div.onclick = () => selectSongForLobby(doc.id, s);
+            grid.appendChild(div);
+        });
+    });
+};
+
+window.selectSongForLobby = function(id, data) {
+    // Guardamos la canción seleccionada globalmente
+    curSongData = { id: id, ...data };
+    
+    // Cerramos el selector
+    closeModal('song-selector');
+    
+    // Abrimos directamente el panel de dificultad/creación
+    // Esto reutiliza tu modal "diff" pero le activamos el modo creación
+    openModal('diff');
+    
+    // Mostramos el botón de crear y ocultamos los de jugar solo
+    const createBtn = document.getElementById('create-lobby-opts');
+    if(createBtn) {
+        createBtn.style.display = 'block';
+        // Ocultamos temporalmente las tarjetas de dificultad de "Solo" si quisieras, 
+        // o dejamos que el usuario elija dificultad y luego pulse "Crear Sala".
+    }
+    
+    notify(`Seleccionado: ${data.title}`, "info");
+};
+// ==========================================
+// 11. INTERACCIÓN CON AMIGOS (CORRECCIONES)
+// ==========================================
+
+// Función para desafiar (Abre el selector de música para crear sala)
+window.challengeFriend = function(friendName) {
+    notify(`Desafiando a ${friendName}... Selecciona una canción.`, "info");
+    
+    // Cerramos el perfil del amigo
+    closeModal('friend-profile');
+    closeModal('friends');
+    
+    // Abrimos el selector de canciones para crear la sala
+    openSongSelectorForLobby();
+    
+    // NOTA: Aquí podrías guardar 'friendName' en una variable global 
+    // para invitarlo automáticamente cuando la sala se cree.
+    window.pendingInvite = friendName; 
+};
+
+// Función para abrir el Chat Flotante
+window.openFloatingChat = function(targetUser) {
+    if(!user.name || user.name === "Guest") return notify("Inicia sesión", "error");
+    
+    // Si no se pasa usuario, solo abrimos el contenedor si ya tiene chats
+    const container = document.getElementById('chat-overlay-container');
+    if(!container) return;
+
+    // Verificar si ya existe una ventana para este usuario
+    const existingId = `chat-w-${targetUser || 'global'}`;
+    if(document.getElementById(existingId)) return; // Ya está abierto
+
+    const chatName = targetUser || "Chat Global";
+    
+    // Crear la ventana de chat visualmente
+    const chatWindow = document.createElement('div');
+    chatWindow.className = 'chat-window';
+    chatWindow.id = existingId;
+    chatWindow.innerHTML = `
+        <div class="cw-header" onclick="this.parentElement.classList.toggle('minimized')">
+            <span>${chatName}</span>
+            <span style="font-size:0.8rem">▼</span>
+        </div>
+        <div class="cw-body" id="cw-body-${targetUser}">
+            <div style="color:#666; font-style:italic; text-align:center; margin-top:10px;">
+                Inicio de la charla...
+            </div>
+        </div>
+        <div class="cw-input-area">
+            <input type="text" class="cw-input" placeholder="Escribe..." onkeypress="handleChatInput(event, '${targetUser}', this)">
+        </div>
+    `;
+    
+    container.appendChild(chatWindow);
+    
+    // Cerrar modales que estorben
+    closeModal('friend-profile');
+    closeModal('friends');
+};
+
+// Manejador simple para enviar mensajes (Solo visual por ahora)
+window.handleChatInput = function(e, target, input) {
+    if(e.key === 'Enter' && input.value.trim() !== "") {
+        const body = document.getElementById(`cw-body-${target}`);
+        const msg = document.createElement('div');
+        msg.className = 'cw-msg';
+        msg.innerHTML = `<b style="color:var(--blue)">Yo:</b> ${input.value}`;
+        body.appendChild(msg);
+        body.scrollTop = body.scrollHeight; // Auto scroll
+        
+        input.value = "";
+        
+        // Aquí iría la lógica real de Firebase para enviar mensaje
+        // db.collection('chats').add(...)
+    }
+};
 // === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
