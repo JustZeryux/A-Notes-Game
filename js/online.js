@@ -65,10 +65,20 @@ window.createLobbyData = function(songId, config) {
 function subscribeToLobby(lobbyId) {
     if (lobbyListener) lobbyListener();
     lobbyListener = db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
+        
         if (!doc.exists) {
             leaveLobbyData();
             if(typeof closeModal === 'function') closeModal('host');
             return;
+            if (data.config) {
+        // Actualizar UI visualmente
+        const keyDisp = document.getElementById('lobby-display-keys');
+        const denDisp = document.getElementById('lobby-display-den');
+        
+        if (keyDisp) keyDisp.innerText = data.config.keys[0] + "K";
+        if (denDisp) denDisp.innerText = data.config.density;
+        
+        // Actualizar variables locales pa
         }
         const data = doc.data();
         
