@@ -324,29 +324,29 @@ function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
     
-    // Obtener configuración actual
     const sampleLane = cfg.modes[4][0];
     const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
     const scale = cfg.noteScale || 1;
     const opacity = (cfg.noteOp || 100) / 100;
-    const splashType = cfg.splashType || 'classic'; // Asegurar valor por defecto
+    const splashType = cfg.splashType || 'classic'; 
     
-    // Generar HTML
-    // Usamos el wrapper .splash-wrapper para simular el centrado
-    box.innerHTML = `
-        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity}; transition: 0.1s; position: relative; z-index: 2;">
-            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 15px ${sampleLane.c});">
-                <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
-            </svg>
-        </div>
-        
+    // VERIFICACIÓN: Si showSplash es falso, no renderizamos el div de splash
+    const splashHTML = cfg.showSplash ? `
         <div class="splash-wrapper" style="position: absolute; top: 50%; left: 50%; z-index: 1;">
             <div class="splash-${splashType}" style="
                 --c: ${sampleLane.c}; 
                 animation-iteration-count: infinite; 
                 animation-duration: 1.5s;
             "></div>
+        </div>` : '';
+
+    box.innerHTML = `
+        <div class="preview-note" style="transform: scale(${scale}); opacity: ${opacity}; transition: 0.1s; position: relative; z-index: 2;">
+            <svg viewBox="0 0 100 100" style="width:100%; height:100%; filter: drop-shadow(0 0 15px ${sampleLane.c});">
+                <path d="${shapePath}" fill="${sampleLane.c}" stroke="white" stroke-width="5" />
+            </svg>
         </div>
+        ${splashHTML}
     `;
 }
 // Helpers para generar HTML de los ajustes
