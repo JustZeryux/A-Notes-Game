@@ -1,8 +1,9 @@
-/* === AUDIO & ENGINE (MASTER V81 - CRASH FIX) === */
+/* === AUDIO & ENGINE (MASTER V90 - RESTORED & FIXED) === */
 
 let elTrack = null;
 let mlContainer = null;
 
+// ... (Audio system unlockAudio, genSounds, playHit, playMiss igual que antes) ...
 // === 1. AUDIO SYSTEM ===
 function unlockAudio() {
     if (!window.st.ctx) {
@@ -54,26 +55,23 @@ function playMiss() {
     }
 }
 
+// ... (genMap, initReceptors, prepareAndPlaySong, playSongInternal, loop igual que V81) ...
 // === 2. GENERADOR MAPAS ===
 function genMap(buf, k) {
     if(!buf) return [];
     const data = buf.getChannelData(0);
     const map = [];
     const sampleRate = buf.sampleRate;
-    
     let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
     const thresholdBase = 1.5 - (safeDen * 0.08); 
     const minStep = Math.max(90, 260 - (safeDen * 22)); 
-    
     const windowSize = 1024;
     const step = Math.floor(sampleRate / 100); 
-    
     let lastTime = 0;
     let lastLane = 0;
     let energyHistory = [];
     let laneFreeTimes = new Array(k).fill(0);
     let consecutiveSameLane = 0; 
-
     let currentPattern = 0;
     let patternDuration = 0;
     let patternDir = 1;
@@ -82,14 +80,11 @@ function genMap(buf, k) {
         let sum = 0;
         for (let j = 0; j < windowSize; j += 16) sum += Math.abs(data[i + j]);
         const instantEnergy = sum / (windowSize / 16);
-        
         energyHistory.push(instantEnergy);
         if (energyHistory.length > 40) energyHistory.shift();
-        
         let localAvg = 0;
         for(let e of energyHistory) localAvg += e;
         localAvg /= energyHistory.length;
-        
         const timeMs = (i / sampleRate) * 1000;
         if (timeMs < 1500) continue;
 
@@ -103,7 +98,6 @@ function genMap(buf, k) {
                 patternDuration = Math.floor(Math.random() * 6) + 3;
                 patternDir = Math.random() > 0.5 ? 1 : -1;
             }
-
             let targetLane = 0;
             if (currentPattern === 1) targetLane = (lastLane + patternDir + k) % k;
             else if (currentPattern === 2) targetLane = lastLane;
@@ -158,14 +152,11 @@ function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
     elTrack.innerHTML = '';
-    
     const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
     elTrack.style.transform = `rotateX(${fov}deg)`;
     document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
-
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
-    
     for (let i = 0; i < k; i++) {
         const l = document.createElement('div');
         l.className = 'lane-flash';
@@ -173,44 +164,36 @@ function initReceptors(k) {
         l.style.left = (i * (100 / k)) + '%';
         l.style.setProperty('--c', window.cfg.modes[k][i].c);
         elTrack.appendChild(l);
-
         const r = document.createElement('div');
         r.className = `arrow-wrapper receptor`;
         r.id = `rec-${i}`;
         r.style.left = (i * (100 / k)) + '%';
         r.style.top = y + 'px';
-        
         let strokeColor = "white";
         if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
              if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
              else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
         }
-
         let conf = window.cfg.modes[k][i];
         let shape = PATHS[conf.s] || PATHS['circle'];
-        
         r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shape}" stroke="${strokeColor}" fill="none" stroke-width="4"/></svg>`;
         elTrack.appendChild(r);
         window.elReceptors.push(r);
     }
 }
 
-// --- FIX CRÍTICO: ACCESIBILIDAD GLOBAL PARA ONLINE.JS ---
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
     if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Cargando..."; }
-
     try {
         unlockAudio();
         let songInRam = window.ramSongs.find(s => s.id === window.curSongData.id);
         const currentDen = window.cfg.den || 5;
-
         if (songInRam && (songInRam.kVersion !== k || songInRam.genDen !== currentDen)) {
             window.ramSongs = window.ramSongs.filter(s => s.id !== window.curSongData.id); 
             songInRam = null; 
         }
-
         if (!songInRam) {
             const response = await fetch(window.curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
@@ -219,7 +202,6 @@ window.prepareAndPlaySong = async function(k) {
             songInRam = { id: window.curSongData.id, buf: audioBuffer, map: map, kVersion: k, genDen: currentDen };
             window.ramSongs.push(songInRam);
         }
-        
         if(window.isMultiplayer) {
             document.getElementById('loading-text').innerText = "Esperando jugadores...";
             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded();
@@ -227,7 +209,6 @@ window.prepareAndPlaySong = async function(k) {
             if(loader) loader.style.display = 'none';
             playSongInternal(songInRam);
         }
-        
     } catch (e) {
         console.error(e);
         notify("Error: " + e.message, "error");
@@ -240,54 +221,39 @@ window.playSongInternal = function(s) {
         s = window.ramSongs.find(x => x.id === window.curSongData.id);
     }
     if(!s) return;
-
-    // === FIX DEL CRASH "NULL STYLE" ===
     const loader = document.getElementById('loading-overlay');
     if(loader) loader.style.display = 'none';
-    
-    // Verificamos si existe antes de acceder a style (IMPORTANTE)
     const syncOv = document.getElementById('sync-overlay');
     if(syncOv) syncOv.style.display = 'none'; 
-    // ==================================
-
     window.st.act = true;
     window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
     window.st.spawned = [];
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
-    
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => {
         window.st.trueMaxScore += 350; 
         if(n.type === 'hold') window.st.trueMaxScore += 100;
     });
-
     window.st.maxScorePossible = 0; 
     window.st.keys = new Array(window.keys).fill(0);
     window.st.songDuration = s.buf.duration;
     window.keys = s.kVersion;
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.fcStatus = "GFC";
-
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
-    
-    // Cerrar modales por seguridad
     ['modal-res', 'modal-pause'].forEach(id => {
         const m = document.getElementById(id);
         if(m) m.style.display = 'none';
     });
-
     if(window.isMultiplayer) initMultiLeaderboard();
     else if(document.getElementById('multi-leaderboard')) document.getElementById('multi-leaderboard').style.display = 'none';
-
     initReceptors(window.keys);
     updHUD();
-
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex';
     cd.innerText = "3";
-    
     let count = 3;
     const iv = setInterval(() => {
         count--;
@@ -315,18 +281,14 @@ window.playSongInternal = function(s) {
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-    
     if (window.st.songDuration > 0) {
         const cur = Math.max(0, now / 1000); 
         const pct = Math.min(100, (cur / window.st.songDuration) * 100);
         document.getElementById('top-progress-fill').style.width = pct + "%";
         document.getElementById('top-progress-time').innerText = `${Math.floor(cur/60)}:${Math.floor(cur%60).toString().padStart(2,'0')}`;
     }
-
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
-
-    // SPAWNING
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
@@ -336,25 +298,20 @@ function loop() {
             el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
-            
             let conf = window.cfg.modes[window.keys][n.l];
             let color = conf.c; 
-            
             if (window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
                 const s = window.user.equipped.skin;
                 if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
                 else if (s === 'skin_gold') color = '#FFD700';
                 else if (s === 'skin_dark') color = '#FFFFFF';
             }
-
             let shape = PATHS[conf.s] || PATHS['circle'];
             let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shape}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
-            
             if (n.type === 'hold') {
                 const h = (n.len / 1000) * (window.cfg.spd * 40); 
                 svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${window.cfg.noteOp/100}"></div>`;
             }
-
             el.innerHTML = svg;
             if(elTrack) elTrack.appendChild(el);
             n.el = el;
@@ -362,35 +319,27 @@ function loop() {
             window.st.spawned.push(n);
         } else break;
     }
-
-    // MOVEMENT
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if (!n.el) { window.st.spawned.splice(i, 1); continue; }
-
         const timeDiff = n.t - now + window.cfg.off;
         const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
         let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
-        
         if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
              n.el.style.top = finalY + 'px';
         }
-
         if (n.type === 'hold' && n.h) {
              n.el.style.top = yReceptor + 'px';
              const rem = (n.t + n.len) - now;
              const tr = n.el.querySelector('.sustain-trail');
              if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
-             
              if (!window.st.keys[n.l] && rem > 50) miss(n); 
              else { window.st.hp = Math.min(100, window.st.hp+0.05); updHUD(); }
-
              if (now >= n.t + n.len) {
                  window.st.sc += 100; 
                  n.el.remove(); n.el = null; 
              }
         }
-
         if (!n.h && timeDiff < -160) {
             miss(n);
             if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
@@ -400,7 +349,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === VISUALS: SPLASH SYSTEM ===
+// === FIX: SPLASH POSICIONADO CORRECTAMENTE ===
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
@@ -413,9 +362,11 @@ function createSplash(l) {
     
     const s = document.createElement('div');
     s.className = 'splash-wrapper';
+    
+    // USAMOS EL TOP Y LEFT DEL RECEPTOR EXACTAMENTE
+    // La clase CSS 'splash-wrapper' ahora tiene transform: translate(-50%, -50%) para centrarlo
     s.style.left = r.style.left;
-    s.style.top = r.style.top;
-    s.style.position = 'absolute'; // Asegurar posición
+    s.style.top = r.style.top; 
     
     const inner = document.createElement('div');
     inner.className = `splash-${type}`;
@@ -427,7 +378,7 @@ function createSplash(l) {
     setTimeout(() => s.remove(), 400);
 }
 
-// === INPUTS ===
+// ... (inputs y hit logic igual) ...
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!e.repeat && window.cfg.modes[window.keys]) {
@@ -446,19 +397,15 @@ function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
     const flash = document.getElementById(`flash-${l}`);
-    
     if (p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
-        
         if(flash && window.cfg.laneFlash) { 
             flash.style.opacity = 0.5; 
             setTimeout(() => flash.style.opacity=0, 100); 
         }
-
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
-
         if (n) {
             const diff = Math.abs(n.t - now);
             let score=50, text="BAD", color="yellow";
@@ -471,13 +418,10 @@ function hit(l, p) {
                 createSplash(l);
             }
             else { window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; }
-
             if(text==="BAD") window.st.fcStatus="SD";
-
             window.st.sc += score; 
             window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             window.st.hp = Math.min(100, window.st.hp+2);
-            
             showJudge(text, color); playHit(); updHUD();
             n.h = true; 
             if (n.type === 'tap' && n.el) n.el.style.opacity = 0;
@@ -508,22 +452,18 @@ function updHUD() {
     const cEl = document.getElementById('g-combo');
     if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
     document.getElementById('health-fill').style.height = window.st.hp + "%";
-    
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
     document.getElementById('g-acc').innerText = acc + "%";
-
     const fcEl = document.getElementById('hud-fc');
     if(fcEl) {
         fcEl.innerText = window.cfg.showFC ? window.st.fcStatus : "";
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
-    
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
 
-// === MULTIPLAYER LEADERBOARD ===
 function initMultiLeaderboard() {
     if (!document.getElementById('multi-leaderboard')) {
         mlContainer = document.createElement('div');
@@ -540,21 +480,15 @@ window.updateMultiLeaderboardUI = function(scores) {
     if (!mlContainer) return;
     scores.sort((a, b) => b.score - a.score);
     const existingNodes = Array.from(mlContainer.children);
-    
     scores.forEach((p, index) => {
         let row = existingNodes.find(node => node.dataset.name === p.name);
         const topPos = index * 65; 
-        
         if (!row) {
             row = document.createElement('div');
             row.className = `ml-row ${p.name === window.user.name ? 'is-me' : ''}`;
             row.dataset.name = p.name;
             row.style.top = topPos + 'px';
-            row.innerHTML = `
-                <div class="ml-pos">#${index+1}</div>
-                <div class="ml-av" style="background-image:url(${p.avatar||''})"></div>
-                <div class="ml-info"><div class="ml-name">${p.name}</div><div class="ml-score">0</div></div>
-            `;
+            row.innerHTML = `<div class="ml-pos">#${index+1}</div><div class="ml-av" style="background-image:url(${p.avatar||''})"></div><div class="ml-info"><div class="ml-name">${p.name}</div><div class="ml-score">0</div></div>`;
             mlContainer.appendChild(row);
         } else {
             row.style.top = topPos + 'px';
@@ -564,17 +498,15 @@ window.updateMultiLeaderboardUI = function(scores) {
     });
 };
 
-// === FIN DEL JUEGO ===
+// === FIX: PANTALLA DE RESULTADOS (PP & XP RESTAURADOS) ===
 function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     document.getElementById('game-layer').style.display = 'none';
-    
     if(window.isMultiplayer) {
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
         return; 
     }
-
     const modal = document.getElementById('modal-res');
     if(modal) {
         modal.style.display = 'flex';
@@ -594,6 +526,13 @@ function end(died) {
         if (!died && window.user.name !== "Guest") {
             xpGain = Math.floor(window.st.sc / 250);
             window.user.xp += xpGain;
+            
+            // CÁLCULO DE PP RESTAURADO
+            if(window.st.ranked) {
+                if(finalAcc > 90) ppGain = Math.floor((window.st.sc / 5000) * ((finalAcc-90)/10)); 
+                window.user.pp += ppGain;
+            }
+
             if(typeof save === 'function') save();
             if(typeof updateFirebaseScore === 'function') updateFirebaseScore();
         }
@@ -607,7 +546,10 @@ function end(died) {
                     <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
                 </div>
             </div>
-            <div class="res-grid"><div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div></div>
+            <div class="res-grid">
+                <div class="res-card xp-card"><div class="res-label">XP</div><div class="res-val" style="color:var(--blue)">+${xpGain}</div></div>
+                <div class="res-card pp-card"><div class="res-label">PP</div><div class="res-val" style="color:var(--gold)">+${ppGain}</div></div>
+            </div>
             <div style="margin-top:30px; display:flex; gap:10px;">
                 <button class="action" onclick="toMenu()">CONTINUAR</button>
                 <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
@@ -616,10 +558,9 @@ function end(died) {
     }
 }
 
-window.restartSong = function() {
-    prepareAndPlaySong(window.keys);
-};
+window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
+// === FIX: MENU DE PAUSA (STATS RESTAURADAS) ===
 function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
@@ -632,6 +573,12 @@ function togglePause() {
             panel.innerHTML = `
                 <div class="m-title">PAUSA</div>
                 <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
+                    <div style="color:var(--sick)">SICK: <span>${window.st.stats.s}</span></div>
+                    <div style="color:var(--good)">GOOD: <span>${window.st.stats.g}</span></div>
+                    <div style="color:var(--bad)">BAD: <span>${window.st.stats.b}</span></div>
+                    <div style="color:var(--miss)">MISS: <span>${window.st.stats.m}</span></div>
+                </div>
                 <button class="action" onclick="resumeGame()">CONTINUAR</button>
                 <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
                 <button class="action secondary" onclick="toMenu()">SALIR</button>
