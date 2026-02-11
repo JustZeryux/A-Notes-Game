@@ -1,9 +1,10 @@
-/* === ONLINE SYSTEM (LOBBY, FRIENDS & CHALLENGES) === */
+/* === ONLINE SYSTEM (LOGIC ONLY - V19 STABLE) === */
 
 let currentLobbyId = null;
 let lobbyListener = null;
 let multiScores = [];
 
+// Inicializar conexión P2P y status
 function initOnline() {
     if(typeof Peer === 'undefined') return;
     peer = new Peer(null, { secure: true }); 
@@ -18,7 +19,7 @@ function initOnline() {
         }
     });
     
-    // Escuchar notificaciones de desafíos
+    // Listener de notificaciones (Desafíos)
     if(user.name !== "Guest") {
         db.collection("users").doc(user.name).collection("notifications")
             .orderBy("timestamp", "desc").limit(5)
@@ -26,14 +27,9 @@ function initOnline() {
                 snap.docChanges().forEach(change => {
                     if (change.type === "added") {
                         const n = change.doc.data();
-                        // Solo mostrar si es reciente (menos de 10s) para evitar spam al cargar
                         if (Date.now() - n.timestamp.toMillis() < 10000) {
-                            if(n.type === 'challenge') {
-                                notifyChallenge(n.from, n.lobbyId, n.songName);
-                            } else {
-                                notify(n.body, "info");
-                            }
-                            // Borrar notificación para que no salga de nuevo
+                            if(n.type === 'challenge') notifyChallenge(n.from, n.lobbyId, n.songName);
+                            else notify(n.body, "info");
                             change.doc.ref.delete(); 
                         }
                     }
@@ -42,278 +38,183 @@ function initOnline() {
     }
 }
 
-// === LOBBY BROWSER (SALA ONLINE) ===
-window.openLobbyBrowser = function() {
-    const modal = document.getElementById('modal-lobbies');
-    const list = document.getElementById('lobby-list');
-    if(!modal || !list) return;
-    
-    modal.style.display = 'flex';
-    list.innerHTML = '<div class="loader"></div>';
+// === GESTIÓN DE SALAS (LOBBY DATA) ===
 
-    db.collection("lobbies").where("status", "==", "waiting")
-        .orderBy("createdAt", "desc").limit(20)
-        .onSnapshot(snap => {
-            list.innerHTML = '';
-            if(snap.empty) {
-                list.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">No hay salas públicas. ¡Crea una!</div>';
-                return;
-            }
-            
-            snap.forEach(doc => {
-                const l = doc.data();
-                if(l.config && l.config.private) return; // No mostrar privadas
-
-                const row = document.createElement('div');
-                row.className = 'lobby-box';
-                row.onclick = () => joinLobby(doc.id);
-                row.innerHTML = `
-                    <div class="lobby-info">
-                        <div class="lobby-host">HOST: ${l.host}</div>
-                        <div class="lobby-details">🎵 ${l.songTitle || 'Desconocida'}</div>
-                        <div style="font-size:0.8rem; margin-top:5px;">
-                            ${l.players.length}/8 Jugadores | 
-                            <span style="color:${l.config.ranked ? 'gold' : '#aaa'}">${l.config.ranked ? 'RANKED' : 'CASUAL'}</span>
-                        </div>
-                    </div>
-                    <button class="btn-small btn-add">UNIRSE</button>
-                `;
-                list.appendChild(row);
-            });
-        });
-};
-
-window.joinLobby = function(lobbyId) {
-    if(!user.name || user.name === "Guest") return notify("Inicia sesión para jugar online", "error");
-    
-    const lobbyRef = db.collection("lobbies").doc(lobbyId);
-    
-    db.runTransaction(async (t) => {
-        const doc = await t.get(lobbyRef);
-        if(!doc.exists) throw "La sala ya no existe.";
-        const data = doc.data();
-        if(data.status !== "waiting") throw "La partida ya empezó.";
-        if(data.players.length >= 8) throw "Sala llena.";
-        
-        // Verificar si ya estoy en la lista
-        const alreadyIn = data.players.find(p => p.name === user.name);
-        if(!alreadyIn) {
-            const playerData = { name: user.name, avatar: user.avatarData || '', status: 'joined', score: 0 };
-            t.update(lobbyRef, { players: firebase.firestore.FieldValue.arrayUnion(playerData) });
-        }
-        return data; 
-    }).then((data) => {
-        currentLobbyId = lobbyId;
-        closeModal('lobbies');
-        
-        // Cargar canción si no la tengo
-        db.collection("globalSongs").doc(data.songId).get().then(sDoc => {
-            if(sDoc.exists) {
-                curSongData = { id: sDoc.id, ...sDoc.data() };
-                openHostPanel(curSongData); // Reutilizamos panel de host pero modo cliente
-                
-                // Ocultar controles de host
-                setTimeout(() => {
-                    const btnStart = document.getElementById('btn-start-match');
-                    if(btnStart) btnStart.style.display = 'none';
-                }, 100);
-            }
-        });
-        listenToLobby(lobbyId);
-    }).catch(e => notify(e, "error"));
-};
-
-// === CREAR LOBBY (HOST) ===
-window.createLobby = function(songId, isPrivate = false) {
-    if (!db || !user.name || user.name === "Guest") return notify("Debes iniciar sesión", "error");
-    
-    // Configuración desde el panel
-    const allowedKeys = [];
-    if(document.getElementById('chk-4k')?.checked) allowedKeys.push(4);
-    if(document.getElementById('chk-6k')?.checked) allowedKeys.push(6);
-    if(document.getElementById('chk-7k')?.checked) allowedKeys.push(7);
+// Crear sala en Firebase
+window.createLobbyData = function(songId, config) {
+    if (!db || !user.name || user.name === "Guest") return Promise.reject("Debes iniciar sesión");
 
     const lobbyData = {
         host: user.name,
         songId: songId,
-        songTitle: curSongData.title,
+        songTitle: curSongData.title, // Variable global de main/ui
         status: 'waiting',
         players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready', score: 0 }],
-        config: {
-            density: cfg.lobbyDen || 5,
-            ranked: cfg.lobbyRanked || false,
-            keys: allowedKeys.length > 0 ? allowedKeys : [4],
-            private: isPrivate
-        },
+        config: config,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    db.collection("lobbies").add(lobbyData).then(docRef => {
+    return db.collection("lobbies").add(lobbyData).then(docRef => {
         currentLobbyId = docRef.id;
-        listenToLobby(currentLobbyId);
-        if(!isPrivate) notify("Sala creada. Esperando jugadores...");
+        subscribeToLobby(currentLobbyId);
+        return docRef.id;
     });
-    
-    return currentLobbyId; 
 };
 
-function listenToLobby(lobbyId) {
+// Escuchar cambios en la sala
+function subscribeToLobby(lobbyId) {
     if (lobbyListener) lobbyListener();
     lobbyListener = db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
-        if (!doc.exists) return leaveLobby();
+        if (!doc.exists) {
+            leaveLobbyData();
+            if(typeof closeModal === 'function') closeModal('host');
+            return;
+        }
         const data = doc.data();
         
-        // Si inicia la partida
+        // Si el juego empieza
         if (data.status === 'playing') {
             if (!isMultiplayer) {
                 isMultiplayer = true;
                 cfg.den = data.config.density;
                 st.ranked = data.config.ranked;
-                closeModal('host');
-                startGame(data.config.keys[0]); // Iniciar con la primera key permitida
-                notify("¡PARTIDA INICIADA!");
+                if(typeof closeModal === 'function') closeModal('host');
+                if(typeof startGame === 'function') startGame(data.config.keys[0]);
+                if(typeof notify === 'function') notify("¡PARTIDA INICIADA!", "success");
             }
-            
-            // Actualizar scores en tiempo real durante la partida
-            if(isMultiplayer && typeof updateMultiLeaderboardUI === 'function') {
-                updateMultiLeaderboardUI(data.players);
-            }
+            // Actualizar leaderboard
+            if(typeof updateMultiLeaderboardUI === 'function') updateMultiLeaderboardUI(data.players);
         }
         
-        // Actualizar lista visual en el panel si estamos esperando
+        // Actualizar UI del panel de host
         if (data.status === 'waiting' && typeof updateHostPanelUI === 'function') {
             updateHostPanelUI(data.players);
         }
     });
 }
 
-window.startLobbyMatch = function() {
+// Unirse a una sala existente
+window.joinLobbyData = function(lobbyId) {
+    if(!user.name || user.name === "Guest") return;
+    const lobbyRef = db.collection("lobbies").doc(lobbyId);
+    
+    db.runTransaction(async (t) => {
+        const doc = await t.get(lobbyRef);
+        if(!doc.exists) throw "Sala no encontrada";
+        const data = doc.data();
+        if(data.status !== "waiting") throw "Partida en curso";
+        if(data.players.length >= 8) throw "Sala llena";
+        
+        const exists = data.players.find(p => p.name === user.name);
+        if(!exists) {
+            t.update(lobbyRef, {
+                players: firebase.firestore.FieldValue.arrayUnion({
+                    name: user.name, avatar: user.avatarData||'', status: 'joined', score: 0
+                })
+            });
+        }
+        return data;
+    }).then(data => {
+        currentLobbyId = lobbyId;
+        // Cargar datos de la canción para el cliente
+        db.collection("globalSongs").doc(data.songId).get().then(sDoc => {
+            if(sDoc.exists) {
+                curSongData = { id: sDoc.id, ...sDoc.data() };
+                if(typeof openHostPanel === 'function') openHostPanel(curSongData, true); // true = modo cliente
+            }
+        });
+        subscribeToLobby(lobbyId);
+    }).catch(e => { if(typeof notify === 'function') notify(e, "error"); });
+};
+
+window.startLobbyMatchData = function() {
     if(!currentLobbyId) return;
     db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
 };
 
-window.leaveLobby = function() {
+window.leaveLobbyData = function() {
     if (currentLobbyId) {
         if (lobbyListener) lobbyListener();
-        
-        // Sacarme de la lista de jugadores
         if(user.name) {
              const lobbyRef = db.collection("lobbies").doc(currentLobbyId);
              lobbyRef.get().then(doc => {
                  if(doc.exists) {
-                     const players = doc.data().players.filter(p => p.name !== user.name);
-                     if(players.length === 0) {
-                         lobbyRef.delete(); // Borrar si vacío
-                     } else {
+                     if(doc.data().host === user.name) lobbyRef.delete(); // Host cierra sala
+                     else {
+                         // Cliente sale
+                         const players = doc.data().players.filter(p => p.name !== user.name);
                          lobbyRef.update({ players: players });
                      }
                  }
              });
         }
-        
         currentLobbyId = null;
         isMultiplayer = false;
-        closeModal('host');
     }
 };
 
-// === DESAFIOS (CHALLENGE SYSTEM) ===
-window.challengeFriend = function(targetName) {
-    if(!curSongData) return notify("Selecciona una canción primero", "error");
-    
-    notify(`Desafiando a ${targetName}...`, "info");
-    
-    // 1. Crear Lobby Privado
-    const lobbyData = {
-        host: user.name,
-        songId: curSongData.id,
-        songTitle: curSongData.title,
-        status: 'waiting',
-        players: [{ name: user.name, avatar: user.avatarData || '', status: 'ready', score: 0 }],
-        config: { density: 5, ranked: false, keys: [4], private: true },
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
+// === SISTEMA DE AMIGOS (FIX ACEPTAR/RECHAZAR) ===
 
-    db.collection("lobbies").add(lobbyData).then(docRef => {
-        currentLobbyId = docRef.id;
-        listenToLobby(currentLobbyId);
-        openHostPanel(curSongData); // Mostrar panel al host
-        
-        // 2. Enviar notificación al rival
-        db.collection("users").doc(targetName).collection("notifications").add({
-            type: "challenge",
-            from: user.name,
-            lobbyId: docRef.id,
-            songName: curSongData.title,
-            body: `${user.name} te desafía a: ${curSongData.title}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        notify("Desafío enviado. Esperando...");
+window.sendFriendRequest = function() {
+    const target = document.getElementById('friend-inp').value.trim();
+    if(!target || target === user.name) return notify("Nombre inválido", "error");
+
+    db.collection("users").doc(target).get().then(doc => {
+        if(doc.exists) {
+            const data = doc.data();
+            if(data.friends?.includes(user.name)) return notify("Ya son amigos", "info");
+            if(data.requests?.includes(user.name)) return notify("Solicitud ya enviada", "info");
+
+            db.collection("users").doc(target).update({
+                requests: firebase.firestore.FieldValue.arrayUnion(user.name)
+            }).then(() => {
+                notify(`Solicitud enviada a ${target}`, "success");
+                document.getElementById('friend-inp').value = "";
+            });
+        } else notify("Usuario no encontrado", "error");
     });
 };
 
-function notifyChallenge(from, lobbyId, songName) {
-    const area = document.getElementById('notification-area');
-    const card = document.createElement('div');
-    card.className = 'notify-card';
-    card.style.borderLeftColor = "var(--gold)";
-    card.innerHTML = `
-        <div class="notify-title">⚔️ DESAFÍO DE ${from}</div>
-        <div class="notify-body">Canción: ${songName}</div>
-        <div class="notify-actions">
-            <button class="btn-small btn-acc" onclick="joinLobby('${lobbyId}'); this.parentElement.parentElement.remove()">ACEPTAR</button>
-            <button class="btn-small" style="background:#F9393F" onclick="this.parentElement.parentElement.remove()">IGNORAR</button>
-        </div>
-    `;
-    area.appendChild(card);
-}
-
-// === AMIGOS: RESPONDER SOLICITUD ===
 window.respondFriend = function(targetName, accept) {
-    if(!user.name || user.name === "Guest") return notify("Error de sesión", "error");
+    if(!user.name || user.name === "Guest") return notify("Error sesión", "error");
 
     const batch = db.batch();
     const myRef = db.collection("users").doc(user.name);
     const targetRef = db.collection("users").doc(targetName);
 
-    batch.update(myRef, {
-        requests: firebase.firestore.FieldValue.arrayRemove(targetName)
-    });
+    // 1. Quitar solicitud siempre
+    batch.update(myRef, { requests: firebase.firestore.FieldValue.arrayRemove(targetName) });
 
     if(accept) {
+        // 2. Agregar a amigos (bidireccional)
         batch.update(myRef, { friends: firebase.firestore.FieldValue.arrayUnion(targetName) });
         batch.update(targetRef, { friends: firebase.firestore.FieldValue.arrayUnion(user.name) });
-        notify(`¡${targetName} ahora es tu amigo!`, "success");
+        if(typeof notify === 'function') notify(`¡${targetName} agregado!`, "success");
     } else {
-        notify("Solicitud eliminada");
+        if(typeof notify === 'function') notify("Solicitud rechazada", "info");
     }
 
-    batch.commit().catch(err => notify("Error DB: " + err.message, "error"));
+    batch.commit().catch(e => console.error("Friend Error:", e));
 };
 
-// === LIVE SCORE ===
+// === ENVIAR PUNTUACIÓN EN VIVO ===
 window.sendLobbyScore = function(score) {
     if(!currentLobbyId || !user.name) return;
-    
-    // Actualizar mi score en el array de players del lobby
-    // Esto es pesado para Firestore (muchas escrituras), idealmente usar Realtime DB
-    // Lo limitamos a cada 2 segundos
+    // Throttling para no saturar Firebase (max 1 vez por seg)
     const now = Date.now();
-    if(!window.lastScoreUpdate || now - window.lastScoreUpdate > 2000) {
+    if(!window.lastScoreUpdate || now - window.lastScoreUpdate > 1000) {
         window.lastScoreUpdate = now;
-        
         const lobbyRef = db.collection("lobbies").doc(currentLobbyId);
-        db.runTransaction(async (t) => {
-            const doc = await t.get(lobbyRef);
-            if(!doc.exists) return;
-            
-            const players = doc.data().players;
-            const myIdx = players.findIndex(p => p.name === user.name);
-            
-            if(myIdx !== -1) {
-                players[myIdx].score = score;
-                t.update(lobbyRef, { players: players });
+        // Transacción ligera o update directo
+        // Nota: En prod usar Realtime DB, aquí updateamos todo el array (costoso pero funcional para demo)
+        lobbyRef.get().then(doc => {
+            if(doc.exists) {
+                const players = doc.data().players;
+                const idx = players.findIndex(p => p.name === user.name);
+                if(idx !== -1) {
+                    players[idx].score = score;
+                    lobbyRef.update({ players: players });
+                }
             }
         });
     }
