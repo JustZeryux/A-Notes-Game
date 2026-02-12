@@ -225,3 +225,81 @@ window.leaveLobbyData = function() {
 
 // (sendLobbyScore se mantiene igual...)
 window.sendLobbyScore = function(score, isFinal) { /* ... */ };
+
+// === UI DEL LEADERBOARD EN JUEGO ===
+window.updateMultiLeaderboardUI = function(scores) {
+    const hud = document.getElementById('vs-hud');
+    const container = document.getElementById('multi-players-container');
+    if(!hud || !container) return;
+
+    // Asegurar que sea visible
+    hud.style.display = 'block'; 
+
+    // Ordenar por puntaje descendente
+    scores.sort((a, b) => b.score - a.score);
+
+    container.innerHTML = '';
+    scores.forEach((p, index) => {
+        const isMe = p.name === window.user.name;
+        
+        const row = document.createElement('div');
+        row.className = `ml-row ${isMe ? 'is-me' : ''}`;
+        // Atributo para colorear el top 3 con CSS
+        row.setAttribute('data-rank', index + 1);
+
+        row.innerHTML = `
+            <div class="ml-pos">#${index + 1}</div>
+            <div class="ml-av" style="background-image:url(${p.avatar || ''})"></div>
+            <div class="ml-info">
+                <div class="ml-name">${p.name}</div>
+                <div class="ml-score">${p.score.toLocaleString()}</div>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+};
+
+// === PANTALLA DE RESULTADOS MULTIJUGADOR ===
+window.showMultiplayerResults = function(playersData) {
+    const modal = document.getElementById('modal-res');
+    if(!modal) return;
+
+    // Ordenar final
+    playersData.sort((a, b) => (b.currentScore || 0) - (a.currentScore || 0));
+    
+    const winner = playersData[0];
+    const amIWinner = winner.name === window.user.name;
+    const myData = playersData.find(p => p.name === window.user.name) || { currentScore: 0 };
+
+    modal.style.display = 'flex';
+    const panel = modal.querySelector('.modal-panel');
+    
+    let listHTML = '<div class="rank-table-wrapper"><table class="rank-table" style="font-size:1rem;">';
+    playersData.forEach((p, i) => {
+        listHTML += `
+        <tr class="${p.name === window.user.name ? 'rank-row-me' : ''}">
+            <td>#${i+1}</td>
+            <td>${p.name}</td>
+            <td style="color:var(--blue); font-weight:900;">${(p.currentScore||0).toLocaleString()}</td>
+        </tr>`;
+    });
+    listHTML += '</table></div>';
+
+    panel.innerHTML = `
+        <div class="m-title" style="border-color:${amIWinner ? 'gold' : '#F9393F'}">
+            ${amIWinner ? '🏆 ¡VICTORIA! 🏆' : 'FIN DE PARTIDA'}
+        </div>
+        
+        <div style="text-align:center; margin-bottom:20px;">
+            <div style="font-size:1.2rem; color:#aaa;">GANADOR</div>
+            <div style="font-size:2rem; font-weight:900; color:gold;">${winner.name}</div>
+            <div style="font-size:1.5rem;">${(winner.currentScore||0).toLocaleString()} pts</div>
+        </div>
+
+        ${listHTML}
+
+        <div class="modal-buttons-row">
+            <button class="action secondary" onclick="toMenu(); leaveLobbyData();">SALIR AL MENU</button>
+        </div>
+    `;
+};
