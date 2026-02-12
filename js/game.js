@@ -477,7 +477,15 @@ function createSplash(l) {
 
 // === INPUTS ===
 window.onKd = function(e) {
-    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "Escape") { 
+        e.preventDefault(); 
+        if (window.isMultiplayer) {
+            if(typeof notify === 'function') notify("🚫 No puedes pausar en Online", "error");
+        } else {
+            togglePause(); 
+        }
+        return; 
+    }
     if (!e.repeat && window.cfg.modes[window.keys]) {
         const idx = window.cfg.modes[window.keys].findIndex(l => l.k === e.key.toLowerCase());
         if (idx !== -1) hit(idx, true);
@@ -504,20 +512,30 @@ function hit(l, p) {
         }
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
+        // Buscar nota golpeable
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
 
         if (n) {
-            const diff = Math.abs(n.t - now);
+            const diff = n.t - now; // Diferencia real (positiva o negativa)
+            const absDiff = Math.abs(diff);
+
+            // Guardar para Mean MS
+            window.st.totalOffset += absDiff;
+            window.st.hitCount++;
+
             let score=50, text="BAD", color="yellow";
-            if(diff<45){ 
+            
+            if(absDiff < 45){ 
                 text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; 
                 createSplash(l); 
             }
-            else if(diff<90){ 
+            else if(absDiff < 90){ 
                 text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; 
                 createSplash(l);
             }
-            else { window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; }
+            else { 
+                window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; 
+            }
 
             if(text==="BAD") window.st.fcStatus="SD";
 
@@ -525,7 +543,9 @@ function hit(l, p) {
             window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             window.st.hp = Math.min(100, window.st.hp+2);
             
-            showJudge(text, color); playHit(); updHUD();
+            // Pasamos 'diff' a showJudge
+            showJudge(text, color, diff); 
+            playHit(); updHUD();
             n.h = true; 
             if (n.type === 'tap' && n.el) n.el.style.opacity = 0;
         }
@@ -543,11 +563,40 @@ function miss(n) {
     if(window.st.hp <= 0 && !window.isMultiplayer) end(true);
 }
 
-function showJudge(text, color) {
+function showJudge(text, color, diffMs) {
     if(!window.cfg.judgeVis) return;
+    
+    // Crear contenedor del juicio
+    const container = document.createElement('div');
+    container.className = 'judge-container';
+    container.style.left = getComputedStyle(document.documentElement).getPropertyValue('--judge-x');
+    container.style.top = getComputedStyle(document.documentElement).getPropertyValue('--judge-y');
+
+    // Texto del juicio (SICK, GOOD...)
     const j = document.createElement('div');
-    j.className = 'judge-pop'; j.innerText = text; j.style.color = color;
-    document.body.appendChild(j); setTimeout(() => j.remove(), 400);
+    j.className = 'judge-pop'; 
+    j.innerText = text; 
+    j.style.color = color;
+    
+    container.appendChild(j);
+
+    // Texto de MS (Solo si no es MISS y existe diffMs)
+    if (text !== "MISS" && typeof diffMs === 'number' && window.cfg.showMs) {
+        const msDiv = document.createElement('div');
+        msDiv.className = 'judge-ms';
+        // Formato: +15ms o -10ms
+        const sign = diffMs > 0 ? "+" : "";
+        msDiv.innerText = `${sign}${Math.round(diffMs)}ms`;
+        
+        // Color dependiente del timing (Tarde: Rojo/Naranja, Temprano: Azul/Cyan)
+        if (diffMs > 0) msDiv.style.color = "#ffaa00"; // Late
+        else msDiv.style.color = "#00aaff"; // Early
+        
+        container.appendChild(msDiv);
+    }
+
+    document.body.appendChild(container); 
+    setTimeout(() => container.remove(), 600);
 }
 
 function updHUD() {
