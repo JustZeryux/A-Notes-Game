@@ -625,7 +625,16 @@ function end(died) {
     document.getElementById('game-layer').style.display = 'none';
     
     if(window.isMultiplayer) {
+        // Enviar puntaje final
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
+        
+        // Si soy HOST, cambiar estado de sala a 'finished'
+        // (Nota: Idealmente esperar a todos, pero para v1 lo hacemos directo)
+        if(window.isLobbyHost && window.db && window.currentLobbyId) {
+             setTimeout(() => {
+                window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'finished' });
+             }, 2000); // Pequeño delay para asegurar sync
+        }
         return; 
     }
 
