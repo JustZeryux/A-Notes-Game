@@ -1310,6 +1310,37 @@ function openShop() {
     if(m) m.style.display='flex';
 }
 
+// ==========================================
+// 12. SISTEMA DE NOTIFICACIONES (LISTENER)
+// ==========================================
+
+window.setupNotificationsListener = function() {
+    if(!window.db || !window.user || window.user.name === "Guest") return;
+
+    // Escuchar la subcolección 'notifications' de mi usuario
+    window.db.collection("users").doc(window.user.name).collection("notifications")
+        .orderBy("timestamp", "desc")
+        .limit(5)
+        .onSnapshot(snapshot => {
+            snapshot.docChanges().forEach(change => {
+                if (change.type === "added") {
+                    const data = change.doc.data();
+                    // Evitar notificaciones viejas (más de 30 segundos)
+                    const now = Date.now();
+                    const notifTime = data.timestamp ? data.timestamp.toMillis() : 0;
+                    
+                    if (now - notifTime < 30000) { 
+                        if (data.type === 'challenge') {
+                            notifyChallenge(data.from, data.lobbyId, data.songName);
+                            // Opcional: Borrar la notificación después de verla
+                            change.doc.ref.delete(); 
+                        }
+                    }
+                }
+            });
+        });
+};
+
 function buyItem(id, price) {
     if ((user.sp || 0) < price) return notify("SP Insuficientes", "error");
     user.sp -= price;
