@@ -829,57 +829,58 @@ window.openLobbyBrowser = function() {
 window.refreshLobbies = function() {
     const list = document.getElementById('lobby-list');
     if (!list) return;
-    
     list.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Cargando salas...</div>';
 
-    if (!db) {
-        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--miss);">Error de conexión a la base de datos.</div>';
+    if (!window.db) {
+        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--miss);">Error DB</div>';
         return;
     }
 
-    // Buscar salas en estado 'waiting'
-    db.collection("lobbies").where("status", "==", "waiting").get()
-    .then(snapshot => {
-        list.innerHTML = '';
-        if (snapshot.empty) {
-            list.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No hay salas públicas. ¡Crea una!</div>';
-            return;
-        }
+    // FILTRO: Solo salas esperando Y que NO sean privadas
+    window.db.collection("lobbies")
+        .where("status", "==", "waiting")
+        // .where("isPrivate", "==", false) // NOTA: Requiere índice compuesto en Firebase.
+        // Si no quieres crear índice, filtramos en cliente:
+        .get()
+        .then(snapshot => {
+            list.innerHTML = '';
+            let visibleCount = 0;
 
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const div = document.createElement('div');
-            div.className = 'lobby-box';
-            
-            // Crear elemento visual de la sala
-            div.innerHTML = `
-                <div style="display:flex; align-items:center; gap:15px;">
-                    <div style="width:50px; height:50px; background:#333; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.5rem; color:#555;">VS</div>
-                    <div>
-                        <div style="font-weight:900; font-size:1.2rem; color:white;">${data.songTitle || 'Desconocido'}</div>
-                        <div style="color:var(--blue); font-size:0.9rem; font-weight:bold;">HOST: ${data.host}</div>
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                
+                // FILTRO MANUAL DE PRIVACIDAD
+                if (data.isPrivate === true) return; 
+
+                visibleCount++;
+                const div = document.createElement('div');
+                div.className = 'lobby-box';
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <div style="width:50px; height:50px; background:#333; border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.5rem; color:#555;">VS</div>
+                        <div>
+                            <div style="font-weight:900; font-size:1.2rem; color:white;">${data.songTitle || 'Desconocido'}</div>
+                            <div style="color:var(--blue); font-size:0.9rem; font-weight:bold;">HOST: ${data.host}</div>
+                        </div>
                     </div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-weight:900; font-size:1.5rem; color:white;">${data.players ? data.players.length : 1}/8</div>
-                    <div style="font-size:0.8rem; font-weight:bold; color:${data.config?.ranked ? 'var(--gold)' : '#666'}">${data.config?.ranked ? 'RANKED' : 'CASUAL'}</div>
-                </div>
-            `;
-            
-            // Al hacer click, unirse a la sala (función de online.js)
-            div.onclick = function() { 
-                if(window.joinLobbyData) window.joinLobbyData(doc.id); 
-            };
-            
-            list.appendChild(div);
-        });
-    })
-    .catch(error => {
-        console.error("Error cargando salas:", error);
-        list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--miss);">Error al cargar lista.</div>';
-    });
-};
+                    <div style="text-align:right;">
+                        <div style="font-weight:900; font-size:1.5rem; color:white;">${data.players ? data.players.length : 1}/8</div>
+                        <div style="font-size:0.8rem; font-weight:bold; color:${data.config?.ranked ? 'var(--gold)' : '#666'}">${data.config?.ranked ? 'RANKED' : 'CASUAL'}</div>
+                    </div>
+                `;
+                div.onclick = function() { if(window.joinLobbyData) window.joinLobbyData(doc.id); };
+                list.appendChild(div);
+            });
 
+            if (visibleCount === 0) {
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No hay salas públicas. ¡Crea una!</div>';
+            }
+        })
+        .catch(error => {
+            console.error(error);
+            list.innerHTML = '<div style="padding:20px; text-align:center;">Error al cargar.</div>';
+        });
+};
 // Abrir selector de canciones para crear sala
 window.openSongSelectorForLobby = function() {
     closeModal('lobbies');
@@ -1179,45 +1180,36 @@ window.confirmCreateLobby = function() {
     
     const densityVal = document.getElementById('lobby-density-input') ? document.getElementById('lobby-density-input').value : 5;
     const isRanked = document.getElementById('chk-ranked') ? document.getElementById('chk-ranked').checked : false;
+    
+    // DETECTAR SI ES DESAFÍO PRIVADO
+    const isPrivate = (window.lobbyTargetFriend !== null);
 
     const config = {
-        keys: [window.selectedLobbyKeys || 4], // El modo seleccionado visualmente
+        keys: [window.selectedLobbyKeys || 4], 
         density: parseInt(densityVal),
         ranked: isRanked
     };
 
     notify("Conectando con servidor...", "info");
 
-    // Llamada a Firebase (online.js)
+    // Pasamos isPrivate a createLobbyData
     if (window.createLobbyData) {
-        window.createLobbyData(curSongData.id, config)
+        window.createLobbyData(curSongData.id, config, isPrivate)
             .then((lobbyId) => {
-                notify("Sala creada con éxito", "success");
+                notify("Sala creada", "success");
                 closeModal('diff');
                 
-                // Si es un desafío a amigo, enviarle la invitación
+                // ENVIAR NOTIFICACIÓN
                 if(window.lobbyTargetFriend) {
                     sendChallengeNotification(window.lobbyTargetFriend, lobbyId, curSongData.title);
                 }
 
-                // Abrir el panel de host
-                if(window.openHostPanel) {
-                    window.openHostPanel(curSongData); 
-                } else {
-                    // Fallback si openHostPanel falló al cargar
-                    document.getElementById('modal-host').style.display = 'flex';
-                }
+                if(window.openHostPanel) window.openHostPanel(curSongData); 
                 
-                // Resetear estado
                 window.isCreatingLobby = false;
                 window.lobbyTargetFriend = null;
             })
-            .catch(err => {
-                console.error(err);
-                notify("Error al crear sala: " + err, "error");
-            });
-    } else {
-        notify("Error: online.js no cargó createLobbyData", "error");
+            .catch(err => notify("Error: " + err, "error"));
     }
 };
 
