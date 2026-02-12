@@ -190,6 +190,18 @@ function subscribeToLobby(lobbyId) {
                 name: p.name, score: p.currentScore || 0, avatar: p.avatar
             }));
             updateMultiLeaderboardUI(scores);
+
+            if (data.status === 'finished') {
+            // Detener motor si sigue corriendo
+            if(window.st.act) {
+                window.st.act = false;
+                if(window.st.src) { window.st.src.stop(); window.st.src = null; }
+                document.getElementById('game-layer').style.display = 'none';
+                document.getElementById('menu-container').classList.remove('hidden');
+            }
+            // Mostrar resultados
+            window.showMultiplayerResults(data.players);
+        }
         }
     });
 }
