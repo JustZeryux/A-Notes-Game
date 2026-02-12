@@ -1,4 +1,4 @@
-/* === GLOBAL CONFIG & VARIABLES (FULL RESTORATION V125) === */
+/* === GLOBAL CONFIG & VARIABLES (FIXED CONNECTION V2) === */
 
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
@@ -9,16 +9,44 @@ const firebaseConfig = {
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
-// Inicialización segura de Firebase
-let db = null;
-try {
-    if (typeof firebase !== 'undefined') {
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        else firebase.app();
-        db = firebase.firestore();
-        console.log("Firebase OK");
+// Definir db en el objeto window explícitamente para evitar problemas de alcance
+window.db = null;
+
+// Función de inicialización robusta (se puede llamar varias veces)
+window.initFireBaseConnection = function() {
+    try {
+        if (typeof firebase !== 'undefined') {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+                console.log("🔥 Firebase Inicializado.");
+            } else {
+                firebase.app(); // Ya estaba iniciado
+            }
+            
+            // Solo conectamos Firestore si no existe aún
+            if (!window.db) {
+                window.db = firebase.firestore();
+                console.log("✅ Base de Datos Conectada (Firestore).");
+                
+                // Configuración de persistencia si es necesaria
+                if(firebase.auth) {
+                    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+                        .catch(e => console.warn("Persistencia Auth:", e));
+                }
+            }
+            return true;
+        } else {
+            console.warn("⚠️ Librería Firebase aún no cargada. Reintentando luego...");
+            return false;
+        }
+    } catch(e) { 
+        console.error("❌ Error Crítico Firebase:", e); 
+        return false;
     }
-} catch(e) { console.error("Error Firebase:", e); }
+};
+
+// Intento inicial inmediato (puede fallar si el CDN es lento)
+window.initFireBaseConnection();
 
 const DB_KEY="omega_u_"; 
 const LAST_KEY="omega_last"; 
@@ -85,13 +113,30 @@ window.st = {
     stats: { s: 0, g: 0, b: 0, m: 0 }, 
     maxScorePossible: 0, ranked: false, startTime: 0,
     songDuration: 0, lastPause: 0, pauseTime: null,
-    totalOffset: 0, hitCount: 0, fcStatus: "GFC", trueMaxScore: 0
+    totalOffset: 0, hitCount: 0, fcStatus: "GFC", trueMaxScore: 0,
+    manualStop: false
 };
 
-window.ramSongs = [];
-window.keys = 4;
-window.curSongData = null;
-window.isMultiplayer = false;
+// Variables de sistema
+var ramSongs = [];
+var curIdx = -1;
+var keys = 4;
+var remapMode = null;
+var remapIdx = null;
+var ctx = null;
+var hitBuf = null;
+var missBuf = null; 
+var songFinished = false; 
+var curSongData = null; 
+
+var peer = null;
+var conn = null;
+var myPeerId = null;
+var opponentScore = 0;
+var isMultiplayer = false;
+var currentLobbyId = null;
+var isLobbyHost = false;
+var lobbyListener = null;
 
 window.PATHS = {
     arrow: "M 20 20 L 50 50 L 80 20 L 80 40 L 50 70 L 20 40 Z",

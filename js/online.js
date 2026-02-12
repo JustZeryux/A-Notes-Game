@@ -20,23 +20,49 @@ window.initOnline = function() {
 // === FUNCIONES GLOBALES (SIN WRAPPING PARA EVITAR ERRORES) ===
 
 window.createLobbyData = function(songId, config) {
-    if (!window.db) return Promise.reject("Firebase no conectado");
-    if (!window.user || window.user.name === "Guest") return Promise.reject("Inicia sesión");
+    // 1. Verificación robusta de conexión
+    if (!window.db) {
+        if (typeof notify === 'function') notify("Error: Base de datos no conectada.", "error");
+        return Promise.reject("Firebase DB no inicializada");
+    }
     
+    // 2. Verificación de librería Firebase Core
+    if (typeof firebase === 'undefined') {
+        if (typeof notify === 'function') notify("Error crítico: Librería Firebase no cargada.", "error");
+        return Promise.reject("Firebase SDK missing");
+    }
+
+    // 3. Verificación de usuario
+    if (!window.user || window.user.name === "Guest") {
+        if (typeof notify === 'function') notify("Debes iniciar sesión para crear sala.", "error");
+        return Promise.reject("Usuario Guest");
+    }
+    
+    console.log("Creando sala para:", songId, "Config:", config);
+
     const lobbyData = {
         host: window.user.name,
         songId: songId,
         songTitle: window.curSongData ? window.curSongData.title : "Desconocido",
         status: 'waiting',
-        players: [{ name: window.user.name, avatar: window.user.avatarData || '', status: 'ready', score: 0 }],
+        players: [{ 
+            name: window.user.name, 
+            avatar: window.user.avatarData || '', 
+            status: 'ready', 
+            score: 0 
+        }],
         config: config, 
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        // Usamos window.firebase para asegurar el scope global
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
     };
     
     return window.db.collection("lobbies").add(lobbyData).then(docRef => {
         currentLobbyId = docRef.id;
         subscribeToLobby(currentLobbyId);
         return docRef.id;
+    }).catch(err => {
+        console.error("Error Firestore:", err);
+        throw err;
     });
 };
 

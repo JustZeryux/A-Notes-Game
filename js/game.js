@@ -58,106 +58,114 @@ function playMiss() {
     }
 }
 
+function normalizeAudio(filteredData) {
+    let max = 0;
+    for (let i = 0; i < filteredData.length; i += 100) { 
+        const v = Math.abs(filteredData[i]);
+        if (v > max) max = v;
+    }
+    if (max === 0) return filteredData;
+    const multiplier = 0.95 / max;
+    if (multiplier > 1.1 || multiplier < 0.9) {
+        for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
+    }
+    return filteredData;
+}
 // ==========================================
 // 2. GENERADOR DE MAPAS (ANTI-SPAM)
 // ==========================================
 function genMap(buf, k) {
-    if(!buf) return [];
-    const data = buf.getChannelData(0);
+    const rawData = buf.getChannelData(0);
+    const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
-    
-    let safeDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
-    const thresholdBase = 1.5 - (safeDen * 0.08); 
-    const minStep = Math.max(90, 260 - (safeDen * 22)); 
-    
+    let density = cfg.den || 5; 
     const windowSize = 1024;
-    const step = Math.floor(sampleRate / 100); 
-    
-    let lastTime = 0;
+    const step = Math.floor(sampleRate / (40 + (density * 5))); 
+    let laneFreeTime = new Array(k).fill(0);
+    let lastNoteTime = -5000;
     let lastLane = 0;
+    let consecutiveInLane = 0;
     let energyHistory = [];
-    let laneFreeTimes = new Array(k).fill(0);
-    let consecutiveSameLane = 0; 
-
-    let currentPattern = 0;
-    let patternDuration = 0;
-    let patternDir = 1;
+    const historySize = 44100 / step; 
+    const thresholdBase = 1.4 - (density * 0.04); 
+    const minGap = Math.max(80, 400 - (density * 30)); 
 
     for (let i = 0; i < data.length - windowSize; i += step) {
         let sum = 0;
-        for (let j = 0; j < windowSize; j += 16) sum += Math.abs(data[i + j]);
-        const instantEnergy = sum / (windowSize / 16);
-        
+        for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
+        const instantEnergy = Math.sqrt(sum / windowSize);
         energyHistory.push(instantEnergy);
-        if (energyHistory.length > 40) energyHistory.shift();
-        
-        let localAvg = 0;
-        for(let e of energyHistory) localAvg += e;
-        localAvg /= energyHistory.length;
-        
+        if (energyHistory.length > historySize) energyHistory.shift();
+        let localAvg = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
         const timeMs = (i / sampleRate) * 1000;
-        if (timeMs < 1500) continue;
 
-        if (instantEnergy > localAvg * thresholdBase && (timeMs - lastTime > minStep)) {
-            if (patternDuration <= 0) {
-                const r = Math.random();
-                if (r < 0.35) currentPattern = 1; 
-                else if (r < 0.45) currentPattern = 2; 
-                else if (r < 0.7) currentPattern = 3; 
-                else currentPattern = 0; 
-                patternDuration = Math.floor(Math.random() * 6) + 3;
-                patternDir = Math.random() > 0.5 ? 1 : -1;
-            }
-
-            let targetLane = 0;
-            if (currentPattern === 1) targetLane = (lastLane + patternDir + k) % k;
-            else if (currentPattern === 2) targetLane = lastLane;
-            else if (currentPattern === 3) targetLane = (lastLane + 2) % k;
-            else targetLane = Math.floor(Math.random() * k);
-
-            if (targetLane === lastLane) {
-                consecutiveSameLane++;
-                if (consecutiveSameLane >= 2) {
-                    targetLane = (targetLane + 1) % k; 
-                    consecutiveSameLane = 0;
-                    currentPattern = 0; 
+        if (instantEnergy > localAvg * thresholdBase && instantEnergy > 0.05) {
+            if (timeMs - lastNoteTime >= minGap) {
+                let lane = Math.floor(Math.random() * k);
+                
+                // Anti-Jackhammer
+                if (lane === lastLane) {
+                    consecutiveInLane++;
+                    if (consecutiveInLane >= 2) {
+                        lane = (lane + 1 + Math.floor(Math.random() * (k - 1))) % k;
+                        consecutiveInLane = 0;
+                    }
+                } else {
+                    consecutiveInLane = 0;
                 }
-            } else { consecutiveSameLane = 0; }
 
-            let finalLane = -1;
-            if (timeMs >= laneFreeTimes[targetLane]) finalLane = targetLane;
-            else {
-                const freeLanes = [];
-                for(let l=0; l<k; l++) if(timeMs >= laneFreeTimes[l]) freeLanes.push(l);
-                if(freeLanes.length > 0) finalLane = freeLanes[Math.floor(Math.random()*freeLanes.length)];
-            }
+                if (density > 5 && Math.random() > 0.7) lane = (lastLane + 1) % k;
 
-            if (finalLane !== -1) {
-                let isHold = false;
-                let holdLen = 0;
-                if (instantEnergy > localAvg * 1.6 && Math.random() > 0.7) {
-                    isHold = true;
-                    holdLen = Math.min(600, Math.random() * 300 + 100);
+                let type = 'tap';
+                let len = 0;
+                if (instantEnergy > localAvg * 1.2 && timeMs > 5000) { 
+                    let futureIndex = i + (step * 4);
+                    if (futureIndex < data.length && Math.abs(data[futureIndex]) > localAvg * 0.8) {
+                        if (Math.random() > 0.4) { 
+                            type = 'hold';
+                            len = Math.min(1500, Math.max(200, Math.random() * 600)); 
+                        }
+                    }
                 }
-                map.push({ t: timeMs, l: finalLane, type: isHold?'hold':'tap', len: holdLen, h:false, scoreGiven:false });
-                laneFreeTimes[finalLane] = timeMs + holdLen + 50; 
-                lastTime = timeMs;
-                lastLane = finalLane;
 
-                if (instantEnergy > localAvg * 2.2 && safeDen >= 6) {
-                    let secondLaneTarget = (finalLane + Math.floor(k/2)) % k;
-                    if (timeMs >= laneFreeTimes[secondLaneTarget] && secondLaneTarget !== finalLane) {
-                        map.push({ t: timeMs, l: secondLaneTarget, type: 'tap', len: 0, h:false, scoreGiven:false });
-                        laneFreeTimes[secondLaneTarget] = timeMs + 50;
+                if (timeMs < laneFreeTime[lane] + 20) {
+                    let found = false;
+                    for (let tryL = 0; tryL < k; tryL++) {
+                        if (timeMs >= laneFreeTime[tryL] + 20) {
+                            lane = tryL;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) continue; 
+                }
+
+                map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
+                laneFreeTime[lane] = timeMs + len + 20; 
+                lastNoteTime = timeMs;
+                lastLane = lane;
+
+                if (density >= 4 && instantEnergy > localAvg * 1.8) {
+                    let maxExtra = (density >= 9 && instantEnergy > localAvg * 2.5) ? 2 : 1;
+                    let extrasAdded = 0;
+                    for (let offset = 1; offset < k; offset++) {
+                        if (extrasAdded >= maxExtra) break;
+                        let chordLane = (lane + offset) % k;
+                        if (density < 6 && Math.abs(chordLane - lane) === 1) continue;
+                        if (timeMs >= laneFreeTime[chordLane] + 20) {
+                            map.push({ t: timeMs, l: chordLane, type: 'tap', len: 0, h: false });
+                            laneFreeTime[chordLane] = timeMs + 20;
+                            extrasAdded++;
+                        }
                     }
                 }
             }
-            patternDuration--;
         }
     }
     return map;
 }
+
 
 // ==========================================
 // 3. INICIO Y RE-GENERACIÓN
@@ -174,6 +182,15 @@ function initReceptors(k) {
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
     
+    // --- LÓGICA DE SKIN ACTIVA ---
+    let activeSkin = null;
+    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
+        // Buscar la skin en la tienda global
+        if (typeof SHOP_ITEMS !== 'undefined') {
+            activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+        }
+    }
+
     for (let i = 0; i < k; i++) {
         const l = document.createElement('div');
         l.className = 'lane-flash';
@@ -187,19 +204,30 @@ function initReceptors(k) {
         r.id = `rec-${i}`;
         r.style.left = (i * (100 / k)) + '%';
         r.style.top = y + 'px';
-        r.style.setProperty('--active-c', window.cfg.modes[k][i].c);
         
-        let strokeColor = "white";
-        // Check Skin
-        if(window.user && window.user.equipped && window.user.equipped.skin !== 'default') {
-             if(window.user.equipped.skin === 'skin_neon') strokeColor = "#00FFFF";
-             else if(window.user.equipped.skin === 'skin_gold') strokeColor = "#FFD700";
+        let conf = window.cfg.modes[k][i];
+        let color = conf.c; // Color por defecto (carril)
+        let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
+
+        // APLICAR SKIN
+        if (activeSkin) {
+            // 1. Forma (Shape)
+            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
+                shapeData = SKIN_PATHS[activeSkin.shape];
+            }
+            // 2. Color (Si es fixed usa el de la skin, si no, usa el del carril)
+            if (activeSkin.fixed) {
+                color = activeSkin.color;
+            }
         }
 
-        let conf = window.cfg.modes[k][i];
-        let shape = PATHS[conf.s] || PATHS['circle'];
+        r.style.setProperty('--active-c', color);
         
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100"><path class="arrow-path" d="${shape}" stroke="${strokeColor}" fill="none" stroke-width="4"/></svg>`;
+        // Renderizar SVG
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 5px ${color})">
+            <path class="arrow-path" d="${shapeData}" stroke="${color}" fill="none" stroke-width="4"/>
+        </svg>`;
+        
         elTrack.appendChild(r);
         window.elReceptors.push(r);
     }
@@ -333,6 +361,11 @@ function loop() {
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
     // SPAWNING
+  let activeSkin = null;
+    if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    }
+
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
@@ -343,20 +376,27 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // PRIORIDAD COLOR: Configuración > Default
-            // La skin solo sobrescribe si NO es default
+            // CONFIGURACIÓN BASE
             let conf = window.cfg.modes[window.keys][n.l];
             let color = conf.c; 
-            
-            if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
-                const s = window.user.equipped.skin;
-                if (s === 'skin_neon') color = (n.l % 2 === 0) ? '#ff66aa' : '#00FFFF';
-                else if (s === 'skin_gold') color = '#FFD700';
-                else if (s === 'skin_dark') color = '#FFFFFF';
+            let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
+
+            // APLICAR SKIN DINÁMICA
+            if (activeSkin) {
+                // Sobrescribir forma
+                if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
+                    shapeData = SKIN_PATHS[activeSkin.shape];
+                }
+                // Sobrescribir color si es fijo
+                if (activeSkin.fixed) {
+                    color = activeSkin.color;
+                }
             }
 
-            let shape = PATHS[conf.s] || PATHS['circle'];
-            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shape}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+            // Renderizar SVG con la forma y color correctos
+            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})">
+                <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>
+            </svg>`;
             
             if (n.type === 'hold') {
                 const h = (n.len / 1000) * (window.cfg.spd * 40); 
