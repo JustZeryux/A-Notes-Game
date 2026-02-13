@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (REMASTERED V2.0 - RHYTHM & FLOW) === */
+/* === AUDIO & ENGINE (MASTER FINAL V3.0 - CLEAN FLOW) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -71,7 +71,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR DE MAPAS "RHYTHM FLOW" (NUEVO)
+// 2. GENERADOR DE MAPAS V3.0 (CLEAN & SATISFYING)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -79,97 +79,133 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // Configuración de Densidad y Ritmo
+    // Configuración
     let density = cfg.den || 5; 
-    const bpmSimulated = 120 + (density * 10); // Simulamos BPM según densidad
-    const step = Math.floor(sampleRate / (bpmSimulated / 60 * 4)); // 1/4 beat step
+    const bpmSimulated = 110 + (density * 12); 
+    const step = Math.floor(sampleRate / (bpmSimulated / 60 * 4)); 
     
-    // Offset de inicio (3 SEGUNDOS DE SILENCIO VISUAL)
+    // Offset de inicio (3s silencio visual)
     const START_OFFSET = 3000; 
 
-    let lastLane = 0;
-    let patternState = 0; // 0: Random, 1: Stairs, 2: Stream
+    // Estado del Generador
+    let laneFreeTime = new Array(k).fill(-10000); // Rastrear cuándo se libera cada carril
+    let lastLane = Math.floor(k / 2);
+    let patternState = 0; 
     let patternCount = 0;
     let lastTime = -5000;
-    const minGap = Math.max(90, 350 - (density * 25)); // Espacio mínimo entre notas
+    let lastDoubleTime = -5000; // Para evitar spam de dobles
+    
+    // Espacio mínimo entre notas (evita solapamientos físicos)
+    const minGap = Math.max(100, 400 - (density * 30)); 
 
-    // Análisis de energía local
     for (let i = 0; i < data.length - 1024; i += step) {
-        // Calcular energía RMS en ventana pequeña
+        // Análisis de Energía
         let sum = 0;
         for (let j = 0; j < 1024; j++) sum += data[i + j] * data[i + j];
         const energy = Math.sqrt(sum / 1024);
-        const timeMs = (i / sampleRate) * 1000 + START_OFFSET; // APLICAMOS OFFSET AQUÍ
+        const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
 
-        // Umbral dinámico basado en densidad
-        const threshold = 0.05 + ((10 - density) * 0.015);
+        // Umbral adaptativo
+        const threshold = 0.06 + ((10 - density) * 0.012);
 
+        // Si hay suficiente energía y ha pasado tiempo desde la última nota global
         if (energy > threshold && (timeMs - lastTime > minGap)) {
+            
+            // 1. Determinar Tipo de Nota y Duración
             let type = 'tap';
             let len = 0;
-            let lane = lastLane;
             
-            // Detección de Hold Notes (Si la energía se mantiene alta)
-            if (energy > threshold * 1.2 && i + step * 4 < data.length) {
-                // Miramos al futuro
+            // Solo generar Hold si la energía se mantiene y no es un pico corto
+            if (energy > threshold * 1.3 && i + step * 6 < data.length) {
                 let futureSum = 0;
-                for(let f=0; f<4; f++) futureSum += Math.abs(data[i + (step*f)]);
-                if(futureSum/4 > energy * 0.9) {
+                for(let f=0; f<6; f++) futureSum += Math.abs(data[i + (step*f)]);
+                if(futureSum/6 > energy * 0.85) {
                     type = 'hold';
-                    len = Math.min(2000, Math.max(200, Math.random() * 800)); // Holds más controlados
+                    len = Math.min(1500, Math.max(300, Math.random() * 800)); 
                 }
             }
 
-            // === LÓGICA DE PATRONES ===
-            const isHard = density >= 6;
-            const isHighEnergy = energy > threshold * 1.8;
-
-            // Decidir patrón si el anterior terminó
+            // 2. Selección de Carril (Inteligente)
+            let lane = lastLane;
+            
+            // Decidir patrón
             if (patternCount <= 0) {
                 const rand = Math.random();
-                if (isHighEnergy && isHard) patternState = 3; // Jumps/Duals
-                else if (rand > 0.7) patternState = 1; // Stairs
-                else if (rand > 0.4) patternState = 2; // Stream (ZigZag)
-                else patternState = 0; // Random Flow
-                patternCount = Math.floor(Math.random() * 4) + 2; // Duración del patrón
+                if (energy > threshold * 2.0) patternState = 0; // Random en picos altos
+                else if (rand > 0.6) patternState = 1; // Escalera
+                else if (rand > 0.3) patternState = 2; // Stream (ZigZag)
+                else patternState = 0;
+                patternCount = Math.floor(Math.random() * 4) + 2; 
             }
 
-            // Ejecutar Patrón
+            // Calcular carril objetivo según patrón
+            let targetLane = lane;
             switch(patternState) {
-                case 1: // Stairs (Escalera)
-                    lane = (lastLane + 1) % k; 
-                    break;
-                case 2: // Stream (Alternar mano)
-                    // Intenta ir lejos de la nota anterior
-                    lane = (lastLane + Math.floor(k/2)) % k; 
-                    break;
-                case 3: // Duals (Solo si es high energy)
-                    lane = Math.floor(Math.random() * k);
-                    break;
-                default: // Random Flow (Evita repetición inmediata)
-                    lane = Math.floor(Math.random() * k);
-                    if (lane === lastLane) lane = (lane + 1) % k;
-                    break;
+                case 1: targetLane = (lastLane + 1) % k; break; // Stairs
+                case 2: targetLane = (lastLane + (k > 4 ? 2 : 1)) % k; break; // Stream
+                default: targetLane = Math.floor(Math.random() * k); break; // Random
             }
 
-            // Agregar nota principal
-            map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
+            // 3. VERIFICACIÓN DE ESPACIO (CRÍTICO)
+            // Buscamos un carril libre. Si el objetivo está ocupado, buscamos el más cercano libre.
+            let finalLane = -1;
+            
+            // Primero probamos el target
+            if (timeMs > laneFreeTime[targetLane] + 20) {
+                finalLane = targetLane;
+            } else {
+                // Si está ocupado, buscar otro
+                const offsets = [1, -1, 2, -2, 3, -3]; // Búsqueda radial
+                for (let o of offsets) {
+                    let tryL = (targetLane + o + k) % k; // Wrap around
+                    if (timeMs > laneFreeTime[tryL] + 20) {
+                        finalLane = tryL;
+                        break;
+                    }
+                }
+            }
+
+            // Si no encontramos carril libre (spam máximo), saltamos esta nota
+            if (finalLane === -1) continue;
+
+            // 4. Inserción de la Nota Principal
+            map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
+            
+            // Actualizar bloqueo del carril
+            // Si es Hold, bloqueamos por duracion + gap. Si es tap, solo gap.
+            laneFreeTime[finalLane] = timeMs + len + (minGap * 0.8); 
+            
             lastTime = timeMs;
-            lastLane = lane;
+            lastLane = finalLane;
             patternCount--;
 
-            // Agregar notas dobles (Jumps) en momentos de alta energía
-            if (isHighEnergy && density >= 5 && type !== 'hold') {
-                let secondLane = (lane + Math.floor(k/2) + 1) % k;
-                if(secondLane !== lane) {
-                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+            // 5. GENERACIÓN DE DOBLES (CONTROLADA)
+            // Solo si: Alta densidad, Mucha energía, No es Hold, y ha pasado tiempo desde el último doble
+            const doubleCooldown = 500 - (density * 30); // Entre 200ms y 500ms
+            
+            if (density >= 5 && energy > threshold * 2.2 && type !== 'hold') {
+                if (timeMs - lastDoubleTime > doubleCooldown) {
+                    // Buscar segundo carril libre lejos del primero
+                    let secondLane = -1;
+                    for (let tryL = 0; tryL < k; tryL++) {
+                        // Evitar adyacentes si es posible para limpieza visual
+                        if (Math.abs(tryL - finalLane) > 1 && timeMs > laneFreeTime[tryL] + 20) {
+                            secondLane = tryL;
+                            break;
+                        }
+                    }
+
+                    if (secondLane !== -1) {
+                        map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                        laneFreeTime[secondLane] = timeMs + (minGap * 0.8);
+                        lastDoubleTime = timeMs; // Reset cooldown
+                    }
                 }
             }
         }
     }
     return map;
 }
-
 
 // ==========================================
 // 3. INICIO Y GESTIÓN
@@ -242,7 +278,7 @@ window.prepareAndPlaySong = async function(k) {
             const response = await fetch(window.curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
-            const map = genMap(audioBuffer, k); // Genera mapa con el nuevo algoritmo
+            const map = genMap(audioBuffer, k); 
             songInRam = { id: window.curSongData.id, buf: audioBuffer, map: map, kVersion: k, genDen: currentDen };
             window.ramSongs.push(songInRam);
         }
@@ -280,7 +316,7 @@ window.playSongInternal = function(s) {
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => {
         window.st.trueMaxScore += 350; 
-        if(n.type === 'hold') window.st.trueMaxScore += 200; // Ajustado valor hold
+        if(n.type === 'hold') window.st.trueMaxScore += 200; 
     });
 
     window.st.keys = new Array(window.keys).fill(0);
@@ -310,7 +346,6 @@ window.playSongInternal = function(s) {
     let count = 3;
     
     // Offset de audio: La música empieza 3 segundos DESPUÉS del tiempo lógico 0
-    // para coincidir con el START_OFFSET del mapa (3000ms)
     const AUDIO_DELAY = 3; 
 
     const iv = setInterval(() => {
@@ -330,10 +365,10 @@ window.playSongInternal = function(s) {
                 g.gain.value = window.cfg.vol;
                 window.st.src.connect(g); g.connect(window.st.ctx.destination);
                 
-                // IMPORTANTE: Arrancar el tiempo lógico AHORA
+                // Arrancar el tiempo lógico
                 window.st.t0 = window.st.ctx.currentTime;
                 
-                // Pero el audio arranca con retraso (Offset)
+                // El audio arranca con retraso para dar tiempo a que bajen las notas
                 window.st.src.start(window.st.ctx.currentTime + AUDIO_DELAY);
                 
                 window.st.src.onended = () => { window.songFinished = true; end(false); };
@@ -344,13 +379,13 @@ window.playSongInternal = function(s) {
 }
 
 // ==========================================
-// 4. BUCLE DE JUEGO (HOLD NOTE FIX)
+// 4. BUCLE DE JUEGO
 // ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     
-    // Actualizar barra de progreso (ajustada con el offset)
+    // Barra de progreso con ajuste de offset
     if (window.st.songDuration > 0) {
         const cur = Math.max(0, (now - 3000) / 1000); 
         const pct = Math.min(100, (cur / window.st.songDuration) * 100);
@@ -361,7 +396,7 @@ function loop() {
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // SPAWNING (Pre-renderizado 1.5s antes)
+    // SPAWNING
     let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
@@ -371,7 +406,6 @@ function loop() {
         const n = window.st.notes[i];
         if (n.s) continue;
         
-        // Spawnear si está en ventana visual
         if (n.t - now < 1500) {
             const el = document.createElement('div');
             const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
@@ -405,7 +439,7 @@ function loop() {
         } else break;
     }
 
-    // LOGICA DE MOVIMIENTO Y HOLDS
+    // MOVEMENT
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if (!n.el) { window.st.spawned.splice(i, 1); continue; }
@@ -414,50 +448,37 @@ function loop() {
         const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
         let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
         
-        // Mover cabeza de la nota
         if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
              n.el.style.top = finalY + 'px';
         }
 
-        // === HOLD LOGIC FIX (NO INSTA-KILL) ===
         if (n.type === 'hold' && n.h) {
-             n.el.style.top = yReceptor + 'px'; // Fijar cabeza en receptor
+             n.el.style.top = yReceptor + 'px'; 
              const rem = (n.t + n.len) - now;
              const tr = n.el.querySelector('.sustain-trail');
              
-             // Reducir tamaño visualmente
              if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
              
-             // SI SUELTAS LA TECLA:
              if (!window.st.keys[n.l]) {
-                 // Cambiar opacidad para indicar que se soltó
                  n.el.style.opacity = 0.4;
-                 
-                 // Solo si faltaba mucho (más de 100ms), rompemos el combo
                  if (rem > 100 && !n.broken) {
-                     window.st.cmb = 0; // Rompe combo
-                     n.broken = true;   // Marcamos como rota para no quitar vida cada frame
-                     // NO QUITAMOS HP AQUÍ, SOLO DEJAMOS DE CURAR
+                     window.st.cmb = 0; 
+                     n.broken = true;   
                  }
              } else {
-                 // SI MANTIENES LA TECLA:
                  n.el.style.opacity = 1;
-                 // Curar solo si no está rota
                  if(!n.broken) window.st.hp = Math.min(100, window.st.hp + 0.1); 
                  updHUD(); 
              }
 
-             // Terminar nota
              if (now >= n.t + n.len) {
-                 if(!n.broken) window.st.sc += 200; // Bonus por terminar completo
+                 if(!n.broken) window.st.sc += 200; 
                  n.el.remove(); n.el = null; 
              }
         }
 
-        // Miss de Tap o Cabeza de Hold
         if (!n.h && timeDiff < -160) {
             miss(n);
-            // Si es hold y fallas la cabeza, se borra toda la nota (no instakill)
             if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
             window.st.spawned.splice(i, 1);
         }
@@ -465,7 +486,7 @@ function loop() {
     requestAnimationFrame(loop);
 }
 
-// === VISUALS: SPLASH CORRECTO ===
+// === VISUALS: SPLASH ===
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
@@ -601,7 +622,7 @@ function updHUD() {
     const fcEl = document.getElementById('hud-fc');
     if(fcEl) {
         fcEl.innerText = window.cfg.showFC ? window.st.fcStatus : "";
-        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
+        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"));
     }
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
