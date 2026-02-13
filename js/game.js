@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V3.0 - CLEAN FLOW) === */
+/* === AUDIO & ENGINE (MASTER FINAL V4.0 - RHYTHMIC GRID) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -58,11 +58,13 @@ function playMiss() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
+    // Muestreo rápido para encontrar pico
     for (let i = 0; i < filteredData.length; i += 100) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
     if (max === 0) return filteredData;
+    // Normalizar para que el pico sea aprox 0.95
     const multiplier = 0.95 / max;
     if (multiplier > 1.1 || multiplier < 0.9) {
         for (let i = 0; i < filteredData.length; i++) filteredData[i] *= multiplier;
@@ -71,7 +73,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR DE MAPAS V3.0 (CLEAN & SATISFYING)
+// 2. GENERADOR DE MAPAS V4.0 (RHYTHMIC GRID)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -79,127 +81,169 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // Configuración
+    // CONFIGURACIÓN DE DIFICULTAD
     let density = cfg.den || 5; 
-    const bpmSimulated = 110 + (density * 12); 
-    const step = Math.floor(sampleRate / (bpmSimulated / 60 * 4)); 
     
-    // Offset de inicio (3s silencio visual)
+    // SIMULACIÓN DE BPM (GRID)
+    // En lugar de analizar cada sample, avanzamos en "ticks" musicales
+    // Simulamos un BPM base de ~140-170 dependiendo de la densidad elegida
+    const simulatedBPM = 130 + (density * 5); 
+    const samplesPerBeat = sampleRate * (60 / simulatedBPM);
+    const step = Math.floor(samplesPerBeat / 4); // Resolución de 1/16 de nota (semi-corchea)
+    
     const START_OFFSET = 3000; 
 
-    // Estado del Generador
-    let laneFreeTime = new Array(k).fill(-10000); // Rastrear cuándo se libera cada carril
+    // Variables de Estado
+    let laneFreeTime = new Array(k).fill(-9999); 
     let lastLane = Math.floor(k / 2);
-    let patternState = 0; 
-    let patternCount = 0;
     let lastTime = -5000;
-    let lastDoubleTime = -5000; // Para evitar spam de dobles
     
-    // Espacio mínimo entre notas (evita solapamientos físicos)
-    const minGap = Math.max(100, 400 - (density * 30)); 
+    // Control de Patrones
+    let patternState = 0; // 0: Alternar, 1: Escalera, 2: Stack
+    let notesInPattern = 0;
+    let patternDirection = 1; // 1: Derecha, -1: Izquierda
 
-    for (let i = 0; i < data.length - 1024; i += step) {
-        // Análisis de Energía
+    // Análisis por "Ticks" (Grid Snap)
+    for (let i = 0; i < data.length - step; i += step) {
+        
+        // 1. Calcular Energía Local (RMS)
         let sum = 0;
-        for (let j = 0; j < 1024; j++) sum += data[i + j] * data[i + j];
-        const energy = Math.sqrt(sum / 1024);
+        // Analizamos una ventana pequeña centrada en el tick
+        const windowSize = Math.floor(step / 2);
+        for (let j = 0; j < windowSize; j++) {
+            if(i+j < data.length) sum += data[i + j] * data[i + j];
+        }
+        const energy = Math.sqrt(sum / windowSize);
+        
+        // Tiempo exacto de este tick
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
 
-        // Umbral adaptativo
-        const threshold = 0.06 + ((10 - density) * 0.012);
+        // Umbral Dinámico (ajustado por densidad)
+        // Cuanto más densidad, más sensible es el umbral
+        const threshold = 0.05 + ((10 - density) * 0.015);
 
-        // Si hay suficiente energía y ha pasado tiempo desde la última nota global
-        if (energy > threshold && (timeMs - lastTime > minGap)) {
-            
-            // 1. Determinar Tipo de Nota y Duración
+        // --- DETECCIÓN DE GOLPE ---
+        if (energy > threshold) {
+            // Evitar notas demasiado pegadas (Speed Limit físico)
+            const minGap = Math.max(80, 250 - (density * 20));
+            if (timeMs - lastTime < minGap) continue;
+
             let type = 'tap';
             let len = 0;
-            
-            // Solo generar Hold si la energía se mantiene y no es un pico corto
-            if (energy > threshold * 1.3 && i + step * 6 < data.length) {
-                let futureSum = 0;
-                for(let f=0; f<6; f++) futureSum += Math.abs(data[i + (step*f)]);
-                if(futureSum/6 > energy * 0.85) {
+            let isHeavyHit = energy > threshold * 2.0; // Golpe fuerte (Kick/Bass)
+
+            // Detección de Hold (Si la energía se mantiene en los siguientes ticks)
+            let holdSustain = 0;
+            if (energy > threshold * 1.2) {
+                // Mirar 4 ticks al futuro
+                for (let h = 1; h <= 8; h++) {
+                    let futureIdx = i + (step * h);
+                    if (futureIdx >= data.length) break;
+                    if (Math.abs(data[futureIdx]) > threshold * 0.8) {
+                        holdSustain++;
+                    } else {
+                        break; 
+                    }
+                }
+                // Si dura más de 2 ticks, es Hold
+                if (holdSustain > 2) {
                     type = 'hold';
-                    len = Math.min(1500, Math.max(300, Math.random() * 800)); 
+                    // Duración basada en ticks sostenidos
+                    len = (holdSustain * (step / sampleRate) * 1000); 
+                    // Capar duración máxima y mínima
+                    len = Math.min(2000, Math.max(150, len));
                 }
             }
 
-            // 2. Selección de Carril (Inteligente)
-            let lane = lastLane;
+            // --- LÓGICA DE POSICIONAMIENTO (PATRONES) ---
             
-            // Decidir patrón
-            if (patternCount <= 0) {
-                const rand = Math.random();
-                if (energy > threshold * 2.0) patternState = 0; // Random en picos altos
-                else if (rand > 0.6) patternState = 1; // Escalera
-                else if (rand > 0.3) patternState = 2; // Stream (ZigZag)
-                else patternState = 0;
-                patternCount = Math.floor(Math.random() * 4) + 2; 
+            // Decidir nuevo patrón si el anterior acabó
+            if (notesInPattern <= 0) {
+                const rnd = Math.random();
+                if (isHeavyHit) patternState = 0; // Reset a centro o alternado en golpes fuertes
+                else if (rnd > 0.6) { patternState = 1; patternDirection *= -1; } // Escalera
+                else if (rnd > 0.3) patternState = 0; // Stream alternado
+                else patternState = 2; // Pequeño stack o repetición
+                notesInPattern = Math.floor(Math.random() * 4) + 2;
             }
 
-            // Calcular carril objetivo según patrón
-            let targetLane = lane;
-            switch(patternState) {
-                case 1: targetLane = (lastLane + 1) % k; break; // Stairs
-                case 2: targetLane = (lastLane + (k > 4 ? 2 : 1)) % k; break; // Stream
-                default: targetLane = Math.floor(Math.random() * k); break; // Random
+            let lane = lastLane;
+
+            if (patternState === 1) { 
+                // Escalera (Stairs)
+                lane = lastLane + patternDirection;
+                if (lane < 0) { lane = 1; patternDirection = 1; }
+                if (lane >= k) { lane = k - 2; patternDirection = -1; }
+            } else if (patternState === 0) {
+                // Stream (Alternar mano o distancia)
+                // Intentar mover lejos de la anterior para flujo
+                let dist = Math.floor(Math.random() * (k - 1)) + 1;
+                lane = (lastLane + dist) % k;
+            } else {
+                // Stack (Repetición o adyacente cercano)
+                if(Math.random() > 0.5) lane = (lastLane + 1) % k;
+                else lane = lastLane; // Jack (repetición) posible en densidades altas
             }
 
-            // 3. VERIFICACIÓN DE ESPACIO (CRÍTICO)
-            // Buscamos un carril libre. Si el objetivo está ocupado, buscamos el más cercano libre.
+            // --- CORRECCIÓN DE COLISIÓN (CRÍTICO) ---
+            // Buscar carril libre si el calculado está ocupado
+            // Un carril está ocupado si el tiempo actual es menor al tiempo libre registrado
+            // (Sumamos un pequeño buffer de 50ms para que visualmente no se peguen)
             let finalLane = -1;
             
-            // Primero probamos el target
-            if (timeMs > laneFreeTime[targetLane] + 20) {
-                finalLane = targetLane;
+            // Probar el carril deseado primero
+            if (timeMs > laneFreeTime[lane] + 50) {
+                finalLane = lane;
             } else {
-                // Si está ocupado, buscar otro
-                const offsets = [1, -1, 2, -2, 3, -3]; // Búsqueda radial
-                for (let o of offsets) {
-                    let tryL = (targetLane + o + k) % k; // Wrap around
-                    if (timeMs > laneFreeTime[tryL] + 20) {
-                        finalLane = tryL;
-                        break;
+                // Buscar el más cercano libre
+                let bestDist = 99;
+                for (let l = 0; l < k; l++) {
+                    if (timeMs > laneFreeTime[l] + 50) {
+                        let d = Math.abs(l - lane);
+                        if (d < bestDist) {
+                            bestDist = d;
+                            finalLane = l;
+                        }
                     }
                 }
             }
 
-            // Si no encontramos carril libre (spam máximo), saltamos esta nota
+            // Si no hay espacio en NINGÚN carril, saltamos la nota (evita spam imposible)
             if (finalLane === -1) continue;
 
-            // 4. Inserción de la Nota Principal
+            // REGISTRAR NOTA
             map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
             
-            // Actualizar bloqueo del carril
-            // Si es Hold, bloqueamos por duracion + gap. Si es tap, solo gap.
-            laneFreeTime[finalLane] = timeMs + len + (minGap * 0.8); 
+            // Actualizar tiempo ocupado del carril
+            laneFreeTime[finalLane] = timeMs + len; // Bloqueado hasta que termine la nota
             
             lastTime = timeMs;
             lastLane = finalLane;
-            patternCount--;
+            notesInPattern--;
 
-            // 5. GENERACIÓN DE DOBLES (CONTROLADA)
-            // Solo si: Alta densidad, Mucha energía, No es Hold, y ha pasado tiempo desde el último doble
-            const doubleCooldown = 500 - (density * 30); // Entre 200ms y 500ms
-            
-            if (density >= 5 && energy > threshold * 2.2 && type !== 'hold') {
-                if (timeMs - lastDoubleTime > doubleCooldown) {
-                    // Buscar segundo carril libre lejos del primero
-                    let secondLane = -1;
-                    for (let tryL = 0; tryL < k; tryL++) {
-                        // Evitar adyacentes si es posible para limpieza visual
-                        if (Math.abs(tryL - finalLane) > 1 && timeMs > laneFreeTime[tryL] + 20) {
-                            secondLane = tryL;
+            // --- DOBLES (CHORDS) PARA GOLPES FUERTES ---
+            // Solo si es un golpe muy fuerte, no es hold, y la densidad lo permite
+            if (isHeavyHit && type === 'tap' && density >= 4) {
+                // Buscar un segundo carril libre (preferiblemente simétrico o alejado)
+                let secondLane = -1;
+                // Intento de simetría (ej: si nota en 0 (izq), poner en 3 (der) en 4k)
+                let idealSecond = (k - 1) - finalLane;
+                
+                if (timeMs > laneFreeTime[idealSecond] + 50 && idealSecond !== finalLane) {
+                    secondLane = idealSecond;
+                } else {
+                    // Si no, buscar cualquiera libre alejado
+                    for(let l=0; l<k; l++) {
+                        if (l !== finalLane && Math.abs(l - finalLane) > 1 && timeMs > laneFreeTime[l] + 50) {
+                            secondLane = l;
                             break;
                         }
                     }
+                }
 
-                    if (secondLane !== -1) {
-                        map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
-                        laneFreeTime[secondLane] = timeMs + (minGap * 0.8);
-                        lastDoubleTime = timeMs; // Reset cooldown
-                    }
+                if (secondLane !== -1) {
+                    map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                    laneFreeTime[secondLane] = timeMs;
                 }
             }
         }
@@ -262,13 +306,14 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Analizando ritmo..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Creando mapa rítmico..."; }
 
     try {
         unlockAudio();
         let songInRam = window.ramSongs.find(s => s.id === window.curSongData.id);
         const currentDen = window.cfg.den || 5;
 
+        // Si cambió la configuración de teclas o densidad, regeneramos
         if (songInRam && (songInRam.kVersion !== k || songInRam.genDen !== currentDen)) {
             window.ramSongs = window.ramSongs.filter(s => s.id !== window.curSongData.id); 
             songInRam = null; 
@@ -345,7 +390,7 @@ window.playSongInternal = function(s) {
     cd.innerText = "3";
     let count = 3;
     
-    // Offset de audio: La música empieza 3 segundos DESPUÉS del tiempo lógico 0
+    // Offset de audio
     const AUDIO_DELAY = 3; 
 
     const iv = setInterval(() => {
@@ -365,10 +410,8 @@ window.playSongInternal = function(s) {
                 g.gain.value = window.cfg.vol;
                 window.st.src.connect(g); g.connect(window.st.ctx.destination);
                 
-                // Arrancar el tiempo lógico
                 window.st.t0 = window.st.ctx.currentTime;
                 
-                // El audio arranca con retraso para dar tiempo a que bajen las notas
                 window.st.src.start(window.st.ctx.currentTime + AUDIO_DELAY);
                 
                 window.st.src.onended = () => { window.songFinished = true; end(false); };
@@ -379,13 +422,12 @@ window.playSongInternal = function(s) {
 }
 
 // ==========================================
-// 4. BUCLE DE JUEGO
+// 4. BUCLE DE JUEGO (OPTIMIZADO)
 // ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     
-    // Barra de progreso con ajuste de offset
     if (window.st.songDuration > 0) {
         const cur = Math.max(0, (now - 3000) / 1000); 
         const pct = Math.min(100, (cur / window.st.songDuration) * 100);
@@ -402,47 +444,59 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
+    // Spawn Window: 1.5 segundos
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
         
         if (n.t - now < 1500) {
-            const el = document.createElement('div');
-            const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
-            el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
-            el.style.left = (n.l * w) + '%';
-            el.style.width = w + '%';
-            
-            let conf = window.cfg.modes[window.keys][n.l];
-            let color = conf.c; 
-            let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
+            // Solo spawnear si no pasó su tiempo
+            if (n.t - now > -200) {
+                const el = document.createElement('div');
+                const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
+                el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
+                el.style.left = (n.l * w) + '%';
+                el.style.width = w + '%';
+                
+                let conf = window.cfg.modes[window.keys][n.l];
+                let color = conf.c; 
+                let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
 
-            if (activeSkin) {
-                if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
-                if (activeSkin.fixed) color = activeSkin.color;
+                if (activeSkin) {
+                    if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
+                    if (activeSkin.fixed) color = activeSkin.color;
+                }
+
+                let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})">
+                    <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>
+                </svg>`;
+                
+                if (n.type === 'hold') {
+                    const h = (n.len / 1000) * (window.cfg.spd * 40); 
+                    svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${window.cfg.noteOp/100}"></div>`;
+                }
+
+                el.innerHTML = svg;
+                if(elTrack) elTrack.appendChild(el);
+                n.el = el;
             }
-
-            let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})">
-                <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>
-            </svg>`;
-            
-            if (n.type === 'hold') {
-                const h = (n.len / 1000) * (window.cfg.spd * 40); 
-                svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${window.cfg.noteOp/100}"></div>`;
-            }
-
-            el.innerHTML = svg;
-            if(elTrack) elTrack.appendChild(el);
-            n.el = el;
             n.s = true;
             window.st.spawned.push(n);
-        } else break;
+        } else break; // Las notas están ordenadas, si esta está lejos, las siguientes también
     }
 
-    // MOVEMENT
+    // MOVEMENT & LOGIC
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
-        if (!n.el) { window.st.spawned.splice(i, 1); continue; }
+        
+        // Si la nota ya pasó y no tiene elemento (fue miss o spawneó tarde), borrar
+        if (!n.el) { 
+            if(n.t - now < -200 && !n.h) {
+                 // Miss silencioso si se pasó mucho (bug fix)
+                 window.st.spawned.splice(i, 1);
+            }
+            continue; 
+        }
 
         const timeDiff = n.t - now + window.cfg.off;
         const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
@@ -452,6 +506,7 @@ function loop() {
              n.el.style.top = finalY + 'px';
         }
 
+        // HOLD ACTIVA
         if (n.type === 'hold' && n.h) {
              n.el.style.top = yReceptor + 'px'; 
              const rem = (n.t + n.len) - now;
@@ -461,6 +516,7 @@ function loop() {
              
              if (!window.st.keys[n.l]) {
                  n.el.style.opacity = 0.4;
+                 // Si se suelta, no mata instantáneamente, solo rompe combo
                  if (rem > 100 && !n.broken) {
                      window.st.cmb = 0; 
                      n.broken = true;   
@@ -477,6 +533,7 @@ function loop() {
              }
         }
 
+        // MISS
         if (!n.h && timeDiff < -160) {
             miss(n);
             if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
