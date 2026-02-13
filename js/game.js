@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V5.2 - SHREDDER MODE) === */
+/* === AUDIO & ENGINE (MASTER FINAL V6.0 - DRAGON SLAYER) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -58,8 +58,8 @@ function playMiss() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
-    // Muestreo un poco más denso para no perder picos rápidos
-    for (let i = 0; i < filteredData.length; i += 50) { 
+    // Muestreo preciso para no perder picos de solos
+    for (let i = 0; i < filteredData.length; i += 20) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
@@ -72,7 +72,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR V5.2 (SHREDDER / GUITAR HERO STYLE)
+// 2. GENERADOR V6.0 (DRAGON SLAYER - HIGH BPM)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -80,166 +80,156 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // CONFIGURACIÓN DE DENSIDAD
+    // CONFIGURACIÓN DE VELOCIDAD EXTREMA
     let density = cfg.den || 5; 
     
-    // BPM SIMULADO (Más alto para estilo Metal/Rock)
-    const simulatedBPM = 145 + (density * 8); 
-    const samplesPerBeat = sampleRate * (60 / simulatedBPM);
-    const step = Math.floor(samplesPerBeat / 4); // 1/16 de nota
+    // FORZAMOS UN BPM ALTO (Tipico de Power Metal ~200 BPM)
+    // Esto asegura que la "rejilla" (Grid) sea lo suficientemente rápida para solos
+    const targetBPM = 180 + (density * 5); 
+    const samplesPerBeat = sampleRate * (60 / targetBPM);
+    const step = Math.floor(samplesPerBeat / 4); // Resolución de 1/16 nota
     
     const START_OFFSET = 3000; 
 
-    // Estado
+    // Estado del Mapa
     let laneFreeTime = new Array(k).fill(-9999); 
     let lastLane = Math.floor(k/2); 
     let lastTime = -5000;
-    let lastEnergy = 0;
+    
+    // Variables de "Intensidad Guitarra"
+    let tensionAccumulator = 0;
+    let patternDirection = 1; // 1: Derecha, -1: Izquierda
+    
+    // Filtro de Energía
+    let avgEnergy = 0;
 
-    // Variables de "Shred" (Solo de Guitarra)
-    let tensionAccumulator = 0; // Acumula energía constante
-    let patternDirection = 1;   // 1: Derecha, -1: Izquierda
-    let streamCount = 0;        // Contador para mantener patrones largos
-
+    // Recorremos la canción paso a paso (Grid 1/16)
     for (let i = 0; i < data.length - step; i += step) {
-        // Análisis de Energía
+        
+        // 1. Análisis de Energía Local (Ventana corta para precisión)
         let sum = 0;
-        const windowSize = Math.floor(step / 2);
+        const windowSize = Math.floor(step * 0.8);
         for (let j = 0; j < windowSize; j++) {
-            if(i+j < data.length) sum += data[i + j] * data[i + j];
+            if(i+j < data.length) sum += Math.abs(data[i + j]);
         }
-        const energy = Math.sqrt(sum / windowSize);
-        const flux = Math.abs(energy - lastEnergy); // Cambio brusco (Golpes de batería)
-        lastEnergy = energy;
+        const energy = sum / windowSize;
+        
+        // Promedio móvil para detectar cambios de sección
+        avgEnergy = (avgEnergy * 0.95) + (energy * 0.05);
 
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
         
-        // Umbral Dinámico (Más bajo = Más notas)
-        // Reduje el umbral respecto a la V5.1 para permitir más "spam" controlado
-        const threshold = 0.04 + ((10 - density) * 0.012);
+        // Umbral Base (Más bajo = detecta más notas)
+        const threshold = 0.03 + ((10 - density) * 0.008); 
         
-        // Detectar "Pared de Sonido" (Guitarra distorsionada constante)
-        if (energy > threshold * 0.8) {
+        // --- DETECCIÓN DE "SOLO DE GUITARRA" ---
+        // Si la energía es consistentemente alta, asumimos que es un "Stream" (chorro de notas)
+        if (energy > avgEnergy * 1.1 && energy > threshold) {
             tensionAccumulator++;
         } else {
-            tensionAccumulator = Math.max(0, tensionAccumulator - 2); // Baja rápido si hay silencio
+            tensionAccumulator = Math.max(0, tensionAccumulator - 2);
         }
 
-        // --- MODO SHRED (GUITARRA INTENSA) ---
-        // Si hay mucha tensión acumulada, entramos en modo "DragonForce"
-        let isGuitarSolo = tensionAccumulator > 8;
+        // ¿Estamos en modo Shredder? (Guitarra rápida constante)
+        let isShredding = tensionAccumulator > 5;
 
-        // Gap mínimo entre notas (Velocidad)
-        let minGap = Math.max(90, 300 - (density * 25));
-        
-        // Si es solo de guitarra, permitimos velocidad extrema (Streams)
-        if (isGuitarSolo) minGap = 80; // 80ms es muy rápido (Stream 1/16 a 180BPM aprox)
+        // Gap Mínimo (Velocidad permitida)
+        // En modo Shredder bajamos a 70ms (aprox 14 notas por segundo)
+        let minGap = isShredding ? 70 : Math.max(100, 350 - (density * 30));
 
-        // Si no hay suficiente energía, saltamos (pero somos más permisivos ahora)
+        // Si no hay energía, saltar
         if (energy < threshold) continue;
-        if (timeMs - lastTime < minGap) continue;
+        
+        // Si hay energía pero muy pegado a la anterior (y no es shred), saltar
+        if (timeMs - lastTime < minGap && !isShredding) continue;
 
+        // --- CLASIFICACIÓN DE NOTA ---
         let type = 'tap';
         let len = 0;
 
-        // --- LÓGICA DE PATRONES ---
-        
-        if (isGuitarSolo) {
-            // === MODO SOLO DE GUITARRA ===
-            // Aquí generamos Escaleras y Streams obligatorios
-            // No hacemos saltos aleatorios, todo debe fluir (1-2-3-4...)
-
-            // Cambiar dirección si llegamos a un borde
-            if (lastLane <= 0) patternDirection = 1;
-            else if (lastLane >= k - 1) patternDirection = -1;
-            
-            // A veces, cambiar dirección aleatoriamente en medio del solo para variedad
-            if (streamCount > 8 && Math.random() > 0.8) {
-                patternDirection *= -1;
-                streamCount = 0;
+        // Si la energía es suave pero alta (Voz sostenida o acordes largos de teclado)
+        // Y NO estamos en medio de un solo loco
+        if (!isShredding && energy > threshold * 1.5 && energy < avgEnergy * 1.5) {
+            // Verificar sustain
+            let sustain = 0;
+            for(let h=1; h<8; h++) {
+                if(i + step*h < data.length && Math.abs(data[i + step*h]) > threshold * 0.8) sustain++;
+                else break;
             }
-
-            lastLane = lastLane + patternDirection;
-            
-            // Corrección segura de límites
-            if (lastLane < 0) lastLane = 1;
-            if (lastLane >= k) lastLane = k - 2;
-            
-            streamCount++;
-
-        } else {
-            // === MODO RITMO NORMAL ===
-            // Aquí seguimos la batería o la voz
-            
-            // Si es un golpe fuerte (Batería), saltamos lejos
-            if (flux > threshold * 0.6) {
-                let jump = Math.floor(Math.random() * (k-1)) + 1;
-                lastLane = (lastLane + jump) % k;
-            } else {
-                // Si es suave (Voz), nos movemos poco
-                lastLane = (lastLane + 1) % k;
-            }
-
-            // Detectar Hold Notes (Solo fuera de los solos rápidos)
-            if (energy > threshold * 1.5 && !isGuitarSolo) {
-                let sustain = 0;
-                for(let h=1; h<6; h++) {
-                    if(i + step*h < data.length && Math.abs(data[i+step*h]) > threshold) sustain++;
-                    else break;
-                }
-                if (sustain > 3 && Math.random() > 0.6) {
-                    type = 'hold';
-                    len = sustain * (step/sampleRate) * 1000;
-                    len = Math.min(800, len);
-                }
+            if (sustain > 4 && Math.random() > 0.5) {
+                type = 'hold';
+                len = sustain * (step/sampleRate) * 1000;
+                len = Math.min(1500, Math.max(200, len));
             }
         }
 
-        // --- COLOCACIÓN Y ANTI-COLISIÓN ---
+        // --- GENERACIÓN DE PATRÓN ---
+        
+        if (isShredding) {
+            // === MODO GUITAR HERO (SOLO) ===
+            // Aquí ignoramos los "golpes" individuales y llenamos la grilla
+            // Generamos patrones de ESCALERA (Sweep Picking)
+            
+            // Lógica de rebote: Si tocamos pared, cambiamos dirección
+            if (lastLane <= 0) patternDirection = 1;
+            if (lastLane >= k - 1) patternDirection = -1;
+            
+            // Movimiento forzado
+            lastLane = lastLane + patternDirection;
+            
+            // Corrección de seguridad
+            if (lastLane < 0) lastLane = 1;
+            if (lastLane >= k) lastLane = k - 2;
+
+        } else {
+            // === MODO RITMO (BATERÍA/VOZ) ===
+            // Aquí sí buscamos variedad
+            
+            // Detectar golpe fuerte (Kick/Snare) comparando con promedio
+            let isKick = energy > avgEnergy * 1.3;
+            
+            if (isKick) {
+                // Salto (Jump) en la pista
+                let jump = Math.floor(Math.random() * (k-1)) + 1;
+                lastLane = (lastLane + jump) % k;
+            } else {
+                // Flujo suave
+                lastLane = (lastLane + 1) % k;
+            }
+        }
+
+        // --- COLOCACIÓN FINAL ---
         let finalLane = -1;
 
-        // 1. Probar carril calculado (Prioridad máxima para mantener el flujo del solo)
-        if (timeMs > laneFreeTime[lastLane] + 40) {
+        // 1. Prioridad absoluta al carril calculado (para mantener la escalera)
+        if (timeMs > laneFreeTime[lastLane] + 30) { // Gap visual mínimo 30ms
             finalLane = lastLane;
         } else {
-            // 2. Si está ocupado (spam muy denso), buscar el vecino más cercano
-            // (Importante: Buscar en la dirección del patrón para no romper la escalera)
-            let tryNext = lastLane + patternDirection;
-            if (tryNext >= 0 && tryNext < k && timeMs > laneFreeTime[tryNext] + 40) {
-                finalLane = tryNext;
-            } else {
-                // 3. Cualquier carril libre
-                for (let l = 0; l < k; l++) {
-                    if (timeMs > laneFreeTime[l] + 40) {
-                        finalLane = l;
-                        break;
-                    }
-                }
+            // 2. Si está ocupado, buscar adyacente EN LA DIRECCIÓN del flujo
+            let nextTry = lastLane + patternDirection;
+            if (nextTry >= 0 && nextTry < k && timeMs > laneFreeTime[nextTry] + 30) {
+                finalLane = nextTry;
             }
         }
 
         if (finalLane === -1) continue;
 
+        // Guardar Nota
         map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-        laneFreeTime[finalLane] = timeMs + len; // Bloquear carril
+        laneFreeTime[finalLane] = timeMs + len; 
         
         lastTime = timeMs;
         lastLane = finalLane;
 
         // --- DOBLES (CHORDS) ---
-        // Solo generamos dobles si hay un GOLPE BRUSCO (Kick/Crash)
-        // Y NO estamos en medio de una escalera rápida (rompería el flujo)
-        let isPercussionHit = flux > threshold * 2.5;
-        
-        if (isPercussionHit && density >= 5 && type === 'tap') {
-             // Solo poner doble si no interfiere con el flujo rápido
-             // (Si el gap es muy pequeño, evitamos dobles para no hacer jacks imposibles)
-             if (minGap > 100 || density >= 8) {
-                 let secondLane = (finalLane + Math.floor(k/2)) % k;
-                 if (timeMs > laneFreeTime[secondLane] + 40) {
-                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
-                     laneFreeTime[secondLane] = timeMs;
-                 }
+        // Solo para golpes DEVASTADORES (Cymbals/Crash)
+        // NUNCA durante un solo (ensucia la escalera)
+        if (!isShredding && energy > avgEnergy * 1.8 && density >= 5 && type === 'tap') {
+             // Solo si hay espacio
+             let chordLane = (finalLane + Math.floor(k/2)) % k;
+             if (timeMs > laneFreeTime[chordLane] + 30) {
+                 map.push({ t: timeMs, l: chordLane, type: 'tap', len: 0, h: false });
+                 laneFreeTime[chordLane] = timeMs;
              }
         }
     }
@@ -301,7 +291,7 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Modo Shredder activado..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Forjando mapa de metal..."; }
 
     try {
         unlockAudio();
