@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V105 - STABLE) === */
+/* === AUDIO & ENGINE (REMASTERED V2.0 - RHYTHM & FLOW) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -23,13 +23,11 @@ function unlockAudio() {
 
 function genSounds() {
     if(!window.st.ctx) return;
-    // Hit Sound (Click corto)
     const b1 = window.st.ctx.createBuffer(1, 2000, 44100);
     const d1 = b1.getChannelData(0);
     for (let i = 0; i < d1.length; i++) d1[i] = Math.sin(i * 0.5) * Math.exp(-i / 300);
     window.hitBuf = b1;
 
-    // Miss Sound (Ruido)
     const b2 = window.st.ctx.createBuffer(1, 4000, 44100);
     const d2 = b2.getChannelData(0);
     for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() - 0.5) * 0.5 * Math.exp(-i / 500);
@@ -71,94 +69,100 @@ function normalizeAudio(filteredData) {
     }
     return filteredData;
 }
+
 // ==========================================
-// 2. GENERADOR DE MAPAS (ANTI-SPAM)
+// 2. GENERADOR DE MAPAS "RHYTHM FLOW" (NUEVO)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
     const data = normalizeAudio(new Float32Array(rawData));
     const map = [];
     const sampleRate = buf.sampleRate;
+    
+    // Configuración de Densidad y Ritmo
     let density = cfg.den || 5; 
-    const windowSize = 1024;
-    const step = Math.floor(sampleRate / (40 + (density * 5))); 
-    let laneFreeTime = new Array(k).fill(0);
-    let lastNoteTime = -5000;
+    const bpmSimulated = 120 + (density * 10); // Simulamos BPM según densidad
+    const step = Math.floor(sampleRate / (bpmSimulated / 60 * 4)); // 1/4 beat step
+    
+    // Offset de inicio (3 SEGUNDOS DE SILENCIO VISUAL)
+    const START_OFFSET = 3000; 
+
     let lastLane = 0;
-    let consecutiveInLane = 0;
-    let energyHistory = [];
-    const historySize = 44100 / step; 
-    const thresholdBase = 1.4 - (density * 0.04); 
-    const minGap = Math.max(80, 400 - (density * 30)); 
+    let patternState = 0; // 0: Random, 1: Stairs, 2: Stream
+    let patternCount = 0;
+    let lastTime = -5000;
+    const minGap = Math.max(90, 350 - (density * 25)); // Espacio mínimo entre notas
 
-    for (let i = 0; i < data.length - windowSize; i += step) {
+    // Análisis de energía local
+    for (let i = 0; i < data.length - 1024; i += step) {
+        // Calcular energía RMS en ventana pequeña
         let sum = 0;
-        for (let j = 0; j < windowSize; j++) sum += data[i + j] * data[i + j];
-        const instantEnergy = Math.sqrt(sum / windowSize);
-        energyHistory.push(instantEnergy);
-        if (energyHistory.length > historySize) energyHistory.shift();
-        let localAvg = energyHistory.reduce((a, b) => a + b, 0) / energyHistory.length;
-        const timeMs = (i / sampleRate) * 1000;
+        for (let j = 0; j < 1024; j++) sum += data[i + j] * data[i + j];
+        const energy = Math.sqrt(sum / 1024);
+        const timeMs = (i / sampleRate) * 1000 + START_OFFSET; // APLICAMOS OFFSET AQUÍ
 
-        if (instantEnergy > localAvg * thresholdBase && instantEnergy > 0.05) {
-            if (timeMs - lastNoteTime >= minGap) {
-                let lane = Math.floor(Math.random() * k);
-                
-                // Anti-Jackhammer
-                if (lane === lastLane) {
-                    consecutiveInLane++;
-                    if (consecutiveInLane >= 2) {
-                        lane = (lane + 1 + Math.floor(Math.random() * (k - 1))) % k;
-                        consecutiveInLane = 0;
-                    }
-                } else {
-                    consecutiveInLane = 0;
+        // Umbral dinámico basado en densidad
+        const threshold = 0.05 + ((10 - density) * 0.015);
+
+        if (energy > threshold && (timeMs - lastTime > minGap)) {
+            let type = 'tap';
+            let len = 0;
+            let lane = lastLane;
+            
+            // Detección de Hold Notes (Si la energía se mantiene alta)
+            if (energy > threshold * 1.2 && i + step * 4 < data.length) {
+                // Miramos al futuro
+                let futureSum = 0;
+                for(let f=0; f<4; f++) futureSum += Math.abs(data[i + (step*f)]);
+                if(futureSum/4 > energy * 0.9) {
+                    type = 'hold';
+                    len = Math.min(2000, Math.max(200, Math.random() * 800)); // Holds más controlados
                 }
+            }
 
-                if (density > 5 && Math.random() > 0.7) lane = (lastLane + 1) % k;
+            // === LÓGICA DE PATRONES ===
+            const isHard = density >= 6;
+            const isHighEnergy = energy > threshold * 1.8;
 
-                let type = 'tap';
-                let len = 0;
-                if (instantEnergy > localAvg * 1.2 && timeMs > 5000) { 
-                    let futureIndex = i + (step * 4);
-                    if (futureIndex < data.length && Math.abs(data[futureIndex]) > localAvg * 0.8) {
-                        if (Math.random() > 0.4) { 
-                            type = 'hold';
-                            len = Math.min(1500, Math.max(200, Math.random() * 600)); 
-                        }
-                    }
-                }
+            // Decidir patrón si el anterior terminó
+            if (patternCount <= 0) {
+                const rand = Math.random();
+                if (isHighEnergy && isHard) patternState = 3; // Jumps/Duals
+                else if (rand > 0.7) patternState = 1; // Stairs
+                else if (rand > 0.4) patternState = 2; // Stream (ZigZag)
+                else patternState = 0; // Random Flow
+                patternCount = Math.floor(Math.random() * 4) + 2; // Duración del patrón
+            }
 
-                if (timeMs < laneFreeTime[lane] + 20) {
-                    let found = false;
-                    for (let tryL = 0; tryL < k; tryL++) {
-                        if (timeMs >= laneFreeTime[tryL] + 20) {
-                            lane = tryL;
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) continue; 
-                }
+            // Ejecutar Patrón
+            switch(patternState) {
+                case 1: // Stairs (Escalera)
+                    lane = (lastLane + 1) % k; 
+                    break;
+                case 2: // Stream (Alternar mano)
+                    // Intenta ir lejos de la nota anterior
+                    lane = (lastLane + Math.floor(k/2)) % k; 
+                    break;
+                case 3: // Duals (Solo si es high energy)
+                    lane = Math.floor(Math.random() * k);
+                    break;
+                default: // Random Flow (Evita repetición inmediata)
+                    lane = Math.floor(Math.random() * k);
+                    if (lane === lastLane) lane = (lane + 1) % k;
+                    break;
+            }
 
-                map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
-                laneFreeTime[lane] = timeMs + len + 20; 
-                lastNoteTime = timeMs;
-                lastLane = lane;
+            // Agregar nota principal
+            map.push({ t: timeMs, l: lane, type: type, len: len, h: false });
+            lastTime = timeMs;
+            lastLane = lane;
+            patternCount--;
 
-                if (density >= 4 && instantEnergy > localAvg * 1.8) {
-                    let maxExtra = (density >= 9 && instantEnergy > localAvg * 2.5) ? 2 : 1;
-                    let extrasAdded = 0;
-                    for (let offset = 1; offset < k; offset++) {
-                        if (extrasAdded >= maxExtra) break;
-                        let chordLane = (lane + offset) % k;
-                        if (density < 6 && Math.abs(chordLane - lane) === 1) continue;
-                        if (timeMs >= laneFreeTime[chordLane] + 20) {
-                            map.push({ t: timeMs, l: chordLane, type: 'tap', len: 0, h: false });
-                            laneFreeTime[chordLane] = timeMs + 20;
-                            extrasAdded++;
-                        }
-                    }
+            // Agregar notas dobles (Jumps) en momentos de alta energía
+            if (isHighEnergy && density >= 5 && type !== 'hold') {
+                let secondLane = (lane + Math.floor(k/2) + 1) % k;
+                if(secondLane !== lane) {
+                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
                 }
             }
         }
@@ -168,7 +172,7 @@ function genMap(buf, k) {
 
 
 // ==========================================
-// 3. INICIO Y RE-GENERACIÓN
+// 3. INICIO Y GESTIÓN
 // ==========================================
 function initReceptors(k) {
     elTrack = document.getElementById('track');
@@ -182,13 +186,9 @@ function initReceptors(k) {
     const y = window.cfg.down ? window.innerHeight - 140 : 80;
     window.elReceptors = []; 
     
-    // --- LÓGICA DE SKIN ACTIVA ---
     let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
-        // Buscar la skin en la tienda global
-        if (typeof SHOP_ITEMS !== 'undefined') {
-            activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
-        }
+        if (typeof SHOP_ITEMS !== 'undefined') activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
     for (let i = 0; i < k; i++) {
@@ -206,28 +206,18 @@ function initReceptors(k) {
         r.style.top = y + 'px';
         
         let conf = window.cfg.modes[k][i];
-        let color = conf.c; // Color por defecto (carril)
+        let color = conf.c;
         let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
 
-        // APLICAR SKIN
         if (activeSkin) {
-            // 1. Forma (Shape)
-            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                shapeData = SKIN_PATHS[activeSkin.shape];
-            }
-            // 2. Color (Si es fixed usa el de la skin, si no, usa el del carril)
-            if (activeSkin.fixed) {
-                color = activeSkin.color;
-            }
+            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
+            if (activeSkin.fixed) color = activeSkin.color;
         }
 
         r.style.setProperty('--active-c', color);
-        
-        // Renderizar SVG
         r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 5px ${color})">
             <path class="arrow-path" d="${shapeData}" stroke="${color}" fill="none" stroke-width="4"/>
         </svg>`;
-        
         elTrack.appendChild(r);
         window.elReceptors.push(r);
     }
@@ -236,7 +226,7 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Cargando..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Analizando ritmo..."; }
 
     try {
         unlockAudio();
@@ -252,7 +242,7 @@ window.prepareAndPlaySong = async function(k) {
             const response = await fetch(window.curSongData.audioURL);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
-            const map = genMap(audioBuffer, k);
+            const map = genMap(audioBuffer, k); // Genera mapa con el nuevo algoritmo
             songInRam = { id: window.curSongData.id, buf: audioBuffer, map: map, kVersion: k, genDen: currentDen };
             window.ramSongs.push(songInRam);
         }
@@ -279,22 +269,20 @@ window.playSongInternal = function(s) {
 
     const loader = document.getElementById('loading-overlay');
     if(loader) loader.style.display = 'none';
-    const syncOv = document.getElementById('sync-overlay');
-    if(syncOv) syncOv.style.display = 'none'; 
-
+    
     window.st.act = true;
     window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
     window.st.spawned = [];
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
     
+    // Calculo de Max Score real
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => {
         window.st.trueMaxScore += 350; 
-        if(n.type === 'hold') window.st.trueMaxScore += 100;
+        if(n.type === 'hold') window.st.trueMaxScore += 200; // Ajustado valor hold
     });
 
-    window.st.maxScorePossible = 0; 
     window.st.keys = new Array(window.keys).fill(0);
     window.st.songDuration = s.buf.duration;
     window.keys = s.kVersion;
@@ -315,10 +303,16 @@ window.playSongInternal = function(s) {
     initReceptors(window.keys);
     updHUD();
 
+    // === CUENTA REGRESIVA ===
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex';
     cd.innerText = "3";
     let count = 3;
+    
+    // Offset de audio: La música empieza 3 segundos DESPUÉS del tiempo lógico 0
+    // para coincidir con el START_OFFSET del mapa (3000ms)
+    const AUDIO_DELAY = 3; 
+
     const iv = setInterval(() => {
         count--;
         if (count > 0) cd.innerText = count;
@@ -326,16 +320,22 @@ window.playSongInternal = function(s) {
             clearInterval(iv);
             cd.innerText = "GO!";
             setTimeout(() => cd.innerText = "", 500);
+            
             try {
                 if (window.st.ctx.state === 'suspended') window.st.ctx.resume();
+                
                 window.st.src = window.st.ctx.createBufferSource();
                 window.st.src.buffer = s.buf;
                 const g = window.st.ctx.createGain();
                 g.gain.value = window.cfg.vol;
                 window.st.src.connect(g); g.connect(window.st.ctx.destination);
                 
+                // IMPORTANTE: Arrancar el tiempo lógico AHORA
                 window.st.t0 = window.st.ctx.currentTime;
-                window.st.src.start(0);
+                
+                // Pero el audio arranca con retraso (Offset)
+                window.st.src.start(window.st.ctx.currentTime + AUDIO_DELAY);
+                
                 window.st.src.onended = () => { window.songFinished = true; end(false); };
                 loop();
             } catch(err) { console.error(err); }
@@ -344,14 +344,15 @@ window.playSongInternal = function(s) {
 }
 
 // ==========================================
-// 4. BUCLE DE JUEGO (CORREGIDO)
+// 4. BUCLE DE JUEGO (HOLD NOTE FIX)
 // ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     
+    // Actualizar barra de progreso (ajustada con el offset)
     if (window.st.songDuration > 0) {
-        const cur = Math.max(0, now / 1000); 
+        const cur = Math.max(0, (now - 3000) / 1000); 
         const pct = Math.min(100, (cur / window.st.songDuration) * 100);
         document.getElementById('top-progress-fill').style.width = pct + "%";
         document.getElementById('top-progress-time').innerText = `${Math.floor(cur/60)}:${Math.floor(cur%60).toString().padStart(2,'0')}`;
@@ -360,8 +361,8 @@ function loop() {
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // SPAWNING
-  let activeSkin = null;
+    // SPAWNING (Pre-renderizado 1.5s antes)
+    let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
@@ -369,6 +370,8 @@ function loop() {
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue;
+        
+        // Spawnear si está en ventana visual
         if (n.t - now < 1500) {
             const el = document.createElement('div');
             const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
@@ -376,24 +379,15 @@ function loop() {
             el.style.left = (n.l * w) + '%';
             el.style.width = w + '%';
             
-            // CONFIGURACIÓN BASE
             let conf = window.cfg.modes[window.keys][n.l];
             let color = conf.c; 
             let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
 
-            // APLICAR SKIN DINÁMICA
             if (activeSkin) {
-                // Sobrescribir forma
-                if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                    shapeData = SKIN_PATHS[activeSkin.shape];
-                }
-                // Sobrescribir color si es fijo
-                if (activeSkin.fixed) {
-                    color = activeSkin.color;
-                }
+                if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
+                if (activeSkin.fixed) color = activeSkin.color;
             }
 
-            // Renderizar SVG con la forma y color correctos
             let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})">
                 <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>
             </svg>`;
@@ -411,7 +405,7 @@ function loop() {
         } else break;
     }
 
-    // MOVEMENT
+    // LOGICA DE MOVIMIENTO Y HOLDS
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if (!n.el) { window.st.spawned.splice(i, 1); continue; }
@@ -420,27 +414,50 @@ function loop() {
         const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
         let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
         
+        // Mover cabeza de la nota
         if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
              n.el.style.top = finalY + 'px';
         }
 
+        // === HOLD LOGIC FIX (NO INSTA-KILL) ===
         if (n.type === 'hold' && n.h) {
-             n.el.style.top = yReceptor + 'px';
+             n.el.style.top = yReceptor + 'px'; // Fijar cabeza en receptor
              const rem = (n.t + n.len) - now;
              const tr = n.el.querySelector('.sustain-trail');
+             
+             // Reducir tamaño visualmente
              if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
              
-             if (!window.st.keys[n.l] && rem > 50) miss(n); 
-             else { window.st.hp = Math.min(100, window.st.hp+0.05); updHUD(); }
+             // SI SUELTAS LA TECLA:
+             if (!window.st.keys[n.l]) {
+                 // Cambiar opacidad para indicar que se soltó
+                 n.el.style.opacity = 0.4;
+                 
+                 // Solo si faltaba mucho (más de 100ms), rompemos el combo
+                 if (rem > 100 && !n.broken) {
+                     window.st.cmb = 0; // Rompe combo
+                     n.broken = true;   // Marcamos como rota para no quitar vida cada frame
+                     // NO QUITAMOS HP AQUÍ, SOLO DEJAMOS DE CURAR
+                 }
+             } else {
+                 // SI MANTIENES LA TECLA:
+                 n.el.style.opacity = 1;
+                 // Curar solo si no está rota
+                 if(!n.broken) window.st.hp = Math.min(100, window.st.hp + 0.1); 
+                 updHUD(); 
+             }
 
+             // Terminar nota
              if (now >= n.t + n.len) {
-                 window.st.sc += 100; 
+                 if(!n.broken) window.st.sc += 200; // Bonus por terminar completo
                  n.el.remove(); n.el = null; 
              }
         }
 
+        // Miss de Tap o Cabeza de Hold
         if (!n.h && timeDiff < -160) {
             miss(n);
+            // Si es hold y fallas la cabeza, se borra toda la nota (no instakill)
             if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
             window.st.spawned.splice(i, 1);
         }
@@ -452,24 +469,17 @@ function loop() {
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     if(!elTrack) return;
-    
     const r = document.getElementById(`rec-${l}`);
     if(!r) return;
-    
     const type = window.cfg.splashType || 'classic';
     const color = window.cfg.modes[window.keys][l].c;
-    
     const s = document.createElement('div');
     s.className = 'splash-wrapper';
-    
-    // Posición exacta
     s.style.left = r.style.left;
     s.style.top = r.style.top;
-    
     const inner = document.createElement('div');
     inner.className = `splash-${type}`;
     inner.style.setProperty('--c', color);
-    
     s.appendChild(inner);
     elTrack.appendChild(s);
     setTimeout(() => s.remove(), 400);
@@ -512,30 +522,20 @@ function hit(l, p) {
         }
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        // Buscar nota golpeable
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
 
         if (n) {
-            const diff = n.t - now; // Diferencia real (positiva o negativa)
+            const diff = n.t - now; 
             const absDiff = Math.abs(diff);
 
-            // Guardar para Mean MS
             window.st.totalOffset += absDiff;
             window.st.hitCount++;
 
             let score=50, text="BAD", color="yellow";
             
-            if(absDiff < 45){ 
-                text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; 
-                createSplash(l); 
-            }
-            else if(absDiff < 90){ 
-                text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; 
-                createSplash(l);
-            }
-            else { 
-                window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; 
-            }
+            if(absDiff < 45){ text="SICK"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
+            else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); }
+            else { window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; }
 
             if(text==="BAD") window.st.fcStatus="SD";
 
@@ -543,7 +543,6 @@ function hit(l, p) {
             window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             window.st.hp = Math.min(100, window.st.hp+2);
             
-            // Pasamos 'diff' a showJudge
             showJudge(text, color, diff); 
             playHit(); updHUD();
             n.h = true; 
@@ -565,33 +564,24 @@ function miss(n) {
 
 function showJudge(text, color, diffMs) {
     if(!window.cfg.judgeVis) return;
-    
-    // Crear contenedor del juicio
     const container = document.createElement('div');
     container.className = 'judge-container';
     container.style.left = getComputedStyle(document.documentElement).getPropertyValue('--judge-x');
     container.style.top = getComputedStyle(document.documentElement).getPropertyValue('--judge-y');
 
-    // Texto del juicio (SICK, GOOD...)
     const j = document.createElement('div');
     j.className = 'judge-pop'; 
     j.innerText = text; 
     j.style.color = color;
-    
     container.appendChild(j);
 
-    // Texto de MS (Solo si no es MISS y existe diffMs)
     if (text !== "MISS" && typeof diffMs === 'number' && window.cfg.showMs) {
         const msDiv = document.createElement('div');
         msDiv.className = 'judge-ms';
-        // Formato: +15ms o -10ms
         const sign = diffMs > 0 ? "+" : "";
         msDiv.innerText = `${sign}${Math.round(diffMs)}ms`;
-        
-        // Color dependiente del timing (Tarde: Rojo/Naranja, Temprano: Azul/Cyan)
-        if (diffMs > 0) msDiv.style.color = "#ffaa00"; // Late
-        else msDiv.style.color = "#00aaff"; // Early
-        
+        if (diffMs > 0) msDiv.style.color = "#ffaa00"; 
+        else msDiv.style.color = "#00aaff"; 
         container.appendChild(msDiv);
     }
 
@@ -617,7 +607,7 @@ function updHUD() {
 }
 
 // ==========================================
-// 5. RESULTADOS & MENU (CORREGIDO)
+// 5. RESULTADOS & MENU
 // ==========================================
 function end(died) {
     window.st.act = false;
@@ -625,15 +615,11 @@ function end(died) {
     document.getElementById('game-layer').style.display = 'none';
     
     if(window.isMultiplayer) {
-        // Enviar puntaje final
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
-        
-        // Si soy HOST, cambiar estado de sala a 'finished'
-        // (Nota: Idealmente esperar a todos, pero para v1 lo hacemos directo)
         if(window.isLobbyHost && window.db && window.currentLobbyId) {
              setTimeout(() => {
                 window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'finished' });
-             }, 2000); // Pequeño delay para asegurar sync
+             }, 2000); 
         }
         return; 
     }
@@ -641,7 +627,6 @@ function end(died) {
     const modal = document.getElementById('modal-res');
     if(modal) {
         modal.style.display = 'flex';
-        const panel = modal.querySelector('.modal-panel');
         const totalMax = window.st.trueMaxScore || 1;
         const finalAcc = Math.round((window.st.sc / totalMax) * 100);
         let r="D", c="red";
@@ -665,6 +650,7 @@ function end(died) {
             if(typeof updateFirebaseScore === 'function') updateFirebaseScore();
         }
 
+        const panel = modal.querySelector('.modal-panel');
         panel.innerHTML = `
             <div class="m-title">RESULTADOS</div>
             <div style="display:flex; justify-content:center; align-items:center; gap:30px;">
@@ -688,13 +674,12 @@ function end(died) {
 
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
-// === PAUSA CON FIX DE TIEMPO ===
 function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
     if(window.st.paused) {
-        window.st.pauseTime = performance.now(); // Marca tiempo
+        window.st.pauseTime = performance.now(); 
         if(window.st.ctx) window.st.ctx.suspend();
         
         if(modal) {
@@ -723,40 +708,32 @@ function togglePause() {
 
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
-    
-    // COMPENSAR EL TIEMPO PERDIDO EN PAUSA
     if(window.st.pauseTime) {
         const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
-        window.st.t0 += pauseDuration; // Movemos el tiempo 0 hacia adelante
+        window.st.t0 += pauseDuration; 
         window.st.pauseTime = null;
     }
-
     window.st.paused = false;
     if(window.st.ctx) window.st.ctx.resume();
     loop();
 }
 
-// === SALIDA LIMPIA (SIN AUDIO DOBLE) ===
 function toMenu() {
-    // 1. Matar fuente de audio
     if(window.st.src) {
         try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
         window.st.src = null;
     }
-    // 2. Suspender contexto global
     if(window.st.ctx) window.st.ctx.suspend();
     
-    // 3. Resetear flags
     window.st.act = false;
     window.st.paused = false;
     window.songFinished = false;
     
-    // 4. Cambiar pantalla
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
     document.getElementById('modal-res').style.display = 'none';
     document.getElementById('modal-pause').style.display = 'none';
 }
 
-function initMultiLeaderboard() { /* (Se mantiene igual que V101) */ }
-window.updateMultiLeaderboardUI = function(scores) { /* (Igual) */ }
+function initMultiLeaderboard() {}
+window.updateMultiLeaderboardUI = function(scores) {}
