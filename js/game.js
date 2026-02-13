@@ -79,176 +79,78 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // CONFIGURACIÓN DE DIFICULTAD REAL
     let density = cfg.den || 5; 
     
-    // GRID ULTRA RÁPIDO (Para detectar solos de 1/32)
-    // Forzamos un BPM base alto para Metal
-    const targetBPM = 190 + (density * 5); 
-    const samplesPerBeat = sampleRate * (60 / targetBPM);
-    const step = Math.floor(samplesPerBeat / 4); // 1/16 de nota
+    // RITMO BASE (Grid 1/16)
+    // Usamos un BPM alto para que no falten espacios en canciones rápidas
+    const baseBPM = 175 + (density * 5); 
+    const samplesPerTick = Math.floor(sampleRate * (60 / baseBPM) / 4);
     
     const START_OFFSET = 3000; 
 
-    // Estado
-    let laneFreeTime = new Array(k).fill(-9999); 
-    let lastLane = Math.floor(k/2); 
+    let lastLane = Math.floor(k/2);
+    let patternDir = 1;
     let lastTime = -5000;
     
-    // Variables de Análisis
-    let chaosAccumulator = 0; // Acumulador de distorsión (Guitarra)
-    let patternDir = 1;
-    let soloMode = false;
+    // Promedio de volumen para comparar
+    let movingAvg = 0;
 
-    // Recorrido
-    for (let i = 1; i < data.length - step; i += step) {
-        
-        // 1. ANÁLISIS MULTI-FACTOR
-        let energySum = 0;
-        let chaosSum = 0; // Suma de diferencias entre samples (Agudos/Distorsión)
-        
-        const windowSize = Math.floor(step * 0.8);
-        
-        for (let j = 0; j < windowSize; j++) {
-            if(i+j >= data.length) break;
-            const val = data[i+j];
-            const prev = data[i+j-1] || 0;
-            
-            energySum += Math.abs(val);
-            // El "Caos" es la derivada: qué tan rápido cambia la onda.
-            // Guitarra distorsionada = Caos altísimo. Voz = Caos bajo/medio.
-            chaosSum += Math.abs(val - prev); 
+    for (let i = 0; i < data.length - samplesPerTick; i += samplesPerTick) {
+        // Calcular energía en este bloque
+        let energy = 0;
+        for (let j = 0; j < samplesPerTick; j++) {
+            energy += Math.abs(data[i + j]);
         }
+        energy /= samplesPerTick;
         
-        const energy = energySum / windowSize;
-        const chaos = chaosSum / windowSize; // Promedio de rugosidad
-
+        // Actualizar promedio
+        movingAvg = (movingAvg * 0.9) + (energy * 0.1);
+        
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
-        
-        // Umbrales adaptativos
-        const baseThreshold = 0.03 + ((10 - density) * 0.005); 
-        
-        // --- DETECCIÓN DE INSTRUMENTO ---
-        
-        // Acumular "Caos" para detectar solos sostenidos
-        // Si hay mucho caos y volumen, es guitarra eléctrica
-        if (chaos > 0.08 && energy > baseThreshold) { 
-            chaosAccumulator += 2;
-        } else {
-            chaosAccumulator -= 1;
-        }
-        
-        // Limites acumulador
-        chaosAccumulator = Math.max(0, Math.min(20, chaosAccumulator));
-        
-        // ACTIVAR MODO SOLO si el acumulador está lleno
-        soloMode = chaosAccumulator > 8;
+        const threshold = 0.05 + ((10 - density) * 0.01);
 
-        // Gap mínimo (Velocidad permitida)
-        // En modo Solo, el gap es CERO (limitado solo por el grid 1/16)
-        // En modo Normal, damos un respiro.
-        let minGap = soloMode ? 50 : Math.max(90, 300 - (density * 25));
+        // SOLO GENERAR SI SUPERA EL UMBRAL
+        if (energy > threshold) {
+            
+            // Limitador de velocidad según densidad
+            const minGap = Math.max(70, 300 - (density * 25));
+            if (timeMs - lastTime < minGap) continue;
 
-        if (energy < baseThreshold) continue;
-        if (timeMs - lastTime < minGap) continue;
+            let type = 'tap';
+            let len = 0;
 
-        let type = 'tap';
-        let len = 0;
-
-        // --- LÓGICA DE GENERACIÓN ---
-
-        if (soloMode) {
-            // === GUITARRA (STREAMS & ESCALERAS) ===
-            // Aquí generamos patrones constantes que siguen el grid
-            // Ignoramos picos de volumen, solo llenamos el espacio
+            // --- LÓGICA DE FLUJO RÍTMICO ---
             
-            // Movimiento: Escalera infinita con rebote
-            lastLane += patternDir;
-            
-            if (lastLane >= k) {
-                lastLane = k - 2;
-                patternDir = -1;
-            } else if (lastLane < 0) {
-                lastLane = 1;
-                patternDir = 1;
-            }
-            
-            // Forzar nota (Tap)
-            type = 'tap';
-
-        } else {
-            // === VOZ / RITMO (NO SOLO) ===
-            
-            // Distinguir Voz vs Batería usando el factor "Caos"
-            // Caos bajo + Energía Alta = VOZ (Nota limpia)
-            // Caos medio/alto instantáneo = Batería
-            
-            let isVocal = chaos < 0.05 && energy > baseThreshold * 1.5;
-            
-            if (isVocal) {
-                // VOZ: Generar Holds o Taps suaves
-                // Mirar al futuro para ver si la voz sostiene
-                let sustain = 0;
-                for(let h=1; h<10; h++) {
-                    if (i + step*h < data.length && Math.abs(data[i+step*h]) > baseThreshold) sustain++;
-                    else break;
-                }
+            // 1. Si la energía es muy alta comparada con el promedio (GOLPES/INSTRUMENTAL)
+            if (energy > movingAvg * 1.2) {
+                // Modo Escalera: Moverse 1 carril siempre
+                lastLane += patternDir;
+                if (lastLane >= k) { lastLane = k - 2; patternDir = -1; }
+                if (lastLane <= 0) { lastLane = 1; patternDir = 1; }
+            } 
+            // 2. Si es energía sostenida (VOZ)
+            else if (energy > threshold * 1.4) {
+                // Modo Saltos: Elegir carril aleatorio
+                lastLane = Math.floor(Math.random() * k);
                 
-                if (sustain > 5) {
+                // Probabilidad de Hold Note corta para la voz
+                if (Math.random() > 0.7) {
                     type = 'hold';
-                    len = sustain * (step/sampleRate) * 1000;
-                    len = Math.min(1000, len);
-                }
-                
-                // Movimiento suave para la voz
-                if (Math.random() > 0.5) lastLane = (lastLane + 1) % k;
-                
-            } else {
-                // BATERÍA / RITMO: Saltos más agresivos
-                let jump = Math.floor(Math.random() * 2) + 1;
-                if(Math.random() > 0.5) lastLane = (lastLane + jump) % k;
-                else lastLane = (lastLane - jump + k) % k;
-            }
-        }
-
-        // --- COLOCACIÓN FINAL (SIN MIEDO AL SPAM) ---
-        let finalLane = -1;
-
-        // Prioridad al carril calculado
-        if (timeMs > laneFreeTime[lastLane] + 20) { // Gap visual mínimo casi nulo (20ms)
-            finalLane = lastLane;
-        } else {
-            // Si está lleno, buscar vecino en dirección del flujo
-            let next = lastLane + patternDir;
-            if (next >= 0 && next < k && timeMs > laneFreeTime[next] + 20) {
-                finalLane = next;
-            } else {
-                // Cualquier hueco sirve en modo experto
-                for(let l=0; l<k; l++) {
-                    if (timeMs > laneFreeTime[l] + 20) {
-                        finalLane = l;
-                        break;
-                    }
+                    len = 200 + (Math.random() * 400);
                 }
             }
-        }
 
-        if (finalLane === -1) continue;
-
-        map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-        laneFreeTime[finalLane] = timeMs + len;
-        
-        lastTime = timeMs;
-        lastLane = finalLane;
-
-        // --- DOBLES (CHORDS) ---
-        // Permitir dobles incluso en solos si la energía rompe el techo
-        // Esto añade dificultad extra "DragonForce style"
-        if (energy > baseThreshold * 3.5 && density >= 6) {
-            let chordLane = (finalLane + Math.floor(k/2)) % k;
-            if (timeMs > laneFreeTime[chordLane] + 20) {
-                map.push({ t: timeMs, l: chordLane, type: 'tap', len: 0, h: false });
-                laneFreeTime[chordLane] = timeMs;
+            // Evitar que las notas se peguen visualmente en el mismo carril
+            // (Si el carril está ocupado, simplemente saltamos al siguiente)
+            let finalLane = lastLane;
+            map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
+            
+            lastTime = timeMs;
+            
+            // DOBLES (Chords) solo en picos extremos
+            if (energy > movingAvg * 2.0 && density >= 5 && type === 'tap') {
+                let dLane = (finalLane + Math.floor(k/2)) % k;
+                map.push({ t: timeMs, l: dLane, type: 'tap', len: 0, h: false });
             }
         }
     }
