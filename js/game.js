@@ -622,7 +622,7 @@ function updHUD() {
     const fcEl = document.getElementById('hud-fc');
     if(fcEl) {
         fcEl.innerText = window.cfg.showFC ? window.st.fcStatus : "";
-        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"));
+        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
