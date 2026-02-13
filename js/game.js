@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V4.3 - COMPLEX PATTERNS) === */
+/* === AUDIO & ENGINE (MASTER FINAL V5.0 - VOCAL & BEAT SEPARATION) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -71,7 +71,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR DE MAPAS V4.3 (COMPLEX STAIRS)
+// 2. GENERADOR INTELIGENTE V5.0 (BEAT VS VOCAL)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -82,175 +82,145 @@ function genMap(buf, k) {
     // CONFIGURACIÓN
     let density = cfg.den || 5; 
     
-    // GRID SYSTEM (RITMO)
+    // GRID
     const simulatedBPM = 135 + (density * 5); 
     const samplesPerBeat = sampleRate * (60 / simulatedBPM);
     const step = Math.floor(samplesPerBeat / 4); 
     
     const START_OFFSET = 3000; 
 
-    // Estado del Mapa
+    // Estado
     let laneFreeTime = new Array(k).fill(-9999); 
     let lastLane = Math.floor(k/2); 
     let lastTime = -5000;
-    let lastDoubleTime = -5000;
     
-    // Variables de Patrón Complejo
-    let patternType = 'linear'; // 'linear', 'broken', 'trill'
-    let notesInPattern = 0;
-    let patternDirection = 1; // 1 (Derecha) o -1 (Izquierda)
-    let trillLaneA = 0;
-    let trillLaneB = 1;
+    // Variables para detectar "Instrumental vs Voz"
+    let prevEnergy = 0;
+    let patternState = 'vocal'; // 'stair' (Instrumental) o 'vocal' (Taps/Holds)
+    let patternDirection = 1;
 
     for (let i = 0; i < data.length - step; i += step) {
+        // Análisis de Energía Local
         let sum = 0;
         const windowSize = Math.floor(step / 2);
         for (let j = 0; j < windowSize; j++) {
             if(i+j < data.length) sum += data[i + j] * data[i + j];
         }
         const energy = Math.sqrt(sum / windowSize);
+        
+        // CÁLCULO DE "FLUJO" (La diferencia con la energía anterior)
+        // Si el flujo es alto, es un golpe seco (Batería/Instrumental).
+        // Si el flujo es bajo pero hay energía, es sonido sostenido (Voz).
+        const flux = Math.abs(energy - prevEnergy);
+        prevEnergy = energy;
+
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
         
-        // Umbral Dinámico
+        // Umbrales
         const threshold = 0.05 + ((10 - density) * 0.015);
+        const beatThreshold = threshold * 0.4; // Qué tan fuerte debe ser el cambio para ser Beat
 
         if (energy > threshold) {
-            const minGap = Math.max(80, 240 - (density * 20)); // Un poco más rápido
+            const minGap = Math.max(80, 240 - (density * 20));
             if (timeMs - lastTime < minGap) continue;
 
             let type = 'tap';
             let len = 0;
-            let isMegaHit = energy > threshold * 3.0; // Solo hits brutales son dobles
 
-            // --- HOLD NOTES (EXTREMADAMENTE RARAS) ---
-            if (energy > threshold * 1.8) { // Umbral altísimo
-                let holdSustain = 0;
-                for (let h = 1; h <= 8; h++) {
-                    let futureIdx = i + (step * h);
-                    if (futureIdx >= data.length) break;
-                    if (Math.abs(data[futureIdx]) > threshold * 1.2) {
-                        holdSustain++;
-                    } else break; 
-                }
-                // Probabilidad 30% solamente si sostiene mucho
-                if (holdSustain > 5 && Math.random() > 0.7) {
-                    type = 'hold';
-                    len = (holdSustain * (step / sampleRate) * 1000); 
-                    len = Math.min(800, Math.max(150, len));
-                }
-            }
-
-            // --- LÓGICA DE PATRONES COMPLEJOS ---
+            // --- LÓGICA DE SEPARACIÓN ---
             
-            // 1. ¿Necesitamos un nuevo patrón?
-            if (notesInPattern <= 0) {
-                const rnd = Math.random();
-                
-                // Distribución de Patrones:
-                // 50% Escalera Larga (1-2-3-4)
-                // 30% Escalera Corta / Rota (2-3, 4-3, 1-2)
-                // 20% Trino / ZigZag (1-2-1-2)
-                
-                if (rnd < 0.5) {
-                    patternType = 'linear';
-                    notesInPattern = Math.floor(Math.random() * 5) + 4; // 4 a 8 notas
-                    // Seguir dirección o invertir si estamos en borde
-                    if (lastLane <= 0) patternDirection = 1;
-                    else if (lastLane >= k-1) patternDirection = -1;
-                    else patternDirection = Math.random() > 0.5 ? 1 : -1;
-                } 
-                else if (rnd < 0.8) {
-                    patternType = 'broken';
-                    notesInPattern = Math.floor(Math.random() * 2) + 2; // Solo 2 o 3 notas (ej: 1-2, 3-2-1)
-                    // "Broken" salta a un carril aleatorio para empezar la mini-escalera
-                    lastLane = Math.floor(Math.random() * k); 
-                    patternDirection = Math.random() > 0.5 ? 1 : -1;
-                } 
-                else {
-                    patternType = 'trill';
-                    notesInPattern = Math.floor(Math.random() * 4) + 4; // 4 a 8 notas
-                    // Elegir dos carriles adyacentes para el trino
-                    let base = Math.floor(Math.random() * (k - 1));
-                    trillLaneA = base;
-                    trillLaneB = base + 1;
-                }
+            // 1. DETECTOR DE INSTRUMENTAL (Beat/Stairs)
+            // Si el "flux" (cambio brusco) es alto, es percusión -> USAMOS ESCALERAS
+            if (flux > beatThreshold) {
+                patternState = 'stair';
+            } 
+            // 2. DETECTOR DE VOZ (Melody/Taps/Holds)
+            // Si el "flux" es bajo pero hay volumen, es voz/synth -> USAMOS TAPS/HOLDS
+            else {
+                patternState = 'vocal';
             }
 
-            // 2. Ejecutar Patrón Actual
-            let lane = lastLane;
+            // --- GENERACIÓN SEGÚN TIPO DETECTADO ---
 
-            if (patternType === 'linear') {
-                // Escalera clásica: se mueve 1 y rebota
-                lane = lastLane + patternDirection;
-                if (lane >= k) { lane = k - 2; patternDirection = -1; }
-                if (lane < 0) { lane = 1; patternDirection = 1; }
-            } 
-            else if (patternType === 'broken') {
-                // Escalera corta: se mueve 1, pero si choca pared SE ACABA el patrón
-                lane = lastLane + patternDirection;
-                if (lane >= k || lane < 0) {
-                    // Corrección para no salir del mapa
-                    lane = (lane < 0) ? 0 : k-1;
-                    notesInPattern = 0; // Forzar cambio de patrón
+            if (patternState === 'stair') {
+                // MODO ESCALERA (INSTRUMENTAL)
+                // Hacemos que la nota siga una secuencia lineal (1-2-3-4)
+                
+                // Cambio de dirección inteligente si llegamos al borde
+                if (lastLane >= k-1) patternDirection = -1;
+                if (lastLane <= 0) patternDirection = 1;
+                
+                lastLane = lastLane + patternDirection;
+                
+                // Corrección de límites
+                if (lastLane < 0) lastLane = 0;
+                if (lastLane >= k) lastLane = k-1;
+
+            } else {
+                // MODO VOZ (TAPS & HOLDS)
+                // Hacemos saltos más expresivos o notas largas
+                
+                // Detectar si la voz se mantiene (Hold)
+                // Miramos al futuro para ver si el sonido sigue suave y constante
+                if (energy > threshold * 1.5) {
+                    let sustainCount = 0;
+                    for (let h = 1; h <= 8; h++) {
+                        let fIdx = i + (step * h);
+                        if (fIdx >= data.length) break;
+                        // Checamos que siga habiendo energía
+                        if (Math.abs(data[fIdx]) > threshold * 0.8) sustainCount++;
+                        else break;
+                    }
+                    
+                    // Si dura más de 3 ticks, es un Hold Vocal
+                    if (sustainCount > 3) {
+                        type = 'hold';
+                        len = (sustainCount * (step / sampleRate) * 1000); 
+                        len = Math.min(1200, Math.max(200, len));
+                    }
                 }
-            } 
-            else if (patternType === 'trill') {
-                // Alternar A y B
-                lane = (lane === trillLaneA) ? trillLaneB : trillLaneA;
+
+                // Posición aleatoria para la voz (más orgánico)
+                let dist = Math.floor(Math.random() * k);
+                lastLane = dist;
             }
 
-            // 3. Verificación de Espacio (Anti-Solapamiento)
+            // --- ANTI-COLISIÓN (Siempre activa) ---
             let finalLane = -1;
             
-            // Intento 1: El carril calculado
-            if (timeMs > laneFreeTime[lane] + 40) {
-                finalLane = lane;
+            // Intentar el carril calculado
+            if (timeMs > laneFreeTime[lastLane] + 40) {
+                finalLane = lastLane;
             } else {
-                // Si está ocupado (spam muy rápido), buscar vecino en la dirección del flujo
-                let tryL = lane + patternDirection;
-                if (tryL >= 0 && tryL < k && timeMs > laneFreeTime[tryL] + 40) {
-                    finalLane = tryL;
-                } else {
-                    // Si no, cualquiera libre (último recurso)
-                    for (let l = 0; l < k; l++) {
-                        if (timeMs > laneFreeTime[l] + 40) {
+                // Buscar el más cercano libre
+                let bestDist = 99;
+                for (let l = 0; l < k; l++) {
+                    if (timeMs > laneFreeTime[l] + 40) {
+                        let d = Math.abs(l - lastLane);
+                        if (d < bestDist) {
+                            bestDist = d;
                             finalLane = l;
-                            break;
                         }
                     }
                 }
             }
 
-            if (finalLane === -1) continue; // Si todo está lleno, saltar nota
+            if (finalLane === -1) continue;
 
-            // 4. Guardar Nota
             map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-            laneFreeTime[finalLane] = timeMs + len;
+            laneFreeTime[finalLane] = timeMs + len; // Bloquear carril
             
             lastTime = timeMs;
             lastLane = finalLane;
-            notesInPattern--;
 
-            // --- DOBLES (SOLO EN HITS EXPLOSIVOS) ---
-            // Cooldown de 800ms
-            if (isMegaHit && type === 'tap' && density >= 5) {
-                if (timeMs - lastDoubleTime > 800) {
-                    // Buscar carril lejos del actual para que sea legible
-                    let secondLane = -1;
-                    // Intentar simetría o lejos
-                    for (let l = 0; l < k; l++) {
-                        if (Math.abs(l - finalLane) > 1 && timeMs > laneFreeTime[l] + 40) {
-                            secondLane = l;
-                            break;
-                        }
-                    }
-                    
-                    if (secondLane !== -1) {
-                        map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
-                        laneFreeTime[secondLane] = timeMs;
-                        lastDoubleTime = timeMs;
-                    }
-                }
+            // --- DOBLES (SOLO EN EL INSTRUMENTAL FUERTE) ---
+            // Solo ponemos notas dobles si estamos en modo Stair (Instrumental) y el golpe es muy fuerte
+            if (patternState === 'stair' && flux > beatThreshold * 2.5 && density >= 5 && type === 'tap') {
+                 let secondLane = (finalLane + Math.floor(k/2)) % k;
+                 if (timeMs > laneFreeTime[secondLane] + 40) {
+                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                     laneFreeTime[secondLane] = timeMs;
+                 }
             }
         }
     }
@@ -312,7 +282,7 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Creando mapa rítmico..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Separando voz e instrumental..."; }
 
     try {
         unlockAudio();
