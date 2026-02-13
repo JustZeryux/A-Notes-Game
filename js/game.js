@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V8.0 - MULTI-BAND CHAOS ENGINE) === */
+/* === AUDIO & ENGINE (MASTER FINAL V7.0 - SPECTRAL ANALYZER) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -58,6 +58,7 @@ function playMiss() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
+    // Muestreo optimizado
     for (let i = 0; i < filteredData.length; i += 50) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
@@ -71,7 +72,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR V8.0 (SEPARACIÓN DE FRECUENCIAS Y CAOS)
+// 2. GENERADOR V7.0 (ZCR & STATE MACHINE)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -79,78 +80,182 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
+    // Configuración de Densidad
     let density = cfg.den || 5; 
     
-    // RITMO BASE (Grid 1/16)
-    // Usamos un BPM alto para que no falten espacios en canciones rápidas
-    const baseBPM = 175 + (density * 5); 
-    const samplesPerTick = Math.floor(sampleRate * (60 / baseBPM) / 4);
+    // GRID EXACTO (Snap to Grid)
+    // Usamos 180 BPM como base sólida para metal rápido
+    const baseBPM = 170 + (density * 5); 
+    const samplesPerBeat = sampleRate * (60 / baseBPM);
+    const step16 = Math.floor(samplesPerBeat / 4); // 1/16 nota
     
     const START_OFFSET = 3000; 
 
-    let lastLane = Math.floor(k/2);
-    let patternDir = 1;
+    // Estado del Mapa
+    let laneFreeTime = new Array(k).fill(-9999); 
+    let lastLane = Math.floor(k/2); 
     let lastTime = -5000;
     
-    // Promedio de volumen para comparar
-    let movingAvg = 0;
+    // MÁQUINA DE ESTADOS
+    let currentState = 'IDLE'; // IDLE, GUITAR_SOLO, VOCAL_RHYTHM, DRUM_FILL
+    let stateTimer = 0; // Cuánto tiempo llevamos en este estado (para no cambiar muy rápido)
+    let patternDir = 1;
 
-    for (let i = 0; i < data.length - samplesPerTick; i += samplesPerTick) {
-        // Calcular energía en este bloque
+    // Recorremos la canción en bloques de 1/16 de nota (Grid fijo)
+    for (let i = 0; i < data.length - step16; i += step16) {
+        
+        // 1. ANÁLISIS ESPECTRAL SIMULADO (Zero Crossing Rate)
+        // Contamos cuántas veces la onda cruza el cero. 
+        // Mucho cruce = Frecuencia Alta (Guitarra Distorsionada/Platillos)
+        // Poco cruce = Frecuencia Baja/Media (Voz/Bajo)
+        
+        let zcr = 0;
         let energy = 0;
-        for (let j = 0; j < samplesPerTick; j++) {
-            energy += Math.abs(data[i + j]);
+        const windowSize = Math.floor(step16);
+        
+        for (let j = 0; j < windowSize - 1; j += 4) { // Saltamos samples para optimizar
+            const val = data[i + j];
+            const nextVal = data[i + j + 1];
+            
+            // Energía RMS
+            energy += val * val;
+            
+            // Zero Crossing
+            if ((val >= 0 && nextVal < 0) || (val < 0 && nextVal >= 0)) {
+                zcr++;
+            }
         }
-        energy /= samplesPerTick;
         
-        // Actualizar promedio
-        movingAvg = (movingAvg * 0.9) + (energy * 0.1);
-        
+        energy = Math.sqrt(energy / (windowSize/4));
+        // Normalizar ZCR relativo al tamaño de ventana
+        const zcrDensity = zcr / (windowSize/4); 
+
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
-        const threshold = 0.05 + ((10 - density) * 0.01);
+        
+        // Umbrales
+        const volThreshold = 0.04 + ((10 - density) * 0.01);
+        
+        // --- LÓGICA DE ESTADOS (STATE MACHINE) ---
+        // Solo permitimos cambiar de estado si han pasado > 1.5 segundos (State Locking)
+        // Esto evita que el mapa se sienta "desordenado"
+        
+        stateTimer += (step16 / sampleRate);
+        let canSwitchState = stateTimer > 1.5; 
 
-        // SOLO GENERAR SI SUPERA EL UMBRAL
-        if (energy > threshold) {
+        if (canSwitchState) {
+            if (energy < volThreshold) {
+                currentState = 'IDLE';
+            }
+            // ZCR Alto + Energía Alta = SOLO DE GUITARRA (Shredding)
+            else if (zcrDensity > 0.15 && energy > volThreshold * 1.2) {
+                currentState = 'GUITAR_SOLO';
+                stateTimer = 0;
+            }
+            // ZCR Bajo + Energía Alta = RITMO/VOZ
+            else if (zcrDensity < 0.08 && energy > volThreshold) {
+                currentState = 'VOCAL_RHYTHM';
+                stateTimer = 0;
+            }
+            // Intermedio = DRUMS
+            else if (energy > volThreshold) {
+                currentState = 'DRUM_FILL';
+                stateTimer = 0;
+            }
+        }
+
+        // --- GENERACIÓN BASADA EN ESTADO ---
+        
+        if (currentState === 'IDLE') continue;
+
+        // Gap (Velocidad entre notas)
+        let currentGap = timeMs - lastTime;
+        
+        // 1. MODO GUITAR HERO (SOLOS)
+        if (currentState === 'GUITAR_SOLO') {
+            // Permitimos velocidad máxima (Streams)
+            // Se genera una nota en CADA paso de la grilla 1/16 si la energía sostiene
             
-            // Limitador de velocidad según densidad
-            const minGap = Math.max(70, 300 - (density * 25));
-            if (timeMs - lastTime < minGap) continue;
-
-            let type = 'tap';
-            let len = 0;
-
-            // --- LÓGICA DE FLUJO RÍTMICO ---
-            
-            // 1. Si la energía es muy alta comparada con el promedio (GOLPES/INSTRUMENTAL)
-            if (energy > movingAvg * 1.2) {
-                // Modo Escalera: Moverse 1 carril siempre
-                lastLane += patternDir;
-                if (lastLane >= k) { lastLane = k - 2; patternDir = -1; }
-                if (lastLane <= 0) { lastLane = 1; patternDir = 1; }
-            } 
-            // 2. Si es energía sostenida (VOZ)
-            else if (energy > threshold * 1.4) {
-                // Modo Saltos: Elegir carril aleatorio
-                lastLane = Math.floor(Math.random() * k);
+            if (currentGap >= 75) { // 75ms = Muy rápido
+                let type = 'tap';
                 
-                // Probabilidad de Hold Note corta para la voz
-                if (Math.random() > 0.7) {
-                    type = 'hold';
-                    len = 200 + (Math.random() * 400);
+                // Patrón: Escalera o Stream Infinito
+                // Moverse 1 carril
+                lastLane += patternDir;
+                
+                // Rebotar en bordes
+                if (lastLane >= k) { lastLane = k - 2; patternDir = -1; }
+                if (lastLane < 0) { lastLane = 1; patternDir = 1; }
+                
+                // Colocar
+                map.push({ t: timeMs, l: lastLane, type: type, len: 0, h: false });
+                lastTime = timeMs;
+                
+                // Dobles ocasionales si la energía explota
+                if (energy > volThreshold * 3.0 && density >= 7) {
+                    let dLane = (lastLane + Math.floor(k/2)) % k;
+                    map.push({ t: timeMs, l: dLane, type: 'tap', len: 0, h: false });
                 }
             }
+        }
+        
+        // 2. MODO VOZ/RITMO (VERSOS)
+        else if (currentState === 'VOCAL_RHYTHM') {
+            // Notas más espaciadas, siguiendo la melodía
+            if (currentGap >= 200) { 
+                let type = 'tap';
+                let len = 0;
+                
+                // Detectar nota larga (Hold)
+                // Si la energía se mantiene estable en el futuro
+                if (energy > volThreshold * 1.5) {
+                    let sustain = 0;
+                    for(let h=1; h<10; h++) {
+                        // Miramos el futuro con paso grande
+                        let fIdx = i + (step16 * h);
+                        if(fIdx < data.length && Math.abs(data[fIdx]) > volThreshold * 0.8) sustain++;
+                        else break;
+                    }
+                    
+                    if (sustain > 4 && Math.random() > 0.4) {
+                        type = 'hold';
+                        len = sustain * (step16/sampleRate) * 1000;
+                        len = Math.min(1500, len);
+                    }
+                }
 
-            // Evitar que las notas se peguen visualmente en el mismo carril
-            // (Si el carril está ocupado, simplemente saltamos al siguiente)
-            let finalLane = lastLane;
-            map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-            
-            lastTime = timeMs;
-            
-            // DOBLES (Chords) solo en picos extremos
-            if (energy > movingAvg * 2.0 && density >= 5 && type === 'tap') {
-                let dLane = (finalLane + Math.floor(k/2)) % k;
-                map.push({ t: timeMs, l: dLane, type: 'tap', len: 0, h: false });
+                // Patrón: Saltos suaves o Jack (repetir nota) si es voz
+                if (Math.random() > 0.3) {
+                    lastLane = (lastLane + 1) % k;
+                }
+                
+                // Buscar carril libre
+                let finalLane = lastLane;
+                if (timeMs <= laneFreeTime[finalLane] + 30) {
+                    for(let l=0; l<k; l++) if(timeMs > laneFreeTime[l]+30) { finalLane=l; break; }
+                }
+
+                map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
+                laneFreeTime[finalLane] = timeMs + len;
+                lastTime = timeMs;
+            }
+        }
+        
+        // 3. MODO BATERÍA (DRUMS)
+        else if (currentState === 'DRUM_FILL') {
+            // Notas dobles o saltos grandes
+            if (currentGap >= 150) {
+                // Salto grande
+                let jump = Math.floor(Math.random() * 2) + 1;
+                lastLane = (lastLane + jump) % k;
+                
+                map.push({ t: timeMs, l: lastLane, type: 'tap', len: 0, h: false });
+                
+                // Posibilidad alta de doble (Kick + Snare)
+                if (energy > volThreshold * 2.0 && density >= 5) {
+                    let dLane = (lastLane + 2) % k;
+                    map.push({ t: timeMs, l: dLane, type: 'tap', len: 0, h: false });
+                }
+                lastTime = timeMs;
             }
         }
     }
@@ -212,7 +317,7 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Separando instrumentos..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Analizando frecuencias..."; }
 
     try {
         unlockAudio();
