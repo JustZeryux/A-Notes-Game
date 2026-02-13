@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V5.1 - DYNAMIC FLOW & GUITAR FIX) === */
+/* === AUDIO & ENGINE (MASTER FINAL V5.2 - SHREDDER MODE) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -58,8 +58,8 @@ function playMiss() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
-    // Muestreo optimizado
-    for (let i = 0; i < filteredData.length; i += 100) { 
+    // Muestreo un poco más denso para no perder picos rápidos
+    for (let i = 0; i < filteredData.length; i += 50) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
     }
@@ -72,7 +72,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR V5.1 (GUITAR & VOCAL SEPARATION)
+// 2. GENERADOR V5.2 (SHREDDER / GUITAR HERO STYLE)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -80,13 +80,13 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // CONFIGURACIÓN DE DENSIDAD (AJUSTADA PARA MENOS SPAM)
+    // CONFIGURACIÓN DE DENSIDAD
     let density = cfg.den || 5; 
     
-    // GRID
-    const simulatedBPM = 130 + (density * 5); 
+    // BPM SIMULADO (Más alto para estilo Metal/Rock)
+    const simulatedBPM = 145 + (density * 8); 
     const samplesPerBeat = sampleRate * (60 / simulatedBPM);
-    const step = Math.floor(samplesPerBeat / 4); // 1/16 beat resolution
+    const step = Math.floor(samplesPerBeat / 4); // 1/16 de nota
     
     const START_OFFSET = 3000; 
 
@@ -96,137 +96,150 @@ function genMap(buf, k) {
     let lastTime = -5000;
     let lastEnergy = 0;
 
-    // Variables de "Intensidad Sostenida" (Para detectar solos)
-    let tensionAccumulator = 0;
-    
-    // Variables de Patrón
-    let patternMode = 'normal'; // 'normal', 'stream', 'stairs'
-    let patternDir = 1;
+    // Variables de "Shred" (Solo de Guitarra)
+    let tensionAccumulator = 0; // Acumula energía constante
+    let patternDirection = 1;   // 1: Derecha, -1: Izquierda
+    let streamCount = 0;        // Contador para mantener patrones largos
 
     for (let i = 0; i < data.length - step; i += step) {
-        // Análisis de Energía Local
+        // Análisis de Energía
         let sum = 0;
         const windowSize = Math.floor(step / 2);
         for (let j = 0; j < windowSize; j++) {
             if(i+j < data.length) sum += data[i + j] * data[i + j];
         }
         const energy = Math.sqrt(sum / windowSize);
-        const flux = Math.abs(energy - lastEnergy); // Cambio brusco de volumen
+        const flux = Math.abs(energy - lastEnergy); // Cambio brusco (Golpes de batería)
         lastEnergy = energy;
 
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
         
-        // Umbrales Dinámicos
-        const threshold = 0.05 + ((10 - density) * 0.018);
+        // Umbral Dinámico (Más bajo = Más notas)
+        // Reduje el umbral respecto a la V5.1 para permitir más "spam" controlado
+        const threshold = 0.04 + ((10 - density) * 0.012);
         
-        // Si hay silencio, bajar tensión
-        if (energy < threshold) {
-            tensionAccumulator = Math.max(0, tensionAccumulator - 1);
-            continue;
+        // Detectar "Pared de Sonido" (Guitarra distorsionada constante)
+        if (energy > threshold * 0.8) {
+            tensionAccumulator++;
+        } else {
+            tensionAccumulator = Math.max(0, tensionAccumulator - 2); // Baja rápido si hay silencio
         }
 
-        // Subir tensión si hay energía constante
-        tensionAccumulator++;
-        if (tensionAccumulator > 10) tensionAccumulator = 10;
+        // --- MODO SHRED (GUITARRA INTENSA) ---
+        // Si hay mucha tensión acumulada, entramos en modo "DragonForce"
+        let isGuitarSolo = tensionAccumulator > 8;
 
-        // --- GAP DINÁMICO (ANTI-SPAM) ---
-        // Si la densidad es 5, el gap base es 300ms. Si es 10, es 150ms.
-        // Esto previene que salgan 10 notas en un segundo si no es necesario.
-        let minGap = Math.max(100, 400 - (density * 25));
+        // Gap mínimo entre notas (Velocidad)
+        let minGap = Math.max(90, 300 - (density * 25));
         
-        // Si estamos en un "Solo" (mucha tensión), permitimos notas más rápidas
-        let isHighTension = tensionAccumulator >= 6; // Solo de guitarra o coro intenso
-        if (isHighTension) minGap *= 0.6; // Reducimos el gap al 60% para permitir velocidad
+        // Si es solo de guitarra, permitimos velocidad extrema (Streams)
+        if (isGuitarSolo) minGap = 80; // 80ms es muy rápido (Stream 1/16 a 180BPM aprox)
 
+        // Si no hay suficiente energía, saltamos (pero somos más permisivos ahora)
+        if (energy < threshold) continue;
         if (timeMs - lastTime < minGap) continue;
-
-        // --- CLASIFICACIÓN DEL SONIDO ---
 
         let type = 'tap';
         let len = 0;
 
-        // 1. DETECCIÓN DE GOLPES SECOS (BATERÍA/KICKS)
-        // Flux alto = cambio repentino = golpe
-        let isPercussion = flux > (threshold * 0.5);
-
-        // 2. DETECCIÓN DE VOZ/SUSTAIN (HOLDS)
-        // Energía alta pero POCO cambio (flux bajo) significa nota sostenida
-        if (!isPercussion && energy > threshold * 1.4 && !isHighTension) {
-            // Verificar futuro
-            let sustainCount = 0;
-            for (let h = 1; h <= 6; h++) {
-                let fIdx = i + (step * h);
-                if (fIdx >= data.length) break;
-                if (Math.abs(data[fIdx]) > threshold * 0.8) sustainCount++;
-                else break; 
-            }
-            
-            // Reducimos probabilidad de Hold para que no sea molesto
-            if (sustainCount > 3 && Math.random() > 0.6) {
-                type = 'hold';
-                len = (sustainCount * (step / sampleRate) * 1000); 
-                len = Math.min(1000, Math.max(200, len));
-            }
-        }
-
-        // --- SELECCIÓN DE PATRÓN ---
+        // --- LÓGICA DE PATRONES ---
         
-        // Si es un Solo de Guitarra (High Tension), forzamos STREAMS o ESCALERAS
-        if (isHighTension) {
-            // Alternamos dirección cada cierto tiempo
-            if (Math.random() > 0.8) patternDir *= -1;
-            
-            // Modo Escalera: Mover 1 carril
-            let nextLane = lastLane + patternDir;
-            
-            // Rebote perfecto
-            if (nextLane >= k) { nextLane = k-2; patternDir = -1; }
-            if (nextLane < 0) { nextLane = 1; patternDirection = 1; }
-            
-            lastLane = nextLane;
+        if (isGuitarSolo) {
+            // === MODO SOLO DE GUITARRA ===
+            // Aquí generamos Escaleras y Streams obligatorios
+            // No hacemos saltos aleatorios, todo debe fluir (1-2-3-4...)
 
-        } else if (isPercussion) {
-            // Si es batería, saltos más grandes (Jumps)
-            let jump = Math.floor(Math.random() * 2) + 1; // 1 o 2 espacios
-            if (Math.random() > 0.5) lastLane = (lastLane + jump) % k;
-            else lastLane = (lastLane - jump + k) % k;
+            // Cambiar dirección si llegamos a un borde
+            if (lastLane <= 0) patternDirection = 1;
+            else if (lastLane >= k - 1) patternDirection = -1;
+            
+            // A veces, cambiar dirección aleatoriamente en medio del solo para variedad
+            if (streamCount > 8 && Math.random() > 0.8) {
+                patternDirection *= -1;
+                streamCount = 0;
+            }
+
+            lastLane = lastLane + patternDirection;
+            
+            // Corrección segura de límites
+            if (lastLane < 0) lastLane = 1;
+            if (lastLane >= k) lastLane = k - 2;
+            
+            streamCount++;
+
         } else {
-            // Voz tranquila: Movimiento suave o quedarse cerca
-            if (Math.random() > 0.5) lastLane = (lastLane + 1) % k;
-        }
+            // === MODO RITMO NORMAL ===
+            // Aquí seguimos la batería o la voz
+            
+            // Si es un golpe fuerte (Batería), saltamos lejos
+            if (flux > threshold * 0.6) {
+                let jump = Math.floor(Math.random() * (k-1)) + 1;
+                lastLane = (lastLane + jump) % k;
+            } else {
+                // Si es suave (Voz), nos movemos poco
+                lastLane = (lastLane + 1) % k;
+            }
 
-        // --- COLOCACIÓN SEGURA (ANTI-COLISIÓN) ---
-        let finalLane = -1;
-
-        // Intentar carril calculado
-        if (timeMs > laneFreeTime[lastLane] + 50) {
-            finalLane = lastLane;
-        } else {
-            // Buscar vecino libre
-            for (let offset = 1; offset < k; offset++) {
-                let tryRight = (lastLane + offset) % k;
-                if (timeMs > laneFreeTime[tryRight] + 50) {
-                    finalLane = tryRight;
-                    break;
+            // Detectar Hold Notes (Solo fuera de los solos rápidos)
+            if (energy > threshold * 1.5 && !isGuitarSolo) {
+                let sustain = 0;
+                for(let h=1; h<6; h++) {
+                    if(i + step*h < data.length && Math.abs(data[i+step*h]) > threshold) sustain++;
+                    else break;
+                }
+                if (sustain > 3 && Math.random() > 0.6) {
+                    type = 'hold';
+                    len = sustain * (step/sampleRate) * 1000;
+                    len = Math.min(800, len);
                 }
             }
         }
 
-        if (finalLane === -1) continue; // Si no hay sitio, no poner nota (Anti-Spam final)
+        // --- COLOCACIÓN Y ANTI-COLISIÓN ---
+        let finalLane = -1;
+
+        // 1. Probar carril calculado (Prioridad máxima para mantener el flujo del solo)
+        if (timeMs > laneFreeTime[lastLane] + 40) {
+            finalLane = lastLane;
+        } else {
+            // 2. Si está ocupado (spam muy denso), buscar el vecino más cercano
+            // (Importante: Buscar en la dirección del patrón para no romper la escalera)
+            let tryNext = lastLane + patternDirection;
+            if (tryNext >= 0 && tryNext < k && timeMs > laneFreeTime[tryNext] + 40) {
+                finalLane = tryNext;
+            } else {
+                // 3. Cualquier carril libre
+                for (let l = 0; l < k; l++) {
+                    if (timeMs > laneFreeTime[l] + 40) {
+                        finalLane = l;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (finalLane === -1) continue;
 
         map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-        laneFreeTime[finalLane] = timeMs + len; // Ocupar carril
+        laneFreeTime[finalLane] = timeMs + len; // Bloquear carril
         
         lastTime = timeMs;
         lastLane = finalLane;
 
         // --- DOBLES (CHORDS) ---
-        // Solo en percusión MUY fuerte y nunca durante un solo de guitarra rápido
-        if (flux > threshold * 3.0 && density >= 6 && type === 'tap' && !isHighTension) {
-             let secondLane = (finalLane + Math.floor(k/2)) % k;
-             if (timeMs > laneFreeTime[secondLane] + 50) {
-                 map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
-                 laneFreeTime[secondLane] = timeMs;
+        // Solo generamos dobles si hay un GOLPE BRUSCO (Kick/Crash)
+        // Y NO estamos en medio de una escalera rápida (rompería el flujo)
+        let isPercussionHit = flux > threshold * 2.5;
+        
+        if (isPercussionHit && density >= 5 && type === 'tap') {
+             // Solo poner doble si no interfiere con el flujo rápido
+             // (Si el gap es muy pequeño, evitamos dobles para no hacer jacks imposibles)
+             if (minGap > 100 || density >= 8) {
+                 let secondLane = (finalLane + Math.floor(k/2)) % k;
+                 if (timeMs > laneFreeTime[secondLane] + 40) {
+                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                     laneFreeTime[secondLane] = timeMs;
+                 }
              }
         }
     }
@@ -288,7 +301,7 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Analizando instrumentos..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Modo Shredder activado..."; }
 
     try {
         unlockAudio();
