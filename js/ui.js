@@ -254,7 +254,7 @@ function switchSetTab(tab) {
     if (tab === 'gameplay') {
         html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
         html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 40);
+        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 100);
         html += renderRange('Dificultad IA (Random)', 'den', 1, 10);
         html += renderRange('Offset Global (ms)', 'off', -200, 200);
     } 
@@ -282,7 +282,6 @@ function switchSetTab(tab) {
         html += renderToggle('Mostrar Mean MS', 'showMean');
         html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100);
         html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100);
-        html += renderRange('Tamaño Nota (Escala)', 'noteScale', 0.5, 1.5, 0.1);
         html += renderRange('Posición Juez Y', 'judgeY', 0, 100);
         html += renderRange('Posición Juez X', 'judgeX', 0, 100);
         html += `<div style="margin-top:20px; border-top:1px solid #333; padding-top:15px;">
