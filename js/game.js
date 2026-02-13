@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V5.0 - VOCAL & BEAT SEPARATION) === */
+/* === AUDIO & ENGINE (MASTER FINAL V5.1 - DYNAMIC FLOW & GUITAR FIX) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -58,6 +58,7 @@ function playMiss() {
 
 function normalizeAudio(filteredData) {
     let max = 0;
+    // Muestreo optimizado
     for (let i = 0; i < filteredData.length; i += 100) { 
         const v = Math.abs(filteredData[i]);
         if (v > max) max = v;
@@ -71,7 +72,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR INTELIGENTE V5.0 (BEAT VS VOCAL)
+// 2. GENERADOR V5.1 (GUITAR & VOCAL SEPARATION)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -79,13 +80,13 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // CONFIGURACIÓN
+    // CONFIGURACIÓN DE DENSIDAD (AJUSTADA PARA MENOS SPAM)
     let density = cfg.den || 5; 
     
     // GRID
-    const simulatedBPM = 135 + (density * 5); 
+    const simulatedBPM = 130 + (density * 5); 
     const samplesPerBeat = sampleRate * (60 / simulatedBPM);
-    const step = Math.floor(samplesPerBeat / 4); 
+    const step = Math.floor(samplesPerBeat / 4); // 1/16 beat resolution
     
     const START_OFFSET = 3000; 
 
@@ -93,11 +94,14 @@ function genMap(buf, k) {
     let laneFreeTime = new Array(k).fill(-9999); 
     let lastLane = Math.floor(k/2); 
     let lastTime = -5000;
+    let lastEnergy = 0;
+
+    // Variables de "Intensidad Sostenida" (Para detectar solos)
+    let tensionAccumulator = 0;
     
-    // Variables para detectar "Instrumental vs Voz"
-    let prevEnergy = 0;
-    let patternState = 'vocal'; // 'stair' (Instrumental) o 'vocal' (Taps/Holds)
-    let patternDirection = 1;
+    // Variables de Patrón
+    let patternMode = 'normal'; // 'normal', 'stream', 'stairs'
+    let patternDir = 1;
 
     for (let i = 0; i < data.length - step; i += step) {
         // Análisis de Energía Local
@@ -107,121 +111,123 @@ function genMap(buf, k) {
             if(i+j < data.length) sum += data[i + j] * data[i + j];
         }
         const energy = Math.sqrt(sum / windowSize);
-        
-        // CÁLCULO DE "FLUJO" (La diferencia con la energía anterior)
-        // Si el flujo es alto, es un golpe seco (Batería/Instrumental).
-        // Si el flujo es bajo pero hay energía, es sonido sostenido (Voz).
-        const flux = Math.abs(energy - prevEnergy);
-        prevEnergy = energy;
+        const flux = Math.abs(energy - lastEnergy); // Cambio brusco de volumen
+        lastEnergy = energy;
 
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
         
-        // Umbrales
-        const threshold = 0.05 + ((10 - density) * 0.015);
-        const beatThreshold = threshold * 0.4; // Qué tan fuerte debe ser el cambio para ser Beat
+        // Umbrales Dinámicos
+        const threshold = 0.05 + ((10 - density) * 0.018);
+        
+        // Si hay silencio, bajar tensión
+        if (energy < threshold) {
+            tensionAccumulator = Math.max(0, tensionAccumulator - 1);
+            continue;
+        }
 
-        if (energy > threshold) {
-            const minGap = Math.max(80, 240 - (density * 20));
-            if (timeMs - lastTime < minGap) continue;
+        // Subir tensión si hay energía constante
+        tensionAccumulator++;
+        if (tensionAccumulator > 10) tensionAccumulator = 10;
 
-            let type = 'tap';
-            let len = 0;
+        // --- GAP DINÁMICO (ANTI-SPAM) ---
+        // Si la densidad es 5, el gap base es 300ms. Si es 10, es 150ms.
+        // Esto previene que salgan 10 notas en un segundo si no es necesario.
+        let minGap = Math.max(100, 400 - (density * 25));
+        
+        // Si estamos en un "Solo" (mucha tensión), permitimos notas más rápidas
+        let isHighTension = tensionAccumulator >= 6; // Solo de guitarra o coro intenso
+        if (isHighTension) minGap *= 0.6; // Reducimos el gap al 60% para permitir velocidad
 
-            // --- LÓGICA DE SEPARACIÓN ---
-            
-            // 1. DETECTOR DE INSTRUMENTAL (Beat/Stairs)
-            // Si el "flux" (cambio brusco) es alto, es percusión -> USAMOS ESCALERAS
-            if (flux > beatThreshold) {
-                patternState = 'stair';
-            } 
-            // 2. DETECTOR DE VOZ (Melody/Taps/Holds)
-            // Si el "flux" es bajo pero hay volumen, es voz/synth -> USAMOS TAPS/HOLDS
-            else {
-                patternState = 'vocal';
+        if (timeMs - lastTime < minGap) continue;
+
+        // --- CLASIFICACIÓN DEL SONIDO ---
+
+        let type = 'tap';
+        let len = 0;
+
+        // 1. DETECCIÓN DE GOLPES SECOS (BATERÍA/KICKS)
+        // Flux alto = cambio repentino = golpe
+        let isPercussion = flux > (threshold * 0.5);
+
+        // 2. DETECCIÓN DE VOZ/SUSTAIN (HOLDS)
+        // Energía alta pero POCO cambio (flux bajo) significa nota sostenida
+        if (!isPercussion && energy > threshold * 1.4 && !isHighTension) {
+            // Verificar futuro
+            let sustainCount = 0;
+            for (let h = 1; h <= 6; h++) {
+                let fIdx = i + (step * h);
+                if (fIdx >= data.length) break;
+                if (Math.abs(data[fIdx]) > threshold * 0.8) sustainCount++;
+                else break; 
             }
+            
+            // Reducimos probabilidad de Hold para que no sea molesto
+            if (sustainCount > 3 && Math.random() > 0.6) {
+                type = 'hold';
+                len = (sustainCount * (step / sampleRate) * 1000); 
+                len = Math.min(1000, Math.max(200, len));
+            }
+        }
 
-            // --- GENERACIÓN SEGÚN TIPO DETECTADO ---
+        // --- SELECCIÓN DE PATRÓN ---
+        
+        // Si es un Solo de Guitarra (High Tension), forzamos STREAMS o ESCALERAS
+        if (isHighTension) {
+            // Alternamos dirección cada cierto tiempo
+            if (Math.random() > 0.8) patternDir *= -1;
+            
+            // Modo Escalera: Mover 1 carril
+            let nextLane = lastLane + patternDir;
+            
+            // Rebote perfecto
+            if (nextLane >= k) { nextLane = k-2; patternDir = -1; }
+            if (nextLane < 0) { nextLane = 1; patternDirection = 1; }
+            
+            lastLane = nextLane;
 
-            if (patternState === 'stair') {
-                // MODO ESCALERA (INSTRUMENTAL)
-                // Hacemos que la nota siga una secuencia lineal (1-2-3-4)
-                
-                // Cambio de dirección inteligente si llegamos al borde
-                if (lastLane >= k-1) patternDirection = -1;
-                if (lastLane <= 0) patternDirection = 1;
-                
-                lastLane = lastLane + patternDirection;
-                
-                // Corrección de límites
-                if (lastLane < 0) lastLane = 0;
-                if (lastLane >= k) lastLane = k-1;
+        } else if (isPercussion) {
+            // Si es batería, saltos más grandes (Jumps)
+            let jump = Math.floor(Math.random() * 2) + 1; // 1 o 2 espacios
+            if (Math.random() > 0.5) lastLane = (lastLane + jump) % k;
+            else lastLane = (lastLane - jump + k) % k;
+        } else {
+            // Voz tranquila: Movimiento suave o quedarse cerca
+            if (Math.random() > 0.5) lastLane = (lastLane + 1) % k;
+        }
 
-            } else {
-                // MODO VOZ (TAPS & HOLDS)
-                // Hacemos saltos más expresivos o notas largas
-                
-                // Detectar si la voz se mantiene (Hold)
-                // Miramos al futuro para ver si el sonido sigue suave y constante
-                if (energy > threshold * 1.5) {
-                    let sustainCount = 0;
-                    for (let h = 1; h <= 8; h++) {
-                        let fIdx = i + (step * h);
-                        if (fIdx >= data.length) break;
-                        // Checamos que siga habiendo energía
-                        if (Math.abs(data[fIdx]) > threshold * 0.8) sustainCount++;
-                        else break;
-                    }
-                    
-                    // Si dura más de 3 ticks, es un Hold Vocal
-                    if (sustainCount > 3) {
-                        type = 'hold';
-                        len = (sustainCount * (step / sampleRate) * 1000); 
-                        len = Math.min(1200, Math.max(200, len));
-                    }
+        // --- COLOCACIÓN SEGURA (ANTI-COLISIÓN) ---
+        let finalLane = -1;
+
+        // Intentar carril calculado
+        if (timeMs > laneFreeTime[lastLane] + 50) {
+            finalLane = lastLane;
+        } else {
+            // Buscar vecino libre
+            for (let offset = 1; offset < k; offset++) {
+                let tryRight = (lastLane + offset) % k;
+                if (timeMs > laneFreeTime[tryRight] + 50) {
+                    finalLane = tryRight;
+                    break;
                 }
-
-                // Posición aleatoria para la voz (más orgánico)
-                let dist = Math.floor(Math.random() * k);
-                lastLane = dist;
             }
+        }
 
-            // --- ANTI-COLISIÓN (Siempre activa) ---
-            let finalLane = -1;
-            
-            // Intentar el carril calculado
-            if (timeMs > laneFreeTime[lastLane] + 40) {
-                finalLane = lastLane;
-            } else {
-                // Buscar el más cercano libre
-                let bestDist = 99;
-                for (let l = 0; l < k; l++) {
-                    if (timeMs > laneFreeTime[l] + 40) {
-                        let d = Math.abs(l - lastLane);
-                        if (d < bestDist) {
-                            bestDist = d;
-                            finalLane = l;
-                        }
-                    }
-                }
-            }
+        if (finalLane === -1) continue; // Si no hay sitio, no poner nota (Anti-Spam final)
 
-            if (finalLane === -1) continue;
+        map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
+        laneFreeTime[finalLane] = timeMs + len; // Ocupar carril
+        
+        lastTime = timeMs;
+        lastLane = finalLane;
 
-            map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-            laneFreeTime[finalLane] = timeMs + len; // Bloquear carril
-            
-            lastTime = timeMs;
-            lastLane = finalLane;
-
-            // --- DOBLES (SOLO EN EL INSTRUMENTAL FUERTE) ---
-            // Solo ponemos notas dobles si estamos en modo Stair (Instrumental) y el golpe es muy fuerte
-            if (patternState === 'stair' && flux > beatThreshold * 2.5 && density >= 5 && type === 'tap') {
-                 let secondLane = (finalLane + Math.floor(k/2)) % k;
-                 if (timeMs > laneFreeTime[secondLane] + 40) {
-                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
-                     laneFreeTime[secondLane] = timeMs;
-                 }
-            }
+        // --- DOBLES (CHORDS) ---
+        // Solo en percusión MUY fuerte y nunca durante un solo de guitarra rápido
+        if (flux > threshold * 3.0 && density >= 6 && type === 'tap' && !isHighTension) {
+             let secondLane = (finalLane + Math.floor(k/2)) % k;
+             if (timeMs > laneFreeTime[secondLane] + 50) {
+                 map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                 laneFreeTime[secondLane] = timeMs;
+             }
         }
     }
     return map;
@@ -282,7 +288,7 @@ function initReceptors(k) {
 window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) return notify("Selecciona una canción", "error");
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Separando voz e instrumental..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Analizando instrumentos..."; }
 
     try {
         unlockAudio();
