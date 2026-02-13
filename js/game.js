@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V4.1 - STAIRWAY FOCUS) === */
+/* === AUDIO & ENGINE (MASTER FINAL V4.2 - PURE STAIRS) === */
 
 let elTrack = null;
 let mlContainer = null;
@@ -71,7 +71,7 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR DE MAPAS V4.1 (STAIRS++)
+// 2. GENERADOR DE MAPAS V4.2 (PURE STAIRS)
 // ==========================================
 function genMap(buf, k) {
     const rawData = buf.getChannelData(0);
@@ -79,25 +79,26 @@ function genMap(buf, k) {
     const map = [];
     const sampleRate = buf.sampleRate;
     
-    // CONFIGURACIÓN DE DIFICULTAD
+    // CONFIGURACIÓN
     let density = cfg.den || 5; 
     
     // GRID SYSTEM
     const simulatedBPM = 130 + (density * 5); 
     const samplesPerBeat = sampleRate * (60 / simulatedBPM);
-    const step = Math.floor(samplesPerBeat / 4); // 1/16 beat resolution
+    const step = Math.floor(samplesPerBeat / 4); 
     
     const START_OFFSET = 3000; 
 
     // Estado
     let laneFreeTime = new Array(k).fill(-9999); 
-    let lastLane = Math.floor(k / 2);
+    let lastLane = 0; // Empezar en la izquierda
     let lastTime = -5000;
+    let lastDoubleTime = -5000;
     
     // Patrones
-    let patternState = 0; 
-    let notesInPattern = 0;
-    let patternDirection = 1;
+    let patternState = 1; // Forzar inicio en escalera
+    let notesInPattern = 10;
+    let patternDirection = 1; // 1: Derecha, -1: Izquierda
 
     for (let i = 0; i < data.length - step; i += step) {
         let sum = 0;
@@ -107,6 +108,8 @@ function genMap(buf, k) {
         }
         const energy = Math.sqrt(sum / windowSize);
         const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
+        
+        // Umbral
         const threshold = 0.05 + ((10 - density) * 0.015);
 
         if (energy > threshold) {
@@ -115,77 +118,87 @@ function genMap(buf, k) {
 
             let type = 'tap';
             let len = 0;
-            let isHeavyHit = energy > threshold * 2.0;
+            
+            // --- DETECCIÓN DE SUPER HIT (PARA DOBLES) ---
+            // Aumentado umbral a 2.5x (mucho más difícil que salga doble)
+            let isMegaHit = energy > threshold * 2.8;
 
-            // --- DETECCIÓN DE HOLD (REDUCIDA DRASTICAMENTE) ---
-            // 1. Umbral más alto (1.5x en vez de 1.2x)
-            // 2. Requiere sostenerse por 3 ticks (antes 2)
-            if (energy > threshold * 1.5) {
+            // --- HOLD NOTES (MUY RARAS) ---
+            if (energy > threshold * 1.6) {
                 let holdSustain = 0;
                 for (let h = 1; h <= 8; h++) {
                     let futureIdx = i + (step * h);
                     if (futureIdx >= data.length) break;
-                    if (Math.abs(data[futureIdx]) > threshold * 0.9) {
+                    if (Math.abs(data[futureIdx]) > threshold * 0.95) {
                         holdSustain++;
-                    } else {
-                        break; 
-                    }
+                    } else break; 
                 }
-                
-                // Solo si dura mucho y pasa un volado del 50%
-                if (holdSustain > 3 && Math.random() > 0.5) {
+                // Probabilidad baja de Hold
+                if (holdSustain > 4 && Math.random() > 0.7) {
                     type = 'hold';
                     len = (holdSustain * (step / sampleRate) * 1000); 
-                    len = Math.min(1500, Math.max(150, len));
+                    len = Math.min(1000, Math.max(150, len));
                 }
             }
 
-            // --- PATRONES (MÁS ESCALERAS) ---
+            // --- DECISIÓN DE PATRÓN ---
+            // Si el patrón anterior terminó
             if (notesInPattern <= 0) {
                 const rnd = Math.random();
-                if (isHeavyHit) patternState = 0; 
                 
-                // AQUI ESTÁ EL CAMBIO: 70% Probabilidad de Escalera
-                else if (rnd > 0.3) { 
-                    patternState = 1; // Stairs
-                    patternDirection *= -1; // Invertir dirección para que no sea monótono
+                // 80% PROBABILIDAD DE ESCALERA (STAIRS)
+                if (rnd > 0.2) { 
+                    patternState = 1; 
+                    // Decidir dirección basada en dónde estamos
+                    if (lastLane <= 1) patternDirection = 1; // Si estamos a la izq, ir a la der
+                    else if (lastLane >= k-2) patternDirection = -1; // Si estamos a la der, ir a la izq
+                    else patternDirection = (Math.random() > 0.5) ? 1 : -1;
                 } 
-                else if (rnd > 0.1) patternState = 0; // Stream
-                else patternState = 2; // Stack
+                else {
+                    patternState = 0; // Stream simple
+                }
                 
-                notesInPattern = Math.floor(Math.random() * 5) + 3; // Patrones un poco más largos
+                notesInPattern = Math.floor(Math.random() * 8) + 4; // Patrones largos
             }
 
+            // --- EJECUCIÓN DEL PATRÓN ---
             let lane = lastLane;
 
             if (patternState === 1) { 
-                // Escalera (Stairs)
+                // LÓGICA DE ESCALERA ESTRICTA
                 lane = lastLane + patternDirection;
-                // Rebote en bordes
-                if (lane < 0) { lane = 1; patternDirection = 1; }
-                if (lane >= k) { lane = k - 2; patternDirection = -1; }
-            } else if (patternState === 0) {
-                // Stream
+                
+                // Si chocamos con pared, rebotamos
+                if (lane >= k) {
+                    lane = k - 2; 
+                    patternDirection = -1;
+                } else if (lane < 0) {
+                    lane = 1;
+                    patternDirection = 1;
+                }
+            } else {
+                // Stream (ZigZag simple)
+                // En modo stream tratamos de no repetir carril
                 let dist = Math.floor(Math.random() * (k - 1)) + 1;
                 lane = (lastLane + dist) % k;
-            } else {
-                // Stack
-                if(Math.random() > 0.6) lane = (lastLane + 1) % k;
-                else lane = lastLane;
             }
 
-            // Anti-Colisión
+            // Anti-Colisión Estricta
             let finalLane = -1;
+            // Intentar el carril deseado
             if (timeMs > laneFreeTime[lane] + 50) {
                 finalLane = lane;
             } else {
-                let bestDist = 99;
-                for (let l = 0; l < k; l++) {
-                    if (timeMs > laneFreeTime[l] + 50) {
-                        let d = Math.abs(l - lane);
-                        if (d < bestDist) {
-                            bestDist = d;
+                // Si está ocupado, buscar el vecino más cercano EN LA DIRECCIÓN DEL PATRÓN
+                let tryL = lane + patternDirection;
+                if (tryL >= 0 && tryL < k && timeMs > laneFreeTime[tryL] + 50) {
+                    finalLane = tryL;
+                } else {
+                    // Si no, cualquiera libre
+                    for (let l = 0; l < k; l++) {
+                        if (timeMs > laneFreeTime[l] + 50) {
                             finalLane = l;
+                            break;
                         }
                     }
                 }
@@ -200,25 +213,19 @@ function genMap(buf, k) {
             lastLane = finalLane;
             notesInPattern--;
 
-            // Dobles (Chords) limitados
-            if (isHeavyHit && type === 'tap' && density >= 5) {
-                let secondLane = -1;
-                let idealSecond = (k - 1) - finalLane;
-                
-                if (timeMs > laneFreeTime[idealSecond] + 50 && idealSecond !== finalLane) {
-                    secondLane = idealSecond;
-                } else {
-                    for(let l=0; l<k; l++) {
-                        if (l !== finalLane && Math.abs(l - finalLane) > 1 && timeMs > laneFreeTime[l] + 50) {
-                            secondLane = l;
-                            break;
-                        }
+            // --- DOBLES (CHORDS) ---
+            // REGLAS ESTRICTAS PARA DOBLES:
+            // 1. Tiene que ser un MEGA HIT (Energía > 2.8x umbral)
+            // 2. NO puede estar en medio de una escalera (patternState 1) -> ESTO ARREGLA TU PROBLEMA
+            // 3. Cooldown de 1000ms entre dobles
+            if (isMegaHit && type === 'tap' && density >= 5 && patternState !== 1) {
+                if (timeMs - lastDoubleTime > 1000) {
+                    let secondLane = (finalLane + Math.floor(k/2)) % k; // Carril opuesto
+                    if (timeMs > laneFreeTime[secondLane] + 50) {
+                        map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                        laneFreeTime[secondLane] = timeMs;
+                        lastDoubleTime = timeMs;
                     }
-                }
-
-                if (secondLane !== -1) {
-                    map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
-                    laneFreeTime[secondLane] = timeMs;
                 }
             }
         }
