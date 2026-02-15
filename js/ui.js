@@ -964,27 +964,6 @@ window.openSongSelectorForLobby = function() {
 // Configurar el modal de dificultad para mostrar opción de crear sala
 // (Esto se conecta con tu HTML: id="create-lobby-opts")
 const originalDiffClick = window.openModal; // Guardar referencia si es necesario
-window.confirmCreateLobby = function() {
-    if(!curSongData) return;
-    // Fix: Usar densidad real
-    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
-    
-    const config = { 
-        keys: [window.selectedLobbyKeys || 4], 
-        density: currentDen, 
-        ranked: false 
-    };
-    
-    notify("Creando sala...", "info");
-    if (window.createLobbyData) {
-        window.createLobbyData(curSongData.id, config, false).then(() => {
-            closeModal('diff');
-            // Abrir panel inmediatamente
-            window.openHostPanel(curSongData, false);
-            window.isCreatingLobby = false;
-        });
-    }
-};
 // ==========================================
 // 10. SELECTOR DE CANCIONES COMPACTO (LOBBY)
 // ==========================================
@@ -1288,33 +1267,7 @@ window.closeModal = function(id) {
         });
     }
 };
-window.confirmCreateLobby = function() {
-    if(!curSongData) return;
-    
-    // 1. Obtener la densidad real
-    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
-    const config = { 
-        keys: [window.selectedLobbyKeys || 4], 
-        density: currentDen, 
-        ranked: false 
-    };
-    
-    notify("Creando sala...", "info");
-    
-    if (window.createLobbyData) {
-        window.createLobbyData(curSongData.id, config, false).then(() => {
-            closeModal('diff');
-            
-            // === FIX: ABRIR EL PANEL INMEDIATAMENTE ===
-            // Sin esto, el juego intenta actualizar una ventana que no existe
-            if(typeof window.openHostPanel === 'function') {
-                window.openHostPanel(curSongData, false); // false = Soy Host
-            }
-            
-            window.isCreatingLobby = false;
-        });
-    }
-};
+
 // === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
@@ -1322,7 +1275,27 @@ function openShop() {
     if(grid && typeof SHOP_ITEMS !== 'undefined') {
         grid.innerHTML = '';
         SHOP_ITEMS.forEach(item => {
-            const owned = user.inventory && user.inventory.includes(item.id);
+           const originalCloseModal = window.closeModal;
+window.closeModal = function(id) {
+    // Restaurar comportamiento original
+    document.getElementById('modal-'+id).style.display = 'none';
+    
+    // Si cerramos el modal de dificultad, cancelamos el modo creación de sala
+    if(id === 'diff' && window.isCreatingLobby) {
+        window.isCreatingLobby = false;
+        if(window.notify) window.notify("Creación de sala cancelada", "info");
+        
+        // Restaurar estilo de las tarjetas
+        document.querySelectorAll('.diff-card').forEach(c => {
+            c.style.border = "2px solid #333";
+            c.style.transform = "scale(1)";
+        });
+        
+        // Ocultar opciones de crear sala
+        const opts = document.getElementById('create-lobby-opts');
+        if(opts) opts.style.display = 'none';
+    }
+}; const owned = user.inventory && user.inventory.includes(item.id);
             const div = document.createElement('div');
             div.className = 'shop-item';
             if (owned) {
