@@ -471,6 +471,10 @@ function closeModal(id){ document.getElementById('modal-'+id).style.display='non
 // 5. CANCIONES Y MENÚ (CON REINTENTO)
 // ==========================================
 
+// ==========================================
+// 5. CANCIONES Y MENÚ (CORREGIDO)
+// ==========================================
+
 let globalSongsListener = null;
 function renderMenu(filter="") {
     if(!db) {
@@ -486,54 +490,39 @@ function renderMenu(filter="") {
         grid.innerHTML = '';
         if(snapshot.empty) { grid.innerHTML = '<div style="color:#666; text-align:center; grid-column:1/-1;">No hay canciones globales. ¡Sube una!</div>'; return; }
         
-// Dentro de renderMenu...
-snapshot.forEach(doc => {
-    const s = doc.data();
-    const songId = doc.id;
-    if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
-    
-    const c = document.createElement('div'); 
-    c.className = 'beatmap-card';
-    
-    let bgStyle;
-    if(s.imageURL) {
-        bgStyle = `background-image:url(${s.imageURL})`;
-    } else {
-        // Generador de color aleatorio basado en nombre (igual que antes)
-        let hash = 0;
-        for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
-        const hue = Math.abs(hash % 360);
-        bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
-    }
-    
-    // HTML NUEVO DE LA TARJETA
-    c.innerHTML = `
-        <div class="bc-bg" style="${bgStyle}"></div>
-        <div class="bc-info">
-            <div class="bc-title">${s.title}</div>
-            <div class="bc-meta">Subido por: ${s.uploader}</div>
+        snapshot.forEach(doc => {
+            const s = doc.data();
+            const songId = doc.id;
+            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
             
-            <div class="card-badges">
-                <div class="key-badge active">4K</div>
-                <div class="key-badge active">6K</div>
-                <div class="key-badge active">7K</div>
-                <div class="key-badge active">9K</div>
-            </div>
-        </div>`;
-        
-    c.onclick = () => { 
-        curSongData = { id: songId, ...s }; 
-        openModal('diff'); 
-    };
-    grid.appendChild(c);
-});
-
+            const c = document.createElement('div'); 
+            c.className = 'beatmap-card';
+            
+            let bgStyle;
+            if(s.imageURL) {
+                bgStyle = `background-image:url(${s.imageURL})`;
+            } else {
+                let hash = 0;
+                for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
+                const hue = Math.abs(hash % 360);
+                bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
+            }
+            
+            // HTML DE LA TARJETA CON ETIQUETAS DE TECLAS
             c.innerHTML = `
                 <div class="bc-bg" style="${bgStyle}"></div>
                 <div class="bc-info">
                     <div class="bc-title">${s.title}</div>
-                    <div class="bc-meta">Subido por: ${s.uploader} ${scoreTag}</div>
+                    <div class="bc-meta">Subido por: ${s.uploader}</div>
+                    
+                    <div class="card-badges">
+                        <div class="key-badge active">4K</div>
+                        <div class="key-badge active">6K</div>
+                        <div class="key-badge active">7K</div>
+                        <div class="key-badge active">9K</div>
+                    </div>
                 </div>`;
+                
             c.onclick = () => { 
                 curSongData = { id: songId, ...s }; 
                 openModal('diff'); 
@@ -542,7 +531,6 @@ snapshot.forEach(doc => {
         });
     });
 }
-
 // ==========================================
 // 6. AMIGOS & SOLICITUDES (COMPLETO)
 // ==========================================
