@@ -204,12 +204,27 @@ function playMiss() {
 }
 
 window.prepareAndPlaySong = async function(k) {
-    if (!window.curSongData) return alert("Selecciona una canción");
+    // 1. SI ESTAMOS EN ONLINE, SETEAR BANDERA
+    if(window.currentLobbyId) {
+        window.isMultiplayer = true;
+    }
+
+    if (!window.curSongData) {
+        if(window.isMultiplayer) {
+            console.warn("Esperando datos de la canción...");
+            return; // Esperar a que joinLobbyData los baje
+        }
+        return alert("Selecciona una canción");
+    }
+    
+    // UI Loader
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "Generando Mapa..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "GENERANDO MAPA..."; }
 
     try {
         unlockAudio();
+        
+        // ... (Carga de buffer igual que antes) ...
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
@@ -226,10 +241,10 @@ window.prepareAndPlaySong = async function(k) {
         const map = genMap(buffer, k);
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         
+        // === ZONA CRÍTICA ONLINE ===
         if(window.isMultiplayer && window.notifyLobbyLoaded) {
              window.notifyLobbyLoaded(); 
-             // NO ocultamos el loader aquí si somos clientes, esperamos al Start del host
-             if(window.isLobbyHost && loader) loader.style.display = 'flex'; 
+             // NO llamamos a playSongInternal aquí. notifyLobbyLoaded lo hará cuando sea seguro.
         } else {
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
