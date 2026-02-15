@@ -1237,34 +1237,29 @@ function sendChallengeNotification(target, lobbyId, songTitle) {
     notify(`Invitación enviada a ${target}`, "success");
 }
 
-// Resetear el modo cuando se cierra el modal manualmente
 const originalCloseModal = window.closeModal;
 window.closeModal = function(id) {
-    if(id === 'dwindow.confirmCreateLobby = function() {
-    if(!curSongData) return;
-    
-    // 1. Obtener la densidad real
-    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
-    const config = { 
-        keys: [window.selectedLobbyKeys || 4], 
-        density: currentDen, 
-        ranked: false 
-    };
-    
-    notify("Creando sala...", "info");
-    
-    if (window.createLobbyData) {
-        window.createLobbyData(curSongData.id, config, false).then(() => {
-            closeModal('diff');
-            
-            // === FIX: ABRIR EL PANEL INMEDIATAMENTE ===
-            // Sin esto, el juego intenta actualizar una ventana que no existe
-            if(typeof window.openHostPanel === 'function') {
-                window.openHostPanel(curSongData, false); // false = Soy Host
-            }
-            
-            window.isCreatingLobby = false;
+    const el = document.getElementById('modal-' + id);
+    if (el) el.style.display = 'none';
+
+    // Si cerramos el modal de dificultad, cancelamos el modo creación de sala
+    // Esto evita que se quede "pegado" el modo de selección
+    if (id === 'diff' && typeof window.isCreatingLobby !== 'undefined' && window.isCreatingLobby) {
+        window.isCreatingLobby = false;
+        
+        // Notificar visualmente
+        if (typeof notify === 'function') notify("Creación de sala cancelada", "info");
+        
+        // Restaurar estilo de las tarjetas (quitar borde verde/azul)
+        const cards = document.querySelectorAll('.diff-card');
+        cards.forEach(c => {
+            c.style.border = "2px solid #333";
+            c.style.transform = "scale(1)";
         });
+
+        // Ocultar opciones de crear sala para la próxima vez
+        const opts = document.getElementById('create-lobby-opts');
+        if(opts) opts.style.display = 'none';
     }
 };
 
@@ -1291,7 +1286,7 @@ window.closeModal = function(id) {
             c.style.transform = "scale(1)";
         });
         
-        // Ocultar opciones de crear sala
+        m// Ocultar opciones de crear sala
         const opts = document.getElementById('create-lobby-opts');
         if(opts) opts.style.display = 'none';
     }
