@@ -252,13 +252,12 @@ window.prepareAndPlaySong = async function(k) {
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
-        
-    } catch (e) {
+    } catch(e) { // <--- AQUÍ ESTABA EL ERROR (FALTABA ESTO)
         console.error(e);
         if(loader) loader.style.display = 'none';
         alert("Error: " + e.message);
     }
-};
+}; // <--- Y ESTO
 
 window.playSongInternal = function(s) {
     if(!s) return;
@@ -535,5 +534,4 @@ function hit(l, p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
 
-        let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        const n = win
+        let now = (window.st.ctx.currentT
