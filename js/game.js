@@ -539,7 +539,15 @@ function miss(n) {
     window.st.stats.m++; window.st.cmb=0; window.st.hp-=10; window.st.fcStatus="SD";
     playMiss(); if(typeof updHUD==='function') updHUD();
     if(n.el) n.el.style.opacity = 0;
-    if(window.st.hp <= 0 && !window.isMultiplayer) end(true);
+    
+    // === FIX: NO MORIR EN MULTIPLAYER ===
+    // Si es multiplayer, dejamos que la vida baje a 0 pero NO llamamos a end(true)
+    if (window.st.hp <= 0) {
+        window.st.hp = 0; // Mínimo 0
+        if (!window.isMultiplayer) {
+            end(true); // Solo muere si es singleplayer
+        }
+    }
 }
 
 // ... (Resto de funciones: updHUD, initReceptors, etc. se mantienen igual)
