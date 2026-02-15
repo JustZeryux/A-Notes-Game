@@ -630,36 +630,44 @@ function showFriendProfile(name) {
 
 /* === UI LOBBY FIXED (VERSIÓN MAESTRA) === */
 
-// 1. ABRIR EL PANEL
-window.openHostPanel = function(songData, isClient = false) {
-    if(!songData) return;
-    curSongData = songData; 
-    
-    // Detener juego de fondo
-    if(typeof st !== 'undefined') { st.act = false; st.paused = false; }
-    document.getElementById('game-layer').style.display = 'none';
+/* === UI LOBBY SAFE VERSION (AUTO-GENERATED HTML) === */
 
-    // Asegurar que el modal existe
+// Función principal para abrir el panel
+window.openHostPanel = function(songData, isClient = false) {
+    if(!songData) return console.error("No song data");
+    window.curSongData = songData; // Asegurar global
+    
+    // 1. Detener juego de fondo para ahorrar recursos
+    if(typeof window.st !== 'undefined') { window.st.act = false; window.st.paused = false; }
+    const gl = document.getElementById('game-layer');
+    if(gl) gl.style.display = 'none';
+
+    // 2. INYECCIÓN AUTOMÁTICA DEL HTML (Anti-Error Null)
+    // Si el div "modal-host" no existe en index.html, lo creamos aquí mismo.
     let modal = document.getElementById('modal-host'); 
     if(!modal) {
+        console.log("Creando modal-host dinámicamente...");
         modal = document.createElement('div');
-        modal.id = 'modal-host'; modal.className = 'modal-overlay'; modal.style.display = 'none';
+        modal.id = 'modal-host'; 
+        modal.className = 'modal-overlay'; 
+        modal.style.display = 'none';
         modal.innerHTML = '<div class="modal-panel host-panel-compact"></div>';
         document.body.appendChild(modal);
     }
 
+    // 3. Configuración
     const panel = modal.querySelector('.modal-panel');
-    panel.className = "modal-panel host-panel-compact";
+    panel.className = "modal-panel host-panel-compact"; // Forzar clase CSS
     
     window.isLobbyHost = !isClient;
-    // CORRECCIÓN: Leer dificultad real
     const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
 
+    // Estilo de fondo
     const bgStyle = songData.imageURL 
         ? `background-image: linear-gradient(to bottom, rgba(0,0,0,0.6), #111), url(${songData.imageURL}); background-size: cover;` 
         : 'background: linear-gradient(to bottom, #333, #111);';
 
-    // HTML ESTRUCTURAL (Usamos IDs universales: room-players y btn-lobby-action)
+    // 4. HTML INTERNO (Usamos IDs seguros: room-players y btn-lobby-action)
     panel.innerHTML = `
         <div class="hp-header" style="${bgStyle}">
             <div class="hp-title-info">
@@ -678,7 +686,7 @@ window.openHostPanel = function(songData, isClient = false) {
                     <span>Densidad</span><strong style="color:var(--good)">${currentDen}</strong>
                 </div>
                 <div style="margin-top:20px; font-size:0.8rem; color:#888; text-align:center;">
-                    ${window.isLobbyHost ? 'ERES EL HOST' : 'ESPERANDO AL HOST'}
+                    ${window.isLobbyHost ? '👑 ERES EL HOST' : 'ESPERANDO AL HOST...'}
                 </div>
             </div>
 
@@ -690,19 +698,19 @@ window.openHostPanel = function(songData, isClient = false) {
         
         <div class="hp-footer">
             <button class="action secondary" onclick="closeModal('host'); leaveLobbyData();">SALIR</button>
-            <button id="btn-lobby-action" class="action" style="opacity:0.5; cursor:wait;">CARGANDO...</button>
+            <button id="btn-lobby-action" class="action" style="opacity:0.5; cursor:wait;">CONECTANDO...</button>
         </div>
     `;
     
     modal.style.display = 'flex';
 };
 
-// 2. ACTUALIZAR LISTA Y BOTONES
+// Función para actualizar la lista (llamada desde online.js)
 window.updateHostPanelUI = function(players, hostName) {
     const container = document.getElementById('room-players');
     const btn = document.getElementById('btn-lobby-action');
     
-    // Si la ventana no existe aún, salir para evitar error
+    // SEGURIDAD: Si la ventana no existe, salir sin error
     if(!container || !btn) return;
     
     container.innerHTML = ''; 
@@ -712,7 +720,7 @@ window.updateHostPanelUI = function(players, hostName) {
     let myStatus = 'not-ready';
     let playersCount = players.length;
 
-    // DIBUJAR JUGADORES
+    // Dibujar lista de jugadores
     players.forEach(p => {
         const isHost = p.name === hostName;
         const isReady = p.status === 'ready';
@@ -722,16 +730,20 @@ window.updateHostPanelUI = function(players, hostName) {
 
         const div = document.createElement('div');
         div.className = 'lobby-p-card';
-        div.style.cssText = `
-            background: ${isReady ? 'rgba(18, 250, 5, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
-            border: 2px solid ${isReady ? 'var(--good)' : '#444'};
-            padding: 10px; border-radius: 8px; width: 90px; text-align: center;
-            display: flex; flex-direction: column; align-items: center; gap: 5px;
-        `;
+        // Bordes verdes si está listo
+        div.style.border = isReady ? '2px solid var(--good)' : '2px solid #444';
+        div.style.background = isReady ? 'rgba(18, 250, 5, 0.1)' : 'rgba(255,255,255,0.05)';
+        div.style.padding = '10px';
+        div.style.borderRadius = '8px';
+        div.style.width = '90px';
+        div.style.textAlign = 'center';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.alignItems = 'center';
         
         div.innerHTML = `
-            <div style="width:35px; height:35px; background:url(${p.avatar||''}) center/cover; border-radius:50%; background-color:#333;"></div>
-            <div style="font-size:0.75rem; font-weight:bold; overflow:hidden; text-overflow:ellipsis; width:100%; white-space:nowrap;">${p.name}</div>
+            <div style="width:35px; height:35px; background:url(${p.avatar||''}) center/cover; border-radius:50%; background-color:#333; margin-bottom:5px;"></div>
+            <div style="font-size:0.7rem; font-weight:bold; overflow:hidden; text-overflow:ellipsis; width:100%;">${p.name}</div>
             <div style="font-size:0.6rem; color:${isReady?'var(--good)':'#888'}; font-weight:900;">
                 ${isHost ? 'HOST' : (isReady ? 'LISTO' : '...')}
             </div>
@@ -739,14 +751,15 @@ window.updateHostPanelUI = function(players, hostName) {
         container.appendChild(div);
     });
 
-    // LÓGICA DEL BOTÓN
-    // Clonamos el botón para limpiar eventos anteriores (evita clicks dobles)
+    // Lógica del Botón Inteligente
+    // Clonamos para limpiar eventos viejos
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
 
     if (amIHost) {
+        // MODO HOST
         newBtn.innerText = "INICIAR PARTIDA";
-        // Permitir iniciar si todos están listos y hay > 1 jugador (o si estoy solo testeando)
+        // Permitir iniciar si hay >1 jugador y todos listos (O si estás solo)
         const canStart = (playersCount > 1 && allReady) || (playersCount === 1);
         
         newBtn.className = "action " + (canStart ? "btn-acc" : "secondary");
@@ -756,12 +769,13 @@ window.updateHostPanelUI = function(players, hostName) {
         newBtn.onclick = () => {
             if(canStart) {
                 newBtn.innerText = "INICIANDO...";
-                window.startLobbyMatchData();
+                if(window.startLobbyMatchData) window.startLobbyMatchData();
             } else {
-                notify("Esperando a que todos estén listos", "error");
+                if(window.notify) window.notify("Esperando a que todos estén listos", "error");
             }
         };
     } else {
+        // MODO CLIENTE
         let isReady = myStatus === 'ready';
         newBtn.innerText = isReady ? "CANCELAR LISTO" : "¡ESTOY LISTO!";
         newBtn.className = isReady ? "action secondary" : "action btn-acc";
@@ -769,28 +783,25 @@ window.updateHostPanelUI = function(players, hostName) {
         newBtn.style.cursor = "pointer";
         
         newBtn.onclick = () => {
-            window.toggleReadyData();
+            if(window.toggleReadyData) window.toggleReadyData();
         };
     }
 };
 
-// 3. CONFIRMAR CREACIÓN (FIX DENSIDAD)
 window.confirmCreateLobby = function() {
-    if(!curSongData) return;
+    if(!window.curSongData) return;
     
-    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
+    // Fix: Densidad correcta
+    const den = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
+    const config = { keys: [window.selectedLobbyKeys || 4], density: den, ranked: false };
     
-    const config = { 
-        keys: [window.selectedLobbyKeys || 4], 
-        density: currentDen, // Ahora usa el valor real
-        ranked: false 
-    };
+    if(window.notify) window.notify("Creando sala...", "info");
     
-    notify("Creando sala...", "info");
     if (window.createLobbyData) {
-        window.createLobbyData(curSongData.id, config, false).then(() => {
-            closeModal('diff');
-            window.openHostPanel(curSongData, false); // Abrir panel inmediatamente
+        window.createLobbyData(window.curSongData.id, config, false).then(() => {
+            if(typeof closeModal === 'function') closeModal('diff');
+            // Abrir panel inmediatamente
+            window.openHostPanel(window.curSongData, false);
             window.isCreatingLobby = false;
         });
     }
