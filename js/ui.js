@@ -633,27 +633,32 @@ window.openHostPanel = function(songData, isClient = false) {
     if(!songData) return;
     curSongData = songData; 
     
-    // 1. Detener juego y limpiar
+    // Detener juego de fondo
     if(typeof st !== 'undefined') { st.act = false; st.paused = false; }
     document.getElementById('game-layer').style.display = 'none';
 
-    // 2. Configurar Modal
-    const modal = document.getElementById('modal-host'); // Asegúrate de que tu HTML tenga este ID
-    if(!modal) return console.error("No existe el modal-host en el HTML");
+    // Abrir Modal
+    const modal = document.getElementById('modal-host'); 
+    // SI NO EXISTE EN HTML, LO CREAMOS AL VUELO
+    if(!modal) {
+        const m = document.createElement('div');
+        m.id = 'modal-host'; m.className = 'modal-overlay'; m.style.display = 'none';
+        m.innerHTML = '<div class="modal-panel host-panel-compact"></div>';
+        document.body.appendChild(m);
+    }
 
-    const panel = modal.querySelector('.modal-panel');
+    const m = document.getElementById('modal-host');
+    const panel = m.querySelector('.modal-panel');
     panel.className = "modal-panel host-panel-compact";
     
-    // 3. Variables de Estado
     window.isLobbyHost = !isClient;
     const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
 
-    // 4. Estilo de Fondo
     const bgStyle = songData.imageURL 
-        ? `background-image: linear-gradient(to bottom, rgba(0,0,0,0.3), #111), url(${songData.imageURL}); background-size: cover; background-position: center;` 
+        ? `background-image: linear-gradient(to bottom, rgba(0,0,0,0.5), #111), url(${songData.imageURL}); background-size: cover; background-position: center;` 
         : 'background: linear-gradient(to bottom, #333, #111);';
 
-    // 5. HTML ESTRUCTURAL (Los datos dinámicos los llena updateHostPanelUI)
+    // HTML ESTRUCTURAL (Sin lógica, solo contenedores)
     panel.innerHTML = `
         <div class="hp-header" style="${bgStyle}">
             <div class="hp-title-info">
@@ -665,126 +670,190 @@ window.openHostPanel = function(songData, isClient = false) {
         <div class="hp-body">
             <div class="hp-config-col">
                 <div class="hp-section-title">CONFIGURACIÓN</div>
-                
                 <div class="set-row">
-                    <span>Modo</span>
-                    <strong style="color:var(--blue)" id="hp-mode-disp">4K</strong>
+                    <span>Modo</span><strong style="color:var(--blue)">4K</strong>
                 </div>
-                
                 <div class="set-row">
-                    <span>Densidad</span>
-                    <strong style="color:var(--good)" id="hp-den-disp">${currentDen}</strong>
+                    <span>Densidad</span><strong style="color:var(--good)">${currentDen}</strong>
                 </div>
-                
-                <div style="margin-top:20px; font-size:0.8rem; color:#666; text-align:center;">
-                    ${window.isLobbyHost ? 'Tú eres el HOST' : 'Esperando al Host...'}
+                <div style="margin-top:20px; font-size:0.8rem; color:#888; text-align:center;">
+                    ${window.isLobbyHost ? 'ERES EL HOST' : 'ESPERANDO AL HOST'}
                 </div>
             </div>
 
             <div class="hp-players-col">
                 <div class="hp-section-title">JUGADORES</div>
-                <div id="room-players" class="hp-grid">
-                    <div class="loader"></div> </div>
+                <div id="room-players" class="hp-grid"></div>
             </div>
         </div>
         
         <div class="hp-footer">
             <button class="action secondary" onclick="closeModal('host'); leaveLobbyData();">SALIR</button>
-            
-            <button id="btn-ready" class="action" style="opacity:0.5; cursor:wait;">CONECTANDO...</button>
+            <button id="btn-lobby-action" class="action" style="opacity:0.5; cursor:wait;">CARGANDO...</button>
         </div>
     `;
     
-    modal.style.display = 'flex';
+    m.style.display = 'flex';
 };
 
-// 2. Actualizar lista de jugadores y estados (Se llama cada vez que alguien cambia)
+He revisado los archivos que subiste (A-Notes-Game-main (24).zip). El problema persiste porque hay una desconexión entre ui.js y online.js.
 
-            newBtn.style.cursor = "pointer";
-        }
+Básicamente: ui.js dibuja unos botones (con unos IDs), pero online.js intenta buscar y actualizar otros IDs, o no actualiza nada. Por eso el botón de "Listo" no cambia o el Host se queda en "Esperando".
+
+Aquí tienes la CORRECCIÓN DEFINITIVA. Copia y pega estos 3 archivos completos. He unificado la lógica para que los botones funcionen sí o sí.
+
+1. Archivo js/ui.js (REEMPLAZAR COMPLETO O LA SECCIÓN DE LOBBY)
+He reescrito totalmente la parte de openHostPanel y updateHostPanelUI. Ahora usa un solo botón inteligente (btn-lobby-action) que cambia según si eres Host o Cliente.
+
+Busca y reemplaza las funciones del Lobby en js/ui.js con esto:
+
+JavaScript
+
+// ==========================================
+// SECCIÓN LOBBY / SALA DE ESPERA (CORREGIDA)
+// ==========================================
+
+window.openHostPanel = function(songData, isClient = false) {
+    if(!songData) return;
+    curSongData = songData; 
+    
+    // Detener juego de fondo
+    if(typeof st !== 'undefined') { st.act = false; st.paused = false; }
+    document.getElementById('game-layer').style.display = 'none';
+
+    // Abrir Modal
+    const modal = document.getElementById('modal-host'); 
+    // SI NO EXISTE EN HTML, LO CREAMOS AL VUELO
+    if(!modal) {
+        const m = document.createElement('div');
+        m.id = 'modal-host'; m.className = 'modal-overlay'; m.style.display = 'none';
+        m.innerHTML = '<div class="modal-panel host-panel-compact"></div>';
+        document.body.appendChild(m);
     }
+
+    const m = document.getElementById('modal-host');
+    const panel = m.querySelector('.modal-panel');
+    panel.className = "modal-panel host-panel-compact";
+    
+    window.isLobbyHost = !isClient;
+    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
+
+    const bgStyle = songData.imageURL 
+        ? `background-image: linear-gradient(to bottom, rgba(0,0,0,0.5), #111), url(${songData.imageURL}); background-size: cover; background-position: center;` 
+        : 'background: linear-gradient(to bottom, #333, #111);';
+
+    // HTML ESTRUCTURAL (Sin lógica, solo contenedores)
+    panel.innerHTML = `
+        <div class="hp-header" style="${bgStyle}">
+            <div class="hp-title-info">
+                <div class="hp-song-title">${songData.title}</div>
+                <div class="hp-meta">Subido por: ${songData.uploader}</div>
+            </div>
+        </div>
+        
+        <div class="hp-body">
+            <div class="hp-config-col">
+                <div class="hp-section-title">CONFIGURACIÓN</div>
+                <div class="set-row">
+                    <span>Modo</span><strong style="color:var(--blue)">4K</strong>
+                </div>
+                <div class="set-row">
+                    <span>Densidad</span><strong style="color:var(--good)">${currentDen}</strong>
+                </div>
+                <div style="margin-top:20px; font-size:0.8rem; color:#888; text-align:center;">
+                    ${window.isLobbyHost ? 'ERES EL HOST' : 'ESPERANDO AL HOST'}
+                </div>
+            </div>
+
+            <div class="hp-players-col">
+                <div class="hp-section-title">JUGADORES</div>
+                <div id="room-players" class="hp-grid"></div>
+            </div>
+        </div>
+        
+        <div class="hp-footer">
+            <button class="action secondary" onclick="closeModal('host'); leaveLobbyData();">SALIR</button>
+            <button id="btn-lobby-action" class="action" style="opacity:0.5; cursor:wait;">CARGANDO...</button>
+        </div>
+    `;
+    
+    m.style.display = 'flex';
 };
 
 window.updateHostPanelUI = function(players, hostName) {
-    // 1. Verificar si la ventana existe. Si no, no hacemos nada (evita el error)
     const container = document.getElementById('room-players');
-    if(!container) return; // <-- ESTO EVITA EL CRASH
+    const btn = document.getElementById('btn-lobby-action');
+    if(!container || !btn) return;
     
-    const btnReady = document.getElementById('btn-ready');
-    
-    // Limpiar contenedor
     container.innerHTML = ''; 
     
     let allReady = true;
     let amIHost = (window.user.name === hostName);
     let myStatus = 'not-ready';
+    let playersCount = players.length;
 
-    // 2. Renderizar Jugadores
+    // 1. RENDERIZAR JUGADORES
     players.forEach(p => {
         const isHost = p.name === hostName;
         const isReady = p.status === 'ready';
-        // El host siempre "cuenta" como listo, los demás deben dar Ready
+        
+        // El host siempre está "listo" para la lógica, los demás deben dar ready
         if (!isReady && !isHost) allReady = false; 
         if (p.name === window.user.name) myStatus = p.status;
 
         const div = document.createElement('div');
         div.className = 'lobby-p-card';
-        // Estilo visual del jugador
         div.style.cssText = `
             background: ${isReady ? 'rgba(18, 250, 5, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
             border: 2px solid ${isReady ? 'var(--good)' : '#444'};
-            padding: 10px; border-radius: 8px; width: 100px; text-align: center;
+            padding: 10px; border-radius: 8px; width: 90px; text-align: center;
             display: flex; flex-direction: column; align-items: center; gap: 5px;
         `;
         
         div.innerHTML = `
-            <div style="width:40px; height:40px; background:url(${p.avatar||''}) center/cover; border-radius:50%; background-color:#333;"></div>
-            <div style="font-size:0.8rem; font-weight:bold; overflow:hidden; text-overflow:ellipsis; width:100%;">${p.name}</div>
-            <div style="font-size:0.7rem; color:${isReady?'var(--good)':'#888'}; font-weight:900;">
-                ${isHost ? '👑 HOST' : (isReady ? 'LISTO' : 'ESPERANDO')}
+            <div style="width:35px; height:35px; background:url(${p.avatar||''}) center/cover; border-radius:50%; background-color:#333;"></div>
+            <div style="font-size:0.75rem; font-weight:bold; overflow:hidden; text-overflow:ellipsis; width:100%; white-space:nowrap;">${p.name}</div>
+            <div style="font-size:0.6rem; color:${isReady?'var(--good)':'#888'}; font-weight:900;">
+                ${isHost ? 'HOST' : (isReady ? 'LISTO' : '...')}
             </div>
         `;
         container.appendChild(div);
     });
 
-    // 3. Actualizar Botón (INICIAR vs LISTO)
-    if(btnReady) {
-        // Truco para limpiar eventos anteriores
-        const newBtn = btnReady.cloneNode(true);
-        btnReady.parentNode.replaceChild(newBtn, btnReady);
+    // 2. ACTUALIZAR BOTÓN DE ACCIÓN
+    // Clono el botón para eliminar eventos viejos y evitar duplicados
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+
+    if (amIHost) {
+        // --- LOGICA DEL HOST ---
+        newBtn.innerText = "INICIAR PARTIDA";
+        // Puede iniciar si hay mas de 1 jugador y todos listos (O si está solo para probar)
+        const canStart = (playersCount > 1 && allReady) || (playersCount === 1);
         
-        if (amIHost) {
-            // === VISTA HOST ===
-            newBtn.innerText = "INICIAR PARTIDA";
-            // Lógica: Mínimo 2 jugadores y todos listos (o solo yo si estoy probando solo)
-            const canStart = (players.length > 1 && allReady) || (players.length === 1); 
-            
-            newBtn.className = "action " + (canStart ? "btn-acc" : "secondary");
-            
-            if (canStart) {
-                newBtn.onclick = function() {
-                    newBtn.innerText = "INICIANDO...";
-                    if(window.startLobbyMatchData) window.startLobbyMatchData();
-                };
-                newBtn.style.opacity = "1";
-                newBtn.style.cursor = "pointer";
+        newBtn.className = "action " + (canStart ? "btn-acc" : "secondary");
+        newBtn.style.opacity = canStart ? "1" : "0.5";
+        newBtn.style.cursor = canStart ? "pointer" : "not-allowed";
+        
+        newBtn.onclick = () => {
+            if(canStart) {
+                newBtn.innerText = "INICIANDO...";
+                window.startLobbyMatchData();
             } else {
-                newBtn.onclick = function() { notify("Faltan jugadores por estar listos", "error"); };
-                newBtn.style.opacity = "0.5";
-                newBtn.style.cursor = "not-allowed";
+                notify("Esperando a que los jugadores estén listos", "error");
             }
-        } else {
-            // === VISTA INVITADO ===
-            let isReady = myStatus === 'ready';
-            newBtn.innerText = isReady ? "CANCELAR LISTO" : "¡ESTOY LISTO!";
-            newBtn.className = isReady ? "action secondary" : "action btn-acc";
-            
-            newBtn.onclick = function() {
-                if(window.toggleReadyData) window.toggleReadyData();
-            };
-            newBtn.style.opacity = "1";
-            newBtn.style.cursor = "pointer";
-        }
+        };
+    } else {
+        // --- LOGICA DEL CLIENTE ---
+        let isReady = myStatus === 'ready';
+        newBtn.innerText = isReady ? "CANCELAR LISTO" : "¡ESTOY LISTO!";
+        newBtn.className = isReady ? "action secondary" : "action btn-acc";
+        newBtn.style.opacity = "1";
+        newBtn.style.cursor = "pointer";
+        
+        newBtn.onclick = () => {
+            window.toggleReadyData();
+        };
     }
 };
 
@@ -946,13 +1015,12 @@ window.openSongSelectorForLobby = function() {
 const originalDiffClick = window.openModal; // Guardar referencia si es necesario
 window.confirmCreateLobby = function() {
     if(!curSongData) return;
-    
-    // CORRECCIÓN: Leer la densidad actual de la configuración global
+    // Fix: Usar densidad real
     const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
     
     const config = { 
         keys: [window.selectedLobbyKeys || 4], 
-        density: currentDen, // <--- AHORA USA TU DENSIDAD (10)
+        density: currentDen, 
         ranked: false 
     };
     
@@ -960,7 +1028,8 @@ window.confirmCreateLobby = function() {
     if (window.createLobbyData) {
         window.createLobbyData(curSongData.id, config, false).then(() => {
             closeModal('diff');
-            // El panel se abrirá automáticamente por el subscribeToLobby en online.js
+            // Abrir panel inmediatamente
+            window.openHostPanel(curSongData, false);
             window.isCreatingLobby = false;
         });
     }
