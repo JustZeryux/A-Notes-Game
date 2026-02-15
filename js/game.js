@@ -1,5 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V12 - ROBUST FIX) === */
-/* Arreglos: Generador no borra notas, Juez visible siempre, Sync ajustado */
+/* === AUDIO & ENGINE (MASTER FINAL V13 - CLEAN UI START) === */
 
 let elTrack = null;
 
@@ -50,17 +49,17 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR DE MAPAS (CORREGIDO: NO BORRA NOTAS)
+// 2. GENERADOR DE MAPAS (NO DELETE / NO OVERLAP)
 // ==========================================
 
 function getSmartLane(last, k, busyLanes, time) {
     let candidates = [];
     for(let i=0; i<k; i++) {
-        // Verificar si el carril está libre (con un pequeño margen de 20ms)
+        // Verificar si el carril está libre (con margen 20ms)
         if (time > busyLanes[i] + 20) candidates.push(i);
     }
     
-    // Si no hay sitio, devolvemos -1 (El generador principal manejará el pánico)
+    // Si no hay sitio, devolvemos -1 (Panic Mode)
     if(candidates.length === 0) return -1;
     
     // Preferir no repetir carril
@@ -86,7 +85,7 @@ function genMap(buf, k) {
     let lastNoteTime = -1000; 
     let lastLane = Math.floor(k/2); 
     
-    // Rastreador de ocupación de carriles
+    // Rastreador de ocupación
     let laneFreeTimes = new Array(k).fill(0);
 
     const energyHistory = [];
@@ -128,16 +127,14 @@ function genMap(buf, k) {
                     lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs);
                 }
 
-                // === FIX CRÍTICO: MODO PÁNICO ===
-                // Si 'lane' es -1 (todo ocupado), NO borramos la nota.
-                // Buscamos el carril que se libera más pronto.
+                // === PANIC MODE: NO BORRAR NOTAS ===
                 if (lane === -1) {
                     let bestLane = 0; 
                     let minTime = Infinity;
                     for(let x=0; x<k; x++) {
                         if(laneFreeTimes[x] < minTime) { minTime = laneFreeTimes[x]; bestLane = x; }
                     }
-                    lane = bestLane; // Forzamos la nota aquí
+                    lane = bestLane; 
                 }
 
                 // --- HOLD DETECTION ---
@@ -157,7 +154,6 @@ function genMap(buf, k) {
 
                 // --- MULTI NOTES ---
                 if(staircaseCount === 0 && density >= 5 && instant > localAvg * (thresholdMult + 0.4)) {
-                     // Buscar segundo carril libre
                      let candidates = [];
                      for(let c=0; c<k; c++) {
                          if(c !== lane && timeMs > laneFreeTimes[c] + 20) candidates.push(c);
@@ -171,7 +167,7 @@ function genMap(buf, k) {
 
                 map.push({ t: timeMs, l: lane, type: type, len: length, h: false });
                 
-                // Actualizar ocupación (+80ms de buffer visual)
+                // Actualizar ocupación
                 laneFreeTimes[lane] = timeMs + length + 80; 
                 
                 lastNoteTime = timeMs; 
@@ -230,10 +226,10 @@ window.prepareAndPlaySong = async function(k) {
         const map = genMap(buffer, k);
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         
-        // Soporte para Lobby Online
         if(window.isMultiplayer && window.notifyLobbyLoaded) {
-             window.notifyLobbyLoaded(); // Notificar a online.js que estamos listos
-             if(loader) loader.style.display = 'none'; // Esperar a que el host inicie
+             window.notifyLobbyLoaded(); 
+             // NO ocultamos el loader aquí si somos clientes, esperamos al Start del host
+             if(window.isLobbyHost && loader) loader.style.display = 'flex'; 
         } else {
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
@@ -249,6 +245,7 @@ window.prepareAndPlaySong = async function(k) {
 window.playSongInternal = function(s) {
     if(!s) return;
     
+    // Reset Stats
     window.st.act = true;
     window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
@@ -267,13 +264,31 @@ window.playSongInternal = function(s) {
     window.st.songDuration = s.buf.duration;
     window.keys = s.kVersion;
 
+    // === FIX JUGADOR 2: LIMPIEZA TOTAL DE UI ===
+    // Forzamos el cierre de TODOS los modales que puedan estorbar
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
-    ['modal-res', 'modal-pause'].forEach(id => { const m = document.getElementById(id); if(m) m.style.display = 'none'; });
+    
+    const uiToClose = [
+        'modal-res', 
+        'modal-pause', 
+        'modal-lobbies',      // Lista de salas
+        'modal-lobby-room',   // Sala de espera
+        'modal-song-selector',// Selector online
+        'modal-diff',         // Selector dificultad
+        'loading-overlay'     // Loader
+    ];
+    
+    uiToClose.forEach(id => {
+        const m = document.getElementById(id);
+        if(m) m.style.display = 'none';
+    });
+    // ==========================================
 
     initReceptors(window.keys);
     if(typeof updHUD === 'function') updHUD();
 
+    // START (PRERENDER)
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex'; cd.innerText = "3";
     
@@ -410,7 +425,7 @@ function loop() {
 }
 
 // ==========================================
-// 5. VISUALS & JUEZ (FIXED DEFAULTS)
+// 5. VISUALS & JUEZ
 // ==========================================
 
 function createSplash(l) {
@@ -436,12 +451,9 @@ function showJudge(text, color, diffMs) {
     
     const container = document.createElement('div');
     container.style.position = 'absolute';
-    
-    // === FIX: Usar variable O fallback por si CSS falla ===
     container.style.left = 'var(--judge-x, 50%)';
     container.style.top = 'var(--judge-y, 40%)';
     container.style.transform = 'translate(-50%, -50%) scale(var(--judge-scale, 1))';
-    
     container.style.zIndex = '500';
     container.style.pointerEvents = 'none';
     container.style.display = 'flex';
@@ -540,17 +552,13 @@ function miss(n) {
     playMiss(); if(typeof updHUD==='function') updHUD();
     if(n.el) n.el.style.opacity = 0;
     
-    // === FIX: NO MORIR EN MULTIPLAYER ===
-    // Si es multiplayer, dejamos que la vida baje a 0 pero NO llamamos a end(true)
+    // === FIX: NO FAIL EN ONLINE ===
     if (window.st.hp <= 0) {
-        window.st.hp = 0; // Mínimo 0
-        if (!window.isMultiplayer) {
-            end(true); // Solo muere si es singleplayer
-        }
+        window.st.hp = 0;
+        if (!window.isMultiplayer) end(true); // Solo muere en singleplayer
     }
 }
 
-// ... (Resto de funciones: updHUD, initReceptors, etc. se mantienen igual)
 function updHUD() {
     const scEl = document.getElementById('g-score');
     if(scEl) scEl.innerText = window.st.sc.toLocaleString();
@@ -578,13 +586,14 @@ function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
-    // === FIX MULTIPLAYER CRASH ===
+    // === FIX MULTIPLAYER ENDING ===
     if(window.isMultiplayer) {
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
-        if(window.isLobbyHost && window.db && window.currentLobbyId) {
+        if(window.isLobbyHost && window.db && window.currentLobbyId && !died) {
+             console.log("Host finalizando...");
              setTimeout(() => {
                 window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'finished' });
-             }, 1500); 
+             }, 2000); 
         }
         return; 
     }
@@ -676,7 +685,7 @@ function initReceptors(k) {
         elTrack.appendChild(l);
     }
 }
-//... (restartSong, resumeGame, toMenu, togglePause sin cambios)
+
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 function togglePause() {
     if(!window.st.act) return;
