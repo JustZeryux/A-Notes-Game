@@ -242,20 +242,16 @@ window.prepareAndPlaySong = async function(k) {
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         
         // === ZONA CRÍTICA ONLINE ===
-        if(window.isMultiplayer && window.notifyLobbyLoaded) {
-             window.notifyLobbyLoaded(); 
-             // NO llamamos a playSongInternal aquí. notifyLobbyLoaded lo hará cuando sea seguro.
+        // Si estamos en online (hay un ID de lobby), NO iniciar audio todavía.
+        if(window.currentLobbyId) {
+             window.isMultiplayer = true;
+             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded(); 
+             // NO llamamos a playSongInternal aquí. Esperamos la señal del Host.
         } else {
+             // Si es Singleplayer, arrancamos normal
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
-
-    } catch (e) {
-        console.error(e);
-        alert("Error: " + e.message);
-        if(loader) loader.style.display = 'none';
-    }
-};
 
 window.playSongInternal = function(s) {
     if(!s) return;
