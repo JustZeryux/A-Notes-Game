@@ -628,15 +628,18 @@ function showFriendProfile(name) {
 // SECCIÓN LOBBY / SALA DE ESPERA (CORREGIDA)
 // ==========================================
 
+/* === UI LOBBY FIXED (VERSIÓN MAESTRA) === */
+
+// 1. ABRIR EL PANEL
 window.openHostPanel = function(songData, isClient = false) {
     if(!songData) return;
     curSongData = songData; 
     
-    // Detener juego
+    // Detener juego de fondo
     if(typeof st !== 'undefined') { st.act = false; st.paused = false; }
     document.getElementById('game-layer').style.display = 'none';
 
-    // Crear/Obtener Modal
+    // Asegurar que el modal existe
     let modal = document.getElementById('modal-host'); 
     if(!modal) {
         modal = document.createElement('div');
@@ -649,57 +652,71 @@ window.openHostPanel = function(songData, isClient = false) {
     panel.className = "modal-panel host-panel-compact";
     
     window.isLobbyHost = !isClient;
+    // CORRECCIÓN: Leer dificultad real
     const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
 
-    // Fondo
     const bgStyle = songData.imageURL 
         ? `background-image: linear-gradient(to bottom, rgba(0,0,0,0.6), #111), url(${songData.imageURL}); background-size: cover;` 
         : 'background: linear-gradient(to bottom, #333, #111);';
 
-    // HTML CON LOS IDs CORRECTOS
+    // HTML ESTRUCTURAL (Usamos IDs universales: room-players y btn-lobby-action)
     panel.innerHTML = `
         <div class="hp-header" style="${bgStyle}">
             <div class="hp-title-info">
                 <div class="hp-song-title">${songData.title}</div>
-                <div class="hp-meta">${songData.uploader}</div>
+                <div class="hp-meta">Subido por: ${songData.uploader}</div>
             </div>
         </div>
+        
         <div class="hp-body">
             <div class="hp-config-col">
-                <div class="hp-section-title">INFO</div>
-                <div class="set-row"><span>Modo</span><strong style="color:var(--blue)">4K</strong></div>
-                <div class="set-row"><span>Densidad</span><strong style="color:var(--good)">${currentDen}</strong></div>
-                <div style="margin-top:15px; font-size:0.8rem; color:#666;">${window.isLobbyHost ? 'ERES HOST' : 'CLIENTE'}</div>
+                <div class="hp-section-title">CONFIGURACIÓN</div>
+                <div class="set-row">
+                    <span>Modo</span><strong style="color:var(--blue)">4K</strong>
+                </div>
+                <div class="set-row">
+                    <span>Densidad</span><strong style="color:var(--good)">${currentDen}</strong>
+                </div>
+                <div style="margin-top:20px; font-size:0.8rem; color:#888; text-align:center;">
+                    ${window.isLobbyHost ? 'ERES EL HOST' : 'ESPERANDO AL HOST'}
+                </div>
             </div>
+
             <div class="hp-players-col">
                 <div class="hp-section-title">JUGADORES</div>
                 <div id="room-players" class="hp-grid"></div>
             </div>
         </div>
+        
         <div class="hp-footer">
             <button class="action secondary" onclick="closeModal('host'); leaveLobbyData();">SALIR</button>
-            <button id="btn-lobby-action" class="action" style="opacity:0.5;">CONECTANDO...</button>
+            <button id="btn-lobby-action" class="action" style="opacity:0.5; cursor:wait;">CARGANDO...</button>
         </div>
     `;
+    
     modal.style.display = 'flex';
 };
 
+// 2. ACTUALIZAR LISTA Y BOTONES
 window.updateHostPanelUI = function(players, hostName) {
-    // BUSCAR LOS IDs QUE DEFINIMOS ARRIBA
     const container = document.getElementById('room-players');
     const btn = document.getElementById('btn-lobby-action');
     
-    if(!container || !btn) return; // Si no existen, no hacemos nada (evita crash)
+    // Si la ventana no existe aún, salir para evitar error
+    if(!container || !btn) return;
     
     container.innerHTML = ''; 
+    
     let allReady = true;
     let amIHost = (window.user.name === hostName);
     let myStatus = 'not-ready';
+    let playersCount = players.length;
 
     // DIBUJAR JUGADORES
     players.forEach(p => {
         const isHost = p.name === hostName;
         const isReady = p.status === 'ready';
+        
         if (!isReady && !isHost) allReady = false; 
         if (p.name === window.user.name) myStatus = p.status;
 
@@ -708,23 +725,30 @@ window.updateHostPanelUI = function(players, hostName) {
         div.style.cssText = `
             background: ${isReady ? 'rgba(18, 250, 5, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
             border: 2px solid ${isReady ? 'var(--good)' : '#444'};
-            padding: 8px; border-radius: 6px; width: 80px; text-align: center;
+            padding: 10px; border-radius: 8px; width: 90px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
         `;
+        
         div.innerHTML = `
-            <div style="width:30px; height:30px; background:url(${p.avatar||''}) center/cover; border-radius:50%; background-color:#333; margin:0 auto;"></div>
-            <div style="font-size:0.7rem; font-weight:bold; overflow:hidden; text-overflow:ellipsis;">${p.name}</div>
-            <div style="font-size:0.6rem; color:${isReady?'var(--good)':'#888'};">${isHost ? 'HOST' : (isReady ? 'LISTO' : '...')}</div>
+            <div style="width:35px; height:35px; background:url(${p.avatar||''}) center/cover; border-radius:50%; background-color:#333;"></div>
+            <div style="font-size:0.75rem; font-weight:bold; overflow:hidden; text-overflow:ellipsis; width:100%; white-space:nowrap;">${p.name}</div>
+            <div style="font-size:0.6rem; color:${isReady?'var(--good)':'#888'}; font-weight:900;">
+                ${isHost ? 'HOST' : (isReady ? 'LISTO' : '...')}
+            </div>
         `;
         container.appendChild(div);
     });
 
-    // ACTUALIZAR BOTÓN
+    // LÓGICA DEL BOTÓN
+    // Clonamos el botón para limpiar eventos anteriores (evita clicks dobles)
     const newBtn = btn.cloneNode(true);
     btn.parentNode.replaceChild(newBtn, btn);
 
     if (amIHost) {
-        newBtn.innerText = "INICIAR";
-        const canStart = (players.length > 1 && allReady) || (players.length === 1);
+        newBtn.innerText = "INICIAR PARTIDA";
+        // Permitir iniciar si todos están listos y hay > 1 jugador (o si estoy solo testeando)
+        const canStart = (playersCount > 1 && allReady) || (playersCount === 1);
+        
         newBtn.className = "action " + (canStart ? "btn-acc" : "secondary");
         newBtn.style.opacity = canStart ? "1" : "0.5";
         newBtn.style.cursor = canStart ? "pointer" : "not-allowed";
@@ -732,36 +756,46 @@ window.updateHostPanelUI = function(players, hostName) {
         newBtn.onclick = () => {
             if(canStart) {
                 newBtn.innerText = "INICIANDO...";
-                if(window.startLobbyMatchData) window.startLobbyMatchData();
+                window.startLobbyMatchData();
             } else {
-                notify("Esperando jugadores...", "error");
+                notify("Esperando a que todos estén listos", "error");
             }
         };
     } else {
         let isReady = myStatus === 'ready';
-        newBtn.innerText = isReady ? "CANCELAR" : "¡LISTO!";
+        newBtn.innerText = isReady ? "CANCELAR LISTO" : "¡ESTOY LISTO!";
         newBtn.className = isReady ? "action secondary" : "action btn-acc";
         newBtn.style.opacity = "1";
         newBtn.style.cursor = "pointer";
-        newBtn.onclick = () => { if(window.toggleReadyData) window.toggleReadyData(); };
+        
+        newBtn.onclick = () => {
+            window.toggleReadyData();
+        };
     }
 };
 
-// FIX DENSIDAD EN CREATE
+// 3. CONFIRMAR CREACIÓN (FIX DENSIDAD)
 window.confirmCreateLobby = function() {
     if(!curSongData) return;
-    const den = (window.cfg && window.cfg.den) ? window.cfg.den : 5; // LEER DENSIDAD REAL
-    const config = { keys: [window.selectedLobbyKeys || 4], density: den, ranked: false };
     
-    notify("Creando...", "info");
+    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
+    
+    const config = { 
+        keys: [window.selectedLobbyKeys || 4], 
+        density: currentDen, // Ahora usa el valor real
+        ranked: false 
+    };
+    
+    notify("Creando sala...", "info");
     if (window.createLobbyData) {
         window.createLobbyData(curSongData.id, config, false).then(() => {
             closeModal('diff');
-            window.openHostPanel(curSongData, false);
+            window.openHostPanel(curSongData, false); // Abrir panel inmediatamente
             window.isCreatingLobby = false;
         });
     }
 };
+
 
 // Toggle visual del menú de ajustes dentro del lobby
 window.toggleLobbySettings = function() {
