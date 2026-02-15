@@ -74,189 +74,90 @@ function normalizeAudio(filteredData) {
 // ==========================================
 // 2. GENERADOR V7.0 (ZCR & STATE MACHINE)
 // ==========================================
+// Reemplaza toda la función genMap actual con esta:
 function genMap(buf, k) {
-    const rawData = buf.getChannelData(0);
-    const data = normalizeAudio(new Float32Array(rawData));
-    const map = [];
+    const data = buf.getChannelData(0);
     const sampleRate = buf.sampleRate;
+    const map = [];
     
-    // Configuración de Densidad
-    let density = cfg.den || 5; 
+    // Configuración base (Oppa Logic)
+    const step = Math.floor(sampleRate / 60); // Muestreo ~60fps
+    let lastTime = -1000;
+    let lastLane = Math.floor(k / 2);
+    let direction = 1; // Para escaleras (1 o -1)
     
-    // GRID EXACTO (Snap to Grid)
-    // Usamos 180 BPM como base sólida para metal rápido
-    const baseBPM = 170 + (density * 5); 
-    const samplesPerBeat = sampleRate * (60 / baseBPM);
-    const step16 = Math.floor(samplesPerBeat / 4); // 1/16 nota
+    // Factor de dificultad basado en tu slider de densidad (1-10)
+    // cfg.den: 1 (fácil) a 10 (difícil)
+    const density = window.cfg.den || 5;
     
-    const START_OFFSET = 3000; 
+    // Umbral dinámico: A mayor densidad, detecta sonidos más suaves
+    const thresholdBase = 0.18 - (density * 0.015); 
 
-    // Estado del Mapa
-    let laneFreeTime = new Array(k).fill(-9999); 
-    let lastLane = Math.floor(k/2); 
-    let lastTime = -5000;
-    
-    // MÁQUINA DE ESTADOS
-    let currentState = 'IDLE'; // IDLE, GUITAR_SOLO, VOCAL_RHYTHM, DRUM_FILL
-    let stateTimer = 0; // Cuánto tiempo llevamos en este estado (para no cambiar muy rápido)
-    let patternDir = 1;
+    for (let i = 0; i < data.length; i += step) {
+        const timeMs = (i / sampleRate) * 1000;
+        const volume = Math.abs(data[i]);
 
-    // Recorremos la canción en bloques de 1/16 de nota (Grid fijo)
-    for (let i = 0; i < data.length - step16; i += step16) {
-        
-        // 1. ANÁLISIS ESPECTRAL SIMULADO (Zero Crossing Rate)
-        // Contamos cuántas veces la onda cruza el cero. 
-        // Mucho cruce = Frecuencia Alta (Guitarra Distorsionada/Platillos)
-        // Poco cruce = Frecuencia Baja/Media (Voz/Bajo)
-        
-        let zcr = 0;
-        let energy = 0;
-        const windowSize = Math.floor(step16);
-        
-        for (let j = 0; j < windowSize - 1; j += 4) { // Saltamos samples para optimizar
-            const val = data[i + j];
-            const nextVal = data[i + j + 1];
+        // Distancia mínima entre notas (a mayor densidad, permite notas más rápidas)
+        const minTimeDist = 550 - (density * 45);
+
+        if (volume > thresholdBase && (timeMs - lastTime) > minTimeDist) {
+            let lane;
+            let type = 'tap';
+            let length = 0;
+
+            // --- LÓGICA DE PATRONES ---
             
-            // Energía RMS
-            energy += val * val;
-            
-            // Zero Crossing
-            if ((val >= 0 && nextVal < 0) || (val < 0 && nextVal >= 0)) {
-                zcr++;
-            }
-        }
-        
-        energy = Math.sqrt(energy / (windowSize/4));
-        // Normalizar ZCR relativo al tamaño de ventana
-        const zcrDensity = zcr / (windowSize/4); 
-
-        const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
-        
-        // Umbrales
-        const volThreshold = 0.04 + ((10 - density) * 0.01);
-        
-        // --- LÓGICA DE ESTADOS (STATE MACHINE) ---
-        // Solo permitimos cambiar de estado si han pasado > 1.5 segundos (State Locking)
-        // Esto evita que el mapa se sienta "desordenado"
-        
-        stateTimer += (step16 / sampleRate);
-        let canSwitchState = stateTimer > 1.5; 
-
-        if (canSwitchState) {
-            if (energy < volThreshold) {
-                currentState = 'IDLE';
-            }
-            // ZCR Alto + Energía Alta = SOLO DE GUITARRA (Shredding)
-            else if (zcrDensity > 0.15 && energy > volThreshold * 1.2) {
-                currentState = 'GUITAR_SOLO';
-                stateTimer = 0;
-            }
-            // ZCR Bajo + Energía Alta = RITMO/VOZ
-            else if (zcrDensity < 0.08 && energy > volThreshold) {
-                currentState = 'VOCAL_RHYTHM';
-                stateTimer = 0;
-            }
-            // Intermedio = DRUMS
-            else if (energy > volThreshold) {
-                currentState = 'DRUM_FILL';
-                stateTimer = 0;
-            }
-        }
-
-        // --- GENERACIÓN BASADA EN ESTADO ---
-        
-        if (currentState === 'IDLE') continue;
-
-        // Gap (Velocidad entre notas)
-        let currentGap = timeMs - lastTime;
-        
-        // 1. MODO GUITAR HERO (SOLOS)
-        if (currentState === 'GUITAR_SOLO') {
-            // Permitimos velocidad máxima (Streams)
-            // Se genera una nota en CADA paso de la grilla 1/16 si la energía sostiene
-            
-            if (currentGap >= 75) { // 75ms = Muy rápido
-                let type = 'tap';
+            // Si el volumen es alto (> 0.4), hacemos patrones estructurados (Escaleras/Saltos)
+            if (volume > 0.4) {
+                // Algoritmo de escalera: Sube o baja por las teclas
+                lane = (lastLane + direction + k) % k;
                 
-                // Patrón: Escalera o Stream Infinito
-                // Moverse 1 carril
-                lastLane += patternDir;
-                
-                // Rebotar en bordes
-                if (lastLane >= k) { lastLane = k - 2; patternDir = -1; }
-                if (lastLane < 0) { lastLane = 1; patternDir = 1; }
-                
-                // Colocar
-                map.push({ t: timeMs, l: lastLane, type: type, len: 0, h: false });
-                lastTime = timeMs;
-                
-                // Dobles ocasionales si la energía explota
-                if (energy > volThreshold * 3.0 && density >= 7) {
-                    let dLane = (lastLane + Math.floor(k/2)) % k;
-                    map.push({ t: timeMs, l: dLane, type: 'tap', len: 0, h: false });
+                // 30% de probabilidad de cambiar dirección o salto aleatorio
+                if (Math.random() > 0.7) {
+                     direction *= -1; 
+                     lane = Math.floor(Math.random() * k);
                 }
+            } else {
+                // Nota aleatoria normal para sonidos suaves
+                lane = Math.floor(Math.random() * k);
             }
-        }
-        
-        // 2. MODO VOZ/RITMO (VERSOS)
-        else if (currentState === 'VOCAL_RHYTHM') {
-            // Notas más espaciadas, siguiendo la melodía
-            if (currentGap >= 200) { 
-                let type = 'tap';
-                let len = 0;
-                
-                // Detectar nota larga (Hold)
-                // Si la energía se mantiene estable en el futuro
-                if (energy > volThreshold * 1.5) {
-                    let sustain = 0;
-                    for(let h=1; h<10; h++) {
-                        // Miramos el futuro con paso grande
-                        let fIdx = i + (step16 * h);
-                        if(fIdx < data.length && Math.abs(data[fIdx]) > volThreshold * 0.8) sustain++;
-                        else break;
-                    }
-                    
-                    if (sustain > 4 && Math.random() > 0.4) {
-                        type = 'hold';
-                        len = sustain * (step16/sampleRate) * 1000;
-                        len = Math.min(1500, len);
+
+            // --- LÓGICA DE HOLD (NOTAS LARGAS) ---
+            // Mira hacia adelante. Si el sonido se mantiene, es un Hold.
+            let isHold = true;
+            let holdSteps = 0;
+            // Miramos 8 pasos adelante (aprox 130ms)
+            for (let j = 1; j < 8; j++) {
+                if (i + j * step < data.length) {
+                    if (Math.abs(data[i + j * step]) > thresholdBase * 0.8) {
+                         holdSteps++;
+                    } else {
+                         isHold = false;
                     }
                 }
-
-                // Patrón: Saltos suaves o Jack (repetir nota) si es voz
-                if (Math.random() > 0.3) {
-                    lastLane = (lastLane + 1) % k;
-                }
-                
-                // Buscar carril libre
-                let finalLane = lastLane;
-                if (timeMs <= laneFreeTime[finalLane] + 30) {
-                    for(let l=0; l<k; l++) if(timeMs > laneFreeTime[l]+30) { finalLane=l; break; }
-                }
-
-                map.push({ t: timeMs, l: finalLane, type: type, len: len, h: false });
-                laneFreeTime[finalLane] = timeMs + len;
-                lastTime = timeMs;
             }
-        }
-        
-        // 3. MODO BATERÍA (DRUMS)
-        else if (currentState === 'DRUM_FILL') {
-            // Notas dobles o saltos grandes
-            if (currentGap >= 150) {
-                // Salto grande
-                let jump = Math.floor(Math.random() * 2) + 1;
-                lastLane = (lastLane + jump) % k;
-                
-                map.push({ t: timeMs, l: lastLane, type: 'tap', len: 0, h: false });
-                
-                // Posibilidad alta de doble (Kick + Snare)
-                if (energy > volThreshold * 2.0 && density >= 5) {
-                    let dLane = (lastLane + 2) % k;
-                    map.push({ t: timeMs, l: dLane, type: 'tap', len: 0, h: false });
-                }
-                lastTime = timeMs;
+            
+            if (holdSteps > 5 && volume > 0.3) {
+                type = 'hold';
+                length = holdSteps * (step / sampleRate) * 1000 * 4; // Duración ajustada
+                // Limitar duración máxima
+                length = Math.min(length, 2000); 
             }
+
+            // --- MULTI NOTES (ACORDES) ---
+            // Si el volumen es MUY alto y tienes densidad > 5, crea una nota doble
+            if (volume > 0.75 && k >= 4 && density >= 5) {
+                let secondLane = (lane + 2) % k; // Nota paralela (ej: 0 y 2)
+                if(secondLane !== lane) {
+                     map.push({ t: timeMs, l: secondLane, type: 'tap', len: 0, h: false });
+                }
+            }
+
+            // Agregamos la nota principal
+            map.push({ t: timeMs, l: lane, type: type, len: length, h: false });
+            
+            lastTime = timeMs;
+            lastLane = lane;
         }
     }
     return map;
@@ -543,21 +444,29 @@ function loop() {
 
 // === VISUALS: SPLASH ===
 function createSplash(l) {
+    // Verificar Configuración
     if(!window.cfg.showSplash) return;
-    if(!elTrack) return;
+    
+    // Buscar el receptor (la nota fija gris)
     const r = document.getElementById(`rec-${l}`);
     if(!r) return;
-    const type = window.cfg.splashType || 'classic';
+    
+    // Obtener color de la nota
     const color = window.cfg.modes[window.keys][l].c;
+    
+    // Crear elemento
     const s = document.createElement('div');
-    s.className = 'splash-wrapper';
-    s.style.left = r.style.left;
-    s.style.top = r.style.top;
-    const inner = document.createElement('div');
-    inner.className = `splash-${type}`;
-    inner.style.setProperty('--c', color);
-    s.appendChild(inner);
-    elTrack.appendChild(s);
+    s.className = 'splash-oppa'; // Usamos la nueva clase CSS
+    s.style.setProperty('--c', color);
+    
+    // Posicionar EXACTAMENTE sobre el receptor
+    // getBoundingClientRect ayuda a ubicarlo si el track está inclinado o movido
+    const rect = r.getBoundingClientRect();
+    s.style.left = (rect.left + rect.width / 2) + 'px';
+    s.style.top = (rect.top + rect.height / 2) + 'px';
+    s.style.position = 'fixed'; // Fixed para que no le afecte el scroll del track 3D
+    
+    document.body.appendChild(s);
     setTimeout(() => s.remove(), 400);
 }
 
@@ -752,30 +661,30 @@ window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
 function togglePause() {
     if(!window.st.act) return;
+    
     window.st.paused = !window.st.paused;
     const modal = document.getElementById('modal-pause');
+    
     if(window.st.paused) {
-        window.st.pauseTime = performance.now(); 
-        if(window.st.ctx) window.st.ctx.suspend();
+        // Guardar tiempo exacto para no desincronizar audio
+        window.st.pauseTime = performance.now();
+        
+        // SUSPENDER AUDIO (Crucial para que la música pare)
+        if(window.st.ctx && window.st.ctx.state === 'running') {
+            window.st.ctx.suspend();
+        }
         
         if(modal) {
-            modal.style.display = 'flex';
-            const panel = modal.querySelector('.modal-panel');
-            panel.innerHTML = `
-                <div class="m-title">PAUSA</div>
-                <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
-                    <div style="color:var(--sick)">SICK: <span>${window.st.stats.s}</span></div>
-                    <div style="color:var(--good)">GOOD: <span>${window.st.stats.g}</span></div>
-                    <div style="color:var(--bad)">BAD: <span>${window.st.stats.b}</span></div>
-                    <div style="color:var(--miss)">MISS: <span>${window.st.stats.m}</span></div>
-                </div>
-                <div class="modal-buttons-row">
-                    <button class="action" onclick="resumeGame()">CONTINUAR</button>
-                    <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
-                    <button class="action secondary" onclick="toMenu()">MENU</button>
-                </div>
-            `;
+            modal.style.display = 'flex'; // Forzar display flex
+            
+            // Actualizar datos del modal de pausa
+            const accEl = document.getElementById('p-acc');
+            if(accEl) accEl.innerText = document.getElementById('g-acc').innerText;
+            
+            if(document.getElementById('p-sick')) document.getElementById('p-sick').innerText = window.st.stats.s;
+            if(document.getElementById('p-good')) document.getElementById('p-good').innerText = window.st.stats.g;
+            if(document.getElementById('p-bad')) document.getElementById('p-bad').innerText = window.st.stats.b;
+            if(document.getElementById('p-miss')) document.getElementById('p-miss').innerText = window.st.stats.m;
         }
     } else {
         resumeGame();
