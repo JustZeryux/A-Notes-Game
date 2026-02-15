@@ -243,17 +243,7 @@ window.prepareAndPlaySong = async function(k) {
         
         // === ZONA CRÍTICA ONLINE ===
         // Si estamos en online (hay un ID de lobby), NO iniciar audio todavía.
-        if(window.currentLobbyId) {
-             window.isMultiplayer = true;
-             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded(); 
-             // NO llamamos a playSongInternal aquí. Esperamos la señal del Host.
-        } else {
-             // Si es Singleplayer, arrancamos normal
-             playSongInternal(songObj);
-             if(loader) loader.style.display = 'none';
-        }
-
-window.playSongInternal = function(s) {
+        
     if(!s) return;
     
     // Reset Stats
@@ -269,7 +259,21 @@ window.playSongInternal = function(s) {
     window.st.fcStatus = "GFC";
     
     window.st.trueMaxScore = 0;
-    window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trueMaxScore += 200; });
+    window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trif(window.currentLobbyId) {
+             window.isMultiplayer = true;
+             if(window.notifyLobbyLoaded) window.notifyLobbyLoaded(); 
+             // NO llamamos a playSongInternal aquí. Esperamos la señal del Host.
+        } else {
+             // Si es Singleplayer, arrancamos normal
+             playSongInternal(songObj);
+             if(loader) loader.style.display = 'none';
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}; // <--- ¡AQUÍ FALTA ESTA LLAVE Y EL PUNTO Y COMA!
+
+window.playSongInternal = function(s) {ueMaxScore += 200; });
 
     window.st.keys = new Array(window.keys).fill(0);
     window.st.songDuration = s.buf.duration;
