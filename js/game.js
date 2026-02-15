@@ -202,7 +202,6 @@ function playMiss() {
         s.start(0);
     }
 }
-
 window.prepareAndPlaySong = async function(k) {
     // 1. SI ESTAMOS EN ONLINE, SETEAR BANDERA
     if(window.currentLobbyId) {
@@ -224,7 +223,6 @@ window.prepareAndPlaySong = async function(k) {
     try {
         unlockAudio();
         
-        // ... (Carga de buffer igual que antes) ...
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
@@ -243,23 +241,7 @@ window.prepareAndPlaySong = async function(k) {
         
         // === ZONA CRÍTICA ONLINE ===
         // Si estamos en online (hay un ID de lobby), NO iniciar audio todavía.
-        
-    if(!s) return;
-    
-    // Reset Stats
-    window.st.act = true;
-    window.st.paused = false;
-    window.st.notes = JSON.parse(JSON.stringify(s.map));
-    window.st.spawned = [];
-    window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
-    window.st.maxCmb = 0; 
-    window.st.stats = { s:0, g:0, b:0, m:0 };
-    window.st.hitCount = 0; 
-    window.st.totalOffset = 0;
-    window.st.fcStatus = "GFC";
-    
-    window.st.trueMaxScore = 0;
-    window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trif(window.currentLobbyId) {
+        if(window.currentLobbyId) {
              window.isMultiplayer = true;
              if(window.notifyLobbyLoaded) window.notifyLobbyLoaded(); 
              // NO llamamos a playSongInternal aquí. Esperamos la señal del Host.
@@ -268,10 +250,13 @@ window.prepareAndPlaySong = async function(k) {
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
+
     } catch (e) {
-        console.error(e);
+        console.error("Error al preparar canción:", e);
+        if(loader) loader.style.display = 'none';
+        alert("Error al cargar audio: " + e.message);
     }
-}; // <--- ¡AQUÍ FALTA ESTA LLAVE Y EL PUNTO Y COMA!
+};
 
 window.playSongInternal = function(s) {ueMaxScore += 200; });
 
