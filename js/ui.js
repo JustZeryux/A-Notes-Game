@@ -699,27 +699,37 @@ window.openHostPanel = function(songData, isClient = false) {
 };
 
 // 2. Actualizar lista de jugadores y estados (Se llama cada vez que alguien cambia)
+
+            newBtn.style.cursor = "pointer";
+        }
+    }
+};
+
 window.updateHostPanelUI = function(players, hostName) {
+    // 1. Verificar si la ventana existe. Si no, no hacemos nada (evita el error)
     const container = document.getElementById('room-players');
-    const btnReady = document.getElementById('btn-ready');
-    const btnLeave = document.getElementById('btn-leave-lobby');
+    if(!container) return; // <-- ESTO EVITA EL CRASH
     
-    if(!container) return;
-    container.innerHTML = ''; // Limpiar
+    const btnReady = document.getElementById('btn-ready');
+    
+    // Limpiar contenedor
+    container.innerHTML = ''; 
     
     let allReady = true;
     let amIHost = (window.user.name === hostName);
     let myStatus = 'not-ready';
 
-    // 1. RENDERIZAR JUGADORES
+    // 2. Renderizar Jugadores
     players.forEach(p => {
         const isHost = p.name === hostName;
         const isReady = p.status === 'ready';
-        if (!isReady && !isHost) allReady = false; // El host siempre cuenta como "listo" para la lógica
+        // El host siempre "cuenta" como listo, los demás deben dar Ready
+        if (!isReady && !isHost) allReady = false; 
         if (p.name === window.user.name) myStatus = p.status;
 
         const div = document.createElement('div');
         div.className = 'lobby-p-card';
+        // Estilo visual del jugador
         div.style.cssText = `
             background: ${isReady ? 'rgba(18, 250, 5, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
             border: 2px solid ${isReady ? 'var(--good)' : '#444'};
@@ -737,19 +747,21 @@ window.updateHostPanelUI = function(players, hostName) {
         container.appendChild(div);
     });
 
-    // 2. ACTUALIZAR BOTÓN PRINCIPAL (READY / START)
+    // 3. Actualizar Botón (INICIAR vs LISTO)
     if(btnReady) {
-        // Clonar botón para limpiar eventos anteriores
+        // Truco para limpiar eventos anteriores
         const newBtn = btnReady.cloneNode(true);
         btnReady.parentNode.replaceChild(newBtn, btnReady);
         
         if (amIHost) {
-            // === VISTA DEL HOST ===
+            // === VISTA HOST ===
             newBtn.innerText = "INICIAR PARTIDA";
-            newBtn.className = "action " + (allReady ? "btn-acc" : "secondary"); // Verde si todos listos, Gris si no
+            // Lógica: Mínimo 2 jugadores y todos listos (o solo yo si estoy probando solo)
+            const canStart = (players.length > 1 && allReady) || (players.length === 1); 
             
-            // Lógica: Solo puede iniciar si hay >1 jugador y todos están listos
-            if (players.length > 1 && allReady) {
+            newBtn.className = "action " + (canStart ? "btn-acc" : "secondary");
+            
+            if (canStart) {
                 newBtn.onclick = function() {
                     newBtn.innerText = "INICIANDO...";
                     if(window.startLobbyMatchData) window.startLobbyMatchData();
@@ -757,36 +769,21 @@ window.updateHostPanelUI = function(players, hostName) {
                 newBtn.style.opacity = "1";
                 newBtn.style.cursor = "pointer";
             } else {
-                newBtn.onclick = function() { notify("Esperando a que todos estén listos...", "error"); };
+                newBtn.onclick = function() { notify("Faltan jugadores por estar listos", "error"); };
                 newBtn.style.opacity = "0.5";
                 newBtn.style.cursor = "not-allowed";
             }
         } else {
-            // === VISTA DEL INVITADO ===
+            // === VISTA INVITADO ===
             let isReady = myStatus === 'ready';
             newBtn.innerText = isReady ? "CANCELAR LISTO" : "¡ESTOY LISTO!";
-            newBtn.className = isReady ? "action secondary" : "action btn-acc"; // Gris si ya dio listo, Verde para dar listo
+            newBtn.className = isReady ? "action secondary" : "action btn-acc";
             
             newBtn.onclick = function() {
-                // LLAMADA A ONLINE.JS
                 if(window.toggleReadyData) window.toggleReadyData();
             };
             newBtn.style.opacity = "1";
             newBtn.style.cursor = "pointer";
-        }
-    }
-};
-
-    // Lógica del botón de Cliente (Ready)
-    if(btnReady) {
-        if(meReady) {
-            btnReady.innerText = "¡ESTOY LISTO!";
-            btnReady.style.background = "var(--good)";
-            btnReady.style.color = "black";
-        } else {
-            btnReady.innerText = "MARCAR LISTO";
-            btnReady.style.background = "#444";
-            btnReady.style.color = "white";
         }
     }
 };
@@ -1225,43 +1222,7 @@ window.selectSongForLobby = function(id, data) {
 };
 
 // 3. Crear la sala realmente (Soluciona el "Creando sala..." infinito)
-window.confirmCreateLobby = function() {
-    if(!curSongData) return notify("Error: Sin canción", "error");
-    
-    const densityVal = document.getElementById('lobby-density-input') ? document.getElementById('lobby-density-input').value : 5;
-    const isRanked = document.getElementById('chk-ranked') ? document.getElementById('chk-ranked').checked : false;
-    
-    // DETECTAR SI ES DESAFÍO PRIVADO
-    const isPrivate = (window.lobbyTargetFriend !== null);
 
-    const config = {
-        keys: [window.selectedLobbyKeys || 4], 
-        density: parseInt(densityVal),
-        ranked: isRanked
-    };
-
-    notify("Conectando con servidor...", "info");
-
-    // Pasamos isPrivate a createLobbyData
-    if (window.createLobbyData) {
-        window.createLobbyData(curSongData.id, config, isPrivate)
-            .then((lobbyId) => {
-                notify("Sala creada", "success");
-                closeModal('diff');
-                
-                // ENVIAR NOTIFICACIÓN
-                if(window.lobbyTargetFriend) {
-                    sendChallengeNotification(window.lobbyTargetFriend, lobbyId, curSongData.title);
-                }
-
-                if(window.openHostPanel) window.openHostPanel(curSongData); 
-                
-                window.isCreatingLobby = false;
-                window.lobbyTargetFriend = null;
-            })
-            .catch(err => notify("Error: " + err, "error"));
-    }
-};
 
 // Helper para enviar notificación de desafío (Simulado o real si tienes el sistema)
 function sendChallengeNotification(target, lobbyId, songTitle) {
@@ -1280,22 +1241,60 @@ function sendChallengeNotification(target, lobbyId, songTitle) {
 // Resetear el modo cuando se cierra el modal manualmente
 const originalCloseModal = window.closeModal;
 window.closeModal = function(id) {
-    if(id === 'diff') {
-        window.isCreatingLobby = false;
-        window.lobbyTargetFriend = null;
-        // Ocultar opciones de lobby para la próxima vez que se abra en modo solo
-        const opts = document.getElementById('create-lobby-opts');
-        if(opts) opts.style.display = 'none';
-        
-        // Restaurar estilos de tarjetas
-        document.querySelectorAll('.diff-card').forEach(c => {
-             c.style.border = "2px solid #333";
+    if(id === 'dwindow.confirmCreateLobby = function() {
+    if(!curSongData) return;
+    
+    // 1. Obtener la densidad real
+    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
+    const config = { 
+        keys: [window.selectedLobbyKeys || 4], 
+        density: currentDen, 
+        ranked: false 
+    };
+    
+    notify("Creando sala...", "info");
+    
+    if (window.createLobbyData) {
+        window.createLobbyData(curSongData.id, config, false).then(() => {
+            closeModal('diff');
+            
+            // === FIX: ABRIR EL PANEL INMEDIATAMENTE ===
+            // Sin esto, el juego intenta actualizar una ventana que no existe
+            if(typeof window.openHostPanel === 'function') {
+                window.openHostPanel(curSongData, false); // false = Soy Host
+            }
+            
+            window.isCreatingLobby = false;
         });
     }
-    // Llamar a la función original de cierre (definida en el UI original)
-    document.getElementById('modal-'+id).style.display = 'none';
 };
-
+window.confirmCreateLobby = function() {
+    if(!curSongData) return;
+    
+    // 1. Obtener la densidad real
+    const currentDen = (window.cfg && window.cfg.den) ? window.cfg.den : 5;
+    const config = { 
+        keys: [window.selectedLobbyKeys || 4], 
+        density: currentDen, 
+        ranked: false 
+    };
+    
+    notify("Creando sala...", "info");
+    
+    if (window.createLobbyData) {
+        window.createLobbyData(curSongData.id, config, false).then(() => {
+            closeModal('diff');
+            
+            // === FIX: ABRIR EL PANEL INMEDIATAMENTE ===
+            // Sin esto, el juego intenta actualizar una ventana que no existe
+            if(typeof window.openHostPanel === 'function') {
+                window.openHostPanel(curSongData, false); // false = Soy Host
+            }
+            
+            window.isCreatingLobby = false;
+        });
+    }
+};
 // === TIENDA ===
 function openShop() {
     setText('shop-sp', (user.sp || 0).toLocaleString());
