@@ -94,19 +94,26 @@ window.joinLobbyData = function(lobbyId) {
 
 window.toggleReadyData = function() {
     if(!currentLobbyId || !window.db) return;
+    
     const ref = window.db.collection("lobbies").doc(currentLobbyId);
+    
+    // Usamos transacción para no sobrescribir datos de otros
     window.db.runTransaction(async (t) => {
         const doc = await t.get(ref);
         if(!doc.exists) return;
+        
         let players = doc.data().players;
-        const idx = players.findIndex(p => p.name === window.user.name);
-        if(idx !== -1) {
-            players[idx].status = (players[idx].status === 'ready' ? 'not-ready' : 'ready');
+        const myIndex = players.findIndex(p => p.name === window.user.name);
+        
+        if(myIndex !== -1) {
+            const currentStatus = players[myIndex].status;
+            // Alternar estado
+            players[myIndex].status = (currentStatus === 'ready' ? 'not-ready' : 'ready');
+            
             t.update(ref, { players: players });
         }
-    });
+    }).catch(e => console.error("Error toggle ready:", e));
 };
-
 function subscribeToLobby(lobbyId) {
     if (lobbyListener) lobbyListener();
     lobbyListener = window.db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
