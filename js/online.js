@@ -1,10 +1,10 @@
-/* === ONLINE SYSTEM (FIXED SYNC & PRIVATE V2) === */
+/* === ONLINE SYSTEM (HOST FIX V5) === */
 
 var currentLobbyId = null;
 var lobbyListener = null;
+window.isMultiplayerReady = false; 
 
 window.initOnline = function() {
-    // (Código de PeerJS igual...)
     if(typeof Peer !== 'undefined') {
         try {
             window.peer = new Peer(null, { secure: true }); 
@@ -17,15 +17,37 @@ window.initOnline = function() {
     }
 };
 
-// === NUEVA FUNCIÓN: Notificar que cargué la canción ===
+// === FIX: EL HOST GOBIERNA EL INICIO ===
 window.notifyLobbyLoaded = function() {
-    if(!currentLobbyId || !window.db) return;
-    // Actualizamos nuestro estado a "loaded"
-    // NOTA: Esto se simplifica usando un contador de tiempo en el host para no trabar si alguien tiene internet lento
-    console.log("Canción cargada, esperando señal de inicio...");
+    console.log("Juego listo (Map Generated).");
+    window.isMultiplayerReady = true;
+    
+    // Si soy el Host, YO doy la orden de arrancar, pero espero un poco
+    // para asegurar que los clientes también carguen.
+    if(window.isLobbyHost && currentLobbyId) {
+        document.getElementById('loading-text').innerText = "ESPERANDO JUGADORES...";
+        setTimeout(() => {
+            console.log("Host enviando señal de inicio...");
+            window.db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
+        }, 3000); // 3 segundos de cortesía para que carguen los demás
+    }
+    
+    // Si llegué tarde y la sala ya estaba jugando
+    if(window.lobbyStatusCache === 'playing') {
+        startMultiplayerGameNow();
+    }
 };
 
-// === MODIFICADO: createLobbyData con opción PRIVADA ===
+function startMultiplayerGameNow() {
+    if(!window.isMultiplayerReady) return; // Si no tengo mapa, no arranco
+    
+    const s = window.ramSongs ? window.ramSongs.find(x => x.id === window.curSongData.id) : null;
+    if(s && (!window.st.act || window.st.paused)) {
+        console.log("GO! Iniciando partida multiplayer.");
+        window.playSongInternal(s);
+    }
+}
+
 window.createLobbyData = function(songId, config, isPrivate = false) {
     if (!window.db) return Promise.reject("DB no conectada");
     
@@ -36,21 +58,20 @@ window.createLobbyData = function(songId, config, isPrivate = false) {
         status: 'waiting',
         players: [{ name: window.user.name, avatar: window.user.avatarData || '', status: 'ready', score: 0 }],
         config: config,
-        isPrivate: isPrivate, // <--- NUEVO CAMPO
+        isPrivate: isPrivate,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
     return window.db.collection("lobbies").add(lobbyData).then(docRef => {
         currentLobbyId = docRef.id;
+        window.isLobbyHost = true; // MARCAR COMO HOST
         subscribeToLobby(currentLobbyId);
         return docRef.id;
     });
 };
 
 window.joinLobbyData = function(lobbyId) {
-    // (Igual que antes, solo asegúrate de limpiar listeners viejos)
-    if(lobbyListener) lobbyListener(); // Desuscribir anterior
-    
+    if(lobbyListener) lobbyListener();
     if(!window.db) return;
     const lobbyRef = window.db.collection("lobbies").doc(lobbyId);
     
@@ -72,12 +93,12 @@ window.joinLobbyData = function(lobbyId) {
         return data;
     }).then(data => {
         currentLobbyId = lobbyId;
-        // Cargar datos de la canción
+        window.isLobbyHost = false; // SOY CLIENTE
         window.db.collection("globalSongs").doc(data.songId).get().then(s => {
             if(s.exists) {
                 window.curSongData = { id: s.id, ...s.data() };
                 if(typeof window.openHostPanel === 'function') {
-                    window.openHostPanel(window.curSongData, true); 
+                    window.openHostPanel(window.curSongData, false); 
                 }
             }
         });
@@ -88,7 +109,6 @@ window.joinLobbyData = function(lobbyId) {
 };
 
 window.toggleReadyData = function() {
-    // (Igual que antes)
     if(!currentLobbyId || !window.db) return;
     const ref = window.db.collection("lobbies").doc(currentLobbyId);
     ref.get().then(doc => {
@@ -102,9 +122,8 @@ window.toggleReadyData = function() {
     });
 };
 
-// === CRÍTICO: Sincronización corregida ===
 function subscribeToLobby(lobbyId) {
-    if (lobbyListener) lobbyListener(); // Evitar duplicados
+    if (lobbyListener) lobbyListener();
     
     lobbyListener = window.db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
         if (!doc.exists) { 
@@ -115,98 +134,68 @@ function subscribeToLobby(lobbyId) {
         }
         
         const data = doc.data();
+        window.lobbyStatusCache = data.status;
         
-        // Sincronizar Configuración (Si el host cambia dificultad)
+        // Sync Config
         if (data.config && window.cfg) {
             window.cfg.den = data.config.density;
-            // Actualizar UI del host panel si está abierto
-            if(document.getElementById('hp-mode-disp')) {
-                document.getElementById('hp-mode-disp').innerText = data.config.keys[0] + "K";
-                document.getElementById('hp-den-disp').innerText = data.config.density;
-            }
         }
 
-        // --- FASE 1: CARGA (LOADING) ---
+        // --- CARGA ---
         if (data.status === 'loading') {
             window.isMultiplayer = true;
+            window.isMultiplayerReady = false; 
             if(typeof closeModal === 'function') closeModal('host');
             
-            // Asegurarnos que el loading overlay se muestre
             const loader = document.getElementById('loading-overlay');
             if(loader) {
                 loader.style.display = 'flex';
-                document.getElementById('loading-text').innerText = "SINCRONIZANDO...";
+                document.getElementById('loading-text').innerText = "GENERANDO MAPA...";
             }
 
-            // Iniciar carga de audio (prepareAndPlaySong en game.js se detendrá en "esperando")
             const k = (data.config && data.config.keys) ? data.config.keys[0] : 4;
-            // Solo llamamos si no estamos ya cargando
-            if(!window.curSongData || window.curSongData.id !== data.songId) {
-                 // Fetch rápido si faltan datos
-            }
+            // Iniciamos preparación local
             if(typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
         }
         
-        // --- LÓGICA DEL HOST PARA INICIAR ---
-        if (data.status === 'loading' && window.isLobbyHost) {
-            // Esperamos 4 segundos para dar tiempo a cargar a todos y luego forzamos start
-            if(!window.syncTimer) {
-                window.syncTimer = setTimeout(() => {
-                    window.db.collection("lobbies").doc(lobbyId).update({ status: 'playing' });
-                    window.syncTimer = null;
-                }, 4000); 
-            }
-        }
+        // NOTA: ELIMINÉ EL TIMEOUT DEL HOST AQUÍ. 
+        // AHORA EL INICIO SE GESTIONA EN notifyLobbyLoaded
 
-        // --- FASE 2: JUEGO (PLAYING) - AQUÍ ESTABA EL BUG ---
+        // --- PLAYING ---
         if (data.status === 'playing') {
-            // 1. Ocultar overlays de carga
             const loader = document.getElementById('loading-overlay');
             if(loader) loader.style.display = 'none';
             
-            const syncOv = document.getElementById('sync-overlay');
-            if(syncOv) syncOv.style.display = 'none';
-
-            // 2. INICIAR EL MOTOR DE JUEGO
-            // game.js está pausado esperando. Necesitamos forzar el inicio.
-            if(window.ramSongs && window.curSongData) {
-                const s = window.ramSongs.find(x => x.id === window.curSongData.id);
-                // Solo iniciamos si NO está corriendo ya
-                if(s && (!window.st.act || window.st.paused)) {
-                    console.log("GO! Iniciando partida multiplayer.");
-                    window.playSongInternal(s);
-                }
+            if (window.isMultiplayerReady) {
+                startMultiplayerGameNow();
             }
         }
         
-        // UI Updates del Lobby
+        // UI Updates
         if (data.status === 'waiting' && typeof updateHostPanelUI === 'function') {
             updateHostPanelUI(data.players, data.host);
         }
         
-        // Live Scores
-        if (data.status === 'playing' && data.players && typeof updateMultiLeaderboardUI === 'function') {
-            const scores = data.players.map(p => ({
-                name: p.name, score: p.currentScore || 0, avatar: p.avatar
-            }));
-            updateMultiLeaderboardUI(scores);
+        if (data.status === 'playing' && data.players) {
+            const sortedPlayers = [...data.players].sort((a, b) => (b.currentScore || 0) - (a.currentScore || 0));
+            updateMultiLeaderboardUI(sortedPlayers);
+        }
 
-            if (data.status === 'finished') {
-            // Detener motor si sigue corriendo
+        // --- FINALIZADO ---
+        if (data.status === 'finished') {
             if(window.st.act) {
                 window.st.act = false;
-                if(window.st.src) { window.st.src.stop(); window.st.src = null; }
+                if(window.st.src) { try{window.st.src.stop();}catch(e){} window.st.src = null; }
                 document.getElementById('game-layer').style.display = 'none';
-                document.getElementById('menu-container').classList.remove('hidden');
             }
-            // Mostrar resultados
             window.showMultiplayerResults(data.players);
-        }
         }
     });
 }
 
 window.startLobbyMatchData = function() {
+    // El host cambia el estado a 'loading'.
+    // Esto dispara 'prepareAndPlaySong' en todos.
     if(currentLobbyId && window.db) {
         window.db.collection("lobbies").doc(currentLobbyId).update({ status: 'loading' });
     }
@@ -215,17 +204,15 @@ window.startLobbyMatchData = function() {
 window.leaveLobbyData = function() {
     if (!currentLobbyId || !window.db) return;
     const ref = window.db.collection("lobbies").doc(currentLobbyId);
-    
-    // Desuscribir snapshot
     if(lobbyListener) { lobbyListener(); lobbyListener = null; }
 
     ref.get().then(doc => {
         if(doc.exists) {
+            // Si soy host, borro la sala
             if(doc.data().host === window.user.name) {
-                // Si soy host, borro la sala (o migrar host, pero borrar es más fácil)
                 ref.delete(); 
             } else {
-                // Si soy cliente, me saco de la lista
+                // Si soy cliente, me quito de la lista
                 const p = doc.data().players.filter(x => x.name !== window.user.name);
                 ref.update({ players: p });
             }
@@ -233,30 +220,37 @@ window.leaveLobbyData = function() {
     });
     currentLobbyId = null; 
     window.isMultiplayer = false;
+    window.isLobbyHost = false;
 };
 
-// (sendLobbyScore se mantiene igual...)
-window.sendLobbyScore = function(score, isFinal) { /* ... */ };
+window.sendLobbyScore = function(score, isFinal) {
+    if(!currentLobbyId || !window.db) return;
+    const ref = window.db.collection("lobbies").doc(currentLobbyId);
+    window.db.runTransaction(async (t) => {
+        const doc = await t.get(ref);
+        if(!doc.exists) return;
+        const players = doc.data().players;
+        const myIdx = players.findIndex(p => p.name === window.user.name);
+        if(myIdx !== -1) {
+            players[myIdx].currentScore = score;
+            t.update(ref, { players: players });
+        }
+    });
+};
 
-// === UI DEL LEADERBOARD EN JUEGO ===
-window.updateMultiLeaderboardUI = function(scores) {
+// === LEADERBOARD DERECHO (CUADRADO) ===
+window.updateMultiLeaderboardUI = function(players) {
     const hud = document.getElementById('vs-hud');
     const container = document.getElementById('multi-players-container');
     if(!hud || !container) return;
 
-    // Asegurar que sea visible
-    hud.style.display = 'block'; 
-
-    // Ordenar por puntaje descendente
-    scores.sort((a, b) => b.score - a.score);
-
+    hud.style.display = 'flex'; 
     container.innerHTML = '';
-    scores.forEach((p, index) => {
+    
+    players.forEach((p, index) => {
         const isMe = p.name === window.user.name;
-        
         const row = document.createElement('div');
         row.className = `ml-row ${isMe ? 'is-me' : ''}`;
-        // Atributo para colorear el top 3 con CSS
         row.setAttribute('data-rank', index + 1);
 
         row.innerHTML = `
@@ -264,47 +258,44 @@ window.updateMultiLeaderboardUI = function(scores) {
             <div class="ml-av" style="background-image:url(${p.avatar || ''})"></div>
             <div class="ml-info">
                 <div class="ml-name">${p.name}</div>
-                <div class="ml-score">${p.score.toLocaleString()}</div>
+                <div class="ml-score">${(p.currentScore||0).toLocaleString()}</div>
             </div>
         `;
         container.appendChild(row);
     });
 };
 
-// === PANTALLA DE RESULTADOS MULTIJUGADOR ===
 window.showMultiplayerResults = function(playersData) {
     const modal = document.getElementById('modal-res');
     if(!modal) return;
-
-    // Ordenar final
+    
     playersData.sort((a, b) => (b.currentScore || 0) - (a.currentScore || 0));
     
     const winner = playersData[0];
     const amIWinner = winner.name === window.user.name;
-    const myData = playersData.find(p => p.name === window.user.name) || { currentScore: 0 };
 
     modal.style.display = 'flex';
     const panel = modal.querySelector('.modal-panel');
     
-    let listHTML = '<div class="rank-table-wrapper"><table class="rank-table" style="font-size:1rem;">';
+    let listHTML = '<div class="rank-table-wrapper" style="margin-top:20px; max-height:300px; overflow-y:auto; background:#111; padding:10px; border-radius:8px;"><table class="rank-table" style="font-size:1rem; width:100%;">';
     playersData.forEach((p, i) => {
         listHTML += `
-        <tr class="${p.name === window.user.name ? 'rank-row-me' : ''}">
-            <td>#${i+1}</td>
-            <td>${p.name}</td>
-            <td style="color:var(--blue); font-weight:900;">${(p.currentScore||0).toLocaleString()}</td>
+        <tr class="${p.name === window.user.name ? 'rank-row-me' : ''}" style="border-bottom:1px solid #333;">
+            <td style="color:${i===0?'gold':'white'}; font-weight:bold;">#${i+1}</td>
+            <td style="text-align:left; padding-left:10px;">${p.name}</td>
+            <td style="color:var(--blue); font-weight:900; text-align:right;">${(p.currentScore||0).toLocaleString()}</td>
         </tr>`;
     });
     listHTML += '</table></div>';
 
     panel.innerHTML = `
         <div class="m-title" style="border-color:${amIWinner ? 'gold' : '#F9393F'}">
-            ${amIWinner ? '🏆 ¡VICTORIA! 🏆' : 'FIN DE PARTIDA'}
+            ${amIWinner ? '🏆 ¡VICTORIA! 🏆' : 'PARTIDA FINALIZADA'}
         </div>
         
         <div style="text-align:center; margin-bottom:20px;">
             <div style="font-size:1.2rem; color:#aaa;">GANADOR</div>
-            <div style="font-size:2rem; font-weight:900; color:gold;">${winner.name}</div>
+            <div style="font-size:2.5rem; font-weight:900; color:gold; text-shadow:0 0 20px gold;">${winner.name}</div>
             <div style="font-size:1.5rem;">${(winner.currentScore||0).toLocaleString()} pts</div>
         </div>
 
