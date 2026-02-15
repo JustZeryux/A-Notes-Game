@@ -647,3 +647,85 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 22px; heigh
     background: rgba(68, 204, 255, 0.1);
     box-shadow: 0 0 5px rgba(68, 204, 255, 0.2);
 }
+/* === MULTIPLAYER HUD (RIGHT SIDEBOX) === */
+#vs-hud {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 800;
+    pointer-events: none; /* Para que puedas hacer clic en las notas si pasan por debajo */
+}
+
+.ml-row {
+    position: relative; /* Ya no es absolute, para que se apilen */
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid #333;
+    border-radius: 4px; /* Más cuadrado */
+    padding: 8px;
+    height: 60px;
+    width: 100%;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+}
+
+.ml-row.is-me {
+    border-color: var(--blue);
+    background: rgba(68, 204, 255, 0.15);
+    transform: scale(1.02);
+}
+
+/* Efecto de "Líder" (Dorado) */
+.ml-row[data-rank="1"] {
+    border-color: var(--gold);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+}
+
+.ml-pos {
+    font-size: 1.2rem;
+    font-weight: 900;
+    width: 35px;
+    text-align: center;
+    color: #666;
+    margin-right: 5px;
+}
+
+.ml-row[data-rank="1"] .ml-pos { color: var(--gold); }
+.ml-row[data-rank="2"] .ml-pos { color: silver; }
+.ml-row[data-rank="3"] .ml-pos { color: #cd7f32; }
+
+.ml-av {
+    width: 40px; height: 40px;
+    background-size: cover; background-position: center;
+    border-radius: 4px;
+    margin-right: 10px;
+    background-color: #222;
+}
+
+.ml-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.ml-name {
+    font-size: 0.9rem;
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ml-score {
+    font-size: 1.1rem;
+    font-weight: 900;
+    color: white;
+}
