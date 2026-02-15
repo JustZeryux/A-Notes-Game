@@ -254,8 +254,8 @@ function switchSetTab(tab) {
     if (tab === 'gameplay') {
         html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
         html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 100);
-        html += renderRange('Dificultad IA (Random)', 'den', 1, 10);
+        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 60);
+        html += renderRange('Dificultad', 'den', 1, 20);
         html += renderRange('Offset Global (ms)', 'off', -200, 200);
     } 
     else if (tab === 'visuals') {
