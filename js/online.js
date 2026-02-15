@@ -19,23 +19,25 @@ window.initOnline = function() {
 };
 
 // Se llama cuando game.js termina de generar el mapa
+// === SINCRONIZACIÓN SEGURA ===
 window.notifyLobbyLoaded = function() {
-    console.log(">> SYSTEM: Mapa generado. Listo para sync.");
+    console.log(">> SYSTEM: Mapa generado. Esperando.");
     window.isMultiplayerReady = true;
     
     const txt = document.getElementById('loading-text');
-    if(txt) txt.innerText = "ESPERANDO SINCRONIZACIÓN...";
+    if(txt) txt.innerText = "ESPERANDO JUGADORES...";
 
-    // Si soy Host, doy la orden final tras 3 segundos
+    // Si soy Host, mando la señal a Firebase tras 3s
     if(window.isLobbyHost && currentLobbyId) {
         setTimeout(() => {
             if(window.db) window.db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
         }, 3000); 
     }
     
-    // Si soy Cliente y llegué tarde (la sala ya estaba en playing)
+    // Si soy Cliente y llegué tarde (la partida ya empezó), me uno
     if(window.lobbyStatusCache === 'playing' && !window.hasGameStarted) {
-        startMultiplayerGameNow();
+        // startMultiplayerGameNow debe estar definido en online.js (ver código anterior)
+        if(typeof startMultiplayerGameNow === 'function') startMultiplayerGameNow();
     }
 };
 
