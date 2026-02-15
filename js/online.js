@@ -125,16 +125,25 @@ window.joinLobbyData = function(lobbyId) {
 
 window.toggleReadyData = function() {
     if(!currentLobbyId || !window.db) return;
+    
     const ref = window.db.collection("lobbies").doc(currentLobbyId);
-    ref.get().then(doc => {
+    
+    // Usamos transacción para leer y escribir de forma segura
+    window.db.runTransaction(async (t) => {
+        const doc = await t.get(ref);
         if(!doc.exists) return;
-        let p = doc.data().players;
-        p = p.map(x => {
-            if(x.name === window.user.name) x.status = (x.status === 'ready' ? 'not-ready' : 'ready');
-            return x;
-        });
-        ref.update({ players: p });
-    });
+        
+        let players = doc.data().players;
+        
+        // Buscar mi usuario y cambiar estado
+        const myIndex = players.findIndex(p => p.name === window.user.name);
+        if(myIndex !== -1) {
+            const currentStatus = players[myIndex].status;
+            players[myIndex].status = (currentStatus === 'ready' ? 'not-ready' : 'ready');
+            
+            t.update(ref, { players: players });
+        }
+    }).catch(e => console.error("Error toggle ready:", e));
 };
 
 function subscribeToLobby(lobbyId) {
