@@ -202,7 +202,6 @@ function playMiss() {
         s.start(0);
     }
 }
-
 window.prepareAndPlaySong = async function(k) {
     // 1. SI ESTAMOS EN ONLINE, SETEAR BANDERA
     if(window.currentLobbyId) {
@@ -224,7 +223,6 @@ window.prepareAndPlaySong = async function(k) {
     try {
         unlockAudio();
         
-        // ... (Carga de buffer igual que antes) ...
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
@@ -252,12 +250,13 @@ window.prepareAndPlaySong = async function(k) {
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
-    } catch(e) { // <--- AQUÍ ESTABA EL ERROR (FALTABA ESTO)
+
+    } catch (e) {
         console.error(e);
         if(loader) loader.style.display = 'none';
         alert("Error: " + e.message);
     }
-}; // <--- Y ESTO
+};
 
 window.playSongInternal = function(s) {
     if(!s) return;
@@ -282,18 +281,17 @@ window.playSongInternal = function(s) {
     window.keys = s.kVersion;
 
     // === FIX JUGADOR 2: LIMPIEZA TOTAL DE UI ===
-    // Forzamos el cierre de TODOS los modales que puedan estorbar
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
     
     const uiToClose = [
         'modal-res', 
         'modal-pause', 
-        'modal-lobbies',      // Lista de salas
-        'modal-lobby-room',   // Sala de espera
-        'modal-song-selector',// Selector online
-        'modal-diff',         // Selector dificultad
-        'loading-overlay'     // Loader
+        'modal-lobbies',      
+        'modal-lobby-room',   
+        'modal-song-selector',
+        'modal-diff',         
+        'loading-overlay'     
     ];
     
     uiToClose.forEach(id => {
@@ -534,4 +532,222 @@ function hit(l, p) {
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
 
-        let now = (window.st.ctx.currentT
+        let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
+        const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
+
+        if (n) {
+            const diff = n.t - now; 
+            const absDiff = Math.abs(diff);
+            window.st.totalOffset += absDiff;
+            window.st.hitCount++;
+
+            let score=50, text="BAD", color="yellow";
+            if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
+            else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); }
+            else { window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; }
+
+            if(text==="BAD") window.st.fcStatus="SD";
+            window.st.sc += score; 
+            window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
+            window.st.hp = Math.min(100, window.st.hp+2);
+            
+            showJudge(text, color, diff); 
+            playHit(); if(typeof updHUD==='function') updHUD();
+            n.h = true; if (n.type === 'tap' && n.el) n.el.style.opacity = 0;
+        }
+    } else {
+        if(window.st.keys) window.st.keys[l] = 0;
+        if(r) r.classList.remove('pressed');
+    }
+}
+
+function miss(n) {
+    showJudge("MISS", "#F9393F");
+    window.st.stats.m++; window.st.cmb=0; window.st.hp-=10; window.st.fcStatus="SD";
+    playMiss(); if(typeof updHUD==='function') updHUD();
+    if(n.el) n.el.style.opacity = 0;
+    
+    // === FIX: NO FAIL EN ONLINE ===
+    if (window.st.hp <= 0) {
+        window.st.hp = 0;
+        if (!window.isMultiplayer) end(true); // Solo muere en singleplayer
+    }
+}
+
+function updHUD() {
+    const scEl = document.getElementById('g-score');
+    if(scEl) scEl.innerText = window.st.sc.toLocaleString();
+    const cEl = document.getElementById('g-combo');
+    if(cEl) {
+        if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
+    }
+    document.getElementById('health-fill').style.height = window.st.hp + "%";
+    
+    const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
+    const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
+    const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
+    document.getElementById('g-acc').innerText = acc + "%";
+    
+    const fcEl = document.getElementById('hud-fc-status');
+    if(fcEl) {
+        fcEl.innerText = window.st.fcStatus || "GFC";
+        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
+    }
+    
+    if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+}
+
+function end(died) {
+    window.st.act = false;
+    if(window.st.src) try{ window.st.src.stop(); }catch(e){}
+    
+    // === FIX MULTIPLAYER ENDING ===
+    if(window.isMultiplayer) {
+        if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
+        if(window.isLobbyHost && window.db && window.currentLobbyId && !died) {
+             console.log("Host finalizando...");
+             setTimeout(() => {
+                window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'finished' });
+             }, 2000); 
+        }
+        return; 
+    }
+
+    document.getElementById('game-layer').style.display = 'none';
+    const modal = document.getElementById('modal-res');
+    
+    if(modal) {
+        modal.style.display = 'flex';
+        const totalMax = window.st.trueMaxScore || 1;
+        const finalAcc = Math.round((window.st.sc / totalMax) * 100);
+        let r="D", c="red";
+        if (!died) {
+            if (finalAcc >= 98) { r="SS"; c="cyan" }
+            else if (finalAcc >= 95) { r="S"; c="gold" }
+            else if (finalAcc >= 90) { r="A"; c="lime" }
+            else if (finalAcc >= 80) { r="B"; c="yellow" }
+            else if (finalAcc >= 70) { r="C"; c="orange" }
+        } else { r="F"; c="red"; }
+        
+        let xpGain = 0;
+        if (!died && window.user && window.user.name !== "Guest") {
+            xpGain = Math.floor(window.st.sc / 250);
+            window.user.xp += xpGain;
+            if(typeof save === 'function') save();
+        }
+
+        const panel = modal.querySelector('.modal-panel');
+        if(panel) {
+            panel.innerHTML = `
+                <div class="m-title">RESULTADOS</div>
+                <div style="display:flex; justify-content:center; align-items:center; gap:30px;">
+                    <div class="rank-big" style="color:${c}; font-size:6rem; font-weight:900;">${r}</div>
+                    <div>
+                        <div style="font-size:3rem; font-weight:900;">${window.st.sc.toLocaleString()}</div>
+                        <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
+                    </div>
+                </div>
+                <div class="modal-buttons-row">
+                    <button class="action secondary" onclick="toMenu()">MENU</button>
+                    <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
+                </div>
+            `;
+        }
+    }
+}
+
+function initReceptors(k) {
+    elTrack = document.getElementById('track');
+    if(!elTrack) return;
+    elTrack.innerHTML = '';
+    const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
+    elTrack.style.transform = `rotateX(${fov}deg)`;
+    document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
+    const y = window.cfg.down ? window.innerHeight - 140 : 80;
+    
+    let activeSkin = null;
+    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
+        if (typeof SHOP_ITEMS !== 'undefined') activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    }
+    for (let i = 0; i < k; i++) {
+        const r = document.createElement('div');
+        r.className = `arrow-wrapper receptor`;
+        r.id = `rec-${i}`;
+        r.style.left = (i * (100 / k)) + '%';
+        r.style.top = y + 'px';
+        r.style.width = (100 / k) + '%';
+        let conf = window.cfg.modes[k][i];
+        let color = conf.c;
+        let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
+        if (activeSkin) {
+            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
+            if (activeSkin.fixed) color = activeSkin.color;
+        }
+        r.style.setProperty('--active-c', color);
+        r.style.setProperty('--col', color); 
+        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 5px ${color})">
+            <path class="arrow-path" d="${shapeData}" stroke="${color}" fill="none" stroke-width="4"/>
+        </svg>`;
+        elTrack.appendChild(r);
+        const l = document.createElement('div');
+        l.style.position = 'absolute';
+        l.style.left = (i * (100 / k)) + '%';
+        l.style.width = (100 / k) + '%';
+        l.style.height = '100%';
+        l.style.background = `linear-gradient(to bottom, transparent, ${color}22)`;
+        l.style.borderLeft = '1px solid rgba(255,255,255,0.05)';
+        l.style.zIndex = '-1';
+        elTrack.appendChild(l);
+    }
+}
+
+window.restartSong = function() { prepareAndPlaySong(window.keys); };
+function togglePause() {
+    if(!window.st.act) return;
+    window.st.paused = !window.st.paused;
+    const modal = document.getElementById('modal-pause');
+    if(window.st.paused) {
+        window.st.pauseTime = performance.now(); 
+        if(window.st.ctx) window.st.ctx.suspend();
+        if(modal) {
+            modal.style.display = 'flex';
+            const panel = modal.querySelector('.modal-panel');
+            if(panel) {
+                panel.innerHTML = `
+                    <div class="m-title">PAUSA</div>
+                    <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
+                    <div class="modal-buttons-row">
+                        <button class="action" onclick="resumeGame()">CONTINUAR</button>
+                        <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
+                        <button class="action secondary" onclick="toMenu()">MENU</button>
+                    </div>
+                `;
+            }
+        }
+    } else {
+        resumeGame();
+    }
+}
+function resumeGame() {
+    document.getElementById('modal-pause').style.display = 'none';
+    if(window.st.pauseTime) {
+        const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
+        window.st.t0 += pauseDuration; 
+        window.st.pauseTime = null;
+    }
+    window.st.paused = false;
+    if(window.st.ctx) window.st.ctx.resume();
+    requestAnimationFrame(loop);
+}
+function toMenu() {
+    if(window.st.src) {
+        try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
+        window.st.src = null;
+    }
+    if(window.st.ctx) window.st.ctx.suspend();
+    window.st.act = false; window.st.paused = false;
+    document.getElementById('game-layer').style.display = 'none';
+    document.getElementById('menu-container').classList.remove('hidden');
+    document.getElementById('modal-res').style.display = 'none';
+    document.getElementById('modal-pause').style.display = 'none';
+}
