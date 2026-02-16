@@ -1384,3 +1384,62 @@ function equipItem(id, type) {
     else { user.equipped[type] = id; notify("Equipado"); }
     save(); openShop();
 }
+
+// ==========================================
+// SISTEMA DE SUBIDA A LA NUBE (CLOUD UPLOAD)
+// ==========================================
+
+window.openCloudUpload = function() {
+    // Verificar si el usuario está logueado
+    if (!window.user || window.user.name === "Guest") {
+        return notify("Debes iniciar sesión para subir canciones.", "error");
+    }
+
+    // Crear widget dinámico de Uploadcare
+    uploadcare.openDialog(null, {
+        publicKey: '8f24c5ced2ad35839a30', // Tu clave pública del index.html
+        tabs: 'file',
+        previewStep: true,
+        clearable: true,
+        multiple: false,
+        accept: 'audio/*'
+    }).done(function(file) {
+        file.promise().done(function(fileInfo) {
+            console.log("Archivo subido:", fileInfo);
+            processUpload(fileInfo);
+        });
+    });
+};
+
+function processUpload(fileInfo) {
+    const songName = prompt("Nombre de la canción:", fileInfo.name.replace(/\.[^/.]+$/, ""));
+    if (!songName) return;
+
+    const diff = prompt("Dificultad (Easy, Normal, Hard):", "Normal");
+    
+    // Guardar referencia en Firebase
+    const songId = 'cloud_' + Date.now();
+    const songData = {
+        id: songId,
+        name: songName,
+        artist: window.user.name, // El uploader es el artista
+        url: fileInfo.cdnUrl,     // URL directa de Uploadcare
+        diff: diff || "Normal",
+        uploadedBy: window.user.name,
+        uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        isCloud: true
+    };
+
+    if(window.db) {
+        window.db.collection("songs").doc(songId).set(songData)
+        .then(() => {
+            notify("¡Canción subida a la nube exitosamente!", "success");
+            // Opcional: Recargar lista de canciones
+            if(typeof loadSongs === 'function') loadSongs(); 
+        })
+        .catch(err => {
+            console.error(err);
+            notify("Error al guardar en base de datos.", "error");
+        });
+    }
+}
