@@ -191,17 +191,18 @@
         </div>
     </div>
 
-    <div id="modal-upload" class="modal-overlay">
-        <div class="modal-panel login-box">
-            <div class="m-title">SUBIR A LA NUBE</div>
-            <input type="file" id="up-audio" accept="audio/*" class="log-inp" onchange="autoFillTitle(this)">
-            <input type="text" id="up-title" class="log-inp" placeholder="Título">
-            <input type="file" id="up-image" accept="image/*" class="log-inp">
-            <div id="upload-status" style="margin-bottom:10px;"></div>
-            <button class="action" onclick="startGlobalUpload()" id="btn-upload-start">☁️ PUBLICAR</button>
-            <button class="action secondary" onclick="closeModal('upload')">CANCELAR</button>
-        </div>
+<div id="modal-upload" class="modal-overlay">
+    <div class="modal-panel login-box">
+        <div class="m-title">SUBIR A LA NUBE</div>
+        <p style="color: #ccc; margin-bottom: 20px;">Utiliza nuestro asistente para publicar tu canción (.mp3) y portada.</p>
+        
+        <button class="action" onclick="closeModal('upload'); openCloudUpload()">
+            🚀 INICIAR ASISTENTE DE SUBIDA
+        </button>
+        
+        <button class="action secondary" style="margin-top: 10px;" onclick="closeModal('upload')">CANCELAR</button>
     </div>
+</div>
 
     <div id="modal-lobbies" class="modal-overlay">
         <div class="modal-panel" style="width:800px;">
