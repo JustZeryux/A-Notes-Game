@@ -20,39 +20,51 @@ window.initOnline = function() {
 
 // Se llama cuando game.js termina de generar el mapa
 // === SINCRONIZACIÓN SEGURA ===
-window.notifyLobbyLoaded = function() {
-    console.log(">> SYSTEM: Mapa generado. Esperando.");
-    window.isMultiplayerReady = true;
-    
-    const txt = document.getElementById('loading-text');
-    if(txt) txt.innerText = "ESPERANDO JUGADORES...";
+// === PEGAR/REEMPLAZAR EN JS/ONLINE.JS ===
 
-    // Si soy Host, mando la señal a Firebase tras 3s
-    if(window.isLobbyHost && currentLobbyId) {
-        setTimeout(() => {
-            if(window.db) window.db.collection("lobbies").doc(currentLobbyId).update({ status: 'playing' });
-        }, 3000); 
-    }
+// 1. Función que avisa que tu mapa ya cargó
+window.notifyLobbyLoaded = function() {
+    console.log(">> ONLINE: Enviando señal de listo al servidor.");
+    const txt = document.getElementById('loading-text');
+    if(txt) txt.innerText = "ESPERANDO A TODOS LOS JUGADORES...";
     
-    // Si soy Cliente y llegué tarde (la partida ya empezó), me uno
-    if(window.lobbyStatusCache === 'playing' && !window.hasGameStarted) {
-        // startMultiplayerGameNow debe estar definido en online.js (ver código anterior)
-        if(typeof startMultiplayerGameNow === 'function') startMultiplayerGameNow();
+    // CAMBIO IMPORTANTE: Forzamos la actualización del estado a 'playing'
+    if(window.isLobbyHost && window.currentLobbyId) {
+        console.log(">> SOY HOST: Iniciando cuenta regresiva de 3s...");
+        setTimeout(() => {
+            if(window.db) {
+                console.log(">> HOST: ¡ENVIANDO SEÑAL DE INICIO (GO)!");
+                window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'playing' });
+            }
+        }, 3000); 
     }
 };
 
-function startMultiplayerGameNow() {
-    // BLOQUEO: Si no he generado el mapa, NO inicio
-    if(!window.isMultiplayerReady) return; 
-    if(window.hasGameStarted) return;
-
-    const s = window.ramSongs ? window.ramSongs.find(x => x.id === window.curSongData.id) : null;
-    if(s) {
-        console.log(">> GO! Arrancando motor.");
+// 2. Función que detecta la señal de inicio (GO)
+window.checkGameStart = function(lobbyData) {
+    // Si la base de datos dice 'playing' y yo no he empezado...
+    if (lobbyData.status === 'playing' && !window.hasGameStarted) {
+        console.log(">> RECIBIDA SEÑAL DE INICIO DE FIREBASE!");
         window.hasGameStarted = true;
-        window.playSongInternal(s);
+        
+        // Ocultar Lobby
+        const m = document.getElementById('modal-lobby-room');
+        if(m) m.style.display = 'none';
+        
+        // ARRANCAR EL JUEGO QUE GUARDAMOS EN EL PASO 1
+        if (window.preparedSong) {
+            if(typeof window.playSongInternal === 'function') {
+                window.playSongInternal(window.preparedSong);
+            }
+        } else {
+            // Fallback de emergencia por si algo falló
+            console.warn("¡Emergencia! Canción no estaba en memoria. Intentando recargar...");
+            if(typeof window.prepareAndPlaySong === 'function') {
+                window.prepareAndPlaySong(window.keys || 4);
+            }
+        }
     }
-}
+};
 
 // ... createLobbyData y joinLobbyData IGUAL QUE ANTES ...
 window.createLobbyData = function(songId, config, isPrivate = false) {
