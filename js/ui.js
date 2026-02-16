@@ -1460,3 +1460,49 @@ function saveSongToFirebase(name, diff, audioUrl, imgUrl) {
             });
     }
 }
+
+
+// === PEGAR AL FINAL DE JS/ONLINE.JS ===
+
+// 1. Avisar que ya cargué el mapa
+window.notifyLobbyLoaded = function() {
+    console.log(">> ONLINE: Mapa listo. Enviando señal.");
+    const txt = document.getElementById('loading-text');
+    if(txt) txt.innerText = "ESPERANDO A TODOS...";
+    
+    // Si soy el Host, espero 3 segundos y lanzo la partida para todos
+    if(window.isLobbyHost && window.currentLobbyId) {
+        setTimeout(() => {
+            if(window.db) {
+                console.log(">> HOST: Iniciando partida para todos...");
+                window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'playing' });
+            }
+        }, 3000); 
+    }
+};
+
+// 2. Función auxiliar para manejar el inicio (llámala desde tu onSnapshot)
+window.checkGameStart = function(lobbyData) {
+    // Si el estado es 'playing' y yo aún no he empezado
+    if (lobbyData.status === 'playing' && !window.hasGameStarted) {
+        console.log(">> GO! Iniciando partida.");
+        window.hasGameStarted = true;
+        
+        // Ocultar UI del Lobby
+        const m = document.getElementById('modal-lobby-room');
+        if(m) m.style.display = 'none';
+        
+        // Usar la canción que preparamos en el PASO 2
+        if (window.preparedSong) {
+            if(typeof window.playSongInternal === 'function') {
+                window.playSongInternal(window.preparedSong);
+            }
+        } else {
+            // Si por alguna razón no estaba lista, intentar cargarla de emergencia
+            console.warn("Canción no estaba lista, forzando carga...");
+            if(typeof window.prepareAndPlaySong === 'function') {
+                window.prepareAndPlaySong(window.keys || 4);
+            }
+        }
+    }
+};
