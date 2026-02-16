@@ -238,7 +238,8 @@ window.prepareAndPlaySong = async function(k) {
 
         const map = genMap(buffer, k);
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
-        
+
+        window.preparedSong = songObj;
         // === ZONA CRÍTICA ONLINE ===
         // Si estamos en online (hay un ID de lobby), NO iniciar audio todavía.
         if(window.currentLobbyId) {
