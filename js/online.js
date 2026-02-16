@@ -128,58 +128,69 @@ window.toggleReadyData = function() {
         }
     }).catch(e => console.error("Error toggle ready:", e));
 };
+// === REEMPLAZAR EN JS/ONLINE.JS ===
+
 function subscribeToLobby(lobbyId) {
     if (lobbyListener) lobbyListener();
+    
+    // Aquí está el .onSnapshot que decías no tener (es parte de Firebase)
     lobbyListener = window.db.collection("lobbies").doc(lobbyId).onSnapshot(doc => {
-        if (!doc.exists) { window.leaveLobbyData(); if(typeof closeModal==='function') closeModal('host'); notify("Sala cerrada", "info"); return; }
+        if (!doc.exists) { 
+            window.leaveLobbyData(); 
+            if(typeof closeModal === 'function') closeModal('host'); 
+            notify("La sala ha sido cerrada", "info"); 
+            return; 
+        }
         
         const data = doc.data();
-        window.lobbyStatusCache = data.status;
-        if (data.config && window.cfg) window.cfg.den = data.config.density;
-
+        
+        // 1. Si el estado es 'loading' (El host le dio a iniciar)
         if (data.status === 'loading') {
-            if(window.isMultiplayerReady || window.hasGameStarted) return;
-            window.isMultiplayer = true; window.isMultiplayerReady = false; window.hasGameStarted = false;
-            
-            // Cerrar panel host
-            if(typeof closeModal === 'function') closeModal('host');
-            
-            const loader = document.getElementById('loading-overlay');
-            if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "DESCARGANDO..."; }
-            
-            // Iniciar carga del mapa
-            const k = (data.config && data.config.keys) ? data.config.keys[0] : 4;
-            if(typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+            if(!window.isMultiplayerReady && !window.hasGameStarted) {
+                window.isMultiplayer = true;
+                
+                // Cerrar paneles visuales
+                const hostPanel = document.getElementById('modal-host'); 
+                if(hostPanel) hostPanel.style.display = 'none'; // Ocultar panel host
+                
+                // Mostrar carga
+                const loader = document.getElementById('loading-overlay');
+                if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "SINCRONIZANDO..."; }
+                
+                // Iniciar descarga del mapa
+                const k = (data.config && data.config.keys) ? data.config.keys[0] : 4;
+                if(typeof window.prepareAndPlaySong === 'function') {
+                    window.prepareAndPlaySong(k);
+                }
+            }
         }
         
+        // 2. Si el estado es 'playing' (El host ya cargó y dio la orden final)
         if (data.status === 'playing') {
-            const loader = document.getElementById('loading-overlay');
-            if(loader && window.hasGameStarted) loader.style.display = 'none';
-            // Intentar iniciar si estoy listo
-            startMultiplayerGameNow();
+            // ESTA ES LA LÍNEA QUE FALTABA:
+            handleLobbyStatus(data); 
         }
         
-        // ACTUALIZAR UI DEL PANEL
+        // 3. Actualizar UI de la sala
         if (data.status === 'waiting' && typeof updateHostPanelUI === 'function') {
             updateHostPanelUI(data.players, data.host);
         }
         
-        if (data.status === 'playing' && data.players) {
-            const sorted = [...data.players].sort((a, b) => (b.currentScore || 0) - (a.currentScore || 0));
-            if(typeof updateMultiLeaderboardUI === 'function') updateMultiLeaderboardUI(sorted);
+        // 4. Actualizar tabla de puntos en vivo
+        if (data.status === 'playing' && typeof updateMultiLeaderboardUI === 'function') {
+            updateMultiLeaderboardUI(data.players);
         }
 
+        // 5. Finalizar
         if (data.status === 'finished') {
-            if(window.st.act) {
-                window.st.act = false;
-                if(window.st.src) { try{window.st.src.stop();}catch(e){} window.st.src = null; }
-                document.getElementById('game-layer').style.display = 'none';
-            }
             if(typeof showMultiplayerResults === 'function') showMultiplayerResults(data.players);
             window.hasGameStarted = false;
         }
     });
 }
+
+// Asegúrate de tener esta función al final de online.js también
+
 
 window.startLobbyMatchData = function() {
     if(currentLobbyId && window.db) window.db.collection("lobbies").doc(currentLobbyId).update({ status: 'loading' });
@@ -250,24 +261,18 @@ window.showMultiplayerResults = function(playersData) {
 // Añade esto al final de js/online.js
 window.handleLobbyStatus = function(data) {
     if (data.status === 'playing' && !window.hasGameStarted) {
-        console.log(">> EL HOST INICIÓ LA PARTIDA");
+        console.log(">> GO! Iniciar juego.");
         window.hasGameStarted = true;
         
-        // Ocultar Lobby
-        const m = document.getElementById('modal-lobby-room');
-        if(m) m.style.display = 'none';
+        const loader = document.getElementById('loading-overlay');
+        if(loader) loader.style.display = 'none';
         
-        // Arrancar juego
         if (window.preparedSong) {
-            // Pequeño delay para asegurar sincronía
-            setTimeout(() => {
-                 if(typeof window.playSongInternal === 'function') {
-                     window.playSongInternal(window.preparedSong);
-                 }
-            }, 100);
+            // Usar la canción guardada en memoria
+            if(typeof window.playSongInternal === 'function') window.playSongInternal(window.preparedSong);
         } else {
-            console.error("Error: La canción no estaba lista.");
-            alert("Error: No se pudo cargar el mapa a tiempo.");
+            // Error de sincronización
+            console.error("No estaba listo");
         }
     }
 };
