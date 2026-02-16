@@ -1,4 +1,4 @@
-/* === GLOBAL CONFIG & VARIABLES (FULL & FIXED) === */
+/* === GLOBAL CONFIG & VARIABLES (FIXED CONNECTION V2) === */
 
 const firebaseConfig = {
     apiKey: "AIzaSyAcUwZ5VavXy4WAUIlF6Tl_qMzAykI2EN8",
@@ -9,48 +9,68 @@ const firebaseConfig = {
     appId: "1:149492857447:web:584610d0958419fea7f2c2"
 };
 
-// Inicialización segura de Firebase
+// Definir db en el objeto window explícitamente para evitar problemas de alcance
 window.db = null;
+
+// Función de inicialización robusta (se puede llamar varias veces)
 window.initFireBaseConnection = function() {
     try {
         if (typeof firebase !== 'undefined') {
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-            else firebase.app(); // Ya iniciado
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+                console.log("🔥 Firebase Inicializado.");
+            } else {
+                firebase.app(); // Ya estaba iniciado
+            }
             
+            // Solo conectamos Firestore si no existe aún
             if (!window.db) {
                 window.db = firebase.firestore();
+                console.log("✅ Base de Datos Conectada (Firestore).");
+                
+                // Configuración de persistencia si es necesaria
                 if(firebase.auth) {
-                    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e=>console.warn(e));
+                    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+                        .catch(e => console.warn("Persistencia Auth:", e));
                 }
             }
             return true;
+        } else {
+            console.warn("⚠️ Librería Firebase aún no cargada. Reintentando luego...");
+            return false;
         }
+    } catch(e) { 
+        console.error("❌ Error Crítico Firebase:", e); 
         return false;
-    } catch(e) { console.error("Firebase Error:", e); return false; }
+    }
 };
+
+// Intento inicial inmediato (puede fallar si el CDN es lento)
 window.initFireBaseConnection();
 
-const CURRENT_VERSION = 107;
+const DB_KEY="omega_u_"; 
+const LAST_KEY="omega_last"; 
+const CURRENT_VERSION = 106; 
 
-// === DICCIONARIO DE FORMAS DE SKINS (TU CÓDIGO ORIGINAL) ===
+// === DICCIONARIO DE FORMAS DE SKINS (GLOBAL) ===
 const SKIN_PATHS = {
     circle: "M 50, 50 m -35, 0 a 35,35 0 1,0 70,0 a 35,35 0 1,0 -70,0",
-    demon: "M 50 5 L 95 95 L 5 95 Z",
+    demon: "M 50 5 L 95 95 L 5 95 Z", 
     angel: "M 50 50 m -30 0 a 30,30 0 1,0 60,0 a 30,30 0 1,0 -60,0",
     sniper: "M 45 0 L 55 0 L 55 45 L 100 45 L 100 55 L 55 55 L 55 100 L 45 100 L 45 55 L 0 55 L 0 45 L 45 45 Z",
     shuriken: "M 50 0 L 65 35 L 100 50 L 65 65 L 50 100 L 35 65 L 0 50 L 35 35 Z"
 };
 
-// === TIENDA COMPLETA (TU CÓDIGO ORIGINAL) ===
+// === TIENDA COMPLETA ===
 const SHOP_ITEMS = [
     { id: 'skin_neon', name: 'Pack Neón', price: 500, type: 'skin', desc: 'Estilo Cyberpunk brillante.', color: '#ff66aa', fixed: true, shape: 'circle' },
     { id: 'skin_gold', name: 'Pack Oro', price: 2000, type: 'skin', desc: 'Acabado de lujo dorado.', color: '#FFD700', fixed: true, shape: 'circle' },
     { id: 'skin_dark', name: 'Modo Dark', price: 1000, type: 'skin', desc: 'Alto contraste monocromático.', color: '#444', fixed: true, shape: 'circle' },
     { id: 'skin_demon', name: 'Demon Spikes', price: 3500, type: 'skin', desc: 'Notas agresivas con cuernos.', color: '#FF0000', fixed: true, shape: 'demon' },
     { id: 'skin_angel', name: 'Holy Halo', price: 3500, type: 'skin', desc: 'Anillos divinos brillantes.', color: '#00FFFF', fixed: true, shape: 'angel' },
-    { id: 'skin_shuriken', name: 'Ninja Star', price: 4000, type: 'skin', desc: 'Shurikens giratorios.', color: '#FFF', fixed: false, shape: 'shuriken' },
-    { id: 'skin_sniper', name: 'Crosshair', price: 3000, type: 'skin', desc: 'Miras tácticas.', color: '#0F0', fixed: false, shape: 'sniper' },
-    { id: 'skin_plasma', name: 'Plasma Orb', price: 5000, type: 'skin', desc: 'Núcleo de energía.', color: '#BD00FF', fixed: true, shape: 'circle' },
+    { id: 'skin_shuriken', name: 'Ninja Star', price: 4000, type: 'skin', desc: 'Shurikens giratorios (Tu Color).', color: '#FFF', fixed: false, shape: 'shuriken' },
+    { id: 'skin_sniper', name: 'Crosshair', price: 3000, type: 'skin', desc: 'Miras tácticas (Tu Color).', color: '#0F0', fixed: false, shape: 'sniper' },
+    { id: 'skin_plasma', name: 'Plasma Orb', price: 5000, type: 'skin', desc: 'Núcleo de energía violeta.', color: '#BD00FF', fixed: true, shape: 'circle' },
     { id: 'ui_cyber', name: 'Marco Cyber', price: 1500, type: 'ui', desc: 'Borde futurista.', color: '#00FFFF', fixed: true }
 ];
 
@@ -60,7 +80,10 @@ function createLanes(k) {
     const arr = [];
     for (let i = 0; i < k; i++) {
         let keyChar = 'a';
-        if (k === 4) keyChar = k4[i]; else if (k === 6) keyChar = k6[i]; else if (k === 7) keyChar = k7[i]; else if (k === 9) keyChar = k9[i];
+        if (k === 4) keyChar = k4[i];
+        else if (k === 6) keyChar = k6[i];
+        else if (k === 7) keyChar = k7[i];
+        else if (k === 9) keyChar = k9[i];
         arr.push({ k: keyChar || 'a', c: cols[i % 9], s: 'circle' });
     }
     return arr;
@@ -88,30 +111,45 @@ window.st = {
     notes: [], spawned: [], keys: [], 
     sc: 0, cmb: 0, maxCmb: 0, hp: 50, 
     stats: { s: 0, g: 0, b: 0, m: 0 }, 
-    hitCount: 0, fcStatus: "GFC", trueMaxScore: 0
+    maxScorePossible: 0, ranked: false, startTime: 0,
+    songDuration: 0, lastPause: 0, pauseTime: null,
+    totalOffset: 0, hitCount: 0, fcStatus: "GFC", trueMaxScore: 0,
+    manualStop: false
 };
 
-// Variables del Sistema y Online
+// Variables de sistema
 var ramSongs = [];
-var curSongData = null; 
+var curIdx = -1;
 var keys = 4;
+var remapMode = null;
+var remapIdx = null;
+var ctx = null;
 var hitBuf = null;
 var missBuf = null; 
+var songFinished = false; 
+var curSongData = null; 
 
-// === VARIABLES CRÍTICAS PARA EL ARREGLO ===
+// === VARIABLES MULTIPLAYER & ONLINE (AQUÍ ESTÁ EL FIX) ===
+var peer = null;
+var conn = null;
+var myPeerId = null;
+var opponentScore = 0;
 var isMultiplayer = false;
 var currentLobbyId = null;
 var isLobbyHost = false;
 var lobbyListener = null;
 
-// Estas son las que faltaban y causaban que el online no iniciara
-window.preparedSong = null;     
-window.hasGameStarted = false;  
-window.isMultiplayerReady = false; 
+// NUEVAS VARIABLES PARA EL FIX DE INICIO Y SUBIDA:
+window.preparedSong = null;     // <--- NECESARIA PARA INICIAR PARTIDA ONLINE
+window.hasGameStarted = false;  // <--- NECESARIA PARA EVITAR DOBLE INICIO
+window.isMultiplayerReady = false; // <--- NECESARIA PARA SINCRONIZACIÓN
+// ========================================================
 
 window.PATHS = {
     arrow: "M 20 20 L 50 50 L 80 20 L 80 40 L 50 70 L 20 40 Z",
-    circle: "M 50, 50 m -35, 0 a 35,35 0 1,0 70,0 a 35,35 0 1,0 -70,0"
+    circle: "M 50, 50 m -35, 0 a 35,35 0 1,0 70,0 a 35,35 0 1,0 -70,0",
+    square: "M 15,15 L 85,15 L 85,85 L 15,85 Z",
+    diamond: "M 50,10 L 90,50 L 50,90 L 10,50 Z"
 };
 
 window.notify = function(msg, type="info", duration=4000) {
