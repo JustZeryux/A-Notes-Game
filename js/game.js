@@ -204,55 +204,55 @@ function playMiss() {
 }
 // === REEMPLAZA SOLO LA FUNCIÓN window.prepareAndPlaySong EN JS/GAME.JS ===
 
+// === REEMPLAZAR SOLO ESTA FUNCIÓN EN JS/GAME.JS ===
 window.prepareAndPlaySong = async function(k) {
-    // Detectar si estamos en modo online
+    // 1. Detectar si estamos en modo online
     if(window.currentLobbyId) {
         window.isMultiplayer = true;
     }
 
     if (!window.curSongData) {
-        // Si es cliente online, esperamos calladamente. Si es solo, alerta.
         if(window.isMultiplayer) console.log("Esperando datos de canción...");
         else alert("Selecciona una canción");
         return;
     }
     
+    // UI de carga
     const loader = document.getElementById('loading-overlay');
     if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PROCESANDO MAPA..."; }
 
     try {
-        // Intentar desbloquear audio
         if(typeof unlockAudio === 'function') unlockAudio();
         
         let buffer;
-        // Verificar si la canción ya está en RAM
+        // Buscar si ya está en memoria
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
         if (songInRam) {
             buffer = songInRam.buf;
         } else {
-            // Descargar si no está en RAM
+            // Descargar
             const response = await fetch(window.curSongData.audioURL || window.curSongData.url); 
             const arrayBuffer = await response.arrayBuffer();
-            // Decodificar
             buffer = await window.st.ctx.decodeAudioData(arrayBuffer);
+            
             if(!window.ramSongs) window.ramSongs = [];
             window.ramSongs.push({ id: window.curSongData.id, buf: buffer });
         }
 
-        // Generar mapa (asegúrate que tu función genMap exista en el archivo, no la toques)
+        // Generar Mapa
         const map = genMap(buffer, k);
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         
-        // === EL FIX IMPORTANTE ===
-        window.preparedSong = songObj; // Guardamos la canción lista
+        // === LA CORRECCIÓN CLAVE ===
+        window.preparedSong = songObj; // <--- ESTO FALTABA
         
         if(window.currentLobbyId) {
-             // SI ES ONLINE: No arrancamos el audio. Avisamos que estamos listos.
-             console.log(">> ONLINE: Canción preparada. Esperando señal de inicio.");
+             // Si es Online: NO iniciar audio, solo avisar que estamos listos
+             console.log(">> ONLINE: Canción lista en memoria. Esperando señal...");
              if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         } else {
-             // SI ES SINGLEPLAYER: Arrancamos directo
+             // Si es Solo: Iniciar ya
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
