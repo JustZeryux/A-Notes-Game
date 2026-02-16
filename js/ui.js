@@ -1393,49 +1393,104 @@ function equipItem(id, type) {
 
 // === REEMPLAZAR EN JS/UI.JS ===
 
+// ==========================================
+// SISTEMA DE SUBIDA UPLOADCARE (CORREGIDO)
+// ==========================================
+
 window.openCloudUpload = function() {
-    // Verificación de seguridad
+    // Verificación de usuario (necesario para saber quién subió la canción)
     if (!window.user || window.user.name === "Guest") {
-        return alert("Error: Debes iniciar sesión para subir canciones.");
+        return alert("Error: Debes iniciar sesión para registrar canciones.");
     }
 
-    // 1. Subir Audio
+    // 1. ABRIR UPLOADCARE PARA EL AUDIO
     uploadcare.openDialog(null, {
         publicKey: '8f24c5ced2ad35839a30', 
         tabs: 'file', 
-        title: '1. Sube el Audio (.mp3)',
+        title: '1. Selecciona el Audio (.mp3)',
         accept: 'audio/*'
-    }).done(function(audioFile) {
-        audioFile.promise().done(function(audioInfo) {
+    }).done(function(file) {
+        
+        // Esperamos a que Uploadcare procese el archivo
+        file.promise().done(function(fileInfo) {
             
-            // Timeout para evitar cierre de modales
-            setTimeout(() => {
-                const songName = prompt("Nombre de la canción:", audioInfo.name.replace(/\.[^/.]+$/, ""));
-                if (!songName) return;
-                
-                const diff = prompt("Dificultad (Easy, Normal, Hard):", "Normal");
+            // --- FIX DEL AUTOFILL ---
+            // Obtenemos el nombre de forma segura para que no de error en consola
+            let safeName = "Mi Cancion";
+            if (fileInfo.name) {
+                // Quitamos la extensión .mp3 del nombre
+                safeName = fileInfo.name.split('.').slice(0, -1).join('.') || fileInfo.name;
+            } else if (fileInfo.originalName) {
+                safeName = fileInfo.originalName.split('.').slice(0, -1).join('.');
+            }
 
-                // 2. Preguntar por Imagen
+            // Usamos un pequeño delay para evitar bloqueos de pantalla
+            setTimeout(() => {
+                // Pedimos los datos al usuario
+                const songName = prompt("Nombre de la canción:", safeName);
+                if (!songName) return; // Si cancela, paramos aquí
+                
+                const diff = prompt("Dificultad (Easy, Normal, Hard):", "Normal") || "Normal";
+
+                // 2. PREGUNTAR POR IMAGEN (OPCIONAL)
                 if (confirm("¿Quieres subir una imagen de portada?")) {
                     uploadcare.openDialog(null, {
                         publicKey: '8f24c5ced2ad35839a30',
                         tabs: 'file',
-                        title: '2. Sube la Portada',
+                        title: '2. Selecciona la Portada',
                         accept: 'image/*'
                     }).done(function(imgFile) {
                         imgFile.promise().done(function(imgInfo) {
-                            // Guardar con imagen
-                            finishUpload(songName, diff, audioInfo.cdnUrl, imgInfo.cdnUrl);
+                            // Tenemos Audio e Imagen -> Registramos
+                            registerSongLink(songName, diff, fileInfo.cdnUrl, imgInfo.cdnUrl);
                         });
                     });
                 } else {
-                    // Guardar sin imagen
-                    finishUpload(songName, diff, audioInfo.cdnUrl, null);
+                    // Solo Audio -> Registramos con imagen por defecto
+                    registerSongLink(songName, diff, fileInfo.cdnUrl, null);
                 }
             }, 500);
         });
     });
 };
+
+// Esta función SOLO guarda el link en la lista, no sube archivos
+function registerSongLink(name, diff, audioUrl, imgUrl) {
+    console.log("Registrando link de:", name);
+
+    const songId = 'cloud_' + Date.now();
+    
+    // Datos para la lista de canciones
+    const songData = {
+        id: songId,
+        name: name,
+        artist: window.user.name, // El uploader figura como artista
+        url: audioUrl,            // El link que nos dio Uploadcare
+        img: imgUrl || "img/disc.png", 
+        diff: diff,
+        uploadedBy: window.user.name,
+        uploadedAt: Date.now(),   // Usamos fecha simple para evitar errores
+        isCloud: true
+    };
+
+    // Guardar la referencia en la base de datos para que aparezca en el juego
+    if(window.db) {
+        window.db.collection("songs").doc(songId).set(songData)
+        .then(() => {
+            if(typeof notify === 'function') notify("¡Canción publicada con éxito!", "success");
+            else alert("¡Canción publicada!");
+            
+            // Actualizar la lista si está abierta
+            if(typeof loadSongs === 'function') loadSongs();
+        })
+        .catch(err => {
+            console.error("Error al registrar:", err);
+            alert("Error al guardar el registro: " + err.message);
+        });
+    } else {
+        alert("Error: No hay conexión con la base de datos.");
+    }
+}
 
 function finishUpload(name, diff, audioUrl, imgUrl) {
     const songId = 'cloud_' + Date.now();
