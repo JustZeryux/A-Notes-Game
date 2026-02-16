@@ -508,20 +508,29 @@ function showJudge(text, color, diffMs) {
 }
 
 // Handlers
+// En js/game.js
+
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
-    if (!e.repeat && window.cfg.modes[window.keys]) {
-        const idx = window.cfg.modes[window.keys].findIndex(l => l.k === e.key.toLowerCase());
+    
+    // CORRECCIÓN: Verificar que cfg, modes y keys existen antes de leer
+    if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
+
+    if (!e.repeat) {
+        const idx = window.cfg.modes[window.keys].findIndex(l => l.k && l.k.toLowerCase() === e.key.toLowerCase());
         if (idx !== -1) hit(idx, true);
     }
 };
+
 window.onKu = function(e) {
+    // CORRECCIÓN: Verificar que cfg existe
+    if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
+
     if(window.cfg.modes[window.keys]) {
-        const idx = window.cfg.modes[window.keys].findIndex(l => l.k === e.key.toLowerCase());
+        const idx = window.cfg.modes[window.keys].findIndex(l => l.k && l.k.toLowerCase() === e.key.toLowerCase());
         if (idx !== -1) hit(idx, false);
     }
 };
-
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
