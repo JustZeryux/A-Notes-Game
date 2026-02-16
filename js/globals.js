@@ -129,6 +129,7 @@ var missBuf = null;
 var songFinished = false; 
 var curSongData = null; 
 
+// === VARIABLES MULTIPLAYER & ONLINE (AQUÍ ESTÁ EL FIX) ===
 var peer = null;
 var conn = null;
 var myPeerId = null;
@@ -137,6 +138,12 @@ var isMultiplayer = false;
 var currentLobbyId = null;
 var isLobbyHost = false;
 var lobbyListener = null;
+
+// NUEVAS VARIABLES PARA EL FIX DE INICIO Y SUBIDA:
+window.preparedSong = null;     // <--- NECESARIA PARA INICIAR PARTIDA ONLINE
+window.hasGameStarted = false;  // <--- NECESARIA PARA EVITAR DOBLE INICIO
+window.isMultiplayerReady = false; // <--- NECESARIA PARA SINCRONIZACIÓN
+// ========================================================
 
 window.PATHS = {
     arrow: "M 20 20 L 50 50 L 80 20 L 80 40 L 50 70 L 20 40 Z",
