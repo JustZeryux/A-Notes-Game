@@ -1389,49 +1389,73 @@ function equipItem(id, type) {
 // SISTEMA DE SUBIDA A LA NUBE (AUDIO + IMAGEN)
 // ==========================================
 
+// === REEMPLAZA O AGREGA ESTO EN JS/UI.JS ===
+
 window.openCloudUpload = function() {
-    // 1. Verificar sesión
     if (!window.user || window.user.name === "Guest") {
-        return notify("Inicia sesión para subir canciones.", "error");
+        return notify("Debes iniciar sesión", "error");
     }
 
-    // 2. Primer paso: Subir el AUDIO
+    // 1. Subir Audio
     uploadcare.openDialog(null, {
-        publicKey: '8f24c5ced2ad35839a30', // Tu clave pública
-        tabs: 'file',
+        publicKey: '8f24c5ced2ad35839a30', 
+        tabs: 'file', 
         title: '1. Sube el Audio (.mp3)',
         accept: 'audio/*'
     }).done(function(audioFile) {
         audioFile.promise().done(function(audioInfo) {
             
-            // 3. Segundo paso: Pedir el NOMBRE
-            const songName = prompt("Escribe el nombre de la canción:", audioInfo.name.replace(/\.[^/.]+$/, ""));
-            if (!songName) return;
+            // Usamos timeout para que no se traslapen los popups
+            setTimeout(() => {
+                const songName = prompt("Nombre de la canción:", audioInfo.name.replace(/\.[^/.]+$/, ""));
+                if (!songName) return;
+                
+                const diff = prompt("Dificultad (Easy, Normal, Hard):", "Normal");
 
-            const diff = prompt("Dificultad (Easy, Normal, Hard):", "Normal");
-
-            // 4. Tercer paso: Preguntar por la IMAGEN
-            const wantImage = confirm("¿Quieres subir una imagen de portada para esta canción?");
-            
-            if (wantImage) {
-                uploadcare.openDialog(null, {
-                    publicKey: '8f24c5ced2ad35839a30',
-                    tabs: 'file',
-                    title: '2. Sube la Portada (Imagen)',
-                    accept: 'image/*'
-                }).done(function(imgFile) {
-                    imgFile.promise().done(function(imgInfo) {
-                        // Guardar CON imagen
-                        saveSongToFirebase(songName, diff, audioInfo.cdnUrl, imgInfo.cdnUrl);
+                // 2. Preguntar por Imagen
+                if (confirm("¿Quieres subir una imagen de portada?")) {
+                    uploadcare.openDialog(null, {
+                        publicKey: '8f24c5ced2ad35839a30',
+                        tabs: 'file',
+                        title: '2. Sube la Portada',
+                        accept: 'image/*'
+                    }).done(function(imgFile) {
+                        imgFile.promise().done(function(imgInfo) {
+                            // Guardar con imagen
+                            finishUpload(songName, diff, audioInfo.cdnUrl, imgInfo.cdnUrl);
+                        });
                     });
-                });
-            } else {
-                // Guardar SIN imagen (usa una por defecto)
-                saveSongToFirebase(songName, diff, audioInfo.cdnUrl, null);
-            }
+                } else {
+                    // Guardar sin imagen
+                    finishUpload(songName, diff, audioInfo.cdnUrl, null);
+                }
+            }, 500);
         });
     });
 };
+
+function finishUpload(name, diff, audioUrl, imgUrl) {
+    const songId = 'cloud_' + Date.now();
+    const songData = {
+        id: songId,
+        name: name,
+        artist: window.user.name,
+        url: audioUrl,
+        img: imgUrl || "img/disc.png",
+        diff: diff || "Normal",
+        uploadedBy: window.user.name,
+        uploadedAt: Date.now(),
+        isCloud: true
+    };
+
+    if(window.db) {
+        window.db.collection("songs").doc(songId).set(songData).then(() => {
+            if(typeof notify === 'function') notify("Subida exitosa", "success");
+            // Intentar recargar lista si existe la función
+            if(typeof loadSongs === 'function') loadSongs();
+        });
+    }
+}
 
 function saveSongToFirebase(name, diff, audioUrl, imgUrl) {
     const songId = 'cloud_' + Date.now();
