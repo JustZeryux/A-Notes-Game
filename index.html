@@ -192,15 +192,22 @@
     </div>
 
 <div id="modal-upload" class="modal-overlay">
-    <div class="modal-panel login-box">
-        <div class="m-title">SUBIR A LA NUBE</div>
-        <p style="color: #ccc; margin-bottom: 20px;">Utiliza nuestro asistente para publicar tu canción (.mp3) y portada.</p>
+    <div class="modal-panel login-box" style="text-align: center; border: 2px solid var(--accent); box-shadow: 0 0 50px rgba(255, 102, 170, 0.2); max-width: 500px;">
         
-        <button class="action" onclick="closeModal('upload'); openCloudUpload()">
-            🚀 INICIAR ASISTENTE DE SUBIDA
+        <div class="m-title" style="margin-bottom: 10px; border-bottom: none;">SUBIR CANCIÓN</div>
+        
+        <div style="font-size: 5rem; margin: 20px 0; animation: floatNote 2s infinite ease-in-out;">☁️</div>
+        
+        <p style="color: #ddd; font-size: 1.1rem; margin-bottom: 30px; line-height: 1.6; font-family: 'Nunito', sans-serif;">
+            Publica tu música en el servidor global.<br>
+            <span style="color: var(--blue); font-size: 0.9rem; font-weight: bold;">Soporta .MP3 y Portadas Custom</span>
+        </p>
+        
+        <button class="action" onclick="closeModal('upload'); openCloudUpload()" style="font-size: 1.2rem; padding: 20px; box-shadow: 0 0 20px var(--accent);">
+            🚀 INICIAR ASISTENTE
         </button>
         
-        <button class="action secondary" style="margin-top: 10px;" onclick="closeModal('upload')">CANCELAR</button>
+        <button class="action secondary" style="margin-top: 15px;" onclick="closeModal('upload')">CANCELAR</button>
     </div>
 </div>
 
