@@ -205,54 +205,47 @@ function playMiss() {
 // === REEMPLAZA SOLO LA FUNCIÓN window.prepareAndPlaySong EN JS/GAME.JS ===
 
 // === REEMPLAZAR SOLO ESTA FUNCIÓN EN JS/GAME.JS ===
+// === REEMPLAZAR EN JS/GAME.JS ===
+
 window.prepareAndPlaySong = async function(k) {
-    // 1. Detectar si estamos en modo online
-    if(window.currentLobbyId) {
-        window.isMultiplayer = true;
-    }
+    if(window.currentLobbyId) window.isMultiplayer = true;
 
     if (!window.curSongData) {
-        if(window.isMultiplayer) console.log("Esperando datos de canción...");
-        else alert("Selecciona una canción");
+        if(!window.isMultiplayer) alert("Error: No hay canción seleccionada");
         return;
     }
     
-    // UI de carga
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PROCESANDO MAPA..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "CARGANDO AUDIO..."; }
 
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
         
         let buffer;
-        // Buscar si ya está en memoria
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
         if (songInRam) {
             buffer = songInRam.buf;
         } else {
-            // Descargar
             const response = await fetch(window.curSongData.audioURL || window.curSongData.url); 
             const arrayBuffer = await response.arrayBuffer();
             buffer = await window.st.ctx.decodeAudioData(arrayBuffer);
-            
             if(!window.ramSongs) window.ramSongs = [];
             window.ramSongs.push({ id: window.curSongData.id, buf: buffer });
         }
 
-        // Generar Mapa
-        const map = genMap(buffer, k);
+        const map = genMap(buffer, k); // Tu función genMap original
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         
-        // === LA CORRECCIÓN CLAVE ===
-        window.preparedSong = songObj; // <--- ESTO FALTABA
-        
+        // --- GUARDAR EN MEMORIA ---
+        window.preparedSong = songObj; 
+
         if(window.currentLobbyId) {
-             // Si es Online: NO iniciar audio, solo avisar que estamos listos
-             console.log(">> ONLINE: Canción lista en memoria. Esperando señal...");
+             // ONLINE: Solo avisar
+             console.log(">> ONLINE: Audio listo. Esperando GO.");
              if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         } else {
-             // Si es Solo: Iniciar ya
+             // SOLO: Jugar
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
@@ -260,7 +253,7 @@ window.prepareAndPlaySong = async function(k) {
     } catch (e) {
         console.error(e);
         if(loader) loader.style.display = 'none';
-        alert("Error al cargar: " + e.message);
+        alert("Error carga: " + e.message);
     }
 };
 window.playSongInternal = function(s) {
