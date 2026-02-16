@@ -234,3 +234,28 @@ window.showMultiplayerResults = function(playersData) {
     listHTML += '</table></div>';
     panel.innerHTML = `<div class=\"m-title\" style=\"border-color:${amIWinner ? 'gold' : '#F9393F'}\">${amIWinner ? '🏆 ¡VICTORIA! 🏆' : 'PARTIDA FINALIZADA'}</div><div style=\"text-align:center; margin-bottom:20px;\"><div style=\"font-size:1.2rem; color:#aaa;\">GANADOR</div><div style=\"font-size:2.5rem; font-weight:900; color:gold; text-shadow:0 0 20px gold;\">${winner.name}</div><div style=\"font-size:1.5rem;\">${(winner.currentScore||0).toLocaleString()} pts</div></div>${listHTML}<div class=\"modal-buttons-row\"><button class=\"action secondary\" onclick=\"toMenu(); leaveLobbyData();\">SALIR AL MENU</button></div>`;
 };
+
+// Añade esto al final de js/online.js
+window.handleLobbyStatus = function(data) {
+    if (data.status === 'playing' && !window.hasGameStarted) {
+        console.log(">> EL HOST INICIÓ LA PARTIDA");
+        window.hasGameStarted = true;
+        
+        // Ocultar Lobby
+        const m = document.getElementById('modal-lobby-room');
+        if(m) m.style.display = 'none';
+        
+        // Arrancar juego
+        if (window.preparedSong) {
+            // Pequeño delay para asegurar sincronía
+            setTimeout(() => {
+                 if(typeof window.playSongInternal === 'function') {
+                     window.playSongInternal(window.preparedSong);
+                 }
+            }, 100);
+        } else {
+            console.error("Error: La canción no estaba lista.");
+            alert("Error: No se pudo cargar el mapa a tiempo.");
+        }
+    }
+};
