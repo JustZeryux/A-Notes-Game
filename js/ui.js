@@ -1391,9 +1391,12 @@ function equipItem(id, type) {
 
 // === REEMPLAZA O AGREGA ESTO EN JS/UI.JS ===
 
+// === REEMPLAZAR EN JS/UI.JS ===
+
 window.openCloudUpload = function() {
+    // Verificación de seguridad
     if (!window.user || window.user.name === "Guest") {
-        return notify("Debes iniciar sesión", "error");
+        return alert("Error: Debes iniciar sesión para subir canciones.");
     }
 
     // 1. Subir Audio
@@ -1405,7 +1408,7 @@ window.openCloudUpload = function() {
     }).done(function(audioFile) {
         audioFile.promise().done(function(audioInfo) {
             
-            // Usamos timeout para que no se traslapen los popups
+            // Timeout para evitar cierre de modales
             setTimeout(() => {
                 const songName = prompt("Nombre de la canción:", audioInfo.name.replace(/\.[^/.]+$/, ""));
                 if (!songName) return;
@@ -1444,16 +1447,23 @@ function finishUpload(name, diff, audioUrl, imgUrl) {
         img: imgUrl || "img/disc.png",
         diff: diff || "Normal",
         uploadedBy: window.user.name,
-        uploadedAt: Date.now(),
+        uploadedAt: Date.now(), // Timestamp simple para evitar errores de Firebase
         isCloud: true
     };
 
     if(window.db) {
-        window.db.collection("songs").doc(songId).set(songData).then(() => {
-            if(typeof notify === 'function') notify("Subida exitosa", "success");
-            // Intentar recargar lista si existe la función
+        window.db.collection("songs").doc(songId).set(songData)
+        .then(() => {
+            alert("¡Canción subida exitosamente!");
+            // Recargar lista si existe la función
             if(typeof loadSongs === 'function') loadSongs();
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error al guardar en base de datos: " + err.message);
         });
+    } else {
+        alert("Error: No hay conexión con la base de datos.");
     }
 }
 
