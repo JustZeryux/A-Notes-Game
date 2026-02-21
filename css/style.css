@@ -133,9 +133,6 @@ button.secondary:hover { border-color: white; transform: none; background: #222;
     transform-style: preserve-3d;
     transform: rotateX(0deg);
     
-    /* MÁSCARA DE HORIZONTE: Hace que las notas se desvanezcan arriba */
-    mask-image: linear-gradient(to bottom, transparent 10%, black 40%);
-    -webkit-mask-image: linear-gradient(to bottom, transparent 10%, black 40%);
 }
 
 #track.middle-scroll {
