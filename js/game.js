@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (ULTRA PERFORMANCE 240FPS V15) === */
+/* === AUDIO & ENGINE (ULTRA PERFORMANCE 240FPS + SUBTITLES V16) === */
 
 let elTrack = null;
 
@@ -203,10 +203,13 @@ window.playSongInternal = function(s) {
     
     window.st.act = true; window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
-    window.st.spawned = []; // LIMPIEZA DE ARRAY CRÍTICA
+    window.st.spawned = []; 
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50; window.st.maxCmb = 0; 
     window.st.stats = { s:0, g:0, b:0, m:0 };
-    window.st.hitCount = 0; window.st.totalOffset = 0; window.st.fcStatus = "GFC";
+    window.st.hitCount = 0; window.st.totalOffset = 0; 
+    
+    // Asumimos PFC al inicio de la canción
+    window.st.fcStatus = "PFC"; 
     
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trueMaxScore += 200; });
@@ -221,8 +224,49 @@ window.playSongInternal = function(s) {
     const uiToClose = ['modal-res', 'modal-pause', 'modal-lobbies', 'modal-lobby-room', 'modal-song-selector', 'modal-diff', 'loading-overlay'];
     uiToClose.forEach(id => { const m = document.getElementById(id); if(m) m.style.display = 'none'; });
 
+    // === INYECTAR SUBTÍTULOS Y FONDO SI NO EXISTEN ===
+    if(!document.getElementById('game-bg-container')) {
+        const bgCont = document.createElement('div');
+        bgCont.id = "game-bg-container";
+        bgCont.innerHTML = `<div id="game-bg-img"></div>`;
+        document.getElementById('game-layer').insertBefore(bgCont, document.getElementById('track'));
+        
+        const subCont = document.createElement('div');
+        subCont.id = "subtitles-container";
+        subCont.innerHTML = `<div id="subtitles-text"></div>`;
+        document.getElementById('game-layer').appendChild(subCont);
+    }
+    
+    // Activar Subtítulos si la config está ON
+    const bgC = document.getElementById('game-bg-container');
+    const subC = document.getElementById('subtitles-container');
+    if (window.cfg.subtitles) {
+        bgC.style.display = 'block';
+        document.getElementById('game-bg-img').style.backgroundImage = window.curSongData.imageURL ? `url(${window.curSongData.imageURL})` : 'none';
+        
+        window.st.parsedLyrics = [];
+        window.st.currentLyricIdx = 0;
+        subC.style.display = 'block';
+        document.getElementById('subtitles-text').innerText = "🎵"; 
+        
+        if (window.curSongData.lyrics) {
+            const lines = window.curSongData.lyrics.split('\n');
+            lines.forEach(l => {
+                const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/);
+                if(match) {
+                    const tMs = (parseInt(match[1])*60 + parseFloat(match[2])) * 1000;
+                    window.st.parsedLyrics.push({ t: tMs, tx: match[3].trim() });
+                }
+            });
+            window.st.parsedLyrics.sort((a,b) => a.t - b.t);
+        }
+    } else {
+        bgC.style.display = 'none';
+        subC.style.display = 'none';
+    }
+
     initReceptors(window.keys);
-    updHUD(); // Llamada inicial para limpiar UI vieja
+    updHUD(); 
 
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex'; cd.innerText = "3";
@@ -264,6 +308,19 @@ function loop() {
         if(bar) bar.style.width = pct + "%";
     }
 
+    // Lógica de actualización de Subtítulos
+    if (window.cfg.subtitles && window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
+        let idx = window.st.currentLyricIdx;
+        if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
+            const subEl = document.getElementById('subtitles-text');
+            subEl.innerText = window.st.parsedLyrics[idx].tx;
+            subEl.style.animation = 'none'; 
+            void subEl.offsetWidth; 
+            subEl.style.animation = 'subPop 0.2s ease-out forwards';
+            window.st.currentLyricIdx++;
+        }
+    }
+
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
@@ -272,19 +329,19 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
-    // 1. FASE DE SPAWN (Crear notas visualmente)
+    // 1. FASE DE SPAWN
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
-        if (n.s) continue; // Ya fue lanzada
+        if (n.s) continue; 
         
-        if (n.t - now < 1500) { // Si falta menos de 1.5s
-            if (n.t - now > -200) { // Evitar crear si el lag se comió la nota
+        if (n.t - now < 1500) { 
+            if (n.t - now > -200) { 
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 el.style.left = (n.l * w) + '%';
                 el.style.width = w + '%';
-                el.style.top = '0px'; // FIX GPU: Iniciamos en 0, lo movemos con translate3d
+                el.style.top = '0px'; 
                 
                 let conf = window.cfg.modes[window.keys][n.l];
                 let color = conf.c; 
@@ -310,14 +367,13 @@ function loop() {
             }
             n.s = true;
             window.st.spawned.push(n);
-        } else break; // El array está ordenado, no iteramos lo que falta mucho
+        } else break; 
     }
 
-    // 2. FASE DE PROCESAMIENTO Y DESTRUCCIÓN (De atrás hacia adelante para no romper el array al borrar)
+    // 2. FASE DE PROCESAMIENTO Y DESTRUCCIÓN 
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         
-        // Si fue tocada y es TAP, destruirla del DOM y del array instantaneamente (Cero Lag)
         if (n.h && n.type === 'tap') {
             if(n.el) { n.el.remove(); n.el = null; }
             window.st.spawned.splice(i, 1);
@@ -326,26 +382,22 @@ function loop() {
 
         const timeDiff = n.t - now + (window.cfg.off || 0);
 
-        // DETECCIÓN DE MISS (Si pasó la zona sin ser tocada)
         if (!n.h && timeDiff < -160) {
-            miss(n); // Esto resta puntos y actualiza HUD
-            n.h = true; // La marcamos como muerta
+            miss(n); 
+            n.h = true; 
             if(n.el) { n.el.remove(); n.el = null; }
-            window.st.spawned.splice(i, 1); // ¡Limpiamos la RAM!
+            window.st.spawned.splice(i, 1); 
             continue;
         }
 
-        // MOVER NOTAS VISUALMENTE SI EXISTEN EN EL DOM
         if (n.el) {
             const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
             let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
             
-            // FIX GPU: Usamos translate3d para usar tarjeta gráfica y subir FPS
             if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
                  n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`;
             }
 
-            // LÓGICA DE NOTA MANTENIDA (HOLD)
             if (n.type === 'hold' && n.h) {
                  n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; 
                  const rem = (n.t + n.len) - now;
@@ -364,7 +416,7 @@ function loop() {
                  if (now >= n.t + n.len) {
                      if(!n.broken) window.st.sc += 200; 
                      n.el.remove(); n.el = null; 
-                     window.st.spawned.splice(i, 1); // Muerte limpia
+                     window.st.spawned.splice(i, 1); 
                  }
             }
         }
@@ -463,15 +515,12 @@ window.onKu = function(e) {
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
-    
     if (p) {
         if(!window.st.keys) window.st.keys = [];
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        
-        // Buscar la nota más cercana en el carril (Rango: -160ms a +160ms)
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
 
         if (n) {
@@ -480,16 +529,28 @@ function hit(l, p) {
             window.st.totalOffset += absDiff;
             window.st.hitCount++;
 
-            let score=50, text="BAD", color="#FFD700";
-            
-            // CORRECCIÓN VENTANAS DE JUEZ
-            if(absDiff <= 50){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
-            else if(absDiff <= 100){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); }
+            let score=50, text="BAD", color="yellow";
+            if(absDiff < 45){ 
+                text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); 
+            }
+            else if(absDiff < 90){ 
+                text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); 
+                if(window.st.fcStatus === "PFC") window.st.fcStatus = "GFC";
+            }
             else { 
-                // Fue BAD
-                window.st.stats.b++; 
-                window.st.hp -= 2; 
-                window.st.fcStatus = (window.st.fcStatus !== "SD") ? "FC" : "SD"; 
+                window.st.stats.b++; window.st.hp-=2; 
+                if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; 
+            }
+
+            // EFECTO BUMP DE FONDO SÓLO EN SICK Y GOOD
+            if(window.cfg.subtitles && (text === "SICK!!" || text === "GOOD")) {
+                const bg = document.getElementById('game-bg-img');
+                if(bg) {
+                    bg.classList.remove('bump');
+                    void bg.offsetWidth;
+                    bg.classList.add('bump');
+                    setTimeout(() => bg.classList.remove('bump'), 100);
+                }
             }
 
             window.st.sc += score; 
@@ -501,7 +562,7 @@ function hit(l, p) {
             playHit(); 
             updHUD();
             
-            n.h = true; // Marcar para que el loop la destruya
+            n.h = true; 
         }
     } else {
         if(window.st.keys) window.st.keys[l] = 0;
@@ -514,7 +575,8 @@ function miss(n) {
     window.st.stats.m++; 
     window.st.cmb = 0; 
     window.st.hp -= 10; 
-    window.st.fcStatus = "SD";
+    window.st.fcStatus = "CLEAR"; 
+
     playMiss(); 
     updHUD();
     
@@ -550,7 +612,6 @@ function updHUD() {
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
 
-    // FIX: ACTUALIZAR MÉTRICAS DEL COSTADO IZQUIERDO
     const hSick = document.getElementById('h-sick'); if(hSick) hSick.innerText = window.st.stats.s;
     const hGood = document.getElementById('h-good'); if(hGood) hGood.innerText = window.st.stats.g;
     const hBad = document.getElementById('h-bad'); if(hBad) hBad.innerText = window.st.stats.b;
@@ -597,9 +658,17 @@ function end(died) {
             if(typeof save === 'function') save();
         }
 
+        // Crear Placa Visual del Full Combo
+        let fcBadgeHTML = "";
+        if(!died) {
+            if(window.st.fcStatus === "PFC") fcBadgeHTML = `<div style="background:cyan; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px cyan;">🏆 PERFECT FULL COMBO</div>`;
+            else if(window.st.fcStatus === "GFC") fcBadgeHTML = `<div style="background:gold; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px gold;">🌟 GOOD FULL COMBO</div>`;
+            else if(window.st.fcStatus === "FC") fcBadgeHTML = `<div style="background:#12FA05; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px #12FA05;">✅ FULL COMBO</div>`;
+            else fcBadgeHTML = `<div style="background:#444; color:white; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px;">CLEAR</div>`;
+        }
+
         const panel = modal.querySelector('.modal-panel');
         if(panel) {
-            // FIX PANTALLA RESULTADOS (Incluyendo estadísticas limpias)
             panel.innerHTML = `
                 <div class="m-title">RESULTADOS</div>
                 <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
@@ -607,6 +676,7 @@ function end(died) {
                     <div style="text-align:left;">
                         <div style="font-size:3rem; font-weight:900;">${window.st.sc.toLocaleString()}</div>
                         <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
+                        ${fcBadgeHTML}
                     </div>
                 </div>
                 
