@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (MASTER FINAL V13 - CLEAN UI START) === */
+/* === AUDIO & ENGINE (ULTRA PERFORMANCE 240FPS V15) === */
 
 let elTrack = null;
 
@@ -22,12 +22,10 @@ function unlockAudio() {
 
 function genSounds() {
     if(!window.st.ctx) return;
-    // Hit Sound
     const b1 = window.st.ctx.createBuffer(1, 2000, 44100);
     const d1 = b1.getChannelData(0);
     for (let i = 0; i < d1.length; i++) d1[i] = Math.sin(i * 0.5) * Math.exp(-i / 300);
     window.hitBuf = b1;
-    // Miss Sound
     const b2 = window.st.ctx.createBuffer(1, 4000, 44100);
     const d2 = b2.getChannelData(0);
     for (let i = 0; i < d2.length; i++) d2[i] = (Math.random() * 2 - 1) * 0.3 * Math.exp(-i / 1000);
@@ -49,20 +47,14 @@ function normalizeAudio(filteredData) {
 }
 
 // ==========================================
-// 2. GENERADOR DE MAPAS (NO DELETE / NO OVERLAP)
+// 2. GENERADOR DE MAPAS 
 // ==========================================
-
 function getSmartLane(last, k, busyLanes, time) {
     let candidates = [];
     for(let i=0; i<k; i++) {
-        // Verificar si el carril está libre (con margen 20ms)
         if (time > busyLanes[i] + 20) candidates.push(i);
     }
-    
-    // Si no hay sitio, devolvemos -1 (Panic Mode)
     if(candidates.length === 0) return -1;
-    
-    // Preferir no repetir carril
     let filtered = candidates.filter(c => c !== last);
     if(filtered.length > 0) return filtered[Math.floor(Math.random() * filtered.length)];
     return candidates[Math.floor(Math.random() * candidates.length)];
@@ -84,10 +76,7 @@ function genMap(buf, k) {
     
     let lastNoteTime = -1000; 
     let lastLane = Math.floor(k/2); 
-    
-    // Rastreador de ocupación
     let laneFreeTimes = new Array(k).fill(0);
-
     const energyHistory = [];
     let staircaseCount = 0; 
     let staircaseDir = 1;
@@ -109,16 +98,10 @@ function genMap(buf, k) {
                 let length = 0;
                 let lane = -1;
 
-                // --- SELECCIÓN DE CARRIL ---
                 if (staircaseCount > 0) {
                     let target = (lastLane + staircaseDir + k) % k;
-                    if (timeMs > laneFreeTimes[target] + 20) {
-                        lane = target;
-                        staircaseCount--;
-                    } else {
-                        staircaseCount = 0;
-                        lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs);
-                    }
+                    if (timeMs > laneFreeTimes[target] + 20) { lane = target; staircaseCount--; } 
+                    else { staircaseCount = 0; lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs); }
                 } else {
                     if (density >= 4 && instant > localAvg * 1.5 && Math.random() > 0.6) {
                         staircaseCount = Math.floor(Math.random() * 3) + 1;
@@ -127,17 +110,12 @@ function genMap(buf, k) {
                     lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs);
                 }
 
-                // === PANIC MODE: NO BORRAR NOTAS ===
                 if (lane === -1) {
-                    let bestLane = 0; 
-                    let minTime = Infinity;
-                    for(let x=0; x<k; x++) {
-                        if(laneFreeTimes[x] < minTime) { minTime = laneFreeTimes[x]; bestLane = x; }
-                    }
+                    let bestLane = 0; let minTime = Infinity;
+                    for(let x=0; x<k; x++) { if(laneFreeTimes[x] < minTime) { minTime = laneFreeTimes[x]; bestLane = x; } }
                     lane = bestLane; 
                 }
 
-                // --- HOLD DETECTION ---
                 if (instant > localAvg * 1.3 && Math.random() > 0.6) {
                     let sustain = 0;
                     for(let h=1; h<10; h++) {
@@ -152,26 +130,9 @@ function genMap(buf, k) {
                     }
                 }
 
-                // --- MULTI NOTES ---
-                if(staircaseCount === 0 && density >= 5 && instant > localAvg * (thresholdMult + 0.4)) {
-                     let candidates = [];
-                     for(let c=0; c<k; c++) {
-                         if(c !== lane && timeMs > laneFreeTimes[c] + 20) candidates.push(c);
-                     }
-                     if(candidates.length > 0) {
-                         let lane2 = candidates[Math.floor(Math.random()*candidates.length)];
-                         map.push({ t: timeMs, l: lane2, type: 'tap', len: 0, h: false });
-                         laneFreeTimes[lane2] = timeMs + 80;
-                     }
-                }
-
                 map.push({ t: timeMs, l: lane, type: type, len: length, h: false });
-                
-                // Actualizar ocupación
                 laneFreeTimes[lane] = timeMs + length + 80; 
-                
-                lastNoteTime = timeMs; 
-                lastLane = lane;
+                lastNoteTime = timeMs; lastLane = lane;
             }
         }
     }
@@ -184,49 +145,33 @@ function genMap(buf, k) {
 
 function playHit() {
     if (window.hitBuf && window.cfg.hitSound && window.st.ctx) {
-        const s = window.st.ctx.createBufferSource();
-        s.buffer = window.hitBuf;
-        const g = window.st.ctx.createGain();
-        g.gain.value = window.cfg.hvol || 0.5;
-        s.connect(g); g.connect(window.st.ctx.destination);
-        s.start(0);
+        const s = window.st.ctx.createBufferSource(); s.buffer = window.hitBuf;
+        const g = window.st.ctx.createGain(); g.gain.value = window.cfg.hvol || 0.5;
+        s.connect(g); g.connect(window.st.ctx.destination); s.start(0);
     }
 }
 function playMiss() {
     if (window.missBuf && window.cfg.missSound && window.st.ctx) {
-        const s = window.st.ctx.createBufferSource();
-        s.buffer = window.missBuf;
-        const g = window.st.ctx.createGain();
-        g.gain.value = window.cfg.missVol || 0.5;
-        s.connect(g); g.connect(window.st.ctx.destination);
-        s.start(0);
+        const s = window.st.ctx.createBufferSource(); s.buffer = window.missBuf;
+        const g = window.st.ctx.createGain(); g.gain.value = window.cfg.missVol || 0.5;
+        s.connect(g); g.connect(window.st.ctx.destination); s.start(0);
     }
 }
-// === REEMPLAZA SOLO LA FUNCIÓN window.prepareAndPlaySong EN JS/GAME.JS ===
-
-// === REEMPLAZAR SOLO ESTA FUNCIÓN EN JS/GAME.JS ===
-// === REEMPLAZAR EN JS/GAME.JS ===
 
 window.prepareAndPlaySong = async function(k) {
     if(window.currentLobbyId) window.isMultiplayer = true;
-
-    if (!window.curSongData) {
-        if(!window.isMultiplayer) alert("Error: No hay canción seleccionada");
-        return;
-    }
+    if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
     const loader = document.getElementById('loading-overlay');
     if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "CARGANDO AUDIO..."; }
 
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
-        
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
-        if (songInRam) {
-            buffer = songInRam.buf;
-        } else {
+        if (songInRam) { buffer = songInRam.buf; } 
+        else {
             const response = await fetch(window.curSongData.audioURL || window.curSongData.url); 
             const arrayBuffer = await response.arrayBuffer();
             buffer = await window.st.ctx.decodeAudioData(arrayBuffer);
@@ -234,18 +179,14 @@ window.prepareAndPlaySong = async function(k) {
             window.ramSongs.push({ id: window.curSongData.id, buf: buffer });
         }
 
-        const map = genMap(buffer, k); // Tu función genMap original
+        const map = genMap(buffer, k); 
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
-        
-        // --- GUARDAR EN MEMORIA ---
         window.preparedSong = songObj; 
 
         if(window.currentLobbyId) {
-             // ONLINE: Solo avisar
              console.log(">> ONLINE: Audio listo. Esperando GO.");
              if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         } else {
-             // SOLO: Jugar
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
@@ -256,20 +197,16 @@ window.prepareAndPlaySong = async function(k) {
         alert("Error carga: " + e.message);
     }
 };
+
 window.playSongInternal = function(s) {
     if(!s) return;
     
-    // Reset Stats
-    window.st.act = true;
-    window.st.paused = false;
+    window.st.act = true; window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
-    window.st.spawned = [];
-    window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50;
-    window.st.maxCmb = 0; 
+    window.st.spawned = []; // LIMPIEZA DE ARRAY CRÍTICA
+    window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50; window.st.maxCmb = 0; 
     window.st.stats = { s:0, g:0, b:0, m:0 };
-    window.st.hitCount = 0; 
-    window.st.totalOffset = 0;
-    window.st.fcStatus = "GFC";
+    window.st.hitCount = 0; window.st.totalOffset = 0; window.st.fcStatus = "GFC";
     
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trueMaxScore += 200; });
@@ -278,37 +215,21 @@ window.playSongInternal = function(s) {
     window.st.songDuration = s.buf.duration;
     window.keys = s.kVersion;
 
-    // === FIX JUGADOR 2: LIMPIEZA TOTAL DE UI ===
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
     
-    const uiToClose = [
-        'modal-res', 
-        'modal-pause', 
-        'modal-lobbies',      
-        'modal-lobby-room',   
-        'modal-song-selector',
-        'modal-diff',         
-        'loading-overlay'     
-    ];
-    
-    uiToClose.forEach(id => {
-        const m = document.getElementById(id);
-        if(m) m.style.display = 'none';
-    });
-    // ==========================================
+    const uiToClose = ['modal-res', 'modal-pause', 'modal-lobbies', 'modal-lobby-room', 'modal-song-selector', 'modal-diff', 'loading-overlay'];
+    uiToClose.forEach(id => { const m = document.getElementById(id); if(m) m.style.display = 'none'; });
 
     initReceptors(window.keys);
-    if(typeof updHUD === 'function') updHUD();
+    updHUD(); // Llamada inicial para limpiar UI vieja
 
-    // START (PRERENDER)
     const cd = document.getElementById('countdown');
     cd.style.display = 'flex'; cd.innerText = "3";
     
     window.st.src = window.st.ctx.createBufferSource();
     window.st.src.buffer = s.buf;
-    const g = window.st.ctx.createGain();
-    g.gain.value = window.cfg.vol || 0.5;
+    const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
     window.st.src.connect(g); g.connect(window.st.ctx.destination);
     
     window.st.src.onended = () => { if(window.st.act) end(false); };
@@ -324,14 +245,13 @@ window.playSongInternal = function(s) {
     const iv = setInterval(() => {
         count--;
         if (count > 0) cd.innerText = count;
-        else {
-            clearInterval(iv);
-            cd.innerText = "GO!";
-            setTimeout(() => { cd.style.display = 'none'; }, 500);
-        }
+        else { clearInterval(iv); cd.innerText = "GO!"; setTimeout(() => { cd.style.display = 'none'; }, 500); }
     }, 1000);
 }
 
+// ==========================================
+// 4. EL LOOP ULTRA-OPTIMIZADO (GPU ACCELERATED)
+// ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) return;
     
@@ -352,17 +272,19 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
+    // 1. FASE DE SPAWN (Crear notas visualmente)
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
-        if (n.s) continue;
+        if (n.s) continue; // Ya fue lanzada
         
-        if (n.t - now < 1500) {
-            if (n.t - now > -200) {
+        if (n.t - now < 1500) { // Si falta menos de 1.5s
+            if (n.t - now > -200) { // Evitar crear si el lag se comió la nota
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 el.style.left = (n.l * w) + '%';
                 el.style.width = w + '%';
+                el.style.top = '0px'; // FIX GPU: Iniciamos en 0, lo movemos con translate3d
                 
                 let conf = window.cfg.modes[window.keys][n.l];
                 let color = conf.c; 
@@ -388,50 +310,63 @@ function loop() {
             }
             n.s = true;
             window.st.spawned.push(n);
-        } else break; 
+        } else break; // El array está ordenado, no iteramos lo que falta mucho
     }
 
+    // 2. FASE DE PROCESAMIENTO Y DESTRUCCIÓN (De atrás hacia adelante para no romper el array al borrar)
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         
-        if (!n.el) { 
-            if(n.t - now < -200 && !n.h) window.st.spawned.splice(i, 1);
-            continue; 
+        // Si fue tocada y es TAP, destruirla del DOM y del array instantaneamente (Cero Lag)
+        if (n.h && n.type === 'tap') {
+            if(n.el) { n.el.remove(); n.el = null; }
+            window.st.spawned.splice(i, 1);
+            continue;
         }
 
         const timeDiff = n.t - now + (window.cfg.off || 0);
-        const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
-        let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
-        
-        if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
-             n.el.style.top = finalY + 'px';
-        }
 
-        if (n.type === 'hold' && n.h) {
-             n.el.style.top = yReceptor + 'px'; 
-             const rem = (n.t + n.len) - now;
-             const tr = n.el.querySelector('.sustain-trail');
-             if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
-             
-             if (!window.st.keys[n.l]) { 
-                 n.el.style.opacity = 0.4;
-                 if (rem > 100 && !n.broken) { window.st.cmb = 0; n.broken = true; }
-             } else {
-                 n.el.style.opacity = 1;
-                 if(!n.broken) window.st.hp = Math.min(100, window.st.hp + 0.1); 
-                 if(typeof updHUD==='function') updHUD(); 
-             }
-
-             if (now >= n.t + n.len) {
-                 if(!n.broken) window.st.sc += 200; 
-                 n.el.remove(); n.el = null; 
-             }
-        }
-
+        // DETECCIÓN DE MISS (Si pasó la zona sin ser tocada)
         if (!n.h && timeDiff < -160) {
-            miss(n);
-            if(n.el) { n.el.style.opacity = 0; setTimeout(()=>n.el && n.el.remove(),100); }
-            window.st.spawned.splice(i, 1);
+            miss(n); // Esto resta puntos y actualiza HUD
+            n.h = true; // La marcamos como muerta
+            if(n.el) { n.el.remove(); n.el = null; }
+            window.st.spawned.splice(i, 1); // ¡Limpiamos la RAM!
+            continue;
+        }
+
+        // MOVER NOTAS VISUALMENTE SI EXISTEN EN EL DOM
+        if (n.el) {
+            const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
+            let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
+            
+            // FIX GPU: Usamos translate3d para usar tarjeta gráfica y subir FPS
+            if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
+                 n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`;
+            }
+
+            // LÓGICA DE NOTA MANTENIDA (HOLD)
+            if (n.type === 'hold' && n.h) {
+                 n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; 
+                 const rem = (n.t + n.len) - now;
+                 const tr = n.el.querySelector('.sustain-trail');
+                 if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
+                 
+                 if (!window.st.keys[n.l]) { 
+                     n.el.style.opacity = 0.4;
+                     if (rem > 100 && !n.broken) { window.st.cmb = 0; n.broken = true; }
+                 } else {
+                     n.el.style.opacity = 1;
+                     if(!n.broken) window.st.hp = Math.min(100, window.st.hp + 0.1); 
+                     updHUD(); 
+                 }
+
+                 if (now >= n.t + n.len) {
+                     if(!n.broken) window.st.sc += 200; 
+                     n.el.remove(); n.el = null; 
+                     window.st.spawned.splice(i, 1); // Muerte limpia
+                 }
+            }
         }
     }
     requestAnimationFrame(loop);
@@ -440,7 +375,6 @@ function loop() {
 // ==========================================
 // 5. VISUALS & JUEZ
 // ==========================================
-
 function createSplash(l) {
     if(!window.cfg.showSplash) return;
     const r = document.getElementById(`rec-${l}`);
@@ -497,8 +431,7 @@ function showJudge(text, color, diffMs) {
         msDiv.style.fontSize = '1.2rem';
         msDiv.style.fontWeight = 'bold';
         msDiv.style.marginTop = '5px';
-        if (diffMs > 0) msDiv.style.color = "#ffaa00"; 
-        else msDiv.style.color = "#00aaff"; 
+        msDiv.style.color = (diffMs > 0) ? "#ffaa00" : "#00aaff"; 
         msDiv.style.animation = 'judgePop 0.35s ease-out forwards';
         container.appendChild(msDiv);
     }
@@ -507,13 +440,12 @@ function showJudge(text, color, diffMs) {
     setTimeout(() => container.remove(), 600);
 }
 
-// Handlers
-// En js/game.js
+// ==========================================
+// 6. EVENTOS DE TECLADO Y EVALUACIÓN
+// ==========================================
 
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
-    
-    // CORRECCIÓN: Verificar que cfg, modes y keys existen antes de leer
     if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
 
     if (!e.repeat) {
@@ -523,23 +455,23 @@ window.onKd = function(e) {
 };
 
 window.onKu = function(e) {
-    // CORRECCIÓN: Verificar que cfg existe
     if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
-
-    if(window.cfg.modes[window.keys]) {
-        const idx = window.cfg.modes[window.keys].findIndex(l => l.k && l.k.toLowerCase() === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, false);
-    }
+    const idx = window.cfg.modes[window.keys].findIndex(l => l.k && l.k.toLowerCase() === e.key.toLowerCase());
+    if (idx !== -1) hit(idx, false);
 };
+
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
+    
     if (p) {
         if(!window.st.keys) window.st.keys = [];
         window.st.keys[l] = 1;
         if(r) r.classList.add('pressed');
 
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
+        
+        // Buscar la nota más cercana en el carril (Rango: -160ms a +160ms)
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
 
         if (n) {
@@ -548,19 +480,28 @@ function hit(l, p) {
             window.st.totalOffset += absDiff;
             window.st.hitCount++;
 
-            let score=50, text="BAD", color="yellow";
-            if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
-            else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); }
-            else { window.st.stats.b++; window.st.hp-=2; window.st.fcStatus = (window.st.fcStatus!=="SD")?"FC":"SD"; }
+            let score=50, text="BAD", color="#FFD700";
+            
+            // CORRECCIÓN VENTANAS DE JUEZ
+            if(absDiff <= 50){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
+            else if(absDiff <= 100){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); }
+            else { 
+                // Fue BAD
+                window.st.stats.b++; 
+                window.st.hp -= 2; 
+                window.st.fcStatus = (window.st.fcStatus !== "SD") ? "FC" : "SD"; 
+            }
 
-            if(text==="BAD") window.st.fcStatus="SD";
             window.st.sc += score; 
-            window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
+            window.st.cmb++; 
+            if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             window.st.hp = Math.min(100, window.st.hp+2);
             
             showJudge(text, color, diff); 
-            playHit(); if(typeof updHUD==='function') updHUD();
-            n.h = true; if (n.type === 'tap' && n.el) n.el.style.opacity = 0;
+            playHit(); 
+            updHUD();
+            
+            n.h = true; // Marcar para que el loop la destruya
         }
     } else {
         if(window.st.keys) window.st.keys[l] = 0;
@@ -570,24 +511,32 @@ function hit(l, p) {
 
 function miss(n) {
     showJudge("MISS", "#F9393F");
-    window.st.stats.m++; window.st.cmb=0; window.st.hp-=10; window.st.fcStatus="SD";
-    playMiss(); if(typeof updHUD==='function') updHUD();
-    if(n.el) n.el.style.opacity = 0;
+    window.st.stats.m++; 
+    window.st.cmb = 0; 
+    window.st.hp -= 10; 
+    window.st.fcStatus = "SD";
+    playMiss(); 
+    updHUD();
     
-    // === FIX: NO FAIL EN ONLINE ===
     if (window.st.hp <= 0) {
         window.st.hp = 0;
-        if (!window.isMultiplayer) end(true); // Solo muere en singleplayer
+        if (!window.isMultiplayer) end(true); 
     }
 }
+
+// ==========================================
+// 7. HUD Y FINALIZACIÓN
+// ==========================================
 
 function updHUD() {
     const scEl = document.getElementById('g-score');
     if(scEl) scEl.innerText = window.st.sc.toLocaleString();
+    
     const cEl = document.getElementById('g-combo');
     if(cEl) {
         if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
     }
+    
     document.getElementById('health-fill').style.height = window.st.hp + "%";
     
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
@@ -595,11 +544,17 @@ function updHUD() {
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
     document.getElementById('g-acc').innerText = acc + "%";
     
-    const fcEl = document.getElementById('hud-fc-status');
+    const fcEl = document.getElementById('hud-fc');
     if(fcEl) {
         fcEl.innerText = window.st.fcStatus || "GFC";
         fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
     }
+
+    // FIX: ACTUALIZAR MÉTRICAS DEL COSTADO IZQUIERDO
+    const hSick = document.getElementById('h-sick'); if(hSick) hSick.innerText = window.st.stats.s;
+    const hGood = document.getElementById('h-good'); if(hGood) hGood.innerText = window.st.stats.g;
+    const hBad = document.getElementById('h-bad'); if(hBad) hBad.innerText = window.st.stats.b;
+    const hMiss = document.getElementById('h-miss'); if(hMiss) hMiss.innerText = window.st.stats.m;
     
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 }
@@ -608,11 +563,9 @@ function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
-    // === FIX MULTIPLAYER ENDING ===
     if(window.isMultiplayer) {
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
         if(window.isLobbyHost && window.db && window.currentLobbyId && !died) {
-             console.log("Host finalizando...");
              setTimeout(() => {
                 window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'finished' });
              }, 2000); 
@@ -626,8 +579,9 @@ function end(died) {
     if(modal) {
         modal.style.display = 'flex';
         const totalMax = window.st.trueMaxScore || 1;
-        const finalAcc = Math.round((window.st.sc / totalMax) * 100);
+        const finalAcc = Math.round((window.st.sc / totalMax) * 1000) / 10;
         let r="D", c="red";
+        
         if (!died) {
             if (finalAcc >= 98) { r="SS"; c="cyan" }
             else if (finalAcc >= 95) { r="S"; c="gold" }
@@ -645,15 +599,24 @@ function end(died) {
 
         const panel = modal.querySelector('.modal-panel');
         if(panel) {
+            // FIX PANTALLA RESULTADOS (Incluyendo estadísticas limpias)
             panel.innerHTML = `
                 <div class="m-title">RESULTADOS</div>
-                <div style="display:flex; justify-content:center; align-items:center; gap:30px;">
+                <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
                     <div class="rank-big" style="color:${c}; font-size:6rem; font-weight:900;">${r}</div>
-                    <div>
+                    <div style="text-align:left;">
                         <div style="font-size:3rem; font-weight:900;">${window.st.sc.toLocaleString()}</div>
                         <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
                     </div>
                 </div>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; background:#111; padding:15px; border-radius:10px; border:1px solid #333; text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:25px;">
+                    <div style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                    <div style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                    <div style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                    <div style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                </div>
+
                 <div class="modal-buttons-row">
                     <button class="action secondary" onclick="toMenu()">MENU</button>
                     <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
@@ -709,6 +672,7 @@ function initReceptors(k) {
 }
 
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
+
 function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
@@ -722,7 +686,7 @@ function togglePause() {
             if(panel) {
                 panel.innerHTML = `
                     <div class="m-title">PAUSA</div>
-                    <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
+                    <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
                     <div class="modal-buttons-row">
                         <button class="action" onclick="resumeGame()">CONTINUAR</button>
                         <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
@@ -735,6 +699,7 @@ function togglePause() {
         resumeGame();
     }
 }
+
 function resumeGame() {
     document.getElementById('modal-pause').style.display = 'none';
     if(window.st.pauseTime) {
@@ -746,6 +711,7 @@ function resumeGame() {
     if(window.st.ctx) window.st.ctx.resume();
     requestAnimationFrame(loop);
 }
+
 function toMenu() {
     if(window.st.src) {
         try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
