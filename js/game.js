@@ -1,4 +1,4 @@
-/* === AUDIO & ENGINE (ULTRA PERFORMANCE 240FPS + SUBTITLES V16) === */
+/* === AUDIO & ENGINE (ULTRA PERFORMANCE + AUTO-LYRICS + FX CAMERA V18) === */
 
 let elTrack = null;
 
@@ -163,10 +163,29 @@ window.prepareAndPlaySong = async function(k) {
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
     const loader = document.getElementById('loading-overlay');
-    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "CARGANDO AUDIO..."; }
+    if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO PISTA..."; }
 
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
+
+        // [NUEVO] AUTO-FETCHER DE LETRAS EN TIEMPO REAL CON LIMPIEZA DE PARÉNTESIS
+        if (window.cfg.subtitles && !window.curSongData.lyrics && window.curSongData.title) {
+            try {
+                // Regex mágico: Elimina cualquier cosa entre () o []
+                let cleanTitle = window.curSongData.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                console.log("Buscando subtítulos automáticos para:", cleanTitle);
+                
+                const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
+                const data = await res.json();
+                const bestMatch = data.find(song => song.syncedLyrics);
+                
+                if (bestMatch && bestMatch.syncedLyrics) {
+                    console.log("¡Letras automáticas encontradas!");
+                    window.curSongData.lyrics = bestMatch.syncedLyrics;
+                }
+            } catch(e) { console.warn("No se encontraron letras automáticas."); }
+        }
+
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
@@ -184,7 +203,6 @@ window.prepareAndPlaySong = async function(k) {
         window.preparedSong = songObj; 
 
         if(window.currentLobbyId) {
-             console.log(">> ONLINE: Audio listo. Esperando GO.");
              if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         } else {
              playSongInternal(songObj);
@@ -208,9 +226,7 @@ window.playSongInternal = function(s) {
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.hitCount = 0; window.st.totalOffset = 0; 
     
-    // Asumimos PFC al inicio de la canción
     window.st.fcStatus = "PFC"; 
-    
     window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trueMaxScore += 200; });
 
@@ -237,13 +253,19 @@ window.playSongInternal = function(s) {
         document.getElementById('game-layer').appendChild(subCont);
     }
     
-    // Activar Subtítulos si la config está ON
     const bgC = document.getElementById('game-bg-container');
     const subC = document.getElementById('subtitles-container');
-    if (window.cfg.subtitles) {
+    
+    // Activar Imagen de Fondo (Con o sin efectos)
+    if (window.cfg.bgEffects || window.cfg.subtitles) {
         bgC.style.display = 'block';
         document.getElementById('game-bg-img').style.backgroundImage = window.curSongData.imageURL ? `url(${window.curSongData.imageURL})` : 'none';
-        
+    } else {
+        bgC.style.display = 'none';
+    }
+
+    // Parsear Subtítulos
+    if (window.cfg.subtitles) {
         window.st.parsedLyrics = [];
         window.st.currentLyricIdx = 0;
         subC.style.display = 'block';
@@ -261,7 +283,6 @@ window.playSongInternal = function(s) {
             window.st.parsedLyrics.sort((a,b) => a.t - b.t);
         }
     } else {
-        bgC.style.display = 'none';
         subC.style.display = 'none';
     }
 
@@ -308,7 +329,7 @@ function loop() {
         if(bar) bar.style.width = pct + "%";
     }
 
-    // Lógica de actualización de Subtítulos
+    // Lógica de Subtítulos
     if (window.cfg.subtitles && window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
         let idx = window.st.currentLyricIdx;
         if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
@@ -542,14 +563,16 @@ function hit(l, p) {
                 if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; 
             }
 
-            // EFECTO BUMP DE FONDO SÓLO EN SICK Y GOOD
-            if(window.cfg.subtitles && (text === "SICK!!" || text === "GOOD")) {
+            // [NUEVO] EFECTOS ALEATORIOS DE CÁMARA EN SICK Y GOOD
+            if(window.cfg.bgEffects && (text === "SICK!!" || text === "GOOD")) {
                 const bg = document.getElementById('game-bg-img');
                 if(bg) {
-                    bg.classList.remove('bump');
-                    void bg.offsetWidth;
-                    bg.classList.add('bump');
-                    setTimeout(() => bg.classList.remove('bump'), 100);
+                    bg.classList.remove('bg-bump-1', 'bg-bump-2', 'bg-bump-3');
+                    void bg.offsetWidth; // Forzar reinicio de animación
+                    // Escoger un movimiento al azar (1 a 3)
+                    const randomBump = 'bg-bump-' + (Math.floor(Math.random() * 3) + 1);
+                    bg.classList.add(randomBump);
+                    setTimeout(() => bg.classList.remove(randomBump), 120);
                 }
             }
 
@@ -658,7 +681,6 @@ function end(died) {
             if(typeof save === 'function') save();
         }
 
-        // Crear Placa Visual del Full Combo
         let fcBadgeHTML = "";
         if(!died) {
             if(window.st.fcStatus === "PFC") fcBadgeHTML = `<div style="background:cyan; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px cyan;">🏆 PERFECT FULL COMBO</div>`;
@@ -743,27 +765,38 @@ function initReceptors(k) {
 
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
+// [NUEVO] CREADOR DINÁMICO DEL MENÚ DE PAUSA
 function togglePause() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
-    const modal = document.getElementById('modal-pause');
+    
+    let modal = document.getElementById('modal-pause');
+    if (!modal) {
+        // Si el menú de pausa fue borrado del HTML, lo inyectamos a la fuerza
+        modal = document.createElement('div');
+        modal.id = 'modal-pause';
+        modal.className = 'modal-overlay';
+        modal.style.zIndex = '99999'; // Inmune a errores de capas
+        document.body.appendChild(modal);
+        modal.innerHTML = `<div class="modal-panel login-box" style="width:400px; text-align:center;"></div>`;
+    }
+
     if(window.st.paused) {
         window.st.pauseTime = performance.now(); 
         if(window.st.ctx) window.st.ctx.suspend();
-        if(modal) {
-            modal.style.display = 'flex';
-            const panel = modal.querySelector('.modal-panel');
-            if(panel) {
-                panel.innerHTML = `
-                    <div class="m-title">PAUSA</div>
-                    <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">ACC: <span id="p-acc">${document.getElementById('g-acc').innerText}</span></div>
-                    <div class="modal-buttons-row">
-                        <button class="action" onclick="resumeGame()">CONTINUAR</button>
-                        <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
-                        <button class="action secondary" onclick="toMenu()">MENU</button>
-                    </div>
-                `;
-            }
+        
+        modal.style.display = 'flex';
+        const panel = modal.querySelector('.modal-panel');
+        if(panel) {
+            panel.innerHTML = `
+                <div class="m-title" style="border-bottom: 2px solid var(--accent); padding-bottom: 10px;">⏸️ PAUSA</div>
+                <div style="font-size:2.5rem; font-weight:900; color:var(--blue); margin: 20px 0;">ACC: <span id="p-acc" style="color:white;">${document.getElementById('g-acc').innerText}</span></div>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button class="action" onclick="resumeGame()" style="font-size:1.2rem; padding:15px;">▶️ CONTINUAR</button>
+                    <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
+                    <button class="action secondary" onclick="toMenu()" style="background:#b32424; color:white; border-color:#ff4d4d;">🚪 SALIR AL MENU</button>
+                </div>
+            `;
         }
     } else {
         resumeGame();
@@ -771,7 +804,9 @@ function togglePause() {
 }
 
 function resumeGame() {
-    document.getElementById('modal-pause').style.display = 'none';
+    const modal = document.getElementById('modal-pause');
+    if(modal) modal.style.display = 'none';
+    
     if(window.st.pauseTime) {
         const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
         window.st.t0 += pauseDuration; 
@@ -792,5 +827,7 @@ function toMenu() {
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
     document.getElementById('modal-res').style.display = 'none';
-    document.getElementById('modal-pause').style.display = 'none';
+    
+    const pauseM = document.getElementById('modal-pause');
+    if(pauseM) pauseM.style.display = 'none';
 }
