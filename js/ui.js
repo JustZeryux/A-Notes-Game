@@ -505,34 +505,27 @@ function renderMenu(filter="") {
             const c = document.createElement('div'); 
             c.className = 'beatmap-card';
             
-            let bgStyle;
+let bgStyle;
             if(s.imageURL) {
                 bgStyle = `background-image:url(${s.imageURL})`;
             } else {
-                // Color fallback temporal
                 let hash = 0;
                 for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
                 const hue = Math.abs(hash % 360);
                 bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
 
-                // === AUTOCURACIÓN DE PORTADAS (API iTunes) ===
+                // === EL TRUCO: AUTOCURAR CANCIONES VIEJAS ===
                 let cleanTitle = s.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
                 fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanTitle)}&entity=song&limit=1`)
                 .then(r => r.json())
                 .then(d => {
                     if(d.results && d.results.length > 0) {
                         let newImg = d.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
-                        
-                        // 1. Actualizar la tarjeta visualmente al instante
                         const bgDiv = c.querySelector('.bc-bg');
                         if(bgDiv) bgDiv.style.backgroundImage = `url(${newImg})`;
-                        
-                        // 2. Guardar en Firebase para que no tenga que buscarla de nuevo
-                        db.collection("globalSongs").doc(songId).update({ imageURL: newImg })
-                        .then(() => console.log("¡Portada auto-generada para:", cleanTitle, "!"))
-                        .catch(err => console.error("Error guardando portada:", err));
+                        db.collection("globalSongs").doc(songId).update({ imageURL: newImg });
                     }
-                }).catch(e => { console.warn("Fallo al buscar portada para", cleanTitle); }); 
+                }).catch(e => {}); 
             }
             
             // HTML DE LA TARJETA CON ETIQUETAS DE TECLAS
@@ -1513,7 +1506,7 @@ window.submitSongToFirebase = async function() {
     btnSubmit.style.pointerEvents = "none";
     
     try {
-        // 1. BLOQUEO ANTI-DUPLICADOS (Clones)
+        // 1. BLOQUEO ANTI-DUPLICADOS
         if (window.db) {
             const checkQuery = await window.db.collection("globalSongs").where("title", "==", title).get();
             if (!checkQuery.empty) {
@@ -1523,26 +1516,21 @@ window.submitSongToFirebase = async function() {
             }
         }
 
-        // 2. AUTO-PORTADA MÁGICA CON iTUNES API
+        // 2. AUTO-PORTADA MÁGICA CON iTUNES API (Alta Definición)
         let finalImageUrl = tempUploadData.imageURL;
         if (!finalImageUrl) {
             try {
-                // Limpiamos (Oficial Video) o [Lyrics] para que la API la encuentre fácil
                 let cleanTitle = title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
                 const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanTitle)}&entity=song&limit=1`);
                 const data = await res.json();
                 
                 if (data.results && data.results.length > 0) {
-                    // La API devuelve 100x100, cambiamos el texto a 600x600 para que sea en Alta Definición
                     finalImageUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
-                    console.log("¡Portada automática encontrada en alta calidad!");
                 }
-            } catch(e) { 
-                console.warn("No se encontró portada en la API."); 
-            }
+            } catch(e) { console.warn("No se encontró portada automática."); }
         }
 
-        // 3. SUBIR A LA BASE DE DATOS
+        // 3. SUBIR A FIREBASE
         const songData = {
             title: title,
             audioURL: tempUploadData.audioURL,
