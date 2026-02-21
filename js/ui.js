@@ -260,7 +260,8 @@ function switchSetTab(tab) {
     } 
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
-        html += renderToggle('Modo Subtítulos y Fondo Rítmico', 'subtitles');
+html += renderToggle('Mostrar Subtítulos (LRC Automático)', 'subtitles');
+html += renderToggle('Efectos de Cámara en el Fondo', 'bgEffects');
         html += renderToggle('Screen Shake', 'shake');
         html += renderToggle('Lane Flash (Luz Carril)', 'laneFlash');
     html += renderToggle('Mostrar Splash Hits', 'showSplash');
