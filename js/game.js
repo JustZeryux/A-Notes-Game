@@ -766,46 +766,53 @@ function initReceptors(k) {
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
 // [NUEVO] CREADOR DINÁMICO DEL MENÚ DE PAUSA
-function togglePause() {
+// ==========================================
+// FIX: MENÚ DE PAUSA A PRUEBA DE BALAS
+// ==========================================
+
+window.togglePause = function() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     
     let modal = document.getElementById('modal-pause');
-    if (!modal) {
-        // Si el menú de pausa fue borrado del HTML, lo inyectamos a la fuerza
-        modal = document.createElement('div');
-        modal.id = 'modal-pause';
-        modal.className = 'modal-overlay';
-        modal.style.zIndex = '99999'; // Inmune a errores de capas
-        document.body.appendChild(modal);
-        modal.innerHTML = `<div class="modal-panel login-box" style="width:400px; text-align:center;"></div>`;
-    }
 
     if(window.st.paused) {
         window.st.pauseTime = performance.now(); 
-        if(window.st.ctx) window.st.ctx.suspend();
+        if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
         
-        modal.style.display = 'flex';
-        const panel = modal.querySelector('.modal-panel');
-        if(panel) {
-            panel.innerHTML = `
-                <div class="m-title" style="border-bottom: 2px solid var(--accent); padding-bottom: 10px;">⏸️ PAUSA</div>
-                <div style="font-size:2.5rem; font-weight:900; color:var(--blue); margin: 20px 0;">ACC: <span id="p-acc" style="color:white;">${document.getElementById('g-acc').innerText}</span></div>
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    <button class="action" onclick="resumeGame()" style="font-size:1.2rem; padding:15px;">▶️ CONTINUAR</button>
-                    <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
-                    <button class="action secondary" onclick="toMenu()" style="background:#b32424; color:white; border-color:#ff4d4d;">🚪 SALIR AL MENU</button>
-                </div>
-            `;
+        if(modal) {
+            // FORZAMOS VISIBILIDAD EXTREMA PARA EVITAR BUGS DE CSS
+            modal.style.setProperty('display', 'flex', 'important');
+            modal.style.setProperty('z-index', '999999', 'important');
+            modal.style.setProperty('opacity', '1', 'important');
+            
+            const panel = modal.querySelector('.modal-panel');
+            if(panel) {
+                // Sacamos la accuracy actual de forma segura
+                const accEl = document.getElementById('g-acc');
+                const currentAcc = accEl ? accEl.innerText : "100%";
+
+                panel.innerHTML = `
+                    <div class="m-title" style="border-bottom: 2px solid var(--accent); padding-bottom: 10px;">⏸️ PAUSA</div>
+                    <div style="font-size:2.5rem; font-weight:900; color:var(--blue); margin: 20px 0;">ACC: <span id="p-acc" style="color:white;">${currentAcc}</span></div>
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        <button class="action" onclick="resumeGame()" style="font-size:1.2rem; padding:15px;">▶️ CONTINUAR</button>
+                        <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
+                        <button class="action secondary" onclick="toMenu()" style="background:#b32424; color:white; border-color:#ff4d4d;">🚪 SALIR AL MENU</button>
+                    </div>
+                `;
+            }
         }
     } else {
         resumeGame();
     }
-}
+};
 
-function resumeGame() {
+window.resumeGame = function() {
     const modal = document.getElementById('modal-pause');
-    if(modal) modal.style.display = 'none';
+    if(modal) {
+        modal.style.setProperty('display', 'none', 'important');
+    }
     
     if(window.st.pauseTime) {
         const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
@@ -813,21 +820,25 @@ function resumeGame() {
         window.st.pauseTime = null;
     }
     window.st.paused = false;
-    if(window.st.ctx) window.st.ctx.resume();
+    if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
     requestAnimationFrame(loop);
-}
+};
 
-function toMenu() {
+window.toMenu = function() {
     if(window.st.src) {
         try { window.st.src.stop(); window.st.src.disconnect(); } catch(e){}
         window.st.src = null;
     }
     if(window.st.ctx) window.st.ctx.suspend();
     window.st.act = false; window.st.paused = false;
+    
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
-    document.getElementById('modal-res').style.display = 'none';
+    
+    // Ocultar modales
+    const resM = document.getElementById('modal-res');
+    if(resM) resM.style.display = 'none';
     
     const pauseM = document.getElementById('modal-pause');
-    if(pauseM) pauseM.style.display = 'none';
-}
+    if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
+};
