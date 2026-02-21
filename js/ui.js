@@ -477,7 +477,12 @@ function closeModal(id){ document.getElementById('modal-'+id).style.display='non
 // 5. CANCIONES Y MENÚ (CORREGIDO)
 // ==========================================
 
+// ==========================================
+// 5. CANCIONES Y MENÚ (CON AUTO-PORTADAS API)
+// ==========================================
+
 let globalSongsListener = null;
+
 function renderMenu(filter="") {
     if(!db) {
         setTimeout(() => renderMenu(filter), 500);
@@ -504,10 +509,30 @@ function renderMenu(filter="") {
             if(s.imageURL) {
                 bgStyle = `background-image:url(${s.imageURL})`;
             } else {
+                // Color fallback temporal
                 let hash = 0;
                 for (let i = 0; i < songId.length; i++) hash = songId.charCodeAt(i) + ((hash << 5) - hash);
                 const hue = Math.abs(hash % 360);
                 bgStyle = `background-image: linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
+
+                // === AUTOCURACIÓN DE PORTADAS (API iTunes) ===
+                let cleanTitle = s.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanTitle)}&entity=song&limit=1`)
+                .then(r => r.json())
+                .then(d => {
+                    if(d.results && d.results.length > 0) {
+                        let newImg = d.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+                        
+                        // 1. Actualizar la tarjeta visualmente al instante
+                        const bgDiv = c.querySelector('.bc-bg');
+                        if(bgDiv) bgDiv.style.backgroundImage = `url(${newImg})`;
+                        
+                        // 2. Guardar en Firebase para que no tenga que buscarla de nuevo
+                        db.collection("globalSongs").doc(songId).update({ imageURL: newImg })
+                        .then(() => console.log("¡Portada auto-generada para:", cleanTitle, "!"))
+                        .catch(err => console.error("Error guardando portada:", err));
+                    }
+                }).catch(e => { console.warn("Fallo al buscar portada para", cleanTitle); }); 
             }
             
             // HTML DE LA TARJETA CON ETIQUETAS DE TECLAS
@@ -1476,51 +1501,67 @@ window.triggerCoverUpload = function() {
     });
 };
 
-window.submitSongToFirebase = function() {
+window.submitSongToFirebase = async function() {
     const title = document.getElementById('up-title').value.trim();
+    const lyrics = document.getElementById('up-lyrics').value.trim();
     
-    // Validaciones
-    if(!title) return notify("¡Escribe un título para la canción!", "error");
-    if(!tempUploadData.audioURL) return notify("¡Falta subir el archivo MP3!", "error");
+    if(!title) return notify("¡Escribe un título!", "error");
+    if(!tempUploadData.audioURL) return notify("¡Falta el archivo MP3!", "error");
     
     const btnSubmit = document.getElementById('btn-publish-song');
     btnSubmit.innerText = "GUARDANDO...";
-    btnSubmit.style.opacity = "0.5";
     btnSubmit.style.pointerEvents = "none";
     
-    // Estructura EXACTA de Firebase de la imagen que enviaste
-    const lyrics = document.getElementById('up-lyrics').value.trim(); // <-- NUEVO
+    try {
+        // 1. BLOQUEO ANTI-DUPLICADOS (Clones)
+        if (window.db) {
+            const checkQuery = await window.db.collection("globalSongs").where("title", "==", title).get();
+            if (!checkQuery.empty) {
+                btnSubmit.innerText = "PUBLICAR CANCIÓN";
+                btnSubmit.style.pointerEvents = "auto";
+                return notify("❌ ¡Esta canción ya fue subida por alguien más!", "error");
+            }
+        }
 
-    const songData = {
-        title: title,
-        audioURL: tempUploadData.audioURL,
-        imageURL: tempUploadData.imageURL || null,
-        uploader: window.user.name,
-        lyrics: lyrics || null,  // <-- NUEVO
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-    
-    // GUARDADO EN LA COLECCIÓN CORRECTA (globalSongs)
-    if(window.db) {
-        window.db.collection("globalSongs").add(songData).then(() => {
+        // 2. AUTO-PORTADA MÁGICA CON iTUNES API
+        let finalImageUrl = tempUploadData.imageURL;
+        if (!finalImageUrl) {
+            try {
+                // Limpiamos (Oficial Video) o [Lyrics] para que la API la encuentre fácil
+                let cleanTitle = title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanTitle)}&entity=song&limit=1`);
+                const data = await res.json();
+                
+                if (data.results && data.results.length > 0) {
+                    // La API devuelve 100x100, cambiamos el texto a 600x600 para que sea en Alta Definición
+                    finalImageUrl = data.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+                    console.log("¡Portada automática encontrada en alta calidad!");
+                }
+            } catch(e) { 
+                console.warn("No se encontró portada en la API."); 
+            }
+        }
+
+        // 3. SUBIR A LA BASE DE DATOS
+        const songData = {
+            title: title,
+            audioURL: tempUploadData.audioURL,
+            imageURL: finalImageUrl || null,
+            uploader: window.user.name,
+            lyrics: lyrics || null, 
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        if(window.db) {
+            await window.db.collection("globalSongs").add(songData);
             notify("¡Canción publicada globalmente!", "success");
             closeModal('upload');
-            
-            // Recargar el menú para que aparezca inmediatamente
-            if(typeof renderMenu === 'function') renderMenu();
-            
-        }).catch(err => {
-            console.error("Error al publicar:", err);
-            notify("Error DB: " + err.message, "error");
-        }).finally(() => {
-            btnSubmit.innerText = "PUBLICAR CANCIÓN";
-            btnSubmit.style.opacity = "1";
-            btnSubmit.style.pointerEvents = "auto";
-        });
-    } else {
-        notify("Desconectado de Firebase", "error");
+        }
+
+    } catch (error) {
+        notify("Error DB: " + error.message, "error");
+    } finally {
         btnSubmit.innerText = "PUBLICAR CANCIÓN";
-        btnSubmit.style.opacity = "1";
         btnSubmit.style.pointerEvents = "auto";
     }
 };
