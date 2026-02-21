@@ -260,6 +260,7 @@ function switchSetTab(tab) {
     } 
     else if (tab === 'visuals') {
         html += renderToggle('Vivid Lights', 'vivid');
+        html += renderToggle('Modo Subtítulos y Fondo Rítmico', 'subtitles');
         html += renderToggle('Screen Shake', 'shake');
         html += renderToggle('Lane Flash (Luz Carril)', 'laneFlash');
     html += renderToggle('Mostrar Splash Hits', 'showSplash');
@@ -1487,12 +1488,15 @@ window.submitSongToFirebase = function() {
     btnSubmit.style.pointerEvents = "none";
     
     // Estructura EXACTA de Firebase de la imagen que enviaste
+    const lyrics = document.getElementById('up-lyrics').value.trim(); // <-- NUEVO
+
     const songData = {
         title: title,
         audioURL: tempUploadData.audioURL,
         imageURL: tempUploadData.imageURL || null,
         uploader: window.user.name,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp() // Fecha de servidor real
+        lyrics: lyrics || null,  // <-- NUEVO
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
     // GUARDADO EN LA COLECCIÓN CORRECTA (globalSongs)
