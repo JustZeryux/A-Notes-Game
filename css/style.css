@@ -115,10 +115,12 @@ button.secondary:hover { border-color: white; transform: none; background: #222;
 
 #track {
     position: relative;
+    z-index: 100; /* <--- ESTO TRAE LA PISTA AL FRENTE (LA SOLUCIÓN) */
     width: 100%;
     max-width: 700px;
-    height: 120%; /* Más alto para compensar la inclinación */
+    height: 120%;
     margin: 0 auto;
+    
     /* Fondo con gradiente para dar efecto de profundidad */
     background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.8) 100%);
     
@@ -127,9 +129,9 @@ button.secondary:hover { border-color: white; transform: none; background: #222;
     border-right: 2px solid rgba(255,255,255,0.2);
     
     /* Configuración 3D */
-    transform-origin: 50% 100%; /* Rotar desde la base */
+    transform-origin: 50% 100%;
     transform-style: preserve-3d;
-    transform: rotateX(0deg); /* Se controla via JS (FOV) */
+    transform: rotateX(0deg);
     
     /* MÁSCARA DE HORIZONTE: Hace que las notas se desvanezcan arriba */
     mask-image: linear-gradient(to bottom, transparent 10%, black 40%);
