@@ -1393,162 +1393,132 @@ function equipItem(id, type) {
 
 // === REEMPLAZAR EN JS/UI.JS ===
 
+
 // ==========================================
-// SISTEMA DE SUBIDA UPLOADCARE (CORREGIDO)
+// A NOTES STUDIO - SISTEMA DE SUBIDA V2
 // ==========================================
 
-window.openCloudUpload = function() {
-    // Verificación de usuario (necesario para saber quién subió la canción)
+let tempUploadData = {
+    audioURL: null,
+    imageURL: null
+};
+
+window.openCustomUploadModal = function() {
     if (!window.user || window.user.name === "Guest") {
-        return alert("Error: Debes iniciar sesión para registrar canciones.");
+        return notify("Debes iniciar sesión para subir canciones", "error");
     }
+    
+    // Limpiar el formulario
+    tempUploadData = { audioURL: null, imageURL: null };
+    document.getElementById('up-title').value = '';
+    
+    const audioLbl = document.getElementById('lbl-up-audio');
+    audioLbl.innerText = 'Ningún archivo seleccionado';
+    audioLbl.style.color = '#666';
+    document.getElementById('btn-up-audio').innerText = 'SELECCIONAR ARCHIVO DE AUDIO';
+    
+    const coverPreview = document.getElementById('up-cover-preview');
+    coverPreview.style.backgroundImage = 'none';
+    coverPreview.style.border = '2px dashed #444';
+    coverPreview.innerHTML = '<span style="font-size:3.5rem;">📷</span><span style="color:#888; font-weight:bold; margin-top:10px; text-transform: uppercase;">Subir Imagen</span>';
+    
+    document.getElementById('btn-publish-song').innerText = 'PUBLICAR CANCIÓN';
+    
+    openModal('upload');
+};
 
-    // 1. ABRIR UPLOADCARE PARA EL AUDIO
+window.triggerAudioUpload = function() {
     uploadcare.openDialog(null, {
-        publicKey: '8f24c5ced2ad35839a30', 
-        tabs: 'file', 
-        title: '1. Selecciona el Audio (.mp3)',
+        publicKey: '8f24c5ced2ad35839a30',
+        tabs: 'file',
         accept: 'audio/*'
     }).done(function(file) {
+        document.getElementById('btn-up-audio').innerText = "SUBIENDO A LA NUBE...";
         
-        // Esperamos a que Uploadcare procese el archivo
         file.promise().done(function(fileInfo) {
+            tempUploadData.audioURL = fileInfo.cdnUrl;
             
-            // --- FIX DEL AUTOFILL ---
-            // Obtenemos el nombre de forma segura para que no de error en consola
-            let safeName = "Mi Cancion";
-            if (fileInfo.name) {
-                // Quitamos la extensión .mp3 del nombre
-                safeName = fileInfo.name.split('.').slice(0, -1).join('.') || fileInfo.name;
-            } else if (fileInfo.originalName) {
-                safeName = fileInfo.originalName.split('.').slice(0, -1).join('.');
+            const audioLbl = document.getElementById('lbl-up-audio');
+            audioLbl.innerText = "✅ " + (fileInfo.name || "Audio subido correctamente");
+            audioLbl.style.color = "var(--good)";
+            document.getElementById('btn-up-audio').innerText = "CAMBIAR AUDIO";
+            
+            // Autocompletar el título si está vacío
+            const titleInput = document.getElementById('up-title');
+            if(titleInput.value.trim() === '') {
+                // Eliminar la extensión .mp3
+                let name = fileInfo.name ? fileInfo.name.split('.').slice(0, -1).join('.') : "Nueva Canción";
+                titleInput.value = name;
             }
-
-            // Usamos un pequeño delay para evitar bloqueos de pantalla
-            setTimeout(() => {
-                // Pedimos los datos al usuario
-                const songName = prompt("Nombre de la canción:", safeName);
-                if (!songName) return; // Si cancela, paramos aquí
-                
-                const diff = prompt("Dificultad (Easy, Normal, Hard):", "Normal") || "Normal";
-
-                // 2. PREGUNTAR POR IMAGEN (OPCIONAL)
-                if (confirm("¿Quieres subir una imagen de portada?")) {
-                    uploadcare.openDialog(null, {
-                        publicKey: '8f24c5ced2ad35839a30',
-                        tabs: 'file',
-                        title: '2. Selecciona la Portada',
-                        accept: 'image/*'
-                    }).done(function(imgFile) {
-                        imgFile.promise().done(function(imgInfo) {
-                            // Tenemos Audio e Imagen -> Registramos
-                            registerSongLink(songName, diff, fileInfo.cdnUrl, imgInfo.cdnUrl);
-                        });
-                    });
-                } else {
-                    // Solo Audio -> Registramos con imagen por defecto
-                    registerSongLink(songName, diff, fileInfo.cdnUrl, null);
-                }
-            }, 500);
+        }).fail(function(){
+            document.getElementById('btn-up-audio').innerText = "SELECCIONAR ARCHIVO DE AUDIO";
         });
     });
 };
 
-// Esta función SOLO guarda el link en la lista, no sube archivos
-function registerSongLink(name, diff, audioUrl, imgUrl) {
-    console.log("Registrando link de:", name);
+window.triggerCoverUpload = function() {
+    uploadcare.openDialog(null, {
+        publicKey: '8f24c5ced2ad35839a30',
+        tabs: 'file',
+        accept: 'image/*'
+    }).done(function(file) {
+        const preview = document.getElementById('up-cover-preview');
+        preview.innerHTML = '<span style="color:var(--accent); font-weight:bold;">Subiendo...</span>';
+        
+        file.promise().done(function(fileInfo) {
+            tempUploadData.imageURL = fileInfo.cdnUrl;
+            preview.innerHTML = '';
+            preview.style.backgroundImage = `url(${fileInfo.cdnUrl})`;
+            preview.style.border = '2px solid var(--gold)';
+        });
+    });
+};
 
-    const songId = 'cloud_' + Date.now();
+window.submitSongToFirebase = function() {
+    const title = document.getElementById('up-title').value.trim();
     
-    // Datos para la lista de canciones
+    // Validaciones
+    if(!title) return notify("¡Escribe un título para la canción!", "error");
+    if(!tempUploadData.audioURL) return notify("¡Falta subir el archivo MP3!", "error");
+    
+    const btnSubmit = document.getElementById('btn-publish-song');
+    btnSubmit.innerText = "GUARDANDO...";
+    btnSubmit.style.opacity = "0.5";
+    btnSubmit.style.pointerEvents = "none";
+    
+    // Estructura EXACTA de Firebase de la imagen que enviaste
     const songData = {
-        id: songId,
-        name: name,
-        artist: window.user.name, // El uploader figura como artista
-        url: audioUrl,            // El link que nos dio Uploadcare
-        img: imgUrl || "img/disc.png", 
-        diff: diff,
-        uploadedBy: window.user.name,
-        uploadedAt: Date.now(),   // Usamos fecha simple para evitar errores
-        isCloud: true
+        title: title,
+        audioURL: tempUploadData.audioURL,
+        imageURL: tempUploadData.imageURL || null,
+        uploader: window.user.name,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp() // Fecha de servidor real
     };
-
-    // Guardar la referencia en la base de datos para que aparezca en el juego
+    
+    // GUARDADO EN LA COLECCIÓN CORRECTA (globalSongs)
     if(window.db) {
-        window.db.collection("songs").doc(songId).set(songData)
-        .then(() => {
-            if(typeof notify === 'function') notify("¡Canción publicada con éxito!", "success");
-            else alert("¡Canción publicada!");
+        window.db.collection("globalSongs").add(songData).then(() => {
+            notify("¡Canción publicada globalmente!", "success");
+            closeModal('upload');
             
-            // Actualizar la lista si está abierta
-            if(typeof loadSongs === 'function') loadSongs();
-        })
-        .catch(err => {
-            console.error("Error al registrar:", err);
-            alert("Error al guardar el registro: " + err.message);
+            // Recargar el menú para que aparezca inmediatamente
+            if(typeof renderMenu === 'function') renderMenu();
+            
+        }).catch(err => {
+            console.error("Error al publicar:", err);
+            notify("Error DB: " + err.message, "error");
+        }).finally(() => {
+            btnSubmit.innerText = "PUBLICAR CANCIÓN";
+            btnSubmit.style.opacity = "1";
+            btnSubmit.style.pointerEvents = "auto";
         });
     } else {
-        alert("Error: No hay conexión con la base de datos.");
+        notify("Desconectado de Firebase", "error");
+        btnSubmit.innerText = "PUBLICAR CANCIÓN";
+        btnSubmit.style.opacity = "1";
+        btnSubmit.style.pointerEvents = "auto";
     }
-}
-
-function finishUpload(name, diff, audioUrl, imgUrl) {
-    const songId = 'cloud_' + Date.now();
-    const songData = {
-        id: songId,
-        name: name,
-        artist: window.user.name,
-        url: audioUrl,
-        img: imgUrl || "img/disc.png",
-        diff: diff || "Normal",
-        uploadedBy: window.user.name,
-        uploadedAt: Date.now(), // Timestamp simple para evitar errores de Firebase
-        isCloud: true
-    };
-
-    if(window.db) {
-        window.db.collection("songs").doc(songId).set(songData)
-        .then(() => {
-            alert("¡Canción subida exitosamente!");
-            // Recargar lista si existe la función
-            if(typeof loadSongs === 'function') loadSongs();
-        })
-        .catch(err => {
-            console.error(err);
-            alert("Error al guardar en base de datos: " + err.message);
-        });
-    } else {
-        alert("Error: No hay conexión con la base de datos.");
-    }
-}
-
-function saveSongToFirebase(name, diff, audioUrl, imgUrl) {
-    const songId = 'cloud_' + Date.now();
-    const songData = {
-        id: songId,
-        name: name,
-        artist: window.user.name, 
-        url: audioUrl,
-        img: imgUrl || "img/disc.png", // Imagen por defecto si no suben nada
-        diff: diff || "Normal",
-        uploadedBy: window.user.name,
-        uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        isCloud: true
-    };
-
-    if (window.db) {
-        window.db.collection("songs").doc(songId).set(songData)
-            .then(() => {
-                notify("¡Canción e imagen subidas!", "success");
-                // Si tienes una función para recargar la lista, llámala aquí
-                if(typeof loadSongs === 'function') loadSongs();
-            })
-            .catch(err => {
-                console.error(err);
-                notify("Error al guardar en la base de datos.", "error");
-            });
-    }
-}
+};
 
 
 // === PEGAR AL FINAL DE JS/ONLINE.JS ===
