@@ -1544,6 +1544,43 @@ window.notifyLobbyLoaded = function() {
     }
 };
 
+window.autoFetchLyrics = async function() {
+    const title = document.getElementById('up-title').value.trim();
+    if (!title) {
+        return notify("Primero escribe el Título (Ej: Artista - Canción) para buscar.", "error");
+    }
+
+    const btn = document.getElementById('btn-fetch-lyrics');
+    btn.innerText = "⏳ BUSCANDO...";
+    btn.style.pointerEvents = "none";
+
+    try {
+        // Hacemos la petición a la API gratuita de LRCLIB
+        const response = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(title)}`);
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+            // Buscamos el primer resultado que tenga letras SINCRONIZADAS (syncedLyrics)
+            const bestMatch = data.find(song => song.syncedLyrics);
+            
+            if (bestMatch && bestMatch.syncedLyrics) {
+                document.getElementById('up-lyrics').value = bestMatch.syncedLyrics;
+                notify("¡Letra sincronizada encontrada!", "success");
+            } else {
+                notify("Encontré la canción, pero no tiene tiempos exactos. Usa formato normal.", "error");
+            }
+        } else {
+            notify("No se encontró la letra en la base de datos.", "error");
+        }
+    } catch (error) {
+        console.error("Error buscando letras:", error);
+        notify("Error al conectar con el servidor de letras.", "error");
+    } finally {
+        btn.innerText = "🔍 BUSCAR LRC AUTOMÁTICO";
+        btn.style.pointerEvents = "auto";
+    }
+};
+
 // 2. Función auxiliar para manejar el inicio (llámala desde tu onSnapshot)
 window.checkGameStart = function(lobbyData) {
     // Si el estado es 'playing' y yo aún no he empezado
@@ -1569,3 +1606,5 @@ window.checkGameStart = function(lobbyData) {
         }
     }
 };
+
+
