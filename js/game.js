@@ -776,9 +776,12 @@ window.togglePause = function() {
     window.st.paused = !window.st.paused;
     
     let modal = document.getElementById('modal-pause');
+    let touchZones = document.getElementById('mobile-touch-zones'); // <--- BUSCAMOS LAS ZONAS
 
     if(window.st.paused) {
-        window.st.pauseTime = performance.now(); 
+        if(touchZones) touchZones.style.display = 'none'; // <--- APAGAMOS LAS ZONAS AL PAUSAR
+        
+        window.st.pauseTime = performance.now();
         if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
         
         if(modal) {
