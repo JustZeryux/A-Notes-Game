@@ -390,12 +390,12 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 .rotating-note .arrow-svg { animation: spinNote 1s linear infinite; }
 @keyframes spinNote { 100% { transform: scale(var(--note-scale)) rotate(360deg); } }
 /* ==========================================================================
-   📱 PORT MÓVIL (RESPONSIVE DESIGN)
+   📱 PORT MÓVIL (RESPONSIVE DESIGN & UX PREMIUM)
    ========================================================================== */
 @media (max-width: 800px) {
     /* 1. Reacomodo del Menú Principal */
     #menu-container { flex-direction: column; overflow-y: auto; }
-    .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 2px solid var(--accent); padding: 20px; flex-shrink: 0; }
+    .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 2px solid var(--accent); padding: 20px; flex-shrink: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
     .content-area { margin-left: 0; width: 100%; height: auto; overflow: visible; }
     .top-bar { padding: 0 20px; height: 80px; flex-direction: column; justify-content: center; gap: 10px; }
     .search-inp { width: 100%; font-size: 1rem; padding: 12px 20px; }
@@ -414,28 +414,53 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     .hp-players-col { max-height: 200px; }
     .m-title { font-size: 1.8rem; flex-wrap: wrap; }
     
-    /* 4. GAMEPLAY HUD (MÓVIL) */
-    #hud { left: 10px; top: 10%; transform: none; flex-direction: column; align-items: flex-start; gap: 5px; z-index: 600; }
-    .score-val { font-size: 2.5rem; text-shadow: 0 0 15px rgba(255,255,255,0.5); }
-    .acc-val { font-size: 1.5rem; }
-    .stat-item { font-size: 1rem; }
+    /* =========================================================
+       4. GAMEPLAY HUD UX (RHYTHM GAME STANDARD) 
+       ========================================================= */
+       
+    /* Limpieza visual: Ocultamos foto de perfil y stats innecesarios in-game */
+    #ig-profile, .stats-col { display: none !important; }
     
-    #combo-container { right: 10px; top: 10%; transform: none; z-index: 600; }
-    .combo-val { font-size: 4rem; text-shadow: 0 0 20px rgba(0, 229, 255, 0.8); }
-    .combo-label { font-size: 1.2rem; letter-spacing: 2px; }
+    /* Pista abarca toda la pantalla para comodidad de los pulgares */
+    #track { width: 100%; max-width: 100%; border: none; background: rgba(0,0,0,0.85); box-shadow: none; }
+    #track.middle-scroll { max-width: 100%; }
+
+    /* Score a la derecha, Precisión a la izquierda (Esquinas superiores) */
+    #hud { 
+        left: 15px; right: 15px; top: 15px; width: calc(100% - 30px); 
+        transform: none; flex-direction: row; justify-content: space-between; 
+        align-items: flex-start; z-index: 600; 
+    }
+    .score-val { font-size: 2rem; text-shadow: 0 2px 10px black; order: 2; }
+    .acc-val { font-size: 1.6rem; text-shadow: 0 2px 10px black; order: 1; }
     
-    .hud-extra { bottom: 10px; right: 10px; }
-    .hud-fc { font-size: 2rem; }
+    /* Combo como marca de agua en el fondo (Centro) */
+    #combo-container { 
+        top: 35%; right: 50%; transform: translateX(50%); 
+        align-items: center; z-index: 50; /* Detrás de las notas */
+        opacity: 0.25; pointer-events: none; 
+    }
+    .combo-val { font-size: 8rem; text-shadow: none; }
+    .combo-label { font-size: 1.5rem; letter-spacing: 5px; }
     
-    /* Barra de vida en el borde izquierdo de la pantalla */
-    .health-bar { position: fixed; left: 0; top: 0; width: 8px; height: 100vh; border-radius: 0; border: none; z-index: 100; opacity: 0.8; }
+    /* Info Extra sutil */
+    .hud-extra { bottom: 15px; right: 15px; opacity: 0.5; }
+    .hud-fc { font-size: 1.8rem; }
+    .hud-mean { font-size: 0.9rem; padding: 4px 10px; }
     
-    /* Pista y Notas adaptadas */
-    #track { border: none; box-shadow: none; background: rgba(0,0,0,0.6); }
-    .judge-pop { font-size: 4rem; top: 30%; }
+    /* Barra de Vida: Línea delgada de neón pegada a la pared derecha */
+    .health-bar { 
+        position: fixed; right: 0; left: auto; top: 0; 
+        width: 6px; height: 100vh; border-radius: 0; border: none; 
+        z-index: 800; background: rgba(0,0,0,0.5); box-shadow: none; order: unset;
+    }
+    
+    /* Textos in-game adaptados */
+    .judge-pop { font-size: 4rem; top: 35%; text-shadow: 0 2px 15px black; }
     .splash { width: 100px; height: 100px; margin-top: -50px; margin-left: -50px; }
-    @keyframes splashAnim { 0% { transform: scale(0.3); opacity: 1; border-width: 8px; } 100% { transform: scale(2); opacity: 0; border-width: 0px; } }
-    
+    @keyframes splashAnim { 0% { transform: scale(0.3); opacity: 1; border-width: 8px; } 100% { transform: scale(2.2); opacity: 0; border-width: 0px; } }
+    #subtitles-text { font-size: 1.6rem; padding: 5px 15px; }
+
     /* Chat y Notificaciones */
     #chat-overlay-container { right: 10px; bottom: 0; width: calc(100% - 20px); }
     .chat-window { width: 100%; }
