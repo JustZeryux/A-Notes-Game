@@ -390,79 +390,75 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 .rotating-note .arrow-svg { animation: spinNote 1s linear infinite; }
 @keyframes spinNote { 100% { transform: scale(var(--note-scale)) rotate(360deg); } }
 /* ==========================================================================
-   📱 PORT MÓVIL (RESPONSIVE DESIGN & UX PREMIUM)
+   📱 PORT MÓVIL DEFINITIVO (SCROLL FIX & UX)
    ========================================================================== */
 @media (max-width: 800px) {
-    /* 1. Reacomodo del Menú Principal */
+    /* 1. Menú Principal Apilado */
     #menu-container { flex-direction: column; overflow-y: auto; }
-    .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 2px solid var(--accent); padding: 20px; flex-shrink: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 2px solid var(--accent); padding: 20px; flex-shrink: 0; }
     .content-area { margin-left: 0; width: 100%; height: auto; overflow: visible; }
     .top-bar { padding: 0 20px; height: 80px; flex-direction: column; justify-content: center; gap: 10px; }
     .search-inp { width: 100%; font-size: 1rem; padding: 12px 20px; }
     
-    /* 2. Tarjetas y Grillas */
-    .song-grid { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+    /* 2. Tarjetas */
+    .song-grid { grid-template-columns: 1fr; padding: 15px; gap: 15px; }
     .beatmap-card { height: 180px; }
-    .diff-grid { grid-template-columns: 1fr 1fr; gap: 15px; }
-    .diff-num { font-size: 4rem; }
+    .diff-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .diff-num { font-size: 3rem; }
     
-    /* 3. Modales Ajustados */
-    .modal-panel, .settings-panel, .host-panel-compact { width: 95% !important; padding: 25px; max-height: 85vh; border-radius: 16px; }
-    .settings-layout, .hp-body { flex-direction: column; height: auto; overflow-y: auto; }
-    .settings-sidebar, .hp-config-col { width: 100%; border-right: none; border-bottom: 1px solid #333; padding-bottom: 20px; }
-    .settings-preview { width: 100%; border-left: none; border-top: 1px solid #333; }
-    .hp-players-col { max-height: 200px; }
-    .m-title { font-size: 1.8rem; flex-wrap: wrap; }
+    /* 3. EL FIX DE LOS MODALES Y AJUSTES (Settings) */
+    .modal-panel, .settings-panel, .host-panel-compact { 
+        width: 95% !important; 
+        max-width: 95vw !important; 
+        height: 90vh !important; /* Altura estricta para que no se salga de pantalla */
+        max-height: 90vh !important;
+        padding: 15px !important; 
+        border-radius: 16px; 
+        display: flex !important;
+        flex-direction: column !important;
+    }
     
-    /* =========================================================
-       4. GAMEPLAY HUD UX (RHYTHM GAME STANDARD) 
-       ========================================================= */
-       
-    /* Limpieza visual: Ocultamos foto de perfil y stats innecesarios in-game */
+    /* Los interiores de los modales ahora se apilan hacia abajo y scrollean */
+    .settings-layout, .hp-body { 
+        display: block !important; /* Quita el flex lateral */
+        flex: 1; 
+        overflow-y: auto !important; 
+        padding-right: 5px;
+    }
+    .settings-sidebar, .hp-config-col { 
+        width: 100% !important; 
+        border-right: none !important; 
+        border-bottom: 2px solid #333 !important; 
+        padding-bottom: 20px !important; 
+        margin-bottom: 20px;
+    }
+    .settings-content, .settings-preview, .hp-players-col { 
+        width: 100% !important; 
+        border: none !important; 
+        padding: 0 !important; 
+        overflow: visible !important;
+    }
+    
+    .m-title { font-size: 1.5rem !important; margin-bottom: 10px !important; text-align: center; }
+    .set-tab-btn { font-size: 1rem; padding: 15px 20px; border-bottom: 1px solid #222; border-left: none; width: 100%; }
+    .set-tab-btn.active { border-left: none; border-bottom: 4px solid var(--blue); }
+    .set-row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 0; }
+    
+    /* 4. GAMEPLAY HUD (Móvil Limpio) */
     #ig-profile, .stats-col { display: none !important; }
-    
-    /* Pista abarca toda la pantalla para comodidad de los pulgares */
     #track { width: 100%; max-width: 100%; border: none; background: rgba(0,0,0,0.85); box-shadow: none; }
     #track.middle-scroll { max-width: 100%; }
 
-    /* Score a la derecha, Precisión a la izquierda (Esquinas superiores) */
-    #hud { 
-        left: 15px; right: 15px; top: 15px; width: calc(100% - 30px); 
-        transform: none; flex-direction: row; justify-content: space-between; 
-        align-items: flex-start; z-index: 600; 
-    }
-    .score-val { font-size: 2rem; text-shadow: 0 2px 10px black; order: 2; }
-    .acc-val { font-size: 1.6rem; text-shadow: 0 2px 10px black; order: 1; }
+    #hud { left: 10px; right: 10px; top: 15px; width: calc(100% - 20px); transform: none; flex-direction: row; justify-content: space-between; align-items: flex-start; z-index: 600; }
+    .score-val { font-size: 2rem; order: 2; }
+    .acc-val { font-size: 1.5rem; order: 1; }
     
-    /* Combo como marca de agua en el fondo (Centro) */
-    #combo-container { 
-        top: 35%; right: 50%; transform: translateX(50%); 
-        align-items: center; z-index: 50; /* Detrás de las notas */
-        opacity: 0.25; pointer-events: none; 
-    }
-    .combo-val { font-size: 8rem; text-shadow: none; }
-    .combo-label { font-size: 1.5rem; letter-spacing: 5px; }
+    #combo-container { top: 35%; right: 50%; transform: translateX(50%); align-items: center; z-index: 50; opacity: 0.25; pointer-events: none; }
+    .combo-val { font-size: 6rem; }
     
-    /* Info Extra sutil */
     .hud-extra { bottom: 15px; right: 15px; opacity: 0.5; }
     .hud-fc { font-size: 1.8rem; }
-    .hud-mean { font-size: 0.9rem; padding: 4px 10px; }
     
-    /* Barra de Vida: Línea delgada de neón pegada a la pared derecha */
-    .health-bar { 
-        position: fixed; right: 0; left: auto; top: 0; 
-        width: 6px; height: 100vh; border-radius: 0; border: none; 
-        z-index: 800; background: rgba(0,0,0,0.5); box-shadow: none; order: unset;
-    }
-    
-    /* Textos in-game adaptados */
-    .judge-pop { font-size: 4rem; top: 35%; text-shadow: 0 2px 15px black; }
-    .splash { width: 100px; height: 100px; margin-top: -50px; margin-left: -50px; }
-    @keyframes splashAnim { 0% { transform: scale(0.3); opacity: 1; border-width: 8px; } 100% { transform: scale(2.2); opacity: 0; border-width: 0px; } }
-    #subtitles-text { font-size: 1.6rem; padding: 5px 15px; }
-
-    /* Chat y Notificaciones */
-    #chat-overlay-container { right: 10px; bottom: 0; width: calc(100% - 20px); }
-    .chat-window { width: 100%; }
-    #notification-area { width: calc(100% - 40px); left: 20px; right: 20px; top: 10px; }
+    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 6px; height: 100vh; border-radius: 0; border: none; z-index: 800; background: rgba(0,0,0,0.5); order: unset; }
+    .judge-pop { font-size: 3.5rem; top: 35%; }
 }
