@@ -843,82 +843,57 @@ window.toMenu = function() {
     const pauseM = document.getElementById('modal-pause');
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 };
-// === SISTEMA MULTI-TOUCH A PRUEBA DE BALAS ===
+// === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS ===
 window.initMobileTouchControls = function(keyCount) {
-    let touchContainer = document.getElementById('mobile-touch-zones');
-    
-    // 1. Crear el contenedor si no existe (asegurando Z-Index máximo)
-    if (!touchContainer) {
-        touchContainer = document.createElement('div');
-        touchContainer.id = 'mobile-touch-zones';
-        // z-index brutal para asegurar que nada tape los dedos
-        touchContainer.style.cssText = 'display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 999999; flex-direction: row; pointer-events: auto;';
-        
-        // Adjuntarlo al document.body en vez de game-layer evita problemas de perspectiva 3D
-        document.body.appendChild(touchContainer); 
+    // 1. DESTRUCCIÓN ABSOLUTA DEL CONTENEDOR VIEJO (Esto arregla el bug 4k -> 6k)
+    let oldContainer = document.getElementById('mobile-touch-zones');
+    if (oldContainer) {
+        oldContainer.remove(); 
     }
 
-    // 2. Si es PC o pantalla grande, lo ocultamos y salimos
-    if (window.innerWidth > 800 && !('ontouchstart' in window)) {
-        touchContainer.style.display = 'none';
-        return;
-    }
+    // 2. Si estamos en PC, no hacemos nada
+    if (window.innerWidth > 800 && !('ontouchstart' in window)) return;
 
-    touchContainer.style.display = 'flex';
-    touchContainer.innerHTML = ''; // Limpiar carriles viejos
+    // 3. Crear contenedor fresco y limpio
+    const touchContainer = document.createElement('div');
+    touchContainer.id = 'mobile-touch-zones';
+    touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 999999; display: flex; flex-direction: row; pointer-events: auto;';
+    document.body.appendChild(touchContainer); 
 
-    // 3. Obtener teclas actuales (Fallback seguro a DFJK)
-    let currentKeys = ['d', 'f', 'j', 'k']; 
-    if (window.cfg && window.cfg.keybinds && window.cfg.keybinds[keyCount]) {
-        currentKeys = window.cfg.keybinds[keyCount];
-    } else if (keyCount === 6) {
-        currentKeys = ['s', 'd', 'f', 'j', 'k', 'l'];
-    }
+    // Obtener teclas
+    let currentKeys = window.cfg?.keybinds?.[keyCount] || (keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k']);
 
-    // 4. Crear los carriles
+    // Crear las zonas táctiles exactas para la cantidad de teclas
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
         zone.style.flex = '1';
         zone.style.height = '100%';
-        zone.style.borderRight = '1px solid rgba(255,255,255,0.1)'; // Línea guía sutil
-        zone.style.background = 'rgba(255,0,85,0)'; // Transparente por defecto
-        zone.style.transition = 'background 0.05s ease'; // Transición rápida para el flash
+        zone.style.borderRight = '1px solid rgba(255,255,255,0.05)'; 
+        zone.style.transition = 'background 0.05s ease';
         
         const targetKey = currentKeys[i].toLowerCase();
-        // Generar un keyCode numérico para emular el teclado a la perfección
         const keyCode = targetKey.toUpperCase().charCodeAt(0);
 
-        // Disparador de eventos maestro
         const dispatchKey = (type) => {
-            const event = new KeyboardEvent(type, { 
-                key: targetKey, 
-                code: `Key${targetKey.toUpperCase()}`, 
-                keyCode: keyCode, 
-                which: keyCode, 
-                bubbles: true, 
-                cancelable: true 
-            });
-            // Enviamos el evento a todo el documento y a window por seguridad
+            const event = new KeyboardEvent(type, { key: targetKey, code: `Key${targetKey.toUpperCase()}`, keyCode: keyCode, bubbles: true });
             document.dispatchEvent(event);
-            window.dispatchEvent(event);
         };
 
-        // EVENTOS TÁCTILES
         zone.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Detiene el zoom de celular
-            zone.style.background = 'rgba(255,0,85,0.2)'; // FLASH VISUAL AL TOCAR
+            e.preventDefault(); 
+            zone.style.background = 'rgba(255,0,85,0.2)'; // Brillo visual
             dispatchKey('keydown');
         }, { passive: false });
 
         zone.addEventListener('touchend', (e) => {
             e.preventDefault();
-            zone.style.background = 'rgba(255,0,85,0)'; // QUITAR FLASH
+            zone.style.background = 'transparent';
             dispatchKey('keyup');
         }, { passive: false });
 
         zone.addEventListener('touchcancel', (e) => {
             e.preventDefault();
-            zone.style.background = 'rgba(255,0,85,0)'; // QUITAR FLASH
+            zone.style.background = 'transparent';
             dispatchKey('keyup');
         }, { passive: false });
 
