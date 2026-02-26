@@ -856,65 +856,58 @@ window.toMenu = function() {
 // === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS ===
 // === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS (V-FINAL) ===
 window.initMobileTouchControls = function(keyCount) {
-    // Destruimos las zonas anteriores para evitar bugs al cambiar de 4K a 6K
+    // 1. ARRANCAMOS LAS CINTAS VIEJAS (Esto arregla el bug de 4K a 6K)
     let oldContainer = document.getElementById('mobile-touch-zones');
-    if (oldContainer) oldContainer.remove(); 
+    if (oldContainer) {
+        oldContainer.remove(); 
+    }
 
-    // Si estamos en PC, cancelamos
+    // 2. Si estás en computadora, no hacemos nada y cancelamos
     if (window.innerWidth > 800 && !('ontouchstart' in window)) return;
 
-    // Crear nuevo contenedor
+    // 3. PONEMOS UN CONTENEDOR NUEVO Y LIMPIO
     const touchContainer = document.createElement('div');
     touchContainer.id = 'mobile-touch-zones';
-    // Z-INDEX: 800. Esto es CRÍTICO. 
-    // Queda por encima de las notas, pero POR DEBAJO del menú de pausa (z-index 10000)
+    // El z-index 800 es para que no tape tu botón de pausa ni otros menús
     touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 800; display: flex; flex-direction: row; pointer-events: auto;';
     document.body.appendChild(touchContainer); 
 
-    // FIX 6K/4K: Leer las teclas EXACTAS que el juego tiene configuradas
+    // 4. PREGUNTAMOS QUÉ LETRAS SE VAN A USAR (D, F, J, K o S, D, F, J, K, L)
     let currentKeys = [];
     if (window.cfg && window.cfg.modes && window.cfg.modes[keyCount]) {
-        for(let i = 0; i < keyCount; i++) {
-            currentKeys.push(window.cfg.modes[keyCount][i].k);
-        }
+        for(let i = 0; i < keyCount; i++) currentKeys.push(window.cfg.modes[keyCount][i].k);
     } else {
-        // Fallback de emergencia
         currentKeys = keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k'];
     }
 
-    // Crear las columnas para tocar
+    // 5. CORTAMOS LA PANTALLA EN LOS PEDAZOS NECESARIOS Y LES DAMOS VIDA
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
         zone.style.flex = '1';
         zone.style.height = '100%';
-        zone.style.borderRight = '1px solid rgba(255,255,255,0.05)'; 
-        zone.style.transition = 'background 0.05s ease';
+        zone.style.borderRight = '1px solid rgba(255,255,255,0.05)';
         
         const targetKey = currentKeys[i].toLowerCase();
 
-        // Mandar toque directamente a la función del juego (100% preciso)
+        // Cuando tu dedo TOCA la pantalla
         zone.addEventListener('touchstart', (e) => {
             e.preventDefault(); 
-            zone.style.background = 'rgba(255,255,255,0.1)'; // Brillo sutil
-            if(typeof window.onKd === 'function') {
-                window.onKd({ key: targetKey, preventDefault: ()=>{} });
-            }
+            zone.style.background = 'rgba(255,255,255,0.1)'; // Brilla un poquito para que sepas que tocaste
+            if(typeof window.onKd === 'function') window.onKd({ key: targetKey, preventDefault: ()=>{} });
         }, { passive: false });
 
+        // Cuando tu dedo SUELTA la pantalla
         zone.addEventListener('touchend', (e) => {
             e.preventDefault();
             zone.style.background = 'transparent';
-            if(typeof window.onKu === 'function') {
-                window.onKu({ key: targetKey, preventDefault: ()=>{} });
-            }
+            if(typeof window.onKu === 'function') window.onKu({ key: targetKey, preventDefault: ()=>{} });
         }, { passive: false });
 
+        // Por si deslizas el dedo fuera de la zona
         zone.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             zone.style.background = 'transparent';
-            if(typeof window.onKu === 'function') {
-                window.onKu({ key: targetKey, preventDefault: ()=>{} });
-            }
+            if(typeof window.onKu === 'function') window.onKu({ key: targetKey, preventDefault: ()=>{} });
         }, { passive: false });
 
         touchContainer.appendChild(zone);
