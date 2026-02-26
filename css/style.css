@@ -391,78 +391,77 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 .rotating-note .arrow-svg { animation: spinNote 1s linear infinite; }
 @keyframes spinNote { 100% { transform: scale(var(--note-scale)) rotate(360deg); } }
 /* ==========================================================================
-   📱 PORT MÓVIL DEFINITIVO (UX DESAMONTONADA Y VISUALMENTE HERMOSA)
+   📱 PORT MÓVIL DEFINITIVO (AGREGAR AL FINAL DE TU STYLE.CSS)
    ========================================================================== */
+
+/* FIX DE SEGURIDAD PARA SUBIR CANCIONES (Asegura que Uploadcare siempre esté al frente) */
+.uploadcare--dialog { z-index: 999999 !important; }
+
+/* Botón de pausa base (oculto en PC) */
+#mobile-pause-btn { 
+    display: none; position: absolute; top: 15px; right: 50%; transform: translateX(50%); 
+    width: 45px; height: 45px; background: rgba(0,0,0,0.6); border: 2px solid var(--accent); 
+    border-radius: 50%; align-items: center; justify-content: center; font-size: 1.2rem; 
+    color: white; z-index: 2000; cursor: pointer; 
+}
+
 @media (max-width: 800px) {
-    /* 1. UX MENÚ PRINCIPAL (Estructura Limpia) */
-    #menu-container { flex-direction: column; overflow-y: auto; overflow-x: hidden; background: var(--bg-color); }
+    /* 1. LAYOUT INICIAL DESAMONTONADO */
+    #menu-container { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+    .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 2px solid var(--accent); padding: 15px; flex-shrink: 0; }
+    .content-area { margin-left: 0; width: 100%; height: auto; }
+    .top-bar { padding: 15px; height: auto; }
     
-    .sidebar { width: 100%; height: auto; border: none; padding: 15px; border-bottom: 2px solid var(--accent); flex-shrink: 0; background: rgba(10,10,15,0.95); }
-    
-    /* Perfil ultra compacto */
-    .user-card { padding: 10px; border-radius: 12px; margin-bottom: 5px; }
-    .u-avatar { width: 40px; height: 40px; font-size: 1rem; }
+    /* El Perfil se mueve abajo a la derecha */
+    .user-card { position: fixed; bottom: 20px; right: 20px; z-index: 9000; width: auto; box-shadow: 0 5px 20px rgba(0,0,0,0.8); background: rgba(10,10,15,0.95); }
+    .u-avatar { width: 45px; height: 45px; font-size: 1.2rem; }
     .u-info div:first-child { font-size: 1rem; }
     .u-info div:last-child { font-size: 0.8rem; }
     
-    /* FIX: Los botones ya no son una torre larga, son una Grid horizontal */
+    /* Botones de navegación en cuadrícula (ahorra espacio) */
     .nav-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 5px; }
-    .nav-btn { flex-direction: column; padding: 10px 5px; font-size: 0.8rem; text-align: center; justify-content: center; gap: 5px; background: rgba(255,255,255,0.03); border-radius: 8px; }
-    .nav-btn.active { border-left: none; border-bottom: 3px solid var(--blue); padding-left: 5px; background: rgba(0,229,255,0.1); }
-    .import-btn { padding: 12px; font-size: 0.95rem; margin-top: 10px; border-radius: 10px; }
-
-    /* Contenido y Buscador */
-    .content-area { margin-left: 0; width: 100%; height: auto; }
-    .top-bar { padding: 15px; height: auto; }
-    .search-inp { width: 100%; font-size: 0.95rem; padding: 12px; }
+    .nav-btn { padding: 10px 5px; font-size: 0.85rem; text-align: center; justify-content: center; }
+    .nav-btn.active { border-left: none; border-bottom: 3px solid var(--blue); padding-left: 5px; }
+    .search-inp { width: 100%; }
     
-    /* Canciones en 1 columna ordenada */
-    .song-grid { grid-template-columns: 1fr; padding: 15px; gap: 15px; }
-    .beatmap-card { height: 150px; }
-    .diff-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    /* Lista de canciones con espacio abajo para que el perfil no las tape */
+    .song-grid { grid-template-columns: 1fr; padding: 15px; padding-bottom: 90px; } 
+    .beatmap-card { height: 160px; }
     
-    /* 2. FIX DE LOS MODALES DE AJUSTES (Settings sin amontonar) */
-    .modal-panel, .settings-panel, .host-panel-compact { width: 95% !important; max-width: 95vw !important; height: 85vh !important; max-height: 85vh !important; padding: 20px 15px !important; border-radius: 16px; display: flex !important; flex-direction: column !important; }
-    
-    .settings-layout { display: flex; flex-direction: column !important; flex: 1; overflow: hidden; }
-    /* Las pestañas (Teclas, Audio) ahora scrollean de izquierda a derecha */
-    .settings-sidebar { width: 100% !important; flex-direction: row !important; overflow-x: auto; border-right: none !important; border-bottom: 1px solid #333 !important; padding-bottom: 5px !important; margin-bottom: 10px; flex-shrink: 0; display: flex; }
-    .set-tab-btn { white-space: nowrap; padding: 10px 15px !important; font-size: 0.9rem !important; border-left: none !important; border-bottom: 2px solid transparent !important; }
-    .set-tab-btn.active { border-bottom: 2px solid var(--blue) !important; background: rgba(0,229,255,0.1); }
-    
-    .settings-content { padding: 5px !important; overflow-y: auto !important; flex: 1; }
-    .settings-preview { display: none !important; } /* Escondemos el preview inútil en móvil */
-    .m-title { font-size: 1.4rem !important; margin-bottom: 15px !important; }
-    
-    /* 3. GAMEPLAY MÓVIL (Pista Chica y Pausa Visible) */
-    #ig-profile, .stats-col, .hud-extra { display: none !important; } 
-
-    /* Botón de pausa en el centro arriba. Display block para que se vea. */
-    #mobile-pause-btn {
-        display: flex !important; position: absolute; top: 10px; right: 50%; transform: translateX(50%);
-        width: 45px; height: 45px; background: rgba(0,0,0,0.6);
-        border: 2px solid var(--accent); border-radius: 50%;
-        align-items: center; justify-content: center;
-        font-size: 1.2rem; color: white; z-index: 900; cursor: pointer;
+    /* 2. FIX MODALES Y AJUSTES (Para que no se salgan de pantalla) */
+    .modal-panel, .settings-panel, .host-panel-compact { 
+        width: 95% !important; max-width: 95vw !important; 
+        height: 85vh !important; max-height: 85vh !important; 
+        padding: 20px 15px !important; display: flex !important; flex-direction: column !important; 
     }
-
-    /* Pista más chica (90% de ancho) para que no asfixie la visión */
-    #track { width: 90%; margin: 0 auto; max-width: 100%; border-left: 1px solid rgba(255,255,255,0.1); border-right: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.85); box-shadow: 0 0 30px rgba(0,0,0,0.9); }
-    #track.middle-scroll { max-width: 90%; }
-
-    /* Score y Acc a los lados, sin estorbar el centro */
-    #hud { left: 10px; right: 10px; top: 15px; width: auto; transform: none; flex-direction: row; justify-content: space-between; align-items: flex-start; z-index: 600; gap: 0; }
-    .score-val { font-size: 1.6rem; order: 2; text-shadow: 0 2px 5px black; }
+    
+    /* Scroll interno para las opciones */
+    .settings-layout, .hp-body, .diff-grid { flex: 1; overflow-y: auto !important; display: block !important; }
+    
+    /* Pestañas de ajustes horizontales */
+    .settings-sidebar { display: flex; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #333; padding-bottom: 10px; width: 100%; margin-bottom: 10px; }
+    .set-tab-btn { padding: 10px 15px; font-size: 0.9rem; white-space: nowrap; border-left: none; }
+    .settings-content { padding: 5px 0; }
+    .settings-preview { display: none !important; } /* Ocultamos el cuadro visual en cel para que quepa todo */
+    
+    /* Fix Modal de Dificultad */
+    .diff-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .diff-num { font-size: 3.5rem; }
+    #diff-song-cover { height: 140px !important; min-height: 140px !important; } /* Aseguramos que se vea la foto */
+    
+    /* 3. GAMEPLAY MÓVIL (Pista chica) */
+    #ig-profile, .stats-col, .hud-extra { display: none !important; } 
+    
+    /* Track al 85% para poder ver el fondo y descansar la vista */
+    #track { width: 85%; max-width: 100%; border: none; }
+    #track.middle-scroll { max-width: 85%; }
+    
+    #hud { top: 15px; left: 10px; right: 10px; width: auto; flex-direction: row; justify-content: space-between; }
+    .score-val { font-size: 1.8rem; order: 2; }
     .acc-val { font-size: 1.2rem; order: 1; }
     
-    /* Combo al centro y transparente */
-    #combo-container { top: 25%; right: 50%; transform: translateX(50%); align-items: center; z-index: 50; opacity: 0.25; pointer-events: none; }
-    .combo-val { font-size: 5rem; text-shadow: none; }
-    .combo-label { font-size: 1rem; }
-    
-    /* Barra de vida a la orilla derecha */
-    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 4px; height: 100vh; border-radius: 0; border: none; z-index: 800; background: rgba(0,0,0,0.5); order: unset; }
-    
-    .judge-pop { font-size: 3rem; top: 35%; }
-    .splash-wrapper { transform: translate(-50%, -50%) scale(0.6); }
+    #combo-container { top: 30%; right: 50%; transform: translateX(50%); opacity: 0.3; pointer-events: none; }
+    .combo-val { font-size: 5rem; }
+    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 5px; height: 100vh; z-index: 800; }
+    .judge-pop { font-size: 3rem; top: 40%; }
 }
