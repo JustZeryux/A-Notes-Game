@@ -1431,11 +1431,13 @@ window.openCustomUploadModal = function() {
     // Limpiar el formulario
     tempUploadData = { audioURL: null, imageURL: null };
     document.getElementById('up-title').value = '';
+    document.getElementById('up-url').value = ''; // Limpiar input de URL
     
     const audioLbl = document.getElementById('lbl-up-audio');
     audioLbl.innerText = 'Ningún archivo seleccionado';
     audioLbl.style.color = '#666';
-    document.getElementById('btn-up-audio').innerText = 'SELECCIONAR ARCHIVO DE AUDIO';
+    document.getElementById('btn-up-audio').innerText = '1. SUBIR MP3 (UPLOADCARE)';
+    document.getElementById('btn-up-audio').style.background = 'white';
     
     const coverPreview = document.getElementById('up-cover-preview');
     coverPreview.style.backgroundImage = 'none';
@@ -1447,37 +1449,47 @@ window.openCustomUploadModal = function() {
     openModal('upload');
 };
 
-// FIX DEFINITIVO: Subida de Audio Nativa (Sin ventana problemática)
+// --- NUEVA FUNCIÓN: Manejador de URL Directa ---
+window.handleUrlInput = function(val) {
+    const audioLbl = document.getElementById('lbl-up-audio');
+    if(val.trim() !== "") {
+        tempUploadData.audioURL = val.trim();
+        if(audioLbl) {
+            audioLbl.innerText = "🔗 Usando enlace URL directo";
+            audioLbl.style.color = "var(--blue)";
+        }
+    } else {
+        tempUploadData.audioURL = null;
+        if(audioLbl) {
+            audioLbl.innerText = "Ningún archivo seleccionado";
+            audioLbl.style.color = "#666";
+        }
+    }
+};
+
+// --- RESTAURADO: El viejo Uploadcare que querías de vuelta ---
 window.triggerAudioUpload = function() {
     if (typeof uploadcare === 'undefined') {
         notify("Uploadcare no ha cargado aún. Revisa tu internet.", "error");
         return;
     }
-
-    // 1. Creamos un input nativo invisible
-    let input = document.createElement('input');
-    input.type = 'file';
-    // Le quitamos el audio/* para que Android no se ponga estricto con los MP3
-    input.accept = '.mp3, .ogg, .wav, audio/*'; 
-
-    // 2. Escuchamos cuando el usuario elige el archivo
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return; // Si cancela, no hacemos nada
-
+    
+    uploadcare.openDialog(null, {
+        publicKey: '8f24c5ced2ad35839a30',
+        tabs: 'file',
+        accept: 'audio/*'
+    }).done(function(file) {
         const btn = document.getElementById('btn-up-audio');
         const audioLbl = document.getElementById('lbl-up-audio');
         
         btn.innerText = "SUBIENDO A LA NUBE...";
         btn.style.background = "#ffaa00"; 
         btn.style.color = "black";
+        
+        // Limpiamos la barra de URL para evitar conflictos
+        document.getElementById('up-url').value = '';
 
-        // 3. Enviamos el archivo DIRECTAMENTE por la API, esquivando el openDialog
-        const upload = uploadcare.fileFrom('object', file, {
-            publicKey: '8f24c5ced2ad35839a30'
-        });
-
-        upload.promise().done(function(fileInfo) {
+        file.promise().done(function(fileInfo) {
             tempUploadData.audioURL = fileInfo.cdnUrl;
 
             if(audioLbl) {
@@ -1493,50 +1505,31 @@ window.triggerAudioUpload = function() {
                 let name = fileInfo.name ? fileInfo.name.split('.').slice(0, -1).join('.') : "Nueva Canción";
                 titleInput.value = name;
             }
-        }).fail(function(error, fileInfo){
-            alert("⚠️ ERROR DE SUBIDA:\n\n" + error);
-            notify("Error: " + error, "error");
-            btn.innerText = "SELECCIONAR ARCHIVO DE AUDIO";
+        }).fail(function(error){
+            notify("Uploadcare falló. Intenta usando una URL directa.", "error");
+            btn.innerText = "1. SUBIR MP3 (UPLOADCARE)";
             btn.style.background = "white"; 
             btn.style.color = "black";
         });
-    };
-
-    // 4. Activamos el input invisible
-    input.click();
+    });
 };
 
-// FIX DEFINITIVO: Subida de Imagen Nativa (Sin ventana problemática)
 window.triggerCoverUpload = function() {
-    if (typeof uploadcare === 'undefined') return notify("Uploadcare no cargó.", "error");
-
-    let input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
+    uploadcare.openDialog(null, {
+        publicKey: '8f24c5ced2ad35839a30',
+        tabs: 'file',
+        accept: 'image/*'
+    }).done(function(file) {
         const preview = document.getElementById('up-cover-preview');
         preview.innerHTML = '<span style="color:var(--accent); font-weight:bold;">Subiendo...</span>';
         
-        const upload = uploadcare.fileFrom('object', file, {
-            publicKey: '8f24c5ced2ad35839a30'
-        });
-
-        upload.promise().done(function(fileInfo) {
+        file.promise().done(function(fileInfo) {
             tempUploadData.imageURL = fileInfo.cdnUrl;
             preview.innerHTML = '';
             preview.style.backgroundImage = `url(${fileInfo.cdnUrl})`;
             preview.style.border = '2px solid var(--gold)';
-        }).fail(function(error){
-            notify("Error al subir imagen", "error");
-            preview.innerHTML = '<span style="font-size:3.5rem;">📷</span><span style="color:#888; font-weight:bold; margin-top:10px; text-transform: uppercase;">Subir Imagen</span>';
         });
-    };
-
-    input.click();
+    });
 };
 
 window.submitSongToFirebase = async function() {
@@ -1544,7 +1537,7 @@ window.submitSongToFirebase = async function() {
     const lyrics = document.getElementById('up-lyrics').value.trim();
     
     if(!title) return notify("¡Escribe un título!", "error");
-    if(!tempUploadData.audioURL) return notify("¡Falta el archivo MP3!", "error");
+    if(!tempUploadData.audioURL) return notify("¡Falta el archivo MP3 o la URL!", "error");
     
     const btnSubmit = document.getElementById('btn-publish-song');
     btnSubmit.innerText = "GUARDANDO...";
@@ -1573,6 +1566,7 @@ window.submitSongToFirebase = async function() {
             } catch(e) { console.warn("No se encontró portada automática."); }
         }
 
+        // Subir a la colección CORRECTA: globalSongs
         const songData = {
             title: title,
             audioURL: tempUploadData.audioURL,
