@@ -391,77 +391,79 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 .rotating-note .arrow-svg { animation: spinNote 1s linear infinite; }
 @keyframes spinNote { 100% { transform: scale(var(--note-scale)) rotate(360deg); } }
 /* ==========================================================================
-   📱 PORT MÓVIL DEFINITIVO (AGREGAR AL FINAL DE TU STYLE.CSS)
+   📱 PORT MÓVIL DEFINITIVO (REPARACIÓN DE BUGS VISUALES)
    ========================================================================== */
-
-/* FIX DE SEGURIDAD PARA SUBIR CANCIONES (Asegura que Uploadcare siempre esté al frente) */
-.uploadcare--dialog { z-index: 999999 !important; }
-
-/* Botón de pausa base (oculto en PC) */
-#mobile-pause-btn { 
-    display: none; position: absolute; top: 15px; right: 50%; transform: translateX(50%); 
-    width: 45px; height: 45px; background: rgba(0,0,0,0.6); border: 2px solid var(--accent); 
-    border-radius: 50%; align-items: center; justify-content: center; font-size: 1.2rem; 
-    color: white; z-index: 2000; cursor: pointer; 
-}
-
 @media (max-width: 800px) {
-    /* 1. LAYOUT INICIAL DESAMONTONADO */
-    #menu-container { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
-    .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 2px solid var(--accent); padding: 15px; flex-shrink: 0; }
-    .content-area { margin-left: 0; width: 100%; height: auto; }
-    .top-bar { padding: 15px; height: auto; }
+    /* --- 1. RESET Y ESTRUCTURA BASE --- */
+    body, html { height: 100%; overflow: hidden; }
+    #menu-container { flex-direction: column; overflow-y: auto; display: flex; background: var(--bg-color); }
     
-    /* El Perfil se mueve abajo a la derecha */
-    .user-card { position: fixed; bottom: 20px; right: 20px; z-index: 9000; width: auto; box-shadow: 0 5px 20px rgba(0,0,0,0.8); background: rgba(10,10,15,0.95); }
-    .u-avatar { width: 45px; height: 45px; font-size: 1.2rem; }
-    .u-info div:first-child { font-size: 1rem; }
-    .u-info div:last-child { font-size: 0.8rem; }
+    /* --- 2. SIDEBAR Y MENÚ PRINCIPAL --- */
+    .sidebar { width: 100%; height: auto; position: relative; padding: 20px; border-right: none; border-bottom: 2px solid var(--accent); flex-shrink: 0; z-index: 10; background: rgba(10,10,15,0.98); }
+    .brand { font-size: 1.8rem; justify-content: center; margin-bottom: 15px; }
     
-    /* Botones de navegación en cuadrícula (ahorra espacio) */
-    .nav-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 5px; }
-    .nav-btn { padding: 10px 5px; font-size: 0.85rem; text-align: center; justify-content: center; }
-    .nav-btn.active { border-left: none; border-bottom: 3px solid var(--blue); padding-left: 5px; }
-    .search-inp { width: 100%; }
+    /* Perfil en su lugar original, pero asegurado para que no flote feo */
+    .user-card { position: static; width: 100%; margin-bottom: 15px; transform: none !important; }
+    .top-bar .user-card { display: none; } /* Ocultar copias flotantes rotas */
     
-    /* Lista de canciones con espacio abajo para que el perfil no las tape */
-    .song-grid { grid-template-columns: 1fr; padding: 15px; padding-bottom: 90px; } 
+    /* Botones del menú en 2 columnas para ahorrar espacio */
+    .nav-section { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .nav-btn { padding: 12px; font-size: 0.85rem; justify-content: center; text-align: center; }
+    .import-btn { padding: 15px; font-size: 1rem; margin-top: 15px; }
+    
+    /* --- 3. BARRA SUPERIOR (Buscador y SP/PP) --- */
+    .content-area { width: 100%; margin-left: 0; flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    /* El fix del buscador flotante: lo ordenamos en columna */
+    .top-bar { flex-direction: column; height: auto; padding: 15px; gap: 15px; align-items: stretch; justify-content: center; }
+    .search-inp { width: 100%; padding: 12px; font-size: 1rem; margin: 0; }
+    
+    /* --- 4. LISTA DE CANCIONES --- */
+    .song-grid { grid-template-columns: 1fr; padding: 15px; gap: 15px; overflow-y: auto; flex: 1; }
     .beatmap-card { height: 160px; }
     
-    /* 2. FIX MODALES Y AJUSTES (Para que no se salgan de pantalla) */
+    /* --- 5. MODALES (EL FIX PARA QUE SE VEAN LOS BOTONES 4K/6K Y AJUSTES) --- */
+    /* Cambiamos a display: block para que el scroll funcione y no aplaste los botones */
     .modal-panel, .settings-panel, .host-panel-compact { 
-        width: 95% !important; max-width: 95vw !important; 
-        height: 85vh !important; max-height: 85vh !important; 
-        padding: 20px 15px !important; display: flex !important; flex-direction: column !important; 
+        width: 95% !important; max-width: 95% !important; 
+        height: auto !important; max-height: 85vh !important; 
+        padding: 20px !important; display: block !important; 
+        overflow-y: auto !important; border-radius: 15px;
     }
     
-    /* Scroll interno para las opciones */
-    .settings-layout, .hp-body, .diff-grid { flex: 1; overflow-y: auto !important; display: block !important; }
+    /* Modal de Dificultad (Selecciona Modo) */
+    #diff-song-cover { height: 140px !important; min-height: 140px !important; border-radius: 10px; margin-bottom: 15px; }
+    /* Forzamos a que la grid de dificultades se muestre */
+    .diff-grid { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .diff-card { padding: 20px 5px; }
+    .diff-num { font-size: 3rem; }
     
-    /* Pestañas de ajustes horizontales */
-    .settings-sidebar { display: flex; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid #333; padding-bottom: 10px; width: 100%; margin-bottom: 10px; }
-    .set-tab-btn { padding: 10px 15px; font-size: 0.9rem; white-space: nowrap; border-left: none; }
-    .settings-content { padding: 5px 0; }
-    .settings-preview { display: none !important; } /* Ocultamos el cuadro visual en cel para que quepa todo */
+    /* Ajustes / Configuración */
+    .settings-layout { display: flex; flex-direction: column; }
+    /* Pestañas (Gameplay, Visuales) deslizan hacia los lados */
+    .settings-sidebar { width: 100% !important; display: flex; flex-direction: row; overflow-x: auto; border-right: none !important; border-bottom: 1px solid #333 !important; padding-bottom: 10px !important; margin-bottom: 15px; }
+    .set-tab-btn { padding: 10px 15px !important; font-size: 0.9rem !important; white-space: nowrap; border-left: none !important; border-bottom: 2px solid transparent; }
+    .set-tab-btn.active { border-bottom: 2px solid var(--blue); background: rgba(0,229,255,0.1); }
+    .settings-content { padding: 0 !important; overflow: visible !important; }
+    .settings-preview { display: none !important; } /* Ocultar el cuadro visual que roba espacio */
     
-    /* Fix Modal de Dificultad */
-    .diff-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-    .diff-num { font-size: 3.5rem; }
-    #diff-song-cover { height: 140px !important; min-height: 140px !important; } /* Aseguramos que se vea la foto */
+    /* Modal de Pausa y Resultados */
+    .modal-buttons-row { flex-direction: column; }
+    .modal-buttons-row button { width: 100%; margin: 5px 0; }
     
-    /* 3. GAMEPLAY MÓVIL (Pista chica) */
+    /* --- 6. GAMEPLAY (Pista y HUD) --- */
     #ig-profile, .stats-col, .hud-extra { display: none !important; } 
+    #mobile-pause-btn { display: flex !important; }
     
-    /* Track al 85% para poder ver el fondo y descansar la vista */
-    #track { width: 85%; max-width: 100%; border: none; }
-    #track.middle-scroll { max-width: 85%; }
+    #track { width: 90%; max-width: 100%; border: none; }
+    #track.middle-scroll { max-width: 90%; }
     
-    #hud { top: 15px; left: 10px; right: 10px; width: auto; flex-direction: row; justify-content: space-between; }
-    .score-val { font-size: 1.8rem; order: 2; }
+    #hud { top: 15px; left: 10px; right: 10px; width: auto; flex-direction: row; justify-content: space-between; align-items: flex-start; }
+    .score-val { font-size: 1.5rem; order: 2; text-shadow: 0 2px 5px black; }
     .acc-val { font-size: 1.2rem; order: 1; }
     
     #combo-container { top: 30%; right: 50%; transform: translateX(50%); opacity: 0.3; pointer-events: none; }
-    .combo-val { font-size: 5rem; }
-    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 5px; height: 100vh; z-index: 800; }
+    .combo-val { font-size: 4rem; }
+    
+    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 5px; height: 100vh; z-index: 800; background: rgba(0,0,0,0.5); border: none; }
     .judge-pop { font-size: 3rem; top: 40%; }
 }
