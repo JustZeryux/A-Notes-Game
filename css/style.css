@@ -389,3 +389,55 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 @keyframes subPop { 0% { transform: rotateX(40deg) translateY(20px) scale(0.9); opacity: 0; filter: blur(5px); } 40% { transform: rotateX(-5deg) translateY(-5px) scale(1.05); opacity: 1; filter: blur(0px); } 100% { transform: rotateX(0deg) translateY(0) scale(1); opacity: 1; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.8)); } }
 .rotating-note .arrow-svg { animation: spinNote 1s linear infinite; }
 @keyframes spinNote { 100% { transform: scale(var(--note-scale)) rotate(360deg); } }
+/* ==========================================================================
+   📱 PORT MÓVIL (RESPONSIVE DESIGN)
+   ========================================================================== */
+@media (max-width: 800px) {
+    /* 1. Reacomodo del Menú Principal */
+    #menu-container { flex-direction: column; overflow-y: auto; }
+    .sidebar { width: 100%; height: auto; position: relative; border-right: none; border-bottom: 2px solid var(--accent); padding: 20px; flex-shrink: 0; }
+    .content-area { margin-left: 0; width: 100%; height: auto; overflow: visible; }
+    .top-bar { padding: 0 20px; height: 80px; flex-direction: column; justify-content: center; gap: 10px; }
+    .search-inp { width: 100%; font-size: 1rem; padding: 12px 20px; }
+    
+    /* 2. Tarjetas y Grillas */
+    .song-grid { grid-template-columns: 1fr; padding: 20px; gap: 20px; }
+    .beatmap-card { height: 180px; }
+    .diff-grid { grid-template-columns: 1fr 1fr; gap: 15px; }
+    .diff-num { font-size: 4rem; }
+    
+    /* 3. Modales Ajustados */
+    .modal-panel, .settings-panel, .host-panel-compact { width: 95% !important; padding: 25px; max-height: 85vh; border-radius: 16px; }
+    .settings-layout, .hp-body { flex-direction: column; height: auto; overflow-y: auto; }
+    .settings-sidebar, .hp-config-col { width: 100%; border-right: none; border-bottom: 1px solid #333; padding-bottom: 20px; }
+    .settings-preview { width: 100%; border-left: none; border-top: 1px solid #333; }
+    .hp-players-col { max-height: 200px; }
+    .m-title { font-size: 1.8rem; flex-wrap: wrap; }
+    
+    /* 4. GAMEPLAY HUD (MÓVIL) */
+    #hud { left: 10px; top: 10%; transform: none; flex-direction: column; align-items: flex-start; gap: 5px; z-index: 600; }
+    .score-val { font-size: 2.5rem; text-shadow: 0 0 15px rgba(255,255,255,0.5); }
+    .acc-val { font-size: 1.5rem; }
+    .stat-item { font-size: 1rem; }
+    
+    #combo-container { right: 10px; top: 10%; transform: none; z-index: 600; }
+    .combo-val { font-size: 4rem; text-shadow: 0 0 20px rgba(0, 229, 255, 0.8); }
+    .combo-label { font-size: 1.2rem; letter-spacing: 2px; }
+    
+    .hud-extra { bottom: 10px; right: 10px; }
+    .hud-fc { font-size: 2rem; }
+    
+    /* Barra de vida en el borde izquierdo de la pantalla */
+    .health-bar { position: fixed; left: 0; top: 0; width: 8px; height: 100vh; border-radius: 0; border: none; z-index: 100; opacity: 0.8; }
+    
+    /* Pista y Notas adaptadas */
+    #track { border: none; box-shadow: none; background: rgba(0,0,0,0.6); }
+    .judge-pop { font-size: 4rem; top: 30%; }
+    .splash { width: 100px; height: 100px; margin-top: -50px; margin-left: -50px; }
+    @keyframes splashAnim { 0% { transform: scale(0.3); opacity: 1; border-width: 8px; } 100% { transform: scale(2); opacity: 0; border-width: 0px; } }
+    
+    /* Chat y Notificaciones */
+    #chat-overlay-container { right: 10px; bottom: 0; width: calc(100% - 20px); }
+    .chat-window { width: 100%; }
+    #notification-area { width: calc(100% - 40px); left: 20px; right: 20px; top: 10px; }
+}
