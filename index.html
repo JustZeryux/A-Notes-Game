@@ -21,14 +21,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
-    <script>
-        UPLOADCARE_PUBLIC_KEY = '8f24c5ced2ad35839a30'; 
-        UPLOADCARE_LOCALE = 'es';
-        UPLOADCARE_TABS = 'file'; 
-    </script>
     
-    <script src="https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js"></script>
+    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
 
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -41,6 +35,7 @@
         <div class="loader"></div>
         <div id="loading-text">Cargando...</div>
     </div>
+    
     <div id="bg-layer">
         <video id="bg-video" loop muted playsinline style="display:none;"></video>
         <img id="bg-image">
@@ -53,7 +48,7 @@
                 A Notes Game
             </div>
             
-            <div class="user-card" onclick="openModal('profile')" onmouseenter="playHover()">
+            <div class="user-card" onclick="openModal('profile')" onmouseenter="if(typeof playHover==='function') playHover()">
                 <div class="u-avatar" id="m-av">G</div>
                 <div class="u-info">
                     <div id="m-name">Guest</div>
@@ -62,15 +57,15 @@
             </div>
 
             <div class="nav-section">
-                <button class="nav-btn active" id="nav-songs" onmouseenter="playHover()" onclick="changeSection('songs')">🎵 CANCIONES GLOBALES</button>
-                <button class="nav-btn" id="nav-multi" onmouseenter="playHover()" onclick="openLobbyBrowser()">⚔️ SALAS ONLINE</button>
-                <button class="nav-btn" id="nav-shop" onmouseenter="playHover()" onclick="openShop()">🛒 TIENDA</button>
-                <button class="nav-btn" id="nav-settings" onmouseenter="playHover()" onclick="openModal('settings')">⚙️ AJUSTES</button>
-                <button class="nav-btn" id="nav-rank" onmouseenter="playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
-                <button class="nav-btn" id="nav-friends" onmouseenter="playHover()" onclick="openFriends()">👥 AMIGOS</button>
+                <button class="nav-btn active" id="nav-songs" onmouseenter="if(typeof playHover==='function') playHover()" onclick="changeSection('songs')">🎵 CANCIONES GLOBALES</button>
+                <button class="nav-btn" id="nav-multi" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLobbyBrowser()">⚔️ SALAS ONLINE</button>
+                <button class="nav-btn" id="nav-shop" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openShop()">🛒 TIENDA</button>
+                <button class="nav-btn" id="nav-settings" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openModal('settings')">⚙️ AJUSTES</button>
+                <button class="nav-btn" id="nav-rank" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
+                <button class="nav-btn" id="nav-friends" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openFriends()">👥 AMIGOS</button>
             </div>
 
-            <button class="import-btn" id="imp-btn" onmouseenter="playHover()" onclick="openCustomUploadModal()">
+            <button class="import-btn" id="imp-btn" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openCustomUploadModal()">
                 <span id="imp-txt">☁️ SUBIR CANCIÓN</span>
             </button>
             <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
@@ -89,8 +84,7 @@
     </div>
 
     <div id="game-layer" style="display:none;">
-        <div id="mobile-touch-zones" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 900; flex-direction: row;">
-        </div>
+        <div id="mobile-touch-zones" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 900; flex-direction: row;"></div>
         <div id="top-progress-bar">
             <div id="top-progress-fill"></div>
             <div id="top-progress-time">0:00 / 0:00</div>
@@ -130,21 +124,19 @@
                 <div class="score-label">SCORE</div>
                 <div class="score-val" id="g-score">0</div>
             </div>
-            
             <div class="health-bar"><div class="health-fill" id="health-fill"></div></div>
         </div>
         
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     </div>
+
     <div id="modal-settings" class="modal-overlay">
-        <div class="modal-panel settings-panel">
-        </div>
+        <div class="modal-panel settings-panel"></div>
     </div>
 
     <div id="modal-diff" class="modal-overlay">
         <div class="modal-panel" style="width:1000px;">
             <div class="m-title">SELECCIONA MODO</div>
-            
             <div id="diff-song-cover" style="width:200px; height:200px; background:#333; margin:0 auto 20px; border-radius:15px; background-size:cover; background-position:center; border:3px solid var(--accent); box-shadow:0 0 40px rgba(255,102,170,0.2);"></div>
             <div id="diff-song-title" style="text-align:center; font-size:2rem; font-weight:900; margin-bottom:30px; color:white;">...</div>
 
@@ -217,25 +209,17 @@
 
                     <div style="background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
                         <div style="color:var(--blue); font-weight:900; margin-bottom:10px;">🎧 ARCHIVO MP3</div>
+                        <div style="display:flex; gap:10px; margin-bottom:15px;">
+                            <button class="action" id="btn-up-audio" onclick="triggerAudioUpload()" style="flex:1; font-size: 0.9rem;">SUBIR MP3</button>
+                        </div>
+                        <div id="lbl-up-audio" style="margin-top:15px; font-weight: bold; color:#666; text-align:center;">Ningún archivo seleccionado</div>
+                    </div>
 
-                        <div style="background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
-                        <div style="color:var(--blue); font-weight:900; margin-bottom:10px;">🎧 ARCHIVO MP3</div>
-                        
-                        <div style="display:flex; gap:10px; margin-bottom:15px;">
-                            <button class="action" id="btn-up-audio" onclick="triggerAudioUpload()" style="flex:1; font-size: 0.9rem;">SUBIR MP3</button>
-                        </div>
-                                            
-                        <div id="lbl-up-audio" style="margin-top:15px; font-weight: bold; color:#666; text-align:center;">Ningún archivo seleccionado</div>
-                    </div>
-                    
+                    <input type="hidden" id="up-url" value="">
                     <input type="hidden" id="up-lyrics" value="">
-                        <div style="display:flex; gap:10px; margin-bottom:15px;">
-                            <button class="action" id="btn-up-audio" onclick="triggerAudioUpload()" style="flex:1; font-size: 0.9rem;">SUBIR MP3</button>
-                        </div>
-                                            
-                        <div id="lbl-up-audio" style="margin-top:15px; font-weight: bold; color:#666; text-align:center;">Ningún archivo seleccionado</div>
-                    </div>
-                </div> <div style="width: 250px; display:flex; flex-direction:column; gap:10px;">
+
+                </div> 
+                <div style="width: 250px; display:flex; flex-direction:column; gap:10px;">
                     <div style="color:var(--gold); font-weight:900;">🖼️ PORTADA (Opcional)</div>
                     <div id="up-cover-preview" style="width:100%; aspect-ratio: 1; background:#0a0a0a; border:2px dashed #444; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer; background-size:cover; background-position:center;" onclick="triggerCoverUpload()">
                         <span style="font-size:3rem;">📷</span><span style="color:#888; font-weight:bold;">Subir Imagen</span>
