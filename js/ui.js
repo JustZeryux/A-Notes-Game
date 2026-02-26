@@ -1306,7 +1306,7 @@ window.closeModal = function(id) {
             c.style.transform = "scale(1)";
         });
         
-        m// Ocultar opciones de crear sala
+        // Ocultar opciones de crear sala
         const opts = document.getElementById('create-lobby-opts');
         if(opts) opts.style.display = 'none';
     }
