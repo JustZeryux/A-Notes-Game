@@ -421,79 +421,105 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     }
 }
 /* ==========================================================================
-   📱 PORT MÓVIL DEFINITIVO (UX COMPACTA, HUD Y SHOP)
+   📱 PORT MÓVIL DEFINITIVO (CLICS ARREGLADOS, STATS RESTAURADOS Y SCROLL SANO)
    ========================================================================== */
 @media (max-width: 800px) {
-    html, body { height: auto !important; overflow: auto !important; overflow-x: hidden !important; }
-    #menu-container { flex-direction: column; position: relative; height: auto; overflow: visible; display: flex; background: var(--bg-color); }
+    /* 1. ESTRUCTURA SANA (Arregla los clics rotos) */
+    #menu-container { flex-direction: column; display: flex; }
     
-    .sidebar { width: 100%; height: auto; position: relative; padding: 15px; border-right: none; border-bottom: 2px solid var(--accent); box-shadow: 0 5px 15px rgba(0,0,0,0.8); z-index: 10; background: rgba(10,10,15,0.98); }
-    .brand { font-size: 1.8rem; justify-content: center; margin-bottom: 10px; }
+    /* 2. MENÚ LATERAL COMPACTO */
+    .sidebar { width: 100%; height: auto; padding: 15px; border-right: none; border-bottom: 2px solid var(--accent); flex-shrink: 0; z-index: 10; background: rgba(10,10,15,0.98); }
+    .brand { font-size: 1.6rem; justify-content: center; margin-bottom: 10px; }
     
-    .user-card { position: relative !important; width: 100%; margin-bottom: 10px; transform: none !important; bottom: auto; right: auto; }
+    /* Perfil restaurado a su zona original (ni flotante, ni roto) */
+    .user-card { margin-bottom: 10px; padding: 10px; border-radius: 12px; }
+    .u-avatar { width: 40px; height: 40px; font-size: 1rem; }
+    .u-info div:first-child { font-size: 1.1rem; }
+    .u-info div:last-child { font-size: 0.8rem; }
     .top-bar .user-card { display: none; } 
     
-    .nav-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
-    .nav-btn { padding: 10px 5px; font-size: 0.8rem; flex-direction: column; text-align: center; justify-content: center; gap: 5px; border-radius: 8px; }
+    /* Botones de navegación en cuadrícula de 3 */
+    .nav-section { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 5px; }
+    .nav-btn { padding: 8px 5px; font-size: 0.8rem; flex-direction: column; text-align: center; gap: 4px; border-radius: 8px; }
     .nav-btn.active { border-left: none; border-bottom: 3px solid var(--blue); padding-left: 5px; background: rgba(0,229,255,0.1); }
-    .import-btn { padding: 12px; font-size: 0.95rem; margin-top: 10px; border-radius: 10px; }
+    .import-btn { padding: 12px; font-size: 0.9rem; margin-top: 10px; border-radius: 10px; }
     
-    .content-area { width: 100%; margin-left: 0; height: auto; overflow: visible; display: flex; flex-direction: column; }
-    .top-bar { height: auto; padding: 15px; flex-direction: column; gap: 10px; align-items: stretch; justify-content: center; }
-    .search-inp { width: 100%; font-size: 1rem; padding: 10px; margin: 0; }
+    /* 3. BUSCADOR Y LISTA DE CANCIONES (Scroll independiente) */
+    .content-area { width: 100%; margin-left: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .top-bar { height: auto; padding: 15px; flex-direction: column; flex-shrink: 0; }
+    .search-inp { width: 100%; font-size: 1rem; padding: 12px; margin: 0; }
     
-    .song-grid { grid-template-columns: 1fr; padding: 15px; gap: 15px; overflow: visible; }
-    .beatmap-card { height: 140px; }
+    /* El scroll perfecto que no rompe los clics */
+    .song-grid { grid-template-columns: 1fr; padding: 15px; gap: 15px; overflow-y: auto; flex: 1; padding-bottom: 40px; }
+    .beatmap-card { height: 150px; flex-shrink: 0; }
     
-    #notification-area { width: calc(100% - 30px) !important; left: 15px !important; right: 15px !important; top: 10px !important; }
+    /* 4. MODALES, TIENDA Y CONFIGURACIONES (Ajustados) */
+    .modal-panel, .settings-panel, .host-panel-compact { 
+        width: 95% !important; max-width: 95% !important; 
+        height: 85vh !important; max-height: 85vh !important; 
+        padding: 15px !important; display: flex !important; flex-direction: column !important; 
+        border-radius: 15px;
+    }
     
-    /* MODALES COMPACTOS (Para que Subir Canción no se vea gigante) */
-    .modal-panel, .settings-panel, .host-panel-compact { width: 95% !important; max-width: 95% !important; height: auto !important; max-height: 85vh !important; padding: 15px !important; display: block !important; overflow-y: auto !important; border-radius: 12px; }
+    .m-title { font-size: 1.3rem !important; flex-shrink: 0; margin-bottom: 10px !important; text-align: center; }
     
-    /* Achicar inputs y botones dentro de modales */
-    .log-inp, textarea.log-inp { padding: 10px !important; font-size: 0.95rem !important; }
-    button.action { padding: 12px !important; font-size: 1rem !important; }
+    /* Contenedores con scroll interno para que puedas bajar sin trabarte */
+    .settings-layout, .hp-body, .diff-grid { flex: 1; overflow-y: auto !important; display: block !important; padding-right: 5px; }
     
-    .diff-grid { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-    #diff-song-cover { height: 120px !important; min-height: 120px !important; border-radius: 10px; margin-bottom: 10px; }
+    /* Dificultades (Ahora sí se ve la foto y los botones) */
+    .diff-grid { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 5px; }
+    #diff-song-cover { height: 120px !important; min-height: 120px !important; border-radius: 10px; margin-bottom: 10px; flex-shrink: 0; }
     .diff-num { font-size: 2.5rem; }
     .diff-card { padding: 15px 5px; }
     
-    /* TIENDA SÚPER COMPACTA (Grid de 2 columnas) */
-    .shop-grid { grid-template-columns: 1fr 1fr; gap: 10px; padding: 5px; }
-    .shop-item { padding: 10px; border-radius: 10px; }
-    .shop-preview-box { width: 50px; height: 50px; margin-bottom: 8px; }
-    .shop-name { font-size: 0.85rem; margin-bottom: 4px; }
-    .shop-desc { font-size: 0.7rem; height: 30px; margin-bottom: 5px; line-height: 1.1; }
-    .shop-price { font-size: 0.9rem; padding-top: 5px; }
-    .shop-item .btn-add { padding: 8px; font-size: 0.8rem; margin-top: 5px; }
-    
-    .settings-layout { display: flex; flex-direction: column; }
-    .settings-sidebar { width: 100% !important; display: flex; flex-direction: row; overflow-x: auto; border-right: none !important; border-bottom: 1px solid #333 !important; padding-bottom: 10px !important; margin-bottom: 15px; }
+    /* Ajustes (Pestañas horizontales) */
+    .settings-sidebar { width: 100% !important; display: flex; flex-direction: row; overflow-x: auto; border-right: none !important; border-bottom: 1px solid #333 !important; padding-bottom: 8px !important; margin-bottom: 10px; flex-shrink: 0; }
     .set-tab-btn { padding: 8px 12px !important; font-size: 0.85rem !important; white-space: nowrap; border-left: none !important; border-bottom: 2px solid transparent; }
     .set-tab-btn.active { border-bottom: 2px solid var(--blue); background: rgba(0,229,255,0.1); }
-    .settings-content { padding: 0 !important; overflow: visible !important; }
-    .settings-preview { display: none !important; }
+    .settings-content { padding: 0 !important; overflow: visible !important; flex: 1; }
+    .settings-preview { display: none !important; } 
     
-    .modal-buttons-row { flex-direction: column; }
+    /* Tienda Compacta */
+    .shop-grid { grid-template-columns: 1fr 1fr; gap: 10px; padding: 5px; overflow-y: auto; flex: 1; }
+    .shop-item { padding: 10px; border-radius: 10px; }
+    .shop-preview-box { width: 40px; height: 40px; margin-bottom: 5px; }
+    .shop-name { font-size: 0.8rem; margin-bottom: 4px; }
+    .shop-desc { font-size: 0.7rem; height: 28px; margin-bottom: 5px; line-height: 1.1; }
+    .shop-price { font-size: 0.85rem; padding-top: 5px; }
+    .shop-item .btn-add { padding: 8px; font-size: 0.8rem; margin-top: 5px; }
+
+    /* Botones de menú de resultados y pausa */
+    .modal-buttons-row { flex-shrink: 0; flex-direction: column; margin-top: 15px; }
     .modal-buttons-row button { width: 100%; margin: 5px 0; padding: 12px; font-size: 1rem; }
     
-    /* GAMEPLAY HUD RESTAURADO Y VISIBLE */
-    #mobile-pause-btn { position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,0.8); border: 2px solid var(--accent); color: white; display: flex; align-items: center; justify-content: center; z-index: 2000; }
+    /* Notificaciones */
+    #notification-area { width: calc(100% - 30px) !important; left: 15px !important; right: 15px !important; top: 10px !important; }
+    .notify-card { padding: 12px !important; }
     
-    #ig-profile, .stats-col, .hud-extra { display: none !important; } 
+    /* 5. GAMEPLAY MÓVIL (Stats restaurados, Pista adaptada) */
+    #ig-profile { display: none !important; } /* Solo ocultamos la foto de perfil en juego */
     
-    #track { width: 85%; max-width: 100%; border: none; }
-    #track.middle-scroll { max-width: 85%; }
+    /* Reducimos las stats al 60% de su tamaño para que no tapen la pista */
+    .stats-col { transform: scale(0.65); transform-origin: top left; margin-top: -10px; gap: 4px; }
+    .stat-item { font-size: 1.2rem; }
+    .hud-extra { transform: scale(0.65); transform-origin: bottom right; bottom: 5px; right: 5px; }
     
-    /* El HUD ahora sí se verá, con z-index alto */
-    #hud { position: absolute; top: 15px; left: 15px; right: 60px; width: auto; flex-direction: row; justify-content: space-between; align-items: flex-start; z-index: 1000; }
-    .score-val { font-size: 1.5rem; order: 1; text-shadow: 0 2px 5px black; }
-    .acc-val { font-size: 1.2rem; order: 2; text-shadow: 0 2px 5px black; }
+    #mobile-pause-btn { top: 10px; right: 10px; width: 40px; height: 40px; font-size: 1.2rem; display: flex !important; }
     
-    #combo-container { top: 30%; right: 50%; transform: translateX(50%); opacity: 0.3; pointer-events: none; z-index: 50; }
-    .combo-val { font-size: 4rem; }
+    #track { width: 90%; max-width: 100%; border: none; }
+    #track.middle-scroll { max-width: 90%; }
     
-    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 4px; height: 100vh; z-index: 800; background: rgba(0,0,0,0.5); border: none; }
-    .judge-pop { font-size: 3rem; top: 40%; }
+    #hud { top: 10px; left: 10px; right: 10px; width: auto; flex-direction: row; justify-content: space-between; align-items: flex-start; z-index: 600; }
+    .score-val { font-size: 1.5rem; order: 2; text-shadow: 0 2px 5px black; }
+    .acc-val { font-size: 1.2rem; order: 1; }
+    
+    #combo-container { top: 30%; right: 50%; transform: translateX(50%); opacity: 0.3; z-index: 50; }
+    .combo-val { font-size: 4.5rem; }
+    
+    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 5px; height: 100vh; z-index: 800; background: rgba(0,0,0,0.5); border: none; }
+    .judge-pop { font-size: 3.5rem; top: 40%; }
 }
+
+/* FIX INFALIBLE PARA UPLOADCARE (Asegura que funcione en PC y Celular) */
+.uploadcare--dialog { z-index: 9999999 !important; position: fixed !important; }
+.uploadcare--dialog__container { transform: none !important; filter: none !important; backdrop-filter: none !important; }
