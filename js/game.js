@@ -854,26 +854,35 @@ window.toMenu = function() {
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 };
 // === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS ===
+// === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS (V-FINAL) ===
 window.initMobileTouchControls = function(keyCount) {
-    // 1. DESTRUCCIÓN ABSOLUTA DEL CONTENEDOR VIEJO (Esto arregla el bug 4k -> 6k)
+    // Destruimos las zonas anteriores para evitar bugs al cambiar de 4K a 6K
     let oldContainer = document.getElementById('mobile-touch-zones');
-    if (oldContainer) {
-        oldContainer.remove(); 
-    }
+    if (oldContainer) oldContainer.remove(); 
 
-    // 2. Si estamos en PC, no hacemos nada
+    // Si estamos en PC, cancelamos
     if (window.innerWidth > 800 && !('ontouchstart' in window)) return;
 
-    // 3. Crear contenedor fresco y limpio
+    // Crear nuevo contenedor
     const touchContainer = document.createElement('div');
     touchContainer.id = 'mobile-touch-zones';
-    touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 999999; display: flex; flex-direction: row; pointer-events: auto;';
+    // Z-INDEX: 800. Esto es CRÍTICO. 
+    // Queda por encima de las notas, pero POR DEBAJO del menú de pausa (z-index 10000)
+    touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 800; display: flex; flex-direction: row; pointer-events: auto;';
     document.body.appendChild(touchContainer); 
 
-    // Obtener teclas
-    let currentKeys = window.cfg?.keybinds?.[keyCount] || (keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k']);
+    // FIX 6K/4K: Leer las teclas EXACTAS que el juego tiene configuradas
+    let currentKeys = [];
+    if (window.cfg && window.cfg.modes && window.cfg.modes[keyCount]) {
+        for(let i = 0; i < keyCount; i++) {
+            currentKeys.push(window.cfg.modes[keyCount][i].k);
+        }
+    } else {
+        // Fallback de emergencia
+        currentKeys = keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k'];
+    }
 
-    // Crear las zonas táctiles exactas para la cantidad de teclas
+    // Crear las columnas para tocar
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
         zone.style.flex = '1';
@@ -882,29 +891,30 @@ window.initMobileTouchControls = function(keyCount) {
         zone.style.transition = 'background 0.05s ease';
         
         const targetKey = currentKeys[i].toLowerCase();
-        const keyCode = targetKey.toUpperCase().charCodeAt(0);
 
-        const dispatchKey = (type) => {
-            const event = new KeyboardEvent(type, { key: targetKey, code: `Key${targetKey.toUpperCase()}`, keyCode: keyCode, bubbles: true });
-            document.dispatchEvent(event);
-        };
-
+        // Mandar toque directamente a la función del juego (100% preciso)
         zone.addEventListener('touchstart', (e) => {
             e.preventDefault(); 
-            zone.style.background = 'rgba(255,0,85,0.2)'; // Brillo visual
-            dispatchKey('keydown');
+            zone.style.background = 'rgba(255,255,255,0.1)'; // Brillo sutil
+            if(typeof window.onKd === 'function') {
+                window.onKd({ key: targetKey, preventDefault: ()=>{} });
+            }
         }, { passive: false });
 
         zone.addEventListener('touchend', (e) => {
             e.preventDefault();
             zone.style.background = 'transparent';
-            dispatchKey('keyup');
+            if(typeof window.onKu === 'function') {
+                window.onKu({ key: targetKey, preventDefault: ()=>{} });
+            }
         }, { passive: false });
 
         zone.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             zone.style.background = 'transparent';
-            dispatchKey('keyup');
+            if(typeof window.onKu === 'function') {
+                window.onKu({ key: targetKey, preventDefault: ()=>{} });
+            }
         }, { passive: false });
 
         touchContainer.appendChild(zone);
