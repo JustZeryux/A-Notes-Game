@@ -1469,8 +1469,8 @@ window.handleUrlInput = function(val) {
 
 // --- RESTAURADO: El viejo Uploadcare que querías de vuelta ---
 // 1. REEMPLAZA ESTO CON TUS DATOS DE CLOUDINARY
-const CLOUD_NAME = "TU_CLOUD_NAME"; // Ej: "dzq8xyz"
-const UPLOAD_PRESET = "TU_PRESET";  // Ej: "subida_juego"
+const CLOUD_NAME = "djauhc6md"; // Ej: "dzq8xyz"
+const UPLOAD_PRESET = "subida_juego";  // Ej: "subida_juego"
 
 window.triggerAudioUpload = function() {
     if (typeof cloudinary === 'undefined') return notify("Cloudinary no ha cargado.", "error");
