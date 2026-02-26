@@ -394,56 +394,6 @@
             <button class="action" onclick="toMenu()">VOLVER</button>
         </div>
     </div>
-    <script>
-    // FIX DE UPLOADCARE: Feedback visual para saber si realmente subió
-    window.triggerAudioUpload = function() {
-        if (typeof uploadcare === 'undefined') {
-            alert("Uploadcare no ha cargado aún. Revisa tu internet.");
-            return;
-        }
-        
-        var dialog = uploadcare.openDialog(null, {
-            publicKey: '8f24c5ced2ad35839a30',
-            tabs: 'file',
-            accept: 'audio/*'
-        });
-
-        dialog.done(function(file) {
-            const btn = document.getElementById('btn-up-audio');
-            const audioLbl = document.getElementById('lbl-up-audio');
-            
-            // Cambiar a Naranja mientras sube
-            btn.innerText = "SUBIENDO A LA NUBE...";
-            btn.style.background = "#ffaa00"; 
-            btn.style.color = "black";
-
-            file.promise().done(function(fileInfo) {
-                // Guardar la URL en la variable temporal que usa tu juego
-                window.tempUploadData = window.tempUploadData || {};
-                window.tempUploadData.audioURL = fileInfo.cdnUrl;
-
-                // Avisar que fue un éxito (Verde)
-                if(audioLbl) {
-                    audioLbl.innerText = "✅ " + fileInfo.name;
-                    audioLbl.style.color = "#12FA05"; 
-                }
-                btn.innerText = "¡MP3 CARGADO!";
-                btn.style.background = "#12FA05";
-
-                // Autocompletar el título del juego si está vacío
-                const titleInput = document.getElementById('up-title');
-                if(titleInput && titleInput.value.trim() === '') {
-                    titleInput.value = fileInfo.name.split('.').slice(0, -1).join('.');
-                }
-            }).fail(function(error){
-                alert("Uploadcare rechazó el archivo. Puede que pese mucho o superaste el límite de tu API gratis.");
-                btn.innerText = "SELECCIONAR MP3";
-                btn.style.background = ""; // Regresa al color normal
-                btn.style.color = "white";
-            });
-        });
-    };
-    </script>
 
     <script src="js/globals.js"></script>
     <script src="js/auth.js"></script>
