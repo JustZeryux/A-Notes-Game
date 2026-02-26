@@ -1448,30 +1448,47 @@ window.openCustomUploadModal = function() {
 };
 
 window.triggerAudioUpload = function() {
+    if (typeof uploadcare === 'undefined') {
+        notify("Uploadcare no ha cargado aún. Revisa tu internet.", "error");
+        return;
+    }
+    
     uploadcare.openDialog(null, {
         publicKey: '8f24c5ced2ad35839a30',
         tabs: 'file',
         accept: 'audio/*'
     }).done(function(file) {
-        document.getElementById('btn-up-audio').innerText = "SUBIENDO A LA NUBE...";
+        const btn = document.getElementById('btn-up-audio');
+        const audioLbl = document.getElementById('lbl-up-audio');
         
+        // Cambiar a Naranja mientras sube
+        btn.innerText = "SUBIENDO A LA NUBE...";
+        btn.style.background = "#ffaa00"; 
+        btn.style.color = "black";
+
         file.promise().done(function(fileInfo) {
+            // FIX CRÍTICO: Guardar en la variable local correcta que usa submitSongToFirebase
             tempUploadData.audioURL = fileInfo.cdnUrl;
-            
-            const audioLbl = document.getElementById('lbl-up-audio');
-            audioLbl.innerText = "✅ " + (fileInfo.name || "Audio subido correctamente");
-            audioLbl.style.color = "var(--good)";
-            document.getElementById('btn-up-audio').innerText = "CAMBIAR AUDIO";
+
+            // Avisar que fue un éxito (Verde)
+            if(audioLbl) {
+                audioLbl.innerText = "✅ " + (fileInfo.name || "Audio subido correctamente");
+                audioLbl.style.color = "#12FA05"; 
+            }
+            btn.innerText = "¡MP3 CARGADO!";
+            btn.style.background = "#12FA05";
             
             // Autocompletar el título si está vacío
             const titleInput = document.getElementById('up-title');
-            if(titleInput.value.trim() === '') {
-                // Eliminar la extensión .mp3
+            if(titleInput && titleInput.value.trim() === '') {
                 let name = fileInfo.name ? fileInfo.name.split('.').slice(0, -1).join('.') : "Nueva Canción";
                 titleInput.value = name;
             }
-        }).fail(function(){
-            document.getElementById('btn-up-audio').innerText = "SELECCIONAR ARCHIVO DE AUDIO";
+        }).fail(function(error){
+            notify("Uploadcare rechazó el archivo. Reintenta.", "error");
+            btn.innerText = "SELECCIONAR ARCHIVO DE AUDIO";
+            btn.style.background = ""; // Regresa al color normal
+            btn.style.color = "white";
         });
     });
 };
