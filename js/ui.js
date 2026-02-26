@@ -1468,32 +1468,34 @@ window.handleUrlInput = function(val) {
 };
 
 // --- RESTAURADO: El viejo Uploadcare que querías de vuelta ---
-window.triggerAudioUpload = function() {
-    if (typeof uploadcare === 'undefined') {
-        notify("Uploadcare no ha cargado aún. Revisa tu internet.", "error");
-        return;
-    }
-    
-    uploadcare.openDialog(null, {
-        publicKey: '8f24c5ced2ad35839a30',
-        tabs: 'file',
-        accept: 'audio/*'
-    }).done(function(file) {
-        const btn = document.getElementById('btn-up-audio');
-        const audioLbl = document.getElementById('lbl-up-audio');
-        
-        btn.innerText = "SUBIENDO A LA NUBE...";
-        btn.style.background = "#ffaa00"; 
-        btn.style.color = "black";
-        
-        // Limpiamos la barra de URL para evitar conflictos
-        document.getElementById('up-url').value = '';
+// 1. REEMPLAZA ESTO CON TUS DATOS DE CLOUDINARY
+const CLOUD_NAME = "TU_CLOUD_NAME"; // Ej: "dzq8xyz"
+const UPLOAD_PRESET = "TU_PRESET";  // Ej: "subida_juego"
 
-        file.promise().done(function(fileInfo) {
-            tempUploadData.audioURL = fileInfo.cdnUrl;
+window.triggerAudioUpload = function() {
+    if (typeof cloudinary === 'undefined') return notify("Cloudinary no ha cargado.", "error");
+    
+    const urlInput = document.getElementById('up-url');
+    if(urlInput) urlInput.value = '';
+
+    const btn = document.getElementById('btn-up-audio');
+    const audioLbl = document.getElementById('lbl-up-audio');
+
+    // Se abre el widget de Cloudinary
+    let myWidget = cloudinary.createUploadWidget({
+        cloudName: CLOUD_NAME,
+        uploadPreset: UPLOAD_PRESET,
+        sources: ['local'],
+        resourceType: 'auto', // "auto" permite que trague MP3, OGG, Y2Mate sin quejarse
+        clientAllowedFormats: ['mp3', 'ogg', 'wav', 'm4a'],
+        maxFileSize: 15000000 // Límite de 15MB para que no suban locuras
+    }, (error, result) => {
+        if (!error && result && result.event === "success") {
+            // AQUÍ OCURRE LA MAGIA: Guardamos el nuevo link en la variable de tu juego
+            tempUploadData.audioURL = result.info.secure_url;
 
             if(audioLbl) {
-                audioLbl.innerText = "✅ " + (fileInfo.name || "Audio subido correctamente");
+                audioLbl.innerText = "✅ " + result.info.original_filename;
                 audioLbl.style.color = "#12FA05"; 
             }
             btn.innerText = "¡MP3 CARGADO!";
@@ -1502,34 +1504,38 @@ window.triggerAudioUpload = function() {
             
             const titleInput = document.getElementById('up-title');
             if(titleInput && titleInput.value.trim() === '') {
-                let name = fileInfo.name ? fileInfo.name.split('.').slice(0, -1).join('.') : "Nueva Canción";
-                titleInput.value = name;
+                titleInput.value = result.info.original_filename.replace('.mp3', '');
             }
-        }).fail(function(error){
-            notify("Uploadcare falló. Intenta usando una URL directa.", "error");
-            btn.innerText = "1. SUBIR MP3 (UPLOADCARE)";
-            btn.style.background = "white"; 
-            btn.style.color = "black";
-        });
+        } else if (error) {
+            notify("Error al subir el archivo.", "error");
+        }
     });
+    
+    myWidget.open();
 };
 
 window.triggerCoverUpload = function() {
-    uploadcare.openDialog(null, {
-        publicKey: '8f24c5ced2ad35839a30',
-        tabs: 'file',
-        accept: 'image/*'
-    }).done(function(file) {
-        const preview = document.getElementById('up-cover-preview');
-        preview.innerHTML = '<span style="color:var(--accent); font-weight:bold;">Subiendo...</span>';
-        
-        file.promise().done(function(fileInfo) {
-            tempUploadData.imageURL = fileInfo.cdnUrl;
+    if (typeof cloudinary === 'undefined') return notify("Cloudinary no ha cargado.", "error");
+
+    const preview = document.getElementById('up-cover-preview');
+
+    let myWidget = cloudinary.createUploadWidget({
+        cloudName: CLOUD_NAME,
+        uploadPreset: UPLOAD_PRESET,
+        sources: ['local', 'url'],
+        resourceType: 'image',
+        clientAllowedFormats: ['png', 'jpg', 'jpeg', 'webp']
+    }, (error, result) => {
+        if (!error && result && result.event === "success") {
+            // Guardamos el link de la imagen
+            tempUploadData.imageURL = result.info.secure_url;
             preview.innerHTML = '';
-            preview.style.backgroundImage = `url(${fileInfo.cdnUrl})`;
+            preview.style.backgroundImage = `url(${result.info.secure_url})`;
             preview.style.border = '2px solid var(--gold)';
-        });
+        }
     });
+
+    myWidget.open();
 };
 
 window.submitSongToFirebase = async function() {
