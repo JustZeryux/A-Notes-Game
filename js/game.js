@@ -648,6 +648,9 @@ function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
+    let touchZones = document.getElementById('mobile-touch-zones'); // <--- BUSCAMOS
+    if(touchZones) touchZones.style.display = 'none';               // <--- APAGAMOS AL MORIR/GANAR
+    
     if(window.isMultiplayer) {
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
         if(window.isLobbyHost && window.db && window.currentLobbyId && !died) {
@@ -818,6 +821,10 @@ window.resumeGame = function() {
         modal.style.setProperty('display', 'none', 'important');
     }
     
+    // <--- VOLVEMOS A ENCENDER LAS ZONAS TÁCTILES (SOLO EN CELULAR)
+    let touchZones = document.getElementById('mobile-touch-zones');
+    if(touchZones && window.innerWidth <= 800) touchZones.style.display = 'flex'; 
+
     if(window.st.pauseTime) {
         const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
         window.st.t0 += pauseDuration; 
