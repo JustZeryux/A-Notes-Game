@@ -1447,16 +1447,24 @@ window.openCustomUploadModal = function() {
     openModal('upload');
 };
 
+// FIX DEFINITIVO: Subida de Audio Nativa (Sin ventana problemática)
 window.triggerAudioUpload = function() {
     if (typeof uploadcare === 'undefined') {
         notify("Uploadcare no ha cargado aún. Revisa tu internet.", "error");
         return;
     }
-    
-    uploadcare.openDialog(null, {
-        publicKey: '8f24c5ced2ad35839a30',
-        tabs: 'file'
-    }).done(function(file) {
+
+    // 1. Creamos un input nativo invisible
+    let input = document.createElement('input');
+    input.type = 'file';
+    // Le quitamos el audio/* para que Android no se ponga estricto con los MP3
+    input.accept = '.mp3, .ogg, .wav, audio/*'; 
+
+    // 2. Escuchamos cuando el usuario elige el archivo
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return; // Si cancela, no hacemos nada
+
         const btn = document.getElementById('btn-up-audio');
         const audioLbl = document.getElementById('lbl-up-audio');
         
@@ -1464,7 +1472,12 @@ window.triggerAudioUpload = function() {
         btn.style.background = "#ffaa00"; 
         btn.style.color = "black";
 
-        file.promise().done(function(fileInfo) {
+        // 3. Enviamos el archivo DIRECTAMENTE por la API, esquivando el openDialog
+        const upload = uploadcare.fileFrom('object', file, {
+            publicKey: '8f24c5ced2ad35839a30'
+        });
+
+        upload.promise().done(function(fileInfo) {
             tempUploadData.audioURL = fileInfo.cdnUrl;
 
             if(audioLbl) {
@@ -1481,33 +1494,49 @@ window.triggerAudioUpload = function() {
                 titleInput.value = name;
             }
         }).fail(function(error, fileInfo){
-            // ESTO HARÁ QUE EL CELULAR TE MUESTRE EL ERROR REAL EN PANTALLA
-            alert("⚠️ EL SERVIDOR DE UPLOADCARE DICE:\n\n" + error);
-            
+            alert("⚠️ ERROR DE SUBIDA:\n\n" + error);
             notify("Error: " + error, "error");
             btn.innerText = "SELECCIONAR ARCHIVO DE AUDIO";
             btn.style.background = "white"; 
             btn.style.color = "black";
         });
-    });
+    };
+
+    // 4. Activamos el input invisible
+    input.click();
 };
 
+// FIX DEFINITIVO: Subida de Imagen Nativa (Sin ventana problemática)
 window.triggerCoverUpload = function() {
-    uploadcare.openDialog(null, {
-        publicKey: '8f24c5ced2ad35839a30',
-        tabs: 'file',
-        accept: 'image/*'
-    }).done(function(file) {
+    if (typeof uploadcare === 'undefined') return notify("Uploadcare no cargó.", "error");
+
+    let input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
         const preview = document.getElementById('up-cover-preview');
         preview.innerHTML = '<span style="color:var(--accent); font-weight:bold;">Subiendo...</span>';
         
-        file.promise().done(function(fileInfo) {
+        const upload = uploadcare.fileFrom('object', file, {
+            publicKey: '8f24c5ced2ad35839a30'
+        });
+
+        upload.promise().done(function(fileInfo) {
             tempUploadData.imageURL = fileInfo.cdnUrl;
             preview.innerHTML = '';
             preview.style.backgroundImage = `url(${fileInfo.cdnUrl})`;
             preview.style.border = '2px solid var(--gold)';
+        }).fail(function(error){
+            notify("Error al subir imagen", "error");
+            preview.innerHTML = '<span style="font-size:3.5rem;">📷</span><span style="color:#888; font-weight:bold; margin-top:10px; text-transform: uppercase;">Subir Imagen</span>';
         });
-    });
+    };
+
+    input.click();
 };
 
 window.submitSongToFirebase = async function() {
@@ -1522,7 +1551,6 @@ window.submitSongToFirebase = async function() {
     btnSubmit.style.pointerEvents = "none";
     
     try {
-        // 1. BLOQUEO ANTI-DUPLICADOS
         if (window.db) {
             const checkQuery = await window.db.collection("globalSongs").where("title", "==", title).get();
             if (!checkQuery.empty) {
@@ -1532,7 +1560,6 @@ window.submitSongToFirebase = async function() {
             }
         }
 
-        // 2. AUTO-PORTADA MÁGICA CON iTUNES API (Alta Definición)
         let finalImageUrl = tempUploadData.imageURL;
         if (!finalImageUrl) {
             try {
@@ -1546,7 +1573,6 @@ window.submitSongToFirebase = async function() {
             } catch(e) { console.warn("No se encontró portada automática."); }
         }
 
-        // 3. SUBIR A FIREBASE
         const songData = {
             title: title,
             audioURL: tempUploadData.audioURL,
