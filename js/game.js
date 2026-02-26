@@ -843,54 +843,85 @@ window.toMenu = function() {
     const pauseM = document.getElementById('modal-pause');
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 };
-// === SISTEMA MULTI-TOUCH PARA CELULARES ===
-function initMobileTouchControls(keyCount) {
-    const touchContainer = document.getElementById('mobile-touch-zones');
-    if (!touchContainer) return;
+// === SISTEMA MULTI-TOUCH A PRUEBA DE BALAS ===
+window.initMobileTouchControls = function(keyCount) {
+    let touchContainer = document.getElementById('mobile-touch-zones');
+    
+    // 1. Crear el contenedor si no existe (asegurando Z-Index máximo)
+    if (!touchContainer) {
+        touchContainer = document.createElement('div');
+        touchContainer.id = 'mobile-touch-zones';
+        // z-index brutal para asegurar que nada tape los dedos
+        touchContainer.style.cssText = 'display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 999999; flex-direction: row; pointer-events: auto;';
+        
+        // Adjuntarlo al document.body en vez de game-layer evita problemas de perspectiva 3D
+        document.body.appendChild(touchContainer); 
+    }
 
-    // Solo activamos las zonas táctiles si detectamos una pantalla pequeña o un dispositivo touch
+    // 2. Si es PC o pantalla grande, lo ocultamos y salimos
     if (window.innerWidth > 800 && !('ontouchstart' in window)) {
         touchContainer.style.display = 'none';
         return;
     }
 
     touchContainer.style.display = 'flex';
-    touchContainer.innerHTML = ''; // Limpiamos zonas anteriores
+    touchContainer.innerHTML = ''; // Limpiar carriles viejos
 
-    // Obtener las teclas configuradas por el usuario (Fallback a D F J K si no existe)
+    // 3. Obtener teclas actuales (Fallback seguro a DFJK)
     let currentKeys = ['d', 'f', 'j', 'k']; 
     if (window.cfg && window.cfg.keybinds && window.cfg.keybinds[keyCount]) {
         currentKeys = window.cfg.keybinds[keyCount];
+    } else if (keyCount === 6) {
+        currentKeys = ['s', 'd', 'f', 'j', 'k', 'l'];
     }
 
-    // Crear una columna invisible por cada tecla
+    // 4. Crear los carriles
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
         zone.style.flex = '1';
         zone.style.height = '100%';
-        // Descomenta la siguiente línea si quieres ver las líneas guía de las zonas en celular
-        // zone.style.borderRight = '1px solid rgba(255,255,255,0.05)';
+        zone.style.borderRight = '1px solid rgba(255,255,255,0.1)'; // Línea guía sutil
+        zone.style.background = 'rgba(255,0,85,0)'; // Transparente por defecto
+        zone.style.transition = 'background 0.05s ease'; // Transición rápida para el flash
         
         const targetKey = currentKeys[i].toLowerCase();
+        // Generar un keyCode numérico para emular el teclado a la perfección
+        const keyCode = targetKey.toUpperCase().charCodeAt(0);
 
-        // Detectar cuando el dedo TOCA la pantalla (Simula presionar tecla)
+        // Disparador de eventos maestro
+        const dispatchKey = (type) => {
+            const event = new KeyboardEvent(type, { 
+                key: targetKey, 
+                code: `Key${targetKey.toUpperCase()}`, 
+                keyCode: keyCode, 
+                which: keyCode, 
+                bubbles: true, 
+                cancelable: true 
+            });
+            // Enviamos el evento a todo el documento y a window por seguridad
+            document.dispatchEvent(event);
+            window.dispatchEvent(event);
+        };
+
+        // EVENTOS TÁCTILES
         zone.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Evita que la pantalla haga zoom o scroll
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: targetKey, code: `Key${targetKey.toUpperCase()}` }));
+            e.preventDefault(); // Detiene el zoom de celular
+            zone.style.background = 'rgba(255,0,85,0.2)'; // FLASH VISUAL AL TOCAR
+            dispatchKey('keydown');
         }, { passive: false });
 
-        // Detectar cuando el dedo SUELTA la pantalla (Simula soltar tecla)
         zone.addEventListener('touchend', (e) => {
             e.preventDefault();
-            document.dispatchEvent(new KeyboardEvent('keyup', { key: targetKey, code: `Key${targetKey.toUpperCase()}` }));
+            zone.style.background = 'rgba(255,0,85,0)'; // QUITAR FLASH
+            dispatchKey('keyup');
         }, { passive: false });
 
-        // Por si el dedo se desliza fuera de la zona
         zone.addEventListener('touchcancel', (e) => {
             e.preventDefault();
-            document.dispatchEvent(new KeyboardEvent('keyup', { key: targetKey, code: `Key${targetKey.toUpperCase()}` }));
+            zone.style.background = 'rgba(255,0,85,0)'; // QUITAR FLASH
+            dispatchKey('keyup');
         }, { passive: false });
 
         touchContainer.appendChild(zone);
     }
-}
+};
