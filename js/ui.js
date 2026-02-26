@@ -1455,8 +1455,8 @@ window.triggerAudioUpload = function() {
     
     uploadcare.openDialog(null, {
         publicKey: '8f24c5ced2ad35839a30',
-        tabs: 'file',
-        accept: 'audio/*'
+        tabs: 'file'
+        // ELIMINAMOS EL "accept: 'audio/*'" PARA QUE ANDROID NO LO RECHACE
     }).done(function(file) {
         const btn = document.getElementById('btn-up-audio');
         const audioLbl = document.getElementById('lbl-up-audio');
@@ -1467,7 +1467,6 @@ window.triggerAudioUpload = function() {
         btn.style.color = "black";
 
         file.promise().done(function(fileInfo) {
-            // FIX CRÍTICO: Guardar en la variable local correcta que usa submitSongToFirebase
             tempUploadData.audioURL = fileInfo.cdnUrl;
 
             // Avisar que fue un éxito (Verde)
@@ -1477,6 +1476,7 @@ window.triggerAudioUpload = function() {
             }
             btn.innerText = "¡MP3 CARGADO!";
             btn.style.background = "#12FA05";
+            btn.style.color = "black";
             
             // Autocompletar el título si está vacío
             const titleInput = document.getElementById('up-title');
@@ -1485,10 +1485,10 @@ window.triggerAudioUpload = function() {
                 titleInput.value = name;
             }
         }).fail(function(error){
-            notify("Uploadcare rechazó el archivo. Reintenta.", "error");
+            notify("Uploadcare rechazó el archivo. Intenta con otro.", "error");
             btn.innerText = "SELECCIONAR ARCHIVO DE AUDIO";
-            btn.style.background = ""; // Regresa al color normal
-            btn.style.color = "white";
+            btn.style.background = "white"; // Fix visual del botón
+            btn.style.color = "black";      // Fix visual del texto
         });
     });
 };
