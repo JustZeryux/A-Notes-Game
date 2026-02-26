@@ -511,3 +511,14 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 5px; height: 100vh; z-index: 800; background: rgba(0,0,0,0.5); border: none; }
     .judge-pop { font-size: 3.5rem; top: 40%; }
 }
+
+/* FIX INFALIBLE PARA UPLOADCARE */
+.uploadcare--dialog { 
+    z-index: 9999999 !important; 
+    position: fixed !important; 
+}
+.uploadcare--dialog__container { 
+    transform: none !important; 
+    filter: none !important; 
+    backdrop-filter: none !important; 
+}
