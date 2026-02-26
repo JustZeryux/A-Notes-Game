@@ -444,21 +444,30 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     .set-tab-btn.active { border-left: none; border-bottom: 4px solid var(--blue); }
     .set-row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px 0; }
     
-    /* 4. GAMEPLAY HUD (Móvil Limpio) */
-    #ig-profile, .stats-col { display: none !important; }
+    /* =========================================================
+       4. GAMEPLAY HUD UX (MÓVIL LIMPIO Y PAUSA)
+       ========================================================= */
+    #ig-profile, .stats-col, .hud-extra { display: none !important; } /* Ocultar ruido visual */
+    
     #track { width: 100%; max-width: 100%; border: none; background: rgba(0,0,0,0.85); box-shadow: none; }
     #track.middle-scroll { max-width: 100%; }
 
-    #hud { left: 10px; right: 10px; top: 15px; width: calc(100% - 20px); transform: none; flex-direction: row; justify-content: space-between; align-items: flex-start; z-index: 600; }
-    .score-val { font-size: 2rem; order: 2; }
-    .acc-val { font-size: 1.5rem; order: 1; }
+    /* Botón de Pausa solo en celular */
+    #mobile-pause-btn {
+        display: flex; position: absolute; top: 20px; right: 20px;
+        width: 50px; height: 50px; background: rgba(255,0,85,0.2);
+        border: 2px solid var(--accent); border-radius: 50%;
+        align-items: center; justify-content: center;
+        font-size: 1.5rem; color: white; z-index: 2000;
+        box-shadow: 0 0 15px rgba(255,0,85,0.5); cursor: pointer;
+    }
+
+    #hud { left: 15px; top: 20px; width: auto; transform: none; flex-direction: column; align-items: flex-start; z-index: 600; gap: 5px; }
+    .score-val { font-size: 2.2rem; order: 1; text-shadow: 0 2px 10px black; }
+    .acc-val { font-size: 1.5rem; order: 2; }
     
-    #combo-container { top: 35%; right: 50%; transform: translateX(50%); align-items: center; z-index: 50; opacity: 0.25; pointer-events: none; }
-    .combo-val { font-size: 6rem; }
+    #combo-container { top: 35%; right: 50%; transform: translateX(50%); align-items: center; z-index: 50; opacity: 0.3; pointer-events: none; }
+    .combo-val { font-size: 7rem; }
     
-    .hud-extra { bottom: 15px; right: 15px; opacity: 0.5; }
-    .hud-fc { font-size: 1.8rem; }
-    
-    .health-bar { position: fixed; right: 0; left: auto; top: 0; width: 6px; height: 100vh; border-radius: 0; border: none; z-index: 800; background: rgba(0,0,0,0.5); order: unset; }
-    .judge-pop { font-size: 3.5rem; top: 35%; }
-}
+    .health-bar { position: fixed; left: 0; right: auto; top: 0; width: 6px; height: 100vh; border-radius: 0; border: none; z-index: 800; background: rgba(0,0,0,0.5); order: unset; }
+    .judge-pop { font-size: 4rem; top: 35%; text-shadow: 0 2px 15px black; }
