@@ -76,6 +76,7 @@
             <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
         </aside>
 
+        <main class="content-area">
             <div class="top-bar">
                 <input type="text" class="search-inp" placeholder="Buscar en la nube..." oninput="renderMenu(this.value)">
                 <div style="display:flex; gap:20px; align-items:center;">
@@ -95,7 +96,6 @@
             <div id="top-progress-time">0:00 / 0:00</div>
             <div id="game-layer" style="display:none;">
     <div id="mobile-pause-btn" onclick="togglePause()">⏸</div>
-</div>
         <div id="vs-hud">
             <div id="multi-players-container"></div>
         </div>
@@ -402,5 +402,6 @@
     <script src="js/ui.js"></script>
     <script src="js/game.js"></script>
     <script src="js/main.js"></script>
+</div>
 </body>       
 </html>
