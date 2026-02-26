@@ -218,7 +218,8 @@ window.prepareAndPlaySong = async function(k) {
 
 window.playSongInternal = function(s) {
     if(!s) return;
-    
+    // Iniciar controles táctiles basados en la cantidad de teclas (ej. 4)
+    initMobileTouchControls(window.keys || 4);
     window.st.act = true; window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
     window.st.spawned = []; 
