@@ -842,3 +842,54 @@ window.toMenu = function() {
     const pauseM = document.getElementById('modal-pause');
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 };
+// === SISTEMA MULTI-TOUCH PARA CELULARES ===
+function initMobileTouchControls(keyCount) {
+    const touchContainer = document.getElementById('mobile-touch-zones');
+    if (!touchContainer) return;
+
+    // Solo activamos las zonas táctiles si detectamos una pantalla pequeña o un dispositivo touch
+    if (window.innerWidth > 800 && !('ontouchstart' in window)) {
+        touchContainer.style.display = 'none';
+        return;
+    }
+
+    touchContainer.style.display = 'flex';
+    touchContainer.innerHTML = ''; // Limpiamos zonas anteriores
+
+    // Obtener las teclas configuradas por el usuario (Fallback a D F J K si no existe)
+    let currentKeys = ['d', 'f', 'j', 'k']; 
+    if (window.cfg && window.cfg.keybinds && window.cfg.keybinds[keyCount]) {
+        currentKeys = window.cfg.keybinds[keyCount];
+    }
+
+    // Crear una columna invisible por cada tecla
+    for (let i = 0; i < keyCount; i++) {
+        const zone = document.createElement('div');
+        zone.style.flex = '1';
+        zone.style.height = '100%';
+        // Descomenta la siguiente línea si quieres ver las líneas guía de las zonas en celular
+        // zone.style.borderRight = '1px solid rgba(255,255,255,0.05)';
+        
+        const targetKey = currentKeys[i].toLowerCase();
+
+        // Detectar cuando el dedo TOCA la pantalla (Simula presionar tecla)
+        zone.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Evita que la pantalla haga zoom o scroll
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: targetKey, code: `Key${targetKey.toUpperCase()}` }));
+        }, { passive: false });
+
+        // Detectar cuando el dedo SUELTA la pantalla (Simula soltar tecla)
+        zone.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            document.dispatchEvent(new KeyboardEvent('keyup', { key: targetKey, code: `Key${targetKey.toUpperCase()}` }));
+        }, { passive: false });
+
+        // Por si el dedo se desliza fuera de la zona
+        zone.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            document.dispatchEvent(new KeyboardEvent('keyup', { key: targetKey, code: `Key${targetKey.toUpperCase()}` }));
+        }, { passive: false });
+
+        touchContainer.appendChild(zone);
+    }
+}
