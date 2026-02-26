@@ -217,7 +217,21 @@
 
                     <div style="background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
                         <div style="color:var(--blue); font-weight:900; margin-bottom:10px;">🎧 ARCHIVO MP3</div>
+
+                        <div style="background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
+                        <div style="color:var(--blue); font-weight:900; margin-bottom:10px;">🎧 ARCHIVO MP3</div>
                         
+                        <div style="display:flex; gap:10px; margin-bottom:15px;">
+                            <button class="action" id="btn-up-audio" onclick="triggerAudioUpload()" style="flex:1; font-size: 0.9rem;">SUBIR MP3</button>
+                        </div>
+                                            
+                        <div id="lbl-up-audio" style="margin-top:15px; font-weight: bold; color:#666; text-align:center;">Ningún archivo seleccionado</div>
+                    </div>
+                    
+                    <input type="hidden" id="up-lyrics" value="">
+                    
+                </div> <div style="width: 250px; display:flex; flex-direction:column; gap:10px;">
+                    <div style="color:var(--gold); font-weight:900;">🖼️ PORTADA (Opcional)</div>
                         <div style="display:flex; gap:10px; margin-bottom:15px;">
                             <button class="action" id="btn-up-audio" onclick="triggerAudioUpload()" style="flex:1; font-size: 0.9rem;">SUBIR MP3</button>
                         </div>
