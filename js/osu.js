@@ -138,11 +138,11 @@ window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
             } catch(e) { console.warn("No se encontraron letras"); }
         }
 
-        window.curSongData = {
+window.curSongData = {
             id: "osu_" + setId,
             title: title, 
             imageURL: coverUrl,
-            lyrics: fetchedLyrics // Inyectamos las letras directamente al juego
+            lyrics: fetchedLyrics 
         };
 
         const songObj = { 
@@ -152,8 +152,17 @@ window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
             kVersion: parsed.keys 
         };
 
+        // ESTO ES VITAL PARA EL MULTIJUGADOR:
+        window.preparedSong = songObj; 
         loader.style.display = 'none';
-        playSongInternal(songObj);
+
+        if(window.currentLobbyId) {
+             // Si estamos en online, le avisamos al servidor que ya descomprimimos todo
+             if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
+        } else {
+             // Si estamos solos, empezamos directo
+             playSongInternal(songObj);
+        }
 
     } catch(e) {
         console.error(e);
