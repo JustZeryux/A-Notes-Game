@@ -604,3 +604,29 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     background: rgba(255,102,170,0.1);
     box-shadow: 0 0 8px rgba(255,102,170,0.4);
 }
+
+/* === EDITOR STUDIO === */
+.ed-lane {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-right: 1px dashed #333;
+    pointer-events: none;
+}
+.ed-note {
+    position: absolute;
+    height: 20px;
+    background: #00FFFF;
+    border: 2px solid white;
+    border-radius: 4px;
+    box-shadow: 0 0 10px #00FFFF;
+    cursor: pointer;
+    z-index: 50;
+    transform: translateY(-50%); /* Centra la nota en el clic */
+    transition: transform 0.1s;
+}
+.ed-note:hover {
+    transform: translateY(-50%) scale(1.1);
+    background: #ff66aa;
+    box-shadow: 0 0 15px #ff66aa;
+}
