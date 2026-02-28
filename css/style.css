@@ -630,3 +630,48 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     background: #ff66aa;
     box-shadow: 0 0 15px #ff66aa;
 }
+
+/* === ADAPTACIÓN MÓVIL PARA EL SÚPER PERFIL Y MENÚS === */
+@media (max-width: 768px) {
+    /* Los modales ya no tendrán ancho fijo, usarán el 95% de la pantalla */
+    .modal-panel {
+        width: 95% !important;
+        max-width: 100% !important;
+        padding: 15px !important;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Acomodar el Avatar y el Nombre al centro */
+    .profile-header-flex {
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center;
+    }
+    .profile-header-flex > div {
+        text-align: center !important;
+        padding-bottom: 0 !important;
+    }
+    #p-av-big {
+        width: 110px !important;
+        height: 110px !important;
+        margin: -50px auto 15px auto !important; /* Centrado y superpuesto al banner */
+    }
+    #p-name {
+        font-size: 2.2rem !important;
+    }
+
+    /* La cuadrícula de 4 stats pasa a ser de 2 en 2 para que quepan */
+    .profile-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+
+    /* Las tarjetas de Skins y Marcos se apilan una debajo de otra */
+    .profile-equip-flex {
+        flex-direction: column !important;
+    }
+    
+    /* Textos más legibles en tarjetas de ranking/amigos */
+    .rank-card-text { font-size: 1rem !important; }
+}
