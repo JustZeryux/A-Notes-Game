@@ -545,3 +545,45 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     transform: scale(1.05); /* Escalado extra para que no se vean bordes negros si la cámara tiembla */
     transition: transform 0.1s ease-out, filter 0.1s ease-out;
 }
+
+/* === ESTILOS DEL BUSCADOR UNIFICADO Y OSU === */
+.filter-btn {
+    background: transparent;
+    border: 1px solid #444;
+    color: #888;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+.filter-btn:hover { background: rgba(255,255,255,0.1); }
+.filter-btn.active {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+}
+.filter-btn[data-val="osu"].active {
+    background: #ff66aa;
+    color: #fff;
+    border-color: #ff66aa;
+}
+
+/* Aura Rosa para tarjetas Osu */
+.song-card.osu-card {
+    border-color: #ff66aa;
+    box-shadow: 0 0 15px rgba(255, 102, 170, 0.2);
+}
+.song-card.osu-card:hover {
+    box-shadow: 0 0 25px rgba(255, 102, 170, 0.6);
+    transform: translateY(-5px) scale(1.02);
+}
+
+/* Insignia especial de Osu */
+.diff-badge.osu-badge {
+    border-color: #ff66aa !important;
+    color: #ff66aa !important;
+    box-shadow: 0 0 8px rgba(255,102,170,0.4);
+    background: rgba(255,102,170,0.1);
+}
