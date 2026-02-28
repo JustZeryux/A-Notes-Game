@@ -108,9 +108,9 @@ window.toggleProfileSettings = function(show) {
 };
 
 window.showUserProfile = async function(targetName) {
-    if (!window.db) return notify("Base de datos no lista", "error");
+    if (!window.db) return notify("Error: Base de datos no conectada", "error");
     
-    // 1. Preparación de la interfaz
+    // 1. Mostrar modal y limpiar estados previos
     window.toggleProfileSettings(false);
     const m = document.getElementById('modal-profile'); 
     if(m) m.style.display = 'flex';
@@ -118,9 +118,9 @@ window.showUserProfile = async function(targetName) {
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
     
-    // Reset visual y placeholders
     setText('p-name', "Cargando...");
-    setText('p-global-rank', "#--");
+    setText('p-global-rank', "#..."); // Estado de cálculo
+    
     const avBig = document.getElementById('p-av-big');
     if(avBig) { 
         avBig.style.backgroundImage = "none"; 
@@ -129,20 +129,17 @@ window.showUserProfile = async function(targetName) {
         avBig.style.boxShadow = "none";
     }
 
-    // Identificar si es mi propio perfil
     const isMe = (window.user && targetName === window.user.name);
     document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
     document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
-    if(avBig) avBig.style.cursor = isMe ? 'pointer' : 'default';
 
     try {
-        // 2. CARGA DE DATOS (Primero los puntos para que no salgan en 0)
+        // 2. OBTENER DATOS DEL USUARIO
         const doc = await window.db.collection('users').doc(targetName).get();
         if (!doc.exists) return notify("Usuario no encontrado", "error");
-        
         const d = doc.data();
         
-        // Rellenar estadísticas
+        // Rellenar estadísticas de inmediato
         setText('p-name', targetName);
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
@@ -156,26 +153,25 @@ window.showUserProfile = async function(targetName) {
             avBig.style.backgroundImage = url;
             if(d.avatarData) avBig.textContent = ""; 
         }
-        const headerBg = document.getElementById('p-header-bg');
-        if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
 
-        // 3. RANKING Y MEDALLAS (Top 3)
-        const rankingSnap = await window.db.collection("users").orderBy("pp", "desc").get();
-        let rankPos = 0;
-        rankingSnap.forEach((userDoc, index) => {
-            if(userDoc.id === targetName) rankPos = index + 1;
-        });
+        // 3. CALCULAR RANKING GLOBAL REAL (Sin límites de 100+)
+        // Contamos cuántos usuarios tienen más PP que el perfil actual
+        const leaderboardSnap = await window.db.collection("users")
+            .where("pp", ">", (d.pp || 0))
+            .get();
+        
+        const myRank = leaderboardSnap.size + 1;
+        setText('p-global-rank', "#" + myRank); // ¡Adiós al #100+ genérico!
 
-        const finalRank = rankPos > 0 ? "#" + rankPos : "#100+";
-        setText('p-global-rank', finalRank);
-
-        if(avBig && rankPos > 0 && rankPos <= 3) {
-            const colors = {1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32"};
-            avBig.style.border = `4px solid ${colors[rankPos]}`;
-            avBig.style.boxShadow = `0 0 20px ${colors[rankPos]}`;
+        // 4. SISTEMA DE MEDALLAS VISUALES
+        if(avBig && myRank <= 3) {
+            const medalColors = {1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32"};
+            avBig.style.border = `4px solid ${medalColors[myRank]}`;
+            avBig.style.boxShadow = `0 0 20px ${medalColors[myRank]}`;
+            if(myRank === 1) avBig.style.animation = "gold-pulse 2s infinite alternate";
         }
 
-        // 4. ACCIONES SOCIALES (Amigos, Chat, Desafiar)
+        // 5. FUNCIONES SOCIALES (Restauradas)
         if (!isMe) {
             const btnAdd = document.getElementById('btn-add-friend');
             const isFriend = window.user.friends && window.user.friends.includes(targetName);
@@ -194,24 +190,14 @@ window.showUserProfile = async function(targetName) {
                 window.openFloatingChat(targetName); 
                 window.closeModal('profile'); 
             };
-            document.getElementById('btn-challenge-user').onclick = () => { 
-                window.challengeFriend(targetName); 
-            };
+            document.getElementById('btn-challenge-user').onclick = () => { window.challengeFriend(targetName); };
         }
 
-        // 5. EQUIPAMIENTO VISUAL
-        let skinName = "Default", uiName = "Ninguno";
-        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
-            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
-            if(sItem) skinName = sItem.name;
-            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
-            if(uItem) uiName = uItem.name;
-        }
-        setText('p-equipped-skin', skinName);
-        setText('p-equipped-ui', uiName);
+        // 6. EQUIPAMIENTO
         if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
 
     } catch(e) { 
-        console.error("Error cargando perfil:", e);
+        console.error("Error en ranking:", e);
+        notify("Error al sincronizar ranking", "error");
     }
 };
