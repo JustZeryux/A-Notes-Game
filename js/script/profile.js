@@ -108,34 +108,41 @@ window.toggleProfileSettings = function(show) {
 };
 
 window.showUserProfile = async function(targetName) {
-    if (!window.db) return;
+    if (!window.db) return notify("Base de datos no lista", "error");
     
+    // 1. Preparación de la interfaz
     window.toggleProfileSettings(false);
     const m = document.getElementById('modal-profile'); 
     if(m) m.style.display = 'flex';
     
-    // 1. Reset visual inmediato y estado de carga
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('profile-view').style.display = 'block';
+    
+    // Reset visual y placeholders
     setText('p-name', "Cargando...");
     setText('p-global-rank', "#--");
-    setText('p-score', "0"); setText('p-pp-display', "0 PP"); setText('p-sp-display', "0");
-    
     const avBig = document.getElementById('p-av-big');
     if(avBig) { 
         avBig.style.backgroundImage = "none"; 
         avBig.textContent = "G"; 
         avBig.style.border = "4px solid #333";
         avBig.style.boxShadow = "none";
-        avBig.classList.remove('top1-glow'); // Quitamos brillo previo
     }
 
+    // Identificar si es mi propio perfil
+    const isMe = (window.user && targetName === window.user.name);
+    document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
+    document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
+    if(avBig) avBig.style.cursor = isMe ? 'pointer' : 'default';
+
     try {
-        // 2. CARGA DE DATOS PRIMORDIAL (Para que no salgan en 0)
+        // 2. CARGA DE DATOS (Primero los puntos para que no salgan en 0)
         const doc = await window.db.collection('users').doc(targetName).get();
         if (!doc.exists) return notify("Usuario no encontrado", "error");
         
         const d = doc.data();
         
-        // Rellenar puntos inmediatamente
+        // Rellenar estadísticas
         setText('p-name', targetName);
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
@@ -149,40 +156,62 @@ window.showUserProfile = async function(targetName) {
             avBig.style.backgroundImage = url;
             if(d.avatarData) avBig.textContent = ""; 
         }
+        const headerBg = document.getElementById('p-header-bg');
+        if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
 
-        // 3. CÁLCULO DE RANKING (Independiente para no bloquear los datos)
+        // 3. RANKING Y MEDALLAS (Top 3)
         const rankingSnap = await window.db.collection("users").orderBy("pp", "desc").get();
         let rankPos = 0;
-        let index = 1;
-
-        rankingSnap.forEach((userDoc) => {
-            if(userDoc.id === targetName) rankPos = index;
-            index++;
+        rankingSnap.forEach((userDoc, index) => {
+            if(userDoc.id === targetName) rankPos = index + 1;
         });
 
         const finalRank = rankPos > 0 ? "#" + rankPos : "#100+";
         setText('p-global-rank', finalRank);
 
-        // 4. SISTEMA DE MEDALLAS Y BRILLO TOP 1
-        if(avBig && rankPos > 0) {
-            if(rankPos === 1) {
-                avBig.style.border = "4px solid #FFD700";
-                avBig.classList.add('top1-glow'); // Requiere el CSS de abajo
-            } else if(rankPos === 2) {
-                avBig.style.border = "4px solid #C0C0C0";
-                avBig.style.boxShadow = "0 0 15px #C0C0C0";
-            } else if(rankPos === 3) {
-                avBig.style.border = "4px solid #CD7F32";
-                avBig.style.boxShadow = "0 0 15px #CD7F32";
-            }
+        if(avBig && rankPos > 0 && rankPos <= 3) {
+            const colors = {1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32"};
+            avBig.style.border = `4px solid ${colors[rankPos]}`;
+            avBig.style.boxShadow = `0 0 20px ${colors[rankPos]}`;
         }
 
-        // Skins y marcos
-        if (typeof applyUIFrameVisuals === 'function') {
-            applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        // 4. ACCIONES SOCIALES (Amigos, Chat, Desafiar)
+        if (!isMe) {
+            const btnAdd = document.getElementById('btn-add-friend');
+            const isFriend = window.user.friends && window.user.friends.includes(targetName);
+            if (btnAdd) {
+                if (isFriend) {
+                    btnAdd.innerText = "✅ AMIGOS";
+                    btnAdd.style.background = "#333";
+                    btnAdd.onclick = null;
+                } else {
+                    btnAdd.innerText = "➕ AGREGAR AMIGO";
+                    btnAdd.style.background = "var(--good)";
+                    btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
+                }
+            }
+            document.getElementById('btn-chat-user').onclick = () => { 
+                window.openFloatingChat(targetName); 
+                window.closeModal('profile'); 
+            };
+            document.getElementById('btn-challenge-user').onclick = () => { 
+                window.challengeFriend(targetName); 
+            };
         }
+
+        // 5. EQUIPAMIENTO VISUAL
+        let skinName = "Default", uiName = "Ninguno";
+        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
+            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
+            if(sItem) skinName = sItem.name;
+            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
+            if(uItem) uiName = uItem.name;
+        }
+        setText('p-equipped-skin', skinName);
+        setText('p-equipped-ui', uiName);
+        if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
 
     } catch(e) { 
-        console.error("Error crítico en perfil:", e);
+        console.error("Error cargando perfil:", e);
     }
 };
