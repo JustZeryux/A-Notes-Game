@@ -2189,3 +2189,56 @@ window.openStudioDashboard = async function() {
         loader.style.color = "var(--miss)";
     }
 };
+
+// === MOTOR DEL MENÚ DE TECLAS DINÁMICO ===
+window.renderKeyInputs = function() {
+    const k = parseInt(document.getElementById('k-selector').value);
+    const container = document.getElementById('key-inputs-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    // Dibujamos tantos botones como K hayamos elegido
+    for(let i = 0; i < k; i++) {
+        let btn = document.createElement('button');
+        
+        // Limpiamos el texto para que "KeyD" se vea como "D" y "Space" como "ESPACIO"
+        let keyName = window.cfg.keys[k][i].replace('Key', '').replace('Space', 'ESPACIO');
+        
+        btn.style.cssText = 'padding:10px 15px; background:#333; color:white; border:2px solid #555; border-radius:8px; cursor:pointer; font-weight:bold; min-width:45px; transition:0.2s;';
+        btn.innerText = keyName;
+        
+        // Al darle clic al botón, espera la siguiente tecla
+        btn.onclick = function() {
+            btn.innerText = 'PRESIONA...';
+            btn.style.borderColor = '#ff66aa';
+            btn.style.boxShadow = '0 0 10px #ff66aa';
+            
+            const handler = (e) => {
+                e.preventDefault();
+                window.cfg.keys[k][i] = e.code; // Guarda el código de la tecla real
+                btn.innerText = e.code.replace('Key', '').replace('Space', 'ESPACIO');
+                btn.style.borderColor = '#00ffff';
+                btn.style.boxShadow = 'none';
+                document.removeEventListener('keydown', handler);
+            };
+            document.addEventListener('keydown', handler);
+        };
+        container.appendChild(btn);
+    }
+};
+
+window.saveNewKeys = function() {
+    localStorage.setItem('cfg', JSON.stringify(window.cfg));
+    alert("¡Teclas guardadas exitosamente para este modo!");
+};
+
+// Asegurarnos de que dibuje los botones al abrir el modal de ajustes
+const oldOpenModal = window.openModal;
+window.openModal = function(id) {
+    if(oldOpenModal) oldOpenModal(id);
+    else document.getElementById('modal-' + id).style.display = 'flex'; // Tu lógica base
+
+    if(id === 'settings' || id === 'ajustes') {
+        setTimeout(renderKeyInputs, 100); // Llama a dibujar los botones
+    }
+};
