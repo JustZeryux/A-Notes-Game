@@ -179,7 +179,7 @@ window.showUserProfile = async function(targetName) {
             }
         }
 
-        // RANKING Y ANIMACIONES ÉPICAS FINALES
+        // RANKING Y ANIMACIONES ÉPICAS FINALES - Solo números compactos
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
             let rankPos = 0; let index = 1;
             snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
@@ -190,10 +190,10 @@ window.showUserProfile = async function(targetName) {
                 if (rankPos <= 3 && profilePanel) {
                     profilePanel.classList.add(`epic-top-${rankPos}`);
                     if (badge) {
-                        // Textos especiales para los 3 mejores
-                        if (rankPos === 1) badge.innerHTML = `👑 TOP 1`;
-                        else if (rankPos === 2) badge.innerHTML = `🥈 TOP 2`;
-                        else if (rankPos === 3) badge.innerHTML = `🥉 TOP 3`;
+                        // Textos especiales para los 3 mejores - Solo el número con #
+                        if (rankPos === 1) badge.innerHTML = `#1`; // Mantenemos la corona solo para el #1
+                        else if (rankPos === 2) badge.innerHTML = `#2`;
+                        else if (rankPos === 3) badge.innerHTML = `#3`;
                         
                         badge.style.display = 'block';
                     }
@@ -204,7 +204,6 @@ window.showUserProfile = async function(targetName) {
 
             applyUIFrameVisuals(equippedUI, rankPos);
         }).catch(e => console.log("Ranking no disponible", e));
-
     } catch(e) { console.error("Error cargando perfil:", e); }
 };
 
