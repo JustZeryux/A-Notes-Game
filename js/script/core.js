@@ -44,3 +44,32 @@ function playHover(){
         } catch(e){}
     } 
 }
+
+// === SISTEMA DE NOTIFICACIONES GLOBAL ===
+window.notify = function(msg, type = "info") {
+    const container = document.getElementById('notification-area');
+    if(!container) {
+        console.log("Notificación (Oculta):", msg);
+        return;
+    }
+    
+    const div = document.createElement('div');
+    div.className = 'notify-card';
+    
+    // Colores según el tipo de mensaje
+    if(type === 'success') div.style.borderLeftColor = 'var(--good)';
+    else if(type === 'error') div.style.borderLeftColor = 'var(--miss)';
+    else div.style.borderLeftColor = 'var(--blue)';
+    
+    div.innerHTML = `<div class="notify-body">${msg}</div>`;
+    container.appendChild(div);
+    
+    // Efecto de sonido si está activado
+    if(typeof playHover === 'function') playHover();
+    
+    // Desaparecer automáticamente
+    setTimeout(() => {
+        div.style.animation = 'slideOut 0.3s forwards';
+        setTimeout(() => div.remove(), 300);
+    }, 3000);
+};
