@@ -1699,6 +1699,7 @@ window.debounceSearch = function(val) {
 };
 
 // Carga principal al abrir el juego
+// Carga principal al abrir el juego
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
     grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#888; font-size:1.5rem; font-weight:bold;">Conectando a los servidores... ⏳</div>';
@@ -1709,14 +1710,15 @@ window.fetchUnifiedData = async function(query = "") {
     // 1. OBTENER DE FIREBASE (Tu Comunidad)
     try {
         if(window.db) {
-            let snapshot = await window.db.collection("globalSongs").orderBy('createdAt', 'desc').limit(50).get();
+            // FIX: Quitamos el orderBy('createdAt') para que Firebase no oculte las canciones antiguas
+            let snapshot = await window.db.collection("globalSongs").limit(50).get();
             snapshot.forEach(doc => {
                 let data = doc.data();
                 if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
                     fbSongs.push({
                         id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
                         imageURL: data.imageURL || 'icon.png', isOsu: false,
-                        keysAvailable: [4, 6, 7, 9], // Firebase genera todas por defecto
+                        keysAvailable: [4, 6, 7, 9], 
                         raw: { ...data, id: doc.id }
                     });
                 }
@@ -1726,16 +1728,16 @@ window.fetchUnifiedData = async function(query = "") {
 
     // 2. OBTENER DE OSU! DIRECT (API)
     try {
-        // Si no hay búsqueda, traemos los más populares ("stars>3"). Si hay búsqueda, la usamos.
-        let q = query ? encodeURIComponent(query) : 'stars>3';
+        // FIX: Buscamos 'mania' por defecto para que siempre salgan mapas chulos al inicio
+        let q = query ? encodeURIComponent(query) : 'mania';
         const res = await fetch(`https://api.nerinyan.moe/search?q=${q}&m=3`);
         const data = await res.json();
         
         if (data && data.length > 0) {
             data.forEach(set => {
-                const maniaBeatmaps = set.beatmaps.filter(b => b.mode === 3);
+                // FIX VITAL: La API de Osu usa "mode_int" o "mania" en texto.
+                const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
                 if(maniaBeatmaps.length > 0) {
-                    // Extraer qué dificultades (teclas) tiene realmente este mapa de Osu
                     let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
                     osuSongs.push({
                         id: set.id, title: set.title, artist: `Artista: ${set.artist}`,
