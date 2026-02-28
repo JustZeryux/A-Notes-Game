@@ -2071,3 +2071,79 @@ window.openUnifiedDiffModal = function(song) {
 
     openModal('diff');
 };
+
+// === MOTOR DEL CREATOR STUDIO ===
+window.openStudioDashboard = async function() {
+    openModal('studio');
+    const grid = document.getElementById('studio-grid');
+    const loader = document.getElementById('studio-loading');
+    grid.innerHTML = '';
+    loader.style.display = 'block';
+
+    // Verificamos quién está conectado
+    let myUsername = window.user ? window.user.username : localStorage.getItem('username');
+
+    if (!myUsername) {
+        loader.innerText = "Debes iniciar sesión para ver tus mapas. ❌";
+        loader.style.color = "var(--miss)";
+        return;
+    }
+
+    try {
+        // Le pedimos a Firebase SOLO las canciones subidas por TI
+        let snapshot = await window.db.collection("globalSongs").where("uploader", "==", myUsername).get();
+        loader.style.display = 'none';
+
+        if (snapshot.empty) {
+            grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#aaa; font-size:1.2rem; font-weight:bold;">Aún no has subido ninguna canción. <br><br> ¡Sube tu primer MP3 para empezar a mapear! ☁️</div>';
+            return;
+        }
+
+        // Dibujamos tus canciones como un panel de administrador
+        snapshot.forEach(doc => {
+            let song = doc.data();
+            song.id = doc.id; // Guardamos el ID real de la base de datos
+
+            const card = document.createElement('div');
+            card.className = 'song-card'; 
+            card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; border: 2px solid #00ffff; box-shadow: 0 0 15px rgba(0, 255, 255, 0.2); display:flex; flex-direction:column; background:#111;';
+            
+            card.innerHTML = `
+                <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL || 'icon.png'}'); background-size: cover; background-position: center; opacity: 0.4;"></div>
+                
+                <div style="position:relative; z-index:2; padding:15px; flex:1;">
+                    <div style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div>
+                    <div style="font-size: 0.8rem; color: #ccc; margin-top:5px; font-weight:bold;">Artista: ${song.author || 'Desconocido'}</div>
+                </div>
+                
+                <div style="position:relative; z-index:2; display:flex; gap:10px; padding:10px; background:rgba(0,0,0,0.85); border-top:1px solid #333;">
+                    <button class="action btn-edit" style="flex:1; padding:5px; font-size:0.8rem; background:#ff66aa; color:black; width:auto; margin:0; box-shadow:0 0 10px rgba(255,102,170,0.4);">✏️ EDITAR MAPA</button>
+                    <button class="action btn-del" style="flex:1; padding:5px; font-size:0.8rem; border-color:#F9393F; color:#F9393F; background:transparent; width:auto; margin:0;">🗑️ BORRAR</button>
+                </div>
+            `;
+            
+            // Botón de abrir el Editor de tu canción
+            card.querySelector('.btn-edit').onclick = () => {
+                closeModal('studio');
+                if(typeof openEditor === 'function') openEditor(song, 4); // Abre el editor en 4 teclas por defecto
+                else alert("Error: El archivo editor.js no está conectado.");
+            };
+            
+            // Botón para borrar la canción de tu base de datos para siempre
+            card.querySelector('.btn-del').onclick = async () => {
+                if(confirm(`¿Seguro que quieres borrar "${song.title}" para siempre? Se eliminará de la base de datos global.`)) {
+                    card.style.opacity = '0.5';
+                    await window.db.collection('globalSongs').doc(song.id).delete();
+                    openStudioDashboard(); // Recargamos la pantalla para que desaparezca
+                }
+            };
+
+            grid.appendChild(card);
+        });
+
+    } catch(e) {
+        console.error(e);
+        loader.innerText = "Error al conectar con tu Nube.";
+        loader.style.color = "var(--miss)";
+    }
+};
