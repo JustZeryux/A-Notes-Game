@@ -118,3 +118,76 @@ window.challengeFriend = function(friendName) {
     if(typeof window.openSongSelectorForLobby === 'function') window.openSongSelectorForLobby();
     window.pendingInvite = friendName; 
 };
+
+// Abrir/Cerrar la campana
+window.openNotifPanel = function() {
+    const p = document.getElementById('notif-panel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+};
+
+// Guardar tu biografía y estado de privacidad
+window.saveProfilePrivacy = async function() {
+    if(!window.user || !window.db) return;
+    const status = document.getElementById('inp-custom-status').value;
+    const bio = document.getElementById('inp-bio').value;
+    const hide = document.getElementById('chk-hide-items').checked;
+
+    try {
+        await window.db.collection('users').doc(window.user.name).update({
+            customStatus: status,
+            bio: bio,
+            hideItems: hide
+        });
+        notify("Perfil actualizado", "success");
+        toggleProfileSettings(false);
+        showUserProfile(window.user.name); // Recargar
+    } catch(e) { notify("Error al guardar", "error"); }
+};
+
+// Sistema de Notificaciones en Tiempo Real (Incluso si estabas offline)
+window.listenToNotifications = function() {
+    if(!window.user || !window.db) return;
+
+    window.db.collection('users').doc(window.user.name)
+      .collection('notifications').orderBy('timestamp', 'desc')
+      .onSnapshot(snap => {
+        const notifContainer = document.getElementById('notif-list-content');
+        const badge = document.getElementById('notif-badge');
+        
+        if (snap.empty) {
+            notifContainer.innerHTML = '<div style="text-align:center; color:#666; padding:20px;">No tienes notificaciones.</div>';
+            badge.style.display = 'none';
+            return;
+        }
+
+        notifContainer.innerHTML = '';
+        let unreadCount = 0;
+
+        snap.forEach(doc => {
+            const data = doc.data();
+            if(!data.read) unreadCount++;
+
+            const div = document.createElement('div');
+            div.style.padding = "10px";
+            div.style.borderBottom = "1px solid #222";
+            div.style.background = data.read ? "transparent" : "rgba(249, 57, 63, 0.1)"; // Rojo bajito si no está leída
+            
+            div.innerHTML = `
+                <div style="font-weight:bold; color:${data.read ? '#aaa' : 'white'};">${data.title}</div>
+                <div style="font-size:0.8rem; color:#888;">${data.msg}</div>
+                ${data.type === 'friend_request' ? `<button onclick="acceptFriend('${data.from}', '${doc.id}')" style="margin-top:5px; background:var(--good); color:black; border:none; padding:2px 10px; cursor:pointer;">Aceptar</button>` : ''}
+            `;
+            notifContainer.appendChild(div);
+        });
+
+        if(unreadCount > 0) {
+            badge.innerText = unreadCount;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    });
+};
+
+// Ejecutar el listener cuando inicies sesión (Pon esto en auth.js cuando el login sea exitoso)
+// listenToNotifications();
