@@ -1977,31 +1977,64 @@ window.renderUnifiedGrid = function() {
     });
 };
 
+// --- MENÚ DE DIFICULTADES UNIFICADO (CON CANDADOS) ---
 window.openUnifiedDiffModal = function(song) {
-    document.getElementById('diff-song-title').innerText = song.title;
-    document.getElementById('diff-song-cover').style.backgroundImage = `url('${song.imageURL}')`;
+    // 1. Forzamos la actualización inmediata del DOM para evitar que se quede pegada la canción anterior
+    const titleEl = document.getElementById('diff-song-title');
+    const coverEl = document.getElementById('diff-song-cover');
+    titleEl.innerText = song.title;
+    coverEl.style.backgroundImage = `url('${song.imageURL}')`;
+    
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
     
-    const colors = {4: '#00FFFF', 6: '#12FA05', 7: '#FFD700', 9: '#F9393F'};
-    const labels = {4: 'EASY', 6: 'NORMAL', 7: 'INSANE', 9: 'DEMON'};
+    const colors = {4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F'};
+    const labels = {4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON'};
     
-    song.keysAvailable.forEach(k => {
+    // Mezclamos los modos base (4, 6, 7, 9) con cualquier modo raro que tenga Osu (como 5K u 8K)
+    const standardModes = [4, 6, 7, 9];
+    let allModes = [...new Set([...standardModes, ...song.keysAvailable])].sort((a,b) => a - b);
+    
+    allModes.forEach(k => {
         let c = colors[k] || '#ff66aa';
         let l = labels[k] || 'CUSTOM';
         let btn = document.createElement('div');
         btn.className = 'diff-card';
-        btn.style.borderColor = c; btn.style.color = c;
-        btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num">${k}K</div><div class="diff-label">${l}</div>`;
-        btn.onclick = () => {
-            closeModal('diff');
-            if(song.isOsu) {
-                if(typeof downloadAndPlayOsu === 'function') downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
-                else alert("Error: osu.js no conectado");
-            } else {
-                window.curSongData = song.raw; startGame(k);
-            }
-        };
+        
+        // Si la canción SÍ tiene este modo disponible (Boton Brillante)
+        if (song.keysAvailable.includes(k)) {
+            btn.style.borderColor = c; 
+            btn.style.color = c;
+            btn.innerHTML = `
+                <div class="diff-bg-icon">${k}K</div>
+                <div class="diff-num">${k}K</div>
+                <div class="diff-label">${l}</div>
+            `;
+            btn.onclick = () => {
+                closeModal('diff');
+                if(song.isOsu) {
+                    if(typeof downloadAndPlayOsu === 'function') downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
+                    else alert("Error: osu.js no conectado");
+                } else {
+                    window.curSongData = song.raw; startGame(k);
+                }
+            };
+        } 
+        // Si la canción NO tiene este modo disponible (Boton Oscuro con Candado)
+        else {
+            btn.style.borderColor = '#333';
+            btn.style.color = '#555';
+            btn.style.background = 'rgba(0,0,0,0.6)';
+            btn.style.cursor = 'not-allowed';
+            btn.style.boxShadow = 'none';
+            btn.innerHTML = `
+                <div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div>
+                <div class="diff-num">🔒 ${k}K</div>
+                <div class="diff-label">NO DISPONIBLE</div>
+            `;
+            // Al hacer clic no hace nada
+        }
+        
         grid.appendChild(btn);
     });
     openModal('diff');
