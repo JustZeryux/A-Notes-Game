@@ -57,40 +57,42 @@ window.searchOsu = async function() {
     }
 };
 
-window.downloadAndPlayOsu = async function(setId, title, coverUrl) {
+window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
     if(typeof JSZip === 'undefined') return alert("Error: JSZip no está cargado.");
     
-    closeModal('osu');
     const loader = document.getElementById('loading-overlay');
     const loaderText = document.getElementById('loading-text');
     loader.style.display = 'flex';
     
     try {
         loaderText.innerText = "DESCARGANDO MAPA DE OSU!... 🌐";
-        
-        // 1. Descargamos el archivo .osz
         const res = await fetch(`https://api.nerinyan.moe/d/${setId}`);
         const blob = await res.blob();
 
         loaderText.innerText = "DESCOMPRIMIENDO MAPA... 📦";
-        
-        // 2. Extraemos el ZIP en la memoria
         const zip = await JSZip.loadAsync(blob);
         const files = Object.keys(zip.files);
         
-        // Buscamos archivos .osu (Nos quedamos con la dificultad más alta para empezar)
         const osuFiles = files.filter(f => f.endsWith('.osu'));
         if(osuFiles.length === 0) throw new Error("No se encontraron mapas dentro del archivo.");
         
-        // Por ahora cargamos el primer mapa que encontremos en la lista
-        const osuText = await zip.file(osuFiles[osuFiles.length - 1]).async("string");
+        let selectedOsuText = null;
+        
+        // Magia: Buscar el mapa exacto que coincida con las teclas (Ej: 4K, 7K)
+        for(let f of osuFiles) {
+            let text = await zip.file(f).async("string");
+            if(text.includes(`CircleSize:${targetKeys}`) || text.includes(`CircleSize: ${targetKeys}`)) {
+                selectedOsuText = text;
+                break;
+            }
+        }
+        
+        // Fallback por si acaso
+        if(!selectedOsuText) selectedOsuText = await zip.file(osuFiles[0]).async("string");
         
         loaderText.innerText = "TRADUCIENDO MAPA... 🧠";
-
-        // 3. Traducimos el código de Osu! a tu juego
-        const parsed = parseOsuFile(osuText);
+        const parsed = parseOsuFile(selectedOsuText);
         
-        // 4. Extraemos la música (.mp3 o .ogg)
         loaderText.innerText = "PROCESANDO AUDIO... 🎵";
         const audioFileMatcher = new RegExp(parsed.audioFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         const audioKey = files.find(f => audioFileMatcher.test(f));
@@ -103,7 +105,6 @@ window.downloadAndPlayOsu = async function(setId, title, coverUrl) {
         if(!window.st.ctx) unlockAudio();
         const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
 
-        // 5. Preparamos los datos globales para que tu HUD y fondo funcionen
         window.curSongData = {
             id: "osu_" + setId,
             title: title + ` [${parsed.keys}K]`,
@@ -119,8 +120,6 @@ window.downloadAndPlayOsu = async function(setId, title, coverUrl) {
         };
 
         loader.style.display = 'none';
-        
-        // ¡LANZAMOS EL JUEGO DIRECTAMENTE!
         playSongInternal(songObj);
 
     } catch(e) {
