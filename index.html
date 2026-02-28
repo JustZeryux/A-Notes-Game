@@ -402,7 +402,7 @@
     </div>
 
 <div id="modal-profile" class="modal-overlay">
-        <div class="modal-panel" style="width:800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
+        <div class="modal-panel" style="width: 95%; max-width: 800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
             
             <div id="login-view" style="padding: 40px; text-align:center;">
                 <div class="m-title" style="color:var(--accent); border-color:var(--accent);">INICIAR SESIÓN</div>
@@ -421,8 +421,9 @@
                     <button class="action secondary" style="position:absolute; right:15px; top:15px; width:auto; padding:5px 15px; background: rgba(0,0,0,0.5);" onclick="closeModal('profile')">CERRAR X</button>
                 </div>
                 
-                <div style="padding: 0 40px 40px 40px; position:relative; top:-60px;">
-                    <div style="display:flex; align-items:flex-end; gap:25px;">
+                <div style="padding: 0 5% 40px 5%; position:relative; top:-60px;">
+                    
+                    <div class="profile-header-flex" style="display:flex; align-items:flex-end; gap:25px;">
                         <label class="prof-av-big" id="p-av-big" style="width:130px; height:130px; border-radius:20px; border:4px solid var(--accent); box-shadow:0 0 20px var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative;">
                             <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
                         </label>
@@ -430,59 +431,95 @@
                             <h2 id="p-name" style="margin:0; font-size:3rem; font-weight:900; text-shadow:0 4px 10px rgba(0,0,0,0.8); color:white; line-height: 1;">User</h2>
                             <div id="p-lvl-txt" style="color:var(--gold); font-weight:900; font-size:1.2rem; letter-spacing: 2px;">LVL 1</div>
                         </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:15px; margin-top:30px;">
-                        <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                            <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">PERFORMANCE</div>
-                            <div id="p-pp-display" style="color:var(--accent); font-size:1.8rem; font-weight:900;">0 <span style="font-size:1rem;">PP</span></div>
-                        </div>
-                        <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                            <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">TOTAL SCORE</div>
-                            <div id="p-score" style="color:white; font-size:1.8rem; font-weight:900;">0</div>
-                        </div>
-                        <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                            <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">PARTIDAS (PLAYS)</div>
-                            <div id="p-plays" style="color:var(--blue); font-size:1.8rem; font-weight:900;">0</div>
-                        </div>
-                        <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                            <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">SP AHORRADO</div>
-                            <div id="p-sp-display" style="color:var(--gold); font-size:1.8rem; font-weight:900;">0</div>
+                        <div style="text-align:right; padding-bottom: 10px;">
+                            <div style="font-size:0.9rem; color:#888; font-weight:bold; letter-spacing: 1px;">RANKING GLOBAL</div>
+                            <div id="p-global-rank" style="font-size:2.5rem; font-weight:900; color:white; text-shadow: 0 0 15px rgba(255,255,255,0.3);">#--</div>
                         </div>
                     </div>
 
-                    <div style="margin-top:20px; display:flex; gap:15px;">
-                        <div style="flex:1; background:#111; padding:15px 20px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
-                            <div style="font-size:2.5rem; filter: drop-shadow(0 0 10px rgba(0,255,255,0.5));">🎨</div>
-                            <div>
-                                <div style="color:#888; font-size:0.75rem; font-weight:bold;">SKIN DE NOTAS</div>
-                                <div id="p-equipped-skin" style="font-weight:900; font-size:1.2rem; color:#00ffff;">Default</div>
+                    <div id="profile-main-stats">
+                        <div class="xp-container" style="margin-top:25px; height:18px; background:#1a1a1a; border-radius:10px; border: 1px solid #333; overflow:hidden;">
+                            <div class="xp-fill" id="p-xp-bar" style="height:100%; background:linear-gradient(90deg, #ff66aa, #00ffff); width:0%; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+                        </div>
+                        <div class="xp-text" id="p-xp-txt" style="text-align:right; font-size:0.85rem; color:#aaa; margin-top:5px; font-weight:bold;">0 / 1000 XP</div>
+
+                        <div class="profile-stats-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:15px; margin-top:30px;">
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">PERFORMANCE</div>
+                                <div id="p-pp-display" style="color:var(--accent); font-size:1.8rem; font-weight:900;">0 <span style="font-size:1rem;">PP</span></div>
+                            </div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">TOTAL SCORE</div>
+                                <div id="p-score" style="color:white; font-size:1.8rem; font-weight:900;">0</div>
+                            </div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">PARTIDAS</div>
+                                <div id="p-plays" style="color:var(--blue); font-size:1.8rem; font-weight:900;">0</div>
+                            </div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">SP AHORRADO</div>
+                                <div id="p-sp-display" style="color:var(--gold); font-size:1.8rem; font-weight:900;">0</div>
                             </div>
                         </div>
-                        <div style="flex:1; background:#111; padding:15px 20px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
-                            <div style="font-size:2.5rem; filter: drop-shadow(0 0 10px rgba(255,102,170,0.5));">🖼️</div>
-                            <div>
-                                <div style="color:#888; font-size:0.75rem; font-weight:bold;">MARCO EQUIPADO</div>
-                                <div id="p-equipped-ui" style="font-weight:900; font-size:1.2rem; color:#ff66aa;">Ninguno</div>
+
+                        <div class="profile-equip-flex" style="margin-top:20px; display:flex; gap:15px;">
+                            <div style="flex:1; background:#111; padding:15px 20px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:2.5rem; filter: drop-shadow(0 0 10px rgba(0,255,255,0.5));">🎨</div>
+                                <div>
+                                    <div style="color:#888; font-size:0.75rem; font-weight:bold;">SKIN DE NOTAS</div>
+                                    <div id="p-equipped-skin" style="font-weight:900; font-size:1.2rem; color:#00ffff;">Default</div>
+                                </div>
+                            </div>
+                            <div style="flex:1; background:#111; padding:15px 20px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:2.5rem; filter: drop-shadow(0 0 10px rgba(255,102,170,0.5));">🖼️</div>
+                                <div>
+                                    <div style="color:#888; font-size:0.75rem; font-weight:bold;">MARCO EQUIPADO</div>
+                                    <div id="p-equipped-ui" style="font-weight:900; font-size:1.2rem; color:#ff66aa;">Ninguno</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div id="p-owner-actions" style="display:none; gap:15px; margin-top:30px;">
-                        <button class="action secondary" style="flex:1;" onclick="openModal('settings')">⚙️ AJUSTES DE CUENTA</button>
-                        <button class="action secondary" style="flex:1; border-color:#F9393F; color:#F9393F;" onclick="logout()">CERRAR SESIÓN</button>
+                        
+                        <div id="p-owner-actions" style="display:none; gap:15px; margin-top:30px;">
+                            <button class="action secondary" style="flex:1;" onclick="toggleProfileSettings(true)">⚙️ AJUSTES DE CUENTA</button>
+                            <button class="action secondary" style="flex:1; border-color:#F9393F; color:#F9393F;" onclick="logout()">CERRAR SESIÓN</button>
+                        </div>
+
+                        <div id="p-visitor-actions" style="display:none; gap:15px; margin-top:30px;">
+                            <button class="action" style="flex:1; background:var(--good); color:black;" id="btn-add-friend">➕ AGREGAR AMIGO</button>
+                            <button class="action" style="flex:1; background:var(--blue); color:white;" id="btn-chat-user">💬 CHATEAR</button>
+                            <button class="action" style="flex:1; background:var(--gold); color:black;" id="btn-challenge-user">⚔️ DESAFIAR</button>
+                        </div>
                     </div>
 
-                    <div id="p-visitor-actions" style="display:none; gap:15px; margin-top:30px;">
-                        <button class="action" style="flex:1; background:var(--good); color:black;" id="btn-add-friend">➕ AGREGAR AMIGO</button>
-                        <button class="action" style="flex:1; background:var(--blue); color:white;" id="btn-chat-user">💬 CHATEAR</button>
-                        <button class="action" style="flex:1; background:var(--gold); color:black;" id="btn-challenge-user">⚔️ DESAFIAR</button>
+                    <div id="profile-account-settings" style="display:none; margin-top:30px; background:#111; padding:30px; border-radius:12px; border:1px solid #333;">
+                        <h3 style="color:var(--accent); margin-top:0; font-size:1.5rem;">⚙️ AJUSTES DE CUENTA</h3>
+                        
+                        <div id="local-acc-settings">
+                            <label style="color:#888; font-weight:bold; font-size:0.9rem;">Nueva Contraseña</label>
+                            <input type="password" id="new-pass" class="log-inp" placeholder="Escribe tu nueva contraseña">
+                            <button class="action secondary" style="width:100%; margin-bottom:20px;" onclick="changePassword()">ACTUALIZAR CONTRASEÑA</button>
+                        </div>
+
+                        <div id="google-acc-settings" style="display:none; margin-bottom:20px; padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
+                            <div style="color:var(--blue); font-weight:bold;">✅ Cuenta vinculada con Google.</div>
+                        </div>
+
+                        <div id="acc-mgmt-area" style="padding-top:20px; border-top:1px solid #333;">
+                            <button class="btn-google" onclick="linkGoogleAccount()" style="width:100%; margin-bottom:20px;">VINCULAR CON GOOGLE</button>
+                            
+                            <label style="color:#888; font-weight:bold; font-size:0.9rem;">Cambiar Nombre Público</label>
+                            <input type="text" id="new-username" class="log-inp" placeholder="Nuevo Nombre">
+                            <button class="action secondary" style="width:100%;" onclick="changeUsername()">ACTUALIZAR NOMBRE</button>
+                        </div>
+
+                        <button class="action" style="width:100%; margin-top:30px; background:#444; color:white; border:none;" onclick="toggleProfileSettings(false)">⬅ VOLVER AL PERFIL</button>
                     </div>
+
                 </div>
             </div>
         </div>
     </div>
-
+    
     <div id="modal-rank" class="modal-overlay">
         <div class="modal-panel" style="width:700px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
             <div style="padding:20px 30px; background:#111; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center;">
