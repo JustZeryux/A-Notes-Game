@@ -70,9 +70,12 @@ function genMap(buf, k) {
     const density = window.cfg.den || 5;
     const step = Math.floor(sampleRate / 60); 
     
-    let minDistMs = 400 - (density * 35); 
-    if(minDistMs < 80) minDistMs = 80;
-    let thresholdMult = 1.6 - (density * 0.07); 
+    // FIX: Escala matemática suave hasta nivel 20.
+    // Nivel 1 = ~380ms de separación, Nivel 10 = ~240ms, Nivel 20 = ~80ms (Streams muy rápidos pero humanos)
+    let minDistMs = Math.max(70, 400 - (density * 16)); 
+    
+    // FIX: El umbral nunca baja de 0.95. Esto evita que lea ruido blanco como notas.
+    let thresholdMult = Math.max(0.95, 1.65 - (density * 0.035)); 
     
     let lastNoteTime = -1000; 
     let lastLane = Math.floor(k/2); 
@@ -80,6 +83,8 @@ function genMap(buf, k) {
     const energyHistory = [];
     let staircaseCount = 0; 
     let staircaseDir = 1;
+    
+    let prevInstant = 0; 
 
     for (let i = 0; i < data.length; i += step) {
         let sum = 0; 
@@ -87,10 +92,11 @@ function genMap(buf, k) {
         const instant = Math.sqrt(sum / step);
         
         energyHistory.push(instant); 
-        if(energyHistory.length > 30) energyHistory.shift();
+        if(energyHistory.length > 40) energyHistory.shift(); 
         const localAvg = energyHistory.reduce((a,b)=>a+b,0) / energyHistory.length;
 
-        if(instant > localAvg * thresholdMult && instant > 0.01) {
+        // Detección de impacto (Ataque) limpia
+        if(instant > localAvg * thresholdMult && instant > prevInstant && instant > 0.03) {
             const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
             
             if(timeMs - lastNoteTime > minDistMs) {
@@ -98,13 +104,14 @@ function genMap(buf, k) {
                 let length = 0;
                 let lane = -1;
 
+                // Patrones de escaleras (Se vuelven más comunes en niveles altos)
                 if (staircaseCount > 0) {
                     let target = (lastLane + staircaseDir + k) % k;
                     if (timeMs > laneFreeTimes[target] + 20) { lane = target; staircaseCount--; } 
                     else { staircaseCount = 0; lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs); }
                 } else {
-                    if (density >= 4 && instant > localAvg * 1.5 && Math.random() > 0.6) {
-                        staircaseCount = Math.floor(Math.random() * 3) + 1;
+                    if (density >= 5 && instant > localAvg * 1.5 && Math.random() > (1.0 - (density * 0.02))) {
+                        staircaseCount = Math.floor(Math.random() * (density > 12 ? 5 : 3)) + 1;
                         staircaseDir = Math.random() > 0.5 ? 1 : -1;
                     }
                     lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs);
@@ -116,25 +123,43 @@ function genMap(buf, k) {
                     lane = bestLane; 
                 }
 
-                if (instant > localAvg * 1.3 && Math.random() > 0.6) {
+                // Holds (Notas largas inteligentemente calculadas)
+                if (instant > localAvg * 1.5 && Math.random() > 0.6) {
                     let sustain = 0;
-                    for(let h=1; h<10; h++) {
+                    for(let h=1; h<15; h++) {
                         let fIdx = i + (step * h);
-                        if(fIdx < data.length && Math.abs(data[fIdx]) > localAvg * 0.9) sustain++;
+                        if(fIdx < data.length && Math.abs(data[fIdx]) > localAvg * 1.05) sustain++;
                         else break; 
                     }
-                    if(sustain > 4) {
+                    if(sustain > 6) { 
                         type = 'hold';
-                        length = Math.min(sustain * (step/sampleRate)*1000 * 3, 1500);
-                        if(length < 100) { type = 'tap'; length = 0; }
+                        length = Math.min(sustain * (step/sampleRate)*1000 * 2.5, 1200); 
+                        if(length < 150) { type = 'tap'; length = 0; }
                     }
                 }
 
                 map.push({ t: timeMs, l: lane, type: type, len: length, h: false });
-                laneFreeTimes[lane] = timeMs + length + 80; 
-                lastNoteTime = timeMs; lastLane = lane;
+                laneFreeTimes[lane] = timeMs + length + 50; 
+                
+                // === NUEVO: SISTEMA DE ACORDES (NOTAS DOBLES) PARA NIVELES 11 A 20 ===
+                // Solo si el golpe de la canción es muy fuerte y la dificultad es alta
+                if (density > 10 && instant > localAvg * 1.8 && type === 'tap') {
+                    // La probabilidad de que salga una nota doble sube conforme te acercas al nivel 20
+                    if (Math.random() < (density - 10) * 0.08) {
+                        let lane2 = getSmartLane(lane, k, laneFreeTimes, timeMs);
+                        // Asegurarnos de que no caiga en la misma tecla
+                        if (lane2 !== -1 && lane2 !== lane) {
+                            map.push({ t: timeMs, l: lane2, type: 'tap', len: 0, h: false });
+                            laneFreeTimes[lane2] = timeMs + 50;
+                        }
+                    }
+                }
+
+                lastNoteTime = timeMs; 
+                lastLane = lane;
             }
         }
+        prevInstant = instant; 
     }
     return map;
 }
