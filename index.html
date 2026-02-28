@@ -396,10 +396,6 @@
 
             <div id="profile-view" style="display:none;">
                 <div id="p-header-bg" style="height:220px; background:linear-gradient(to bottom, transparent, #0a0a0a), url('icon.png') center/cover; position:relative; transition: all 0.4s ease;">
-    
-    <div id="p-top-badge" style="display:none; position:absolute; top:-30px; left:-20px; font-size:6rem; font-weight:900; transform:rotate(-15deg); z-index:10; font-family:sans-serif; letter-spacing:-5px;">
-        #1
-    </div>
 
     <button class="action secondary" style="position:absolute; right:15px; top:15px; width:auto; padding:5px 15px; background: rgba(0,0,0,0.6); z-index: 10; border:1px solid #555;" onclick="closeModal('profile')">CERRAR X</button>
 
@@ -411,7 +407,32 @@
                 
                 <div style="padding: 0 5% 40px 5%; position:relative; top:-60px;">
                     
-                    <div class="profile-header-flex" style="display:flex; align-items:flex-end; gap:25px;">
+                    <div class="profile-header-flex" style="display:flex; align-items:flex-end; gap:35px;">
+    
+    <div style="position:relative; z-index:10;">
+        <label class="prof-av-big" id="p-av-big" style="width:140px; height:140px; border-radius:20px; border:4px solid var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative; display:block; cursor:pointer;">
+            <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
+        </label>
+        
+        <div id="p-top-badge" style="display:none; position:absolute; bottom:-15px; right:-25px; font-size:1.8rem; font-weight:900; z-index:15; padding: 5px 20px; transform: rotate(-8deg);">
+            👑 TOP 1
+        </div>
+    </div>
+    
+    <div style="flex:1; padding-bottom: 10px;">
+        <h2 id="p-name" style="margin:0; font-size:3.5rem; font-weight:900; text-shadow:0 4px 15px rgba(0,0,0,0.8); color:white; line-height: 1;">User</h2>
+        <div style="display:flex; gap:15px; align-items:center; margin-top:5px;">
+            <div id="p-lvl-txt" style="color:var(--gold); font-weight:900; font-size:1.2rem; letter-spacing: 2px;">LVL 1</div>
+            <div id="p-online-status" style="font-size: 13px; font-weight:bold; background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:10px; border: 1px solid #444;">⚪ Offline</div>
+        </div>
+        <div id="p-custom-status" style="color: var(--accent); font-style: italic; font-size: 14px; margin-top: 5px;"></div>
+    </div>
+
+    <div style="text-align:right; padding-bottom: 10px;">
+        <div style="font-size:0.9rem; color:#888; font-weight:bold; letter-spacing: 1px;">GLOBAL</div>
+        <div id="p-global-rank" style="font-size:2.5rem; font-weight:900; color:white; text-shadow: 0 0 15px rgba(255,255,255,0.3);">#--</div>
+    </div>
+                    </div>que no 
                         <label class="prof-av-big" id="p-av-big" style="width:130px; height:130px; border-radius:20px; border:4px solid var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative; z-index:2; cursor:pointer;">
                             <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
                         </label>
