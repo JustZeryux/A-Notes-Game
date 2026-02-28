@@ -2099,6 +2099,7 @@ const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a20
 
 // === MOTOR DEL CREATOR STUDIO ===
 // === MOTOR DEL CREATOR STUDIO (CON DETECTOR DE SESIÓN BLINDADO) ===
+// === MOTOR DEL CREATOR STUDIO (100% SEGURO Y SILENCIOSO) ===
 window.openStudioDashboard = async function() {
     openModal('studio');
     const grid = document.getElementById('studio-grid');
@@ -2106,45 +2107,43 @@ window.openStudioDashboard = async function() {
     grid.innerHTML = '';
     loader.style.display = 'block';
 
-    // === DETECTOR DE USUARIO TODOTERRENO ===
-    // Busca en todos los "cajones" posibles donde tu juego pudo haber guardado tu sesión
-    let myUsername = window.username || 
-                     window.playerName ||
-                     (window.user && window.user.username) || 
-                     (window.currentUser && window.currentUser.username) || 
-                     localStorage.getItem('username');
+    // === 1. VERIFICACIÓN DE SEGURIDAD ESTRICTA ===
+    let myUsername = null;
 
-    // Si estás usando Firebase Auth clásico
-    if (!myUsername && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+    // A) Buscar directamente en el núcleo de Firebase (Lo más seguro)
+    if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
         myUsername = firebase.auth().currentUser.displayName;
     }
 
-    // FALLBACK INFALIBLE: Si el código sigue ciego, te lo pregunta directamente en vez de bloquearte
+    // B) Buscar en la memoria de tu juego (Por si usas login personalizado)
     if (!myUsername) {
-        myUsername = prompt("Sesión detectada, pero necesito confirmar tu nombre de usuario exacto (Ej: Zeryux):");
+        myUsername = window.username || 
+                     (window.user && window.user.username) || 
+                     localStorage.getItem('username');
     }
 
-    // Si le das a cancelar en el prompt, detenemos la carga
-    if (!myUsername) {
-        loader.innerText = "Debes indicar tu usuario para ver tus mapas. ❌";
+    // C) Si no hay sesión válida, BLOQUEAMOS EL ACCESO. Sin ventanitas falsas.
+    if (!myUsername || myUsername === "Guest" || myUsername.trim() === "") {
+        loader.innerHTML = "⚠️ <b>ACCESO DENEGADO</b><br><br>Debes iniciar sesión en la barra lateral para ver y editar tus mapas.";
         loader.style.color = "var(--miss)";
         return;
     }
 
+    // === 2. OBTENER MAPAS ===
     try {
-        // Le pedimos a Firebase SOLO las canciones subidas por TI (con tu nombre exacto)
+        // Le pedimos a Firebase SOLO las canciones de tu usuario verificado
         let snapshot = await window.db.collection("globalSongs").where("uploader", "==", myUsername).get();
         loader.style.display = 'none';
 
         if (snapshot.empty) {
-            grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:#aaa; font-size:1.2rem; font-weight:bold;">Aún no has subido ninguna canción con el usuario "${myUsername}". <br><br> ¡Sube tu primer MP3 en la barra lateral para empezar a mapear! ☁️</div>`;
+            grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:#aaa; font-size:1.2rem; font-weight:bold;">Aún no has subido ninguna canción. <br><br> ¡Sube tu primer MP3 en la barra lateral para empezar a mapear! ☁️</div>`;
             return;
         }
 
-        // Dibujamos tus canciones como un panel de administrador
+        // === 3. DIBUJAR TARJETAS ===
         snapshot.forEach(doc => {
             let song = doc.data();
-            song.id = doc.id; // Guardamos el ID real de la base de datos
+            song.id = doc.id; 
 
             const card = document.createElement('div');
             card.className = 'song-card'; 
@@ -2164,19 +2163,19 @@ window.openStudioDashboard = async function() {
                 </div>
             `;
             
-            // Botón de abrir el Editor de tu canción
+            // Botón de Editar
             card.querySelector('.btn-edit').onclick = () => {
                 closeModal('studio');
                 if(typeof openEditor === 'function') openEditor(song, 4); 
                 else alert("Error: El archivo editor.js no está conectado.");
             };
             
-            // Botón para borrar la canción de tu base de datos para siempre
+            // Botón de Borrar
             card.querySelector('.btn-del').onclick = async () => {
                 if(confirm(`¿Seguro que quieres borrar "${song.title}" para siempre?`)) {
                     card.style.opacity = '0.5';
                     await window.db.collection('globalSongs').doc(song.id).delete();
-                    openStudioDashboard(); // Recargamos la pantalla
+                    openStudioDashboard(); // Recargar la lista
                 }
             };
 
