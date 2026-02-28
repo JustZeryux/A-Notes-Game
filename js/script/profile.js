@@ -99,40 +99,30 @@ window.updateGlobalRank = function() {
     window.showUserProfile = async function(targetName) {
     if (!window.db) return notify("Error de conexión", "error");
     
-    // 1. Limpiar vista y mostrar cargando
+    // 1. Mostrar modal
     window.toggleProfileSettings(false);
     const m = document.getElementById('modal-profile'); 
     if(m) m.style.display = 'flex';
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
     
+    // Reset visual
     setText('p-name', "Cargando...");
     setText('p-global-rank', "#--");
     const avBig = document.getElementById('p-av-big');
-    if(avBig) { 
-        avBig.style.backgroundImage = "none"; 
-        avBig.textContent = "G"; 
-        avBig.style.border = "4px solid #333";
-        avBig.style.boxShadow = "none";
-        avBig.style.animation = "none";
-    }
+    if(avBig) { avBig.style.backgroundImage = "none"; avBig.textContent = "G"; avBig.style.border = "4px solid #333"; avBig.style.boxShadow = "none"; }
 
     const isMe = (window.user && targetName === window.user.name);
     document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
     document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
 
     try {
-        // ==========================================
-        // FASE 1: LECTURA SEGURA DE DATOS REALES
-        // ==========================================
+        // 2. LEER DATOS DEL USUARIO (Sincronizado)
         const doc = await window.db.collection('users').doc(targetName).get();
-        if (!doc.exists) {
-            setText('p-name', "Usuario no encontrado");
-            return;
-        }
+        if (!doc.exists) return setText('p-name', "Usuario no encontrado");
         const d = doc.data();
         
-        // Stats
+        // Stats base (Si sale 0, intenta buscar en la colección leaderboard si la tienes separada)
         setText('p-name', targetName);
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
@@ -140,87 +130,83 @@ window.updateGlobalRank = function() {
         setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
         setText('p-sp-display', (d.sp || 0).toLocaleString());
         
+        // --- NUEVO: ESTADO ONLINE, CUSTOM STATUS Y BIOGRAFÍA ---
+        // Asume que vas a agregar estos IDs en tu HTML
+        const isOnline = d.online ? "🟢 Conectado" : "⚪ Desconectado";
+        setText('p-online-status', isOnline);
+        setText('p-custom-status', d.customStatus || "");
+        setText('p-bio', d.bio || "Este usuario no ha escrito una biografía.");
+
         // Avatar
         if(d.avatarData && avBig) {
             avBig.style.backgroundImage = `url(${d.avatarData})`;
             avBig.textContent = ""; 
         }
 
-        // ==========================================
-        // FASE 2: EQUIPAMIENTO VISUAL EXACTO
-        // ==========================================
-        let skinName = "Default", uiName = "Ninguno";
-        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
-            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
-            if(sItem) skinName = sItem.name;
-            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
-            if(uItem) uiName = uItem.name;
+        // --- NUEVO: PRIVACIDAD DE ITEMS ---
+        let skinName = "Oculto", uiName = "Oculto";
+        if (!d.hideItems || isMe) { // Solo muestra si NO están ocultos, o si eres tú mismo
+            skinName = "Default"; uiName = "Ninguno";
+            if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
+                const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
+                if(sItem) skinName = sItem.name;
+                const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
+                if(uItem) uiName = uItem.name;
+            }
+            if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        } else {
+            if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals('default');
         }
         setText('p-equipped-skin', skinName);
         setText('p-equipped-ui', uiName);
-        if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
 
-        // ==========================================
-        // FASE 3: FUNCIONES SOCIALES
-        // ==========================================
+        // --- NUEVO: AGREGAR O ELIMINAR AMIGO ---
         if (!isMe) {
             const btnAdd = document.getElementById('btn-add-friend');
-            const isFriend = window.user.friends && window.user.friends.includes(targetName);
+            const friendsList = window.user.friends || [];
+            const isFriend = friendsList.includes(targetName);
+
             if (btnAdd) {
                 if (isFriend) {
-                    btnAdd.innerText = "✅ AMIGOS";
-                    btnAdd.style.background = "#333";
-                    btnAdd.onclick = null;
+                    btnAdd.innerText = "❌ ELIMINAR AMIGO";
+                    btnAdd.style.background = "#FF3333"; // Rojo
+                    btnAdd.style.color = "white";
+                    btnAdd.onclick = () => { window.removeFriend(targetName); window.closeModal('profile'); };
                 } else {
                     btnAdd.innerText = "➕ AGREGAR AMIGO";
-                    btnAdd.style.background = "var(--good)";
+                    btnAdd.style.background = "var(--good)"; // Verde
+                    btnAdd.style.color = "black";
                     btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
                 }
             }
             const btnChat = document.getElementById('btn-chat-user');
             if(btnChat) btnChat.onclick = () => { window.openFloatingChat(targetName); window.closeModal('profile'); };
-            const btnChall = document.getElementById('btn-challenge-user');
-            if(btnChall) btnChall.onclick = () => { window.challengeFriend(targetName); };
         }
 
-        // ==========================================
-        // FASE 4: RANKING GLOBAL (BURBUJA AISLADA)
-        // ==========================================
-        // Al usar .then() en lugar de await, si esto falla, NO ROMPE el resto del perfil
+        // 3. RANKING GLOBAL SINCRONIZADO
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
-            let rankPos = 0;
-            let index = 1;
-            snap.forEach(uDoc => {
-                if(uDoc.id === targetName) rankPos = index;
-                index++;
-            });
-
+            let rankPos = 0; let index = 1;
+            snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
             if (rankPos > 0) {
                 setText('p-global-rank', "#" + rankPos);
-                // Medallas
                 if(avBig && rankPos <= 3) {
                     const colors = {1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32"};
                     avBig.style.border = `4px solid ${colors[rankPos]}`;
-                    avBig.style.boxShadow = `0 0 20px ${colors[rankPos]}`;
                     if(rankPos === 1) avBig.style.animation = "gold-pulse 2s infinite alternate";
                 }
-            } else {
-                setText('p-global-rank', "#100+");
-            }
-        }).catch(err => console.log("Ranking temporalmente no disponible", err));
+            } else { setText('p-global-rank', "#100+"); }
+        });
 
-    } catch(e) { 
-        console.error("Error crítico al cargar perfil:", e);
-    }
-};}).catch(e => console.log("Rank update limit", e));
+    } catch(e) { console.error("Error cargando perfil:", e); }
 };
 
-window.toggleProfileSettings = function(show) {
-    const mainView = document.getElementById('profile-main-stats'); const settingsView = document.getElementById('profile-account-settings');
-    if(mainView && settingsView) {
-        mainView.style.opacity = show ? "0" : "1"; settingsView.style.opacity = show ? "1" : "0";
-        setTimeout(() => { mainView.style.display = show ? 'none' : 'block'; settingsView.style.display = show ? 'block' : 'none'; }, 100);
-    }
+// Función para eliminar amigos
+window.removeFriend = async function(friendName) {
+    if (!window.user || !window.db) return;
+    try {
+        window.user.friends = window.user.friends.filter(f => f !== friendName);
+        await window.db.collection('users').doc(window.user.name).update({ friends: window.user.friends });
+        notify(`Has eliminado a ${friendName} de tus amigos.`, "info");
+        if(typeof updUI === 'function') updUI();
+    } catch (error) { console.error(error); notify("Error al eliminar amigo", "error"); }
 };
-
-
