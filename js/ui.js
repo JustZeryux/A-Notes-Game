@@ -1719,10 +1719,9 @@ window.debounceSearch = function(val) {
 };
 
 // --- CARGA DE CANCIONES (FIREBASE + OSU POR DEFECTO) ---
-// --- CARGA DE CANCIONES (FIREBASE + OSU POR DEFECTO) ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#888; font-size:1.5rem; font-weight:bold;">Conectando a los servidores... ⏳</div>';
+    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Conectando con Osu! y tu Nube... ⏳</div>';
     
     let fbSongs = [];
     let osuSongs = [];
@@ -1744,23 +1743,26 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error DB Local"); }
 
-    // 2. Osu! Mania (Arreglado para que cargue canciones increíbles por defecto)
+    // 2. Osu! Mania (Carga real por defecto)
     try {
-        // FIX: Si la barra está vacía, busca "mania" (esto sí lo entiende la API y trae un montón de mapas)
-        let q = query ? encodeURIComponent(query) : 'mania'; 
+        // FIX VITAL: Si no hay búsqueda, NO enviamos "q=". Así la API nos da las más populares por defecto.
+        let apiUrl = `https://api.nerinyan.moe/search?m=3`;
+        if (query.trim() !== "") {
+            apiUrl += `&q=${encodeURIComponent(query)}`;
+        }
         
-        const res = await fetch(`https://api.nerinyan.moe/search?q=${q}&m=3`);
+        const res = await fetch(apiUrl);
         const data = await res.json();
         
         if (data && data.length > 0) {
             data.forEach(set => {
-                // Filtro hiper-seguro para que no se escape ningún mapa
                 const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
                 
                 if(maniaBeatmaps.length > 0) {
+                    // Saca qué modos de teclas tiene el mapa exactamente
                     let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
                     osuSongs.push({
-                        id: set.id, title: set.title, artist: `Artista: ${set.artist} (Osu!)`,
+                        id: set.id, title: set.title, artist: `Artista: ${set.artist}`,
                         imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
                         isOsu: true, keysAvailable: keys, raw: set
                     });
@@ -1769,10 +1771,8 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error Osu API"); }
 
-    // Juntamos todo (Primero las de Osu, luego las de la comunidad)
+    // Juntamos todo (Osu primero, luego las de la comunidad)
     window.unifiedSongs = [...osuSongs, ...fbSongs];
-    
-    // Llamamos a la función que dibuja el diseño
     renderUnifiedGrid();
 };
 
