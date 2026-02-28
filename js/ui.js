@@ -8,6 +8,7 @@
 // 3. NOTIFICACIONES PERSISTENTES (DESAFÍOS)
 // ==========================================
 // === SET DE TECLAS MAESTRO (EVITA CRASHEOS DE 1K A 10K) ===
+// === SET DE TECLAS Y VISUALES MAESTRO (EVITA CRASHEOS DE 1K A 10K) ===
 const MASTER_KEYS = {
     1: ['Space'],
     2: ['KeyF', 'KeyJ'],
@@ -21,16 +22,34 @@ const MASTER_KEYS = {
     10: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyV', 'KeyN', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon']
 };
 
-// Nos aseguramos de que la configuración exista
 if(!window.cfg) window.cfg = {};
 if(!window.cfg.keys) window.cfg.keys = {};
+if(!window.cfg.modes) window.cfg.modes = {}; // La caja mágica de tu menú
 
-// Revisamos del 1 al 10. Si falta alguna tecla, le ponemos la del Set Maestro
 for(let i = 1; i <= 10; i++) {
+    // 1. Rellenar las teclas simples
     if(!window.cfg.keys[i] || window.cfg.keys[i].length !== i) {
         window.cfg.keys[i] = MASTER_KEYS[i];
     }
+    
+    // 2. FIX MAESTRO: Rellenar la caja de "modos" con colores y formas para que tu UI pueda dibujar
+    if(!window.cfg.modes[i] || window.cfg.modes[i].length !== i) {
+        window.cfg.modes[i] = [];
+        for(let j = 0; j < i; j++) {
+            // Ponemos colores alternados (Cyan y Rosa) para que se vea bonito por defecto
+            let defaultColor = (j % 2 === 0) ? '#00FFFF' : '#ff66aa';
+            // Si es un modo impar (ej. 5K), la tecla del centro será Dorada
+            if(i % 2 !== 0 && j === Math.floor(i/2)) defaultColor = '#FFD700'; 
+            
+            window.cfg.modes[i].push({
+                k: MASTER_KEYS[i][j], // Asigna la tecla (Ej: KeyD)
+                c: defaultColor,      // Asigna el color
+                s: 'circle'           // Asigna la forma por defecto
+            });
+        }
+    }
 }
+localStorage.setItem('cfg', JSON.stringify(window.cfg));
 // Guardamos para que el motor de juego las detecte de inmediato
 localStorage.setItem('cfg', JSON.stringify(window.cfg));
 window.notifyChallenge = function(fromUser, lobbyId, songName) {
