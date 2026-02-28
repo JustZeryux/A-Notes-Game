@@ -93,6 +93,11 @@ window.toggleProfileSettings = function(show) {
 };
 
 // 4. MOSTRAR EL PERFIL CON ESTADOS Y ANIMACIONES ÉPICAS
+
+                
+// ==========================================
+// MOSTRAR EL PERFIL (Cerradura de Privacidad)
+// ==========================================
 window.showUserProfile = async function(targetName) {
     if (!window.db) return notify("Error de conexión", "error");
     
@@ -102,31 +107,46 @@ window.showUserProfile = async function(targetName) {
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
     
-    // Reset de seguridad
     setText('p-name', "Cargando...");
     setText('p-global-rank', "#--");
     
     const profilePanel = document.querySelector('#modal-profile .modal-panel');
-    if(profilePanel) profilePanel.className = 'modal-panel'; // Limpia clases previas
+    if(profilePanel) profilePanel.className = 'modal-panel'; 
     
     const badge = document.getElementById('p-top-badge');
     if(badge) badge.style.display = 'none';
 
+    const isMe = (window.user && targetName === window.user.name);
+    
+    // --- RESET SEGURO DEL AVATAR ---
     const avBig = document.getElementById('p-av-big');
     if(avBig) { 
         avBig.style.backgroundImage = "none"; 
-        avBig.textContent = "G"; 
+        setText('p-av-letter', "G"); // Ya no borra el input, solo cambia la letra
         avBig.style.border = "4px solid #333"; 
         avBig.style.boxShadow = "none"; 
         avBig.style.animation = "none"; 
     }
 
-    const isMe = (window.user && targetName === window.user.name);
+    // --- CERRADURAS DE SEGURIDAD (BOTONES Y CAMBIAR FOTO) ---
     document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
     document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
     
     const btnBanner = document.getElementById('btn-edit-banner');
     if(btnBanner) btnBanner.style.display = isMe ? 'block' : 'none';
+
+    const avOverlay = document.getElementById('p-av-overlay');
+    const avInput = document.getElementById('avatar-upload-input');
+    
+    if (isMe) {
+        if(avBig) avBig.style.cursor = 'pointer';
+        if(avOverlay) avOverlay.style.display = 'block';
+        if(avInput) avInput.disabled = false;
+    } else {
+        if(avBig) avBig.style.cursor = 'default';
+        if(avOverlay) avOverlay.style.display = 'none'; // Foxy ya no tendrá el botón CAMBIAR
+        if(avInput) avInput.disabled = true; // Input desactivado para visitantes
+    }
 
     try {
         const doc = await window.db.collection('users').doc(targetName).get();
@@ -145,13 +165,21 @@ window.showUserProfile = async function(targetName) {
         setText('p-custom-status', d.customStatus || "");
         setText('p-bio', d.bio || "Este usuario no ha escrito una biografía.");
 
-        if(d.avatarData && avBig) { avBig.style.backgroundImage = `url(${d.avatarData})`; avBig.textContent = ""; }
+        // Cargar Avatar sin destruir la estructura
+        if(d.avatarData && avBig) { 
+            avBig.style.backgroundImage = `url(${d.avatarData})`; 
+            setText('p-av-letter', ""); 
+        } else {
+            setText('p-av-letter', targetName.charAt(0).toUpperCase());
+        }
+
         const headerBg = document.getElementById('p-header-bg');
         if(headerBg) {
             const bannerUrl = d.bannerData ? `url(${d.bannerData})` : "url('icon.png')";
             headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${bannerUrl}`;
         }
 
+        // Privacidad de Skins
         let skinName = "Oculto", uiName = "Oculto";
         let equippedUI = 'default';
         if (!d.hideItems || isMe) { 
@@ -179,34 +207,62 @@ window.showUserProfile = async function(targetName) {
             }
         }
 
-        // RANKING Y ANIMACIONES ÉPICAS FINALES - Solo números compactos
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
             let rankPos = 0; let index = 1;
             snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
             
             if (rankPos > 0) {
                 setText('p-global-rank', "#" + rankPos);
-                
                 if (rankPos <= 3 && profilePanel) {
                     profilePanel.classList.add(`epic-top-${rankPos}`);
                     if (badge) {
-                        // Textos especiales para los 3 mejores - Solo el número con #
-                        if (rankPos === 1) badge.innerHTML = `#1`; // Mantenemos la corona solo para el #1
+                        if (rankPos === 1) badge.innerHTML = `👑 #1`;
                         else if (rankPos === 2) badge.innerHTML = `#2`;
                         else if (rankPos === 3) badge.innerHTML = `#3`;
-                        
                         badge.style.display = 'block';
                     }
                 }
-            } else { 
-                setText('p-global-rank', "#100+"); 
-            }
+            } else { setText('p-global-rank', "#100+"); }
 
             applyUIFrameVisuals(equippedUI, rankPos);
         }).catch(e => console.log("Ranking no disponible", e));
+
     } catch(e) { console.error("Error cargando perfil:", e); }
 };
 
+// ==========================================
+// SUBIR FOTO DE PERFIL CORREGIDO
+// ==========================================
+window.uploadAvatar = async function(input) {
+    if (!input.files || input.files.length === 0 || !window.user || !window.db) return;
+    
+    const file = input.files[0];
+    if (file.size > 2 * 1024 * 1024) return notify("La imagen es muy pesada. Máximo 2MB.", "error");
+
+    notify("Subiendo foto de perfil...", "info");
+    
+    try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result;
+            
+            await window.db.collection('users').doc(window.user.name).update({ avatarData: base64 });
+            window.user.avatarData = base64; 
+            
+            const avBig = document.getElementById('p-av-big');
+            if(avBig) {
+                avBig.style.backgroundImage = `url(${base64})`;
+                setText('p-av-letter', ""); // Se borra la letra sin destruir el botón
+            }
+            
+            if(typeof updUI === 'function') updUI();
+            notify("¡Foto de perfil actualizada!", "success");
+        };
+        reader.readAsDataURL(file);
+    } catch(e) { 
+        console.error(e); notify("Error al subir la imagen", "error"); 
+    }
+};
 // 5. FUNCIONES EXTRA
 window.uploadBanner = async function(input) {
     if(!input.files || input.files.length === 0 || !window.user || !window.db) return;
@@ -246,48 +302,3 @@ window.openNotifPanel = function() {
 // ==========================================
 // SUBIR FOTO DE PERFIL (AVATAR)
 // ==========================================
-window.uploadAvatar = async function(input) {
-    // Verificamos que haya seleccionado un archivo y esté conectado
-    if (!input.files || input.files.length === 0 || !window.user || !window.db) return;
-    
-    const file = input.files[0];
-
-    // Opcional: Validar que no suban imágenes de 50MB que traben la base de datos
-    if (file.size > 2 * 1024 * 1024) {
-        return notify("La imagen es muy pesada. Máximo 2MB.", "error");
-    }
-
-    notify("Subiendo foto de perfil...", "info");
-    
-    try {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const base64 = e.target.result;
-            
-            // 1. Guardar en la base de datos de Firebase
-            await window.db.collection('users').doc(window.user.name).update({ 
-                avatarData: base64 
-            });
-            
-            // 2. Actualizar la memoria del juego
-            window.user.avatarData = base64; 
-            
-            // 3. Actualizar la imagen gigante en el modal al instante
-            const avBig = document.getElementById('p-av-big');
-            if(avBig) {
-                avBig.style.backgroundImage = `url(${base64})`;
-                avBig.textContent = ""; // Borramos la letra si la había
-            }
-            
-            // 4. Actualizar el mini-avatar del menú lateral
-            if(typeof updUI === 'function') updUI();
-            
-            notify("¡Foto de perfil actualizada!", "success");
-        };
-        // Leer la imagen y convertirla
-        reader.readAsDataURL(file);
-    } catch(e) { 
-        console.error(e); 
-        notify("Error al subir la imagen", "error"); 
-    }
-};
