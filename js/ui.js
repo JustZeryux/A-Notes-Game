@@ -1678,27 +1678,7 @@ window.checkGameStart = function(lobbyData) {
         }
     }
 };
-// === MOTOR UNIFICADO (FIREBASE + OSU!) ===
-window.currentFilters = { type: 'all', key: 'all' };
-window.unifiedSongs = [];
-window.searchTimeout = null;
 
-window.setFilter = function(category, val) {
-    window.currentFilters[category] = val;
-    // Actualizar color de los botones visualmente
-    document.querySelectorAll(`.filter-btn[data-type="${category}"]`).forEach(btn => {
-        btn.classList.remove('active');
-        if(btn.getAttribute('data-val') === val) btn.classList.add('active');
-    });
-    renderUnifiedGrid();
-};
-
-window.debounceSearch = function(val) {
-    clearTimeout(window.searchTimeout);
-    window.searchTimeout = setTimeout(() => fetchUnifiedData(val), 500);
-};
-
-// Carga principal al abrir el juego
 // Carga principal al abrir el juego
 window.currentFilters = { type: 'all', key: 'all' };
 window.unifiedSongs = [];
@@ -1719,14 +1699,15 @@ window.debounceSearch = function(val) {
 };
 
 // --- CARGA DE CANCIONES (FIREBASE + OSU POR DEFECTO) ---
+// --- CARGA BLINDADA (TODOS LOS MAPAS POR DEFECTO) ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Conectando con Osu! y tu Nube... ⏳</div>';
+    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Cargando Galería Global... ⏳</div>';
     
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. Firebase (Tu Comunidad)
+    // 1. Firebase (Tus canciones)
     try {
         if(window.db) {
             let snapshot = await window.db.collection("globalSongs").limit(50).get();
@@ -1743,12 +1724,13 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error DB Local"); }
 
-    // 2. Osu! Mania (Carga real por defecto)
+    // 2. Osu! Mania (Carga TODOS por defecto)
     try {
-        // FIX VITAL: Si no hay búsqueda, NO enviamos "q=". Así la API nos da las más populares por defecto.
-        let apiUrl = `https://api.nerinyan.moe/search?m=3`;
+        // FIX DEFINITIVO: Si está vacío, no mandamos el parámetro "q=". 
+        // Esto le dice a la API: "Dame la lista global de TODOS los mapas".
+        let apiUrl = "https://api.nerinyan.moe/search?m=3";
         if (query.trim() !== "") {
-            apiUrl += `&q=${encodeURIComponent(query)}`;
+            apiUrl += `&q=${encodeURIComponent(query.trim())}`;
         }
         
         const res = await fetch(apiUrl);
@@ -1756,13 +1738,13 @@ window.fetchUnifiedData = async function(query = "") {
         
         if (data && data.length > 0) {
             data.forEach(set => {
-                const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
+                const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
                 
                 if(maniaBeatmaps.length > 0) {
-                    // Saca qué modos de teclas tiene el mapa exactamente
-                    let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
+                    let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
                     osuSongs.push({
-                        id: set.id, title: set.title, artist: `Artista: ${set.artist}`,
+                        id: set.id, title: set.title, 
+                        artist: `Subido por: ${set.creator}`, 
                         imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
                         isOsu: true, keysAvailable: keys, raw: set
                     });
@@ -1771,11 +1753,10 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error Osu API"); }
 
-    // Juntamos todo (Osu primero, luego las de la comunidad)
+    // Juntamos todo (Osu primero, Firebase después)
     window.unifiedSongs = [...osuSongs, ...fbSongs];
     renderUnifiedGrid();
 };
-
 // --- DIBUJAR LAS TARJETAS CON TU DISEÑO EXACTO ---
 window.renderUnifiedGrid = function() {
     const grid = document.getElementById('song-grid');
