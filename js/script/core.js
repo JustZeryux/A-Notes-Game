@@ -73,3 +73,15 @@ window.notify = function(msg, type = "info") {
         setTimeout(() => div.remove(), 300);
     }, 3000);
 };
+
+// === DESBLOQUEO DE AUDIO DEL NAVEGADOR ===
+window.unlockAudio = function() {
+    if(typeof st !== 'undefined' && st.ctx && st.ctx.state === 'suspended') {
+        st.ctx.resume().then(() => console.log("Audio desbloqueado."));
+    }
+};
+
+document.addEventListener('click', function unlockOnce() {
+    window.unlockAudio();
+    document.removeEventListener('click', unlockOnce);
+}, { once: true });
