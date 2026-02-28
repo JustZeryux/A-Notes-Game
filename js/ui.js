@@ -2034,10 +2034,15 @@ window.openUnifiedDiffModal = function(song) {
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
     
-const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F', 10: '#ff0000'};
+    // === FIX DE ACOMODACIÓN Y DISEÑO ===
+    // Evita que la ventana crezca infinitamente. Si hay muchos botones, se podrá hacer scroll.
+    grid.style.maxHeight = '260px'; 
+    grid.style.overflowY = 'auto';
+    grid.style.padding = '5px';
+    
+    const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F', 10: '#ff0000'};
     const labels = {1: 'RHYTHM', 2: 'BASIC', 3: 'EASY', 4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON', 10: 'IMPOSSIBLE'};
     
-    // 1. DIBUJAR LOS BOTONES Y CANDADOS
     const standardModes = [4, 6, 7, 9];
     let allModes = [...new Set([...standardModes, ...song.keysAvailable])].sort((a,b) => a - b);
     
@@ -2048,10 +2053,14 @@ const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a20
         btn.className = 'diff-card';
         
         if (song.keysAvailable.includes(k)) {
-            // Botón jugable
             btn.style.borderColor = c; 
             btn.style.color = c;
-            btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num">${k}K</div><div class="diff-label">${l}</div>`;
+            // FIX ICONOS: Se respeta tu fuente grande para que se vea igual a tu imagen
+            btn.innerHTML = `
+                <div class="diff-bg-icon">${k}K</div>
+                <div class="diff-num" style="font-size:2.2rem; font-weight:900;">${k}K</div>
+                <div class="diff-label">${l}</div>
+            `;
             btn.onclick = () => {
                 closeModal('diff');
                 if(song.isOsu) {
@@ -2062,34 +2071,36 @@ const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a20
                 }
             };
         } else {
-            // Botón con candado
             btn.style.borderColor = '#333';
             btn.style.color = '#555';
             btn.style.background = 'rgba(0,0,0,0.6)';
             btn.style.cursor = 'not-allowed';
             btn.style.boxShadow = 'none';
-            btn.innerHTML = `<div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div><div class="diff-num">🔒 ${k}K</div><div class="diff-label">NO DISPONIBLE</div>`;
+            btn.innerHTML = `
+                <div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div>
+                <div class="diff-num" style="font-size:2rem; font-weight:900;">🔒 ${k}K</div>
+                <div class="diff-label">NO DISPONIBLE</div>
+            `;
         }
         grid.appendChild(btn);
     });
 
-    // 2. EL BOTÓN DEL EDITOR (SOLO PARA TUS CANCIONES)
     if (!song.isOsu) {
         let editBtn = document.createElement('div');
         editBtn.className = 'diff-card';
-        editBtn.style.gridColumn = "1 / -1"; // Hace que el botón abarque todo lo ancho de la cuadrícula
+        editBtn.style.gridColumn = "1 / -1"; 
         editBtn.style.borderColor = "#ff66aa";
         editBtn.style.color = "#ff66aa";
         editBtn.style.marginTop = "10px";
+        editBtn.style.minHeight = "80px";
         editBtn.innerHTML = `
             <div class="diff-bg-icon">✏️</div>
-            <div class="diff-num">✏️ EDITOR STUDIO</div>
+            <div class="diff-num" style="font-size:1.5rem; font-weight:900;">✏️ EDITOR STUDIO</div>
             <div class="diff-label">Crea y edita tu propio mapa</div>
         `;
         editBtn.onclick = () => {
             closeModal('diff');
             if(typeof openEditor === 'function') openEditor(song.raw, 4);
-            else alert("Error: El archivo editor.js no está conectado en el index.html");
         };
         grid.appendChild(editBtn);
     }
