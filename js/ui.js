@@ -579,35 +579,21 @@ function updateCfgVal(key, val) {
 
 // Asignamos a window para que el HTML pueda verlas
 window.openModal = function(id) {
-    if (id === 'settings') {
-        openSettingsMenu();
-    } else {
-        const m = document.getElementById('modal-'+id);
-        if(m) m.style.display='flex';
-        
-        if(id==='profile') { 
-            const lv = document.getElementById('login-view');
-            const pv = document.getElementById('profile-view');
-            if(lv && pv) {
-                lv.style.display = user.name==='Guest'?'block':'none';
-                pv.style.display = user.name==='Guest'?'none':'block';
-            }
-            switchProfileTab('resumen'); 
+    if (id === 'settings') { openSettingsMenu(); } 
+    else if (id === 'profile') {
+        // En vez de abrirlo a ciegas, usamos nuestro nuevo visualizador unificado
+        if (window.user && window.user.name && window.user.name !== 'Guest') {
+            window.showUserProfile(window.user.name);
+        } else {
+            // Mostrar ventana de Login
+            const m = document.getElementById('modal-profile'); if(m) m.style.display='flex';
+            document.getElementById('login-view').style.display = 'block';
+            document.getElementById('profile-view').style.display = 'none';
         }
+    }
+    else {
+        const m = document.getElementById('modal-'+id); if(m) m.style.display='flex';
         if(id==='upload') setText('upload-status', "");
-        if(id==='diff' && curSongData) { 
-            setText('diff-song-title', curSongData.title);
-            const cover = document.getElementById('diff-song-cover');
-            if(curSongData.imageURL) {
-                cover.style.backgroundImage = `url(${curSongData.imageURL})`;
-            } else {
-                // Color fallback
-                let hash = 0;
-                for (let i = 0; i < curSongData.id.length; i++) hash = curSongData.id.charCodeAt(i) + ((hash << 5) - hash);
-                const hue = Math.abs(hash % 360);
-                cover.style.backgroundImage = `linear-gradient(135deg, hsl(${hue}, 60%, 20%), #000)`;
-            }
-        }
     }
 };
 
@@ -2228,4 +2214,243 @@ window.openStudioDashboard = async function() {
     }
 };
 
-// === MOTOR DEL MENÚ DE TECLAS DINÁMICO ==
+// === MOTOR DEL SÚPER PERFIL (Tuyo y de otros) ===
+window.showUserProfile = async function(targetName) {
+    if (!window.db) return;
+    
+    // Mostramos la ventana y la sección de perfil
+    const m = document.getElementById('modal-profile'); if(m) m.style.display='flex';
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('profile-view').style.display = 'block';
+    
+    // Textos de carga mientras descarga datos
+    setText('p-name', "Cargando..."); setText('p-lvl-txt', "LVL ?");
+    
+    const isMe = (targetName === window.user.name);
+    
+    // Mostramos botones correspondientes
+    document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
+    document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
+    
+    // Si soy yo, habilito el click en el avatar para subir foto. Si es otro, lo desactivo.
+    document.getElementById('p-av-big').style.cursor = isMe ? 'pointer' : 'default';
+    document.getElementById('avatar-upload-input').disabled = !isMe;
+
+    try {
+        const doc = await window.db.collection('users').doc(targetName).get();
+        if (!doc.exists) return notify("Usuario no encontrado", "error");
+        
+        const d = doc.data();
+        
+        // Llenar estadísticas
+        setText('p-name', targetName);
+        setText('p-lvl-txt', "LVL " + (d.lvl || 1));
+        setText('p-score', (d.score || 0).toLocaleString());
+        setText('p-plays', (d.plays || 0).toLocaleString());
+        setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
+        setText('p-sp-display', (d.sp || 0).toLocaleString());
+        
+        // Avatar y Fondo
+        const url = d.avatarData ? `url(${d.avatarData})` : "url('icon.png')";
+        const avBig = document.getElementById('p-av-big');
+        if(avBig) avBig.style.backgroundImage = url;
+        
+        const headerBg = document.getElementById('p-header-bg');
+        if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
+        
+        // Skins y Marcos
+        let skinName = "Default"; let uiName = "Ninguno";
+        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
+            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin); if(sItem) skinName = sItem.name;
+            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui); if(uItem) uiName = uItem.name;
+        }
+        setText('p-equipped-skin', skinName);
+        setText('p-equipped-ui', uiName);
+        
+        // Aplicamos la belleza del Marco UI al perfil
+        applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+
+        // === LÓGICA DE BOTONES PARA VISITANTE ===
+        if (!isMe) {
+            const btnAdd = document.getElementById('btn-add-friend');
+            const isFriend = window.user.friends && window.user.friends.includes(targetName);
+            
+            if (isFriend) {
+                btnAdd.innerText = "✅ AMIGOS";
+                btnAdd.style.background = "#333"; btnAdd.style.color = "#888"; btnAdd.onclick = null;
+            } else {
+                btnAdd.innerText = "➕ AGREGAR AMIGO";
+                btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black";
+                btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
+            }
+            
+            document.getElementById('btn-chat-user').onclick = () => { openFloatingChat(targetName); closeModal('profile'); };
+            document.getElementById('btn-challenge-user').onclick = () => { window.challengeFriend(targetName); closeModal('profile'); };
+        }
+
+    } catch(e) { console.error(e); }
+};
+
+// Función rápida para enviar solicitud desde un botón (no del input)
+window.sendFriendRequestTarget = function(targetName) {
+    if(!window.db || !window.user.name) return;
+    window.db.collection("users").doc(targetName).update({
+        requests: firebase.firestore.FieldValue.arrayUnion(window.user.name)
+    }).then(() => {
+        notify(`Solicitud enviada a ${targetName}`, "success");
+        const btnAdd = document.getElementById('btn-add-friend');
+        if(btnAdd) { btnAdd.innerText = "⏳ ENVIADA"; btnAdd.style.background = "#444"; btnAdd.style.color = "#888"; btnAdd.onclick = null; }
+    });
+};
+
+// === RANKING AAA ===
+window.openLeaderboard = function() {
+    openModal('rank');
+    const list = document.getElementById('rank-list');
+    if(!list) return;
+    list.innerHTML = '<div style="text-align:center; padding:50px; color:var(--gold); font-size:1.2rem; font-weight:bold;">Conectando con la Nube... ⏳</div>';
+    
+    if(!window.db) return;
+    
+    window.db.collection("leaderboard").orderBy("pp", "desc").limit(50).get().then(async snap => {
+        list.innerHTML = '';
+        let pos = 1;
+        
+        for (const doc of snap.docs) {
+            const name = doc.id;
+            const d = doc.data();
+            
+            // Colores especiales para el Top 3
+            let rankColor = "#333"; let posColor = "#aaa";
+            if(pos === 1) { rankColor = "var(--gold)"; posColor = "var(--gold)"; }
+            else if(pos === 2) { rankColor = "silver"; posColor = "silver"; }
+            else if(pos === 3) { rankColor = "#cd7f32"; posColor = "#cd7f32"; }
+
+            // Buscamos rápidamente su avatar en la BD de usuarios
+            let avUrl = 'icon.png'; let lvl = 1;
+            try {
+                const uDoc = await window.db.collection("users").doc(name).get();
+                if(uDoc.exists) { avUrl = uDoc.data().avatarData || 'icon.png'; lvl = uDoc.data().lvl || 1; }
+            } catch(e){}
+
+            const card = document.createElement('div');
+            card.style.cssText = `display:flex; align-items:center; background:#111; padding:10px 20px; border-radius:10px; border-left:4px solid ${rankColor}; cursor:pointer; transition:0.2s; gap:20px; margin-bottom:10px;`;
+            card.onmouseenter = () => card.style.transform = 'scale(1.02)';
+            card.onmouseleave = () => card.style.transform = 'scale(1)';
+            
+            // Al darle clic abre el Súper Perfil ✨
+            card.onclick = () => { closeModal('rank'); showUserProfile(name); };
+
+            card.innerHTML = `
+                <div style="font-size:1.8rem; font-weight:900; width:45px; text-align:center; color:${posColor};">#${pos}</div>
+                <div style="width:50px; height:50px; border-radius:12px; background:url('${avUrl}') center/cover; background-color:#222; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>
+                <div style="flex:1;">
+                    <div style="font-weight:900; font-size:1.2rem; color:white;">${name}</div>
+                    <div style="font-size:0.85rem; color:#888; font-weight:bold;">Jugador Nivel ${lvl}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:900; color:var(--accent); font-size:1.5rem;">${(d.pp || 0).toLocaleString()} <span style="font-size:0.8rem; color:#aaa;">PP</span></div>
+                    <div style="font-size:0.8rem; color:#666; font-weight:bold;">${(d.score || 0).toLocaleString()} Score Total</div>
+                </div>
+            `;
+            list.appendChild(card);
+            pos++;
+        }
+    });
+};
+
+window.showUserProfile = async function(targetName) {
+    if (!window.db) return;
+    
+    // Novedad: Reiniciamos la vista siempre que abrimos un perfil
+    toggleProfileSettings(false);
+
+    // === MOTOR PARA CAMBIAR ENTRE PERFIL Y AJUSTES DE CUENTA ===
+window.toggleProfileSettings = function(show) {
+    const mainView = document.getElementById('profile-main-stats');
+    const settingsView = document.getElementById('profile-account-settings');
+    
+    if(mainView && settingsView) {
+        // Efecto visual suave opcional
+        mainView.style.opacity = show ? "0" : "1";
+        settingsView.style.opacity = show ? "1" : "0";
+        
+        setTimeout(() => {
+            mainView.style.display = show ? 'none' : 'block';
+            settingsView.style.display = show ? 'block' : 'none';
+        }, 100);
+    }
+};
+
+window.openFriends = function() {
+    if(window.user.name === "Guest") return notify("Inicia sesión primero", "error");
+    if(!window.db) return notify("Error de conexión", "error");
+    
+    openModal('friends');
+    const reqList = document.getElementById('req-list');
+    const friList = document.getElementById('friend-list');
+    
+    window.db.collection("users").doc(window.user.name).onSnapshot(doc => {
+        if(!doc.exists) return;
+        const data = doc.data();
+        
+        // 1. Solicitudes Pendientes (Modernas)
+        if(reqList) {
+            reqList.innerHTML = '';
+            if(data.requests && data.requests.length > 0) {
+                data.requests.forEach(reqName => {
+                    const row = document.createElement('div');
+                    row.style.cssText = "display:flex; align-items:center; justify-content:space-between; background:rgba(0, 255, 255, 0.05); padding:10px 15px; border-radius:8px; border:1px solid #00ffff; margin-bottom:10px;";
+                    row.innerHTML = `
+                        <span style="font-weight:900; color:white; font-size:1.1rem;">${reqName}</span>
+                        <div style="display:flex; gap:10px;">
+                            <button class="action" style="width:auto; padding:5px 15px; font-size:0.8rem; background:#00ffff; color:black;" onclick="window.respondFriend('${reqName}', true)">ACEPTAR</button>
+                            <button class="action secondary" style="width:auto; padding:5px 15px; font-size:0.8rem; border-color:#F9393F; color:#F9393F;" onclick="window.respondFriend('${reqName}', false)">X</button>
+                        </div>`;
+                    reqList.appendChild(row);
+                });
+            } else {
+                reqList.innerHTML = '<div style="color:#666; font-size:0.9rem; padding:10px; font-style:italic;">Sin solicitudes pendientes.</div>';
+            }
+        }
+
+        // 2. Amigos Confirmados (Tarjetas Estilo Ranking)
+        if(friList) {
+            friList.innerHTML = '';
+            if(data.friends && data.friends.length > 0) {
+                data.friends.forEach(fName => {
+                    const card = document.createElement('div'); 
+                    card.style.cssText = "display:flex; align-items:center; background:#111; padding:12px; border-radius:10px; border-left:4px solid var(--good); cursor:pointer; transition:0.2s; gap:15px; margin-bottom:10px;";
+                    card.onmouseenter = () => card.style.transform = 'scale(1.02)';
+                    card.onmouseleave = () => card.style.transform = 'scale(1)';
+                    
+                    // Al dar clic abre el Súper Perfil ✨
+                    card.onclick = function() { closeModal('friends'); showUserProfile(fName); };
+                    
+                    card.innerHTML = `
+                        <div id="fav-${fName}" style="width:50px; height:50px; border-radius:12px; background-color:#222; background-size:cover; background-position:center;"></div>
+                        <div style="flex:1;">
+                            <div style="font-weight:900; font-size:1.2rem; color:white;">${fName}</div>
+                            <div id="fstat-${fName}" style="font-size:0.85rem; color:#888; font-weight:bold;">Cargando stats...</div>
+                        </div>
+                        <div style="color:var(--good); font-size:1.5rem; filter: drop-shadow(0 0 5px var(--good));">▶</div>
+                    `;
+                    friList.appendChild(card);
+                    
+                    // Descargamos su foto y stats reales
+                    window.db.collection("users").doc(fName).get().then(fDoc => {
+                        if(fDoc.exists) {
+                            const fd = fDoc.data();
+                            const av = document.getElementById(`fav-${fName}`);
+                            const stat = document.getElementById(`fstat-${fName}`);
+                            if(av) av.style.backgroundImage = fd.avatarData ? `url(${fd.avatarData})` : "url('icon.png')";
+                            if(stat) stat.innerHTML = `<span style="color:var(--gold)">LVL ${fd.lvl || 1}</span> &nbsp;|&nbsp; <span style="color:var(--accent)">${(fd.pp || 0).toLocaleString()} PP</span>`;
+                        }
+                    });
+                });
+            } else {
+                friList.innerHTML = '<div style="padding:20px; text-align:center; color:#666; font-weight:bold;">Aún no tienes amigos agregados.</div>';
+            }
+        }
+    });
+};
