@@ -1999,8 +1999,8 @@ window.renderUnifiedGrid = function() {
 };
 
 // --- MENÚ DE DIFICULTADES UNIFICADO (CON CANDADOS) ---
+// --- MENÚ DE DIFICULTADES UNIFICADO (CON CANDADOS Y EDITOR) ---
 window.openUnifiedDiffModal = function(song) {
-    // 1. Forzamos la actualización inmediata del DOM para evitar que se quede pegada la canción anterior
     const titleEl = document.getElementById('diff-song-title');
     const coverEl = document.getElementById('diff-song-cover');
     titleEl.innerText = song.title;
@@ -2012,7 +2012,7 @@ window.openUnifiedDiffModal = function(song) {
     const colors = {4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F'};
     const labels = {4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON'};
     
-    // Mezclamos los modos base (4, 6, 7, 9) con cualquier modo raro que tenga Osu (como 5K u 8K)
+    // 1. DIBUJAR LOS BOTONES Y CANDADOS
     const standardModes = [4, 6, 7, 9];
     let allModes = [...new Set([...standardModes, ...song.keysAvailable])].sort((a,b) => a - b);
     
@@ -2022,15 +2022,11 @@ window.openUnifiedDiffModal = function(song) {
         let btn = document.createElement('div');
         btn.className = 'diff-card';
         
-        // Si la canción SÍ tiene este modo disponible (Boton Brillante)
         if (song.keysAvailable.includes(k)) {
+            // Botón jugable
             btn.style.borderColor = c; 
             btn.style.color = c;
-            btn.innerHTML = `
-                <div class="diff-bg-icon">${k}K</div>
-                <div class="diff-num">${k}K</div>
-                <div class="diff-label">${l}</div>
-            `;
+            btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num">${k}K</div><div class="diff-label">${l}</div>`;
             btn.onclick = () => {
                 closeModal('diff');
                 if(song.isOsu) {
@@ -2040,43 +2036,38 @@ window.openUnifiedDiffModal = function(song) {
                     window.curSongData = song.raw; startGame(k);
                 }
             };
-        } 
-        // Si la canción NO tiene este modo disponible (Boton Oscuro con Candado)
-        else {
+        } else {
+            // Botón con candado
             btn.style.borderColor = '#333';
             btn.style.color = '#555';
             btn.style.background = 'rgba(0,0,0,0.6)';
             btn.style.cursor = 'not-allowed';
             btn.style.boxShadow = 'none';
-            btn.innerHTML = `
-                <div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div>
-                <div class="diff-num">🔒 ${k}K</div>
-                <div class="diff-label">NO DISPONIBLE</div>
-            `;
-            // Al hacer clic no hace nada
+            btn.innerHTML = `<div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div><div class="diff-num">🔒 ${k}K</div><div class="diff-label">NO DISPONIBLE</div>`;
         }
-        
         grid.appendChild(btn);
     });
-    // === BOTÓN DE EDITOR (SOLO PARA CANCIONES COMUNITARIAS) ===
+
+    // 2. EL BOTÓN DEL EDITOR (SOLO PARA TUS CANCIONES)
     if (!song.isOsu) {
         let editBtn = document.createElement('div');
         editBtn.className = 'diff-card';
-        editBtn.style.gridColumn = "1 / -1"; // Ocupa todo el ancho
+        editBtn.style.gridColumn = "1 / -1"; // Hace que el botón abarque todo lo ancho de la cuadrícula
         editBtn.style.borderColor = "#ff66aa";
         editBtn.style.color = "#ff66aa";
+        editBtn.style.marginTop = "10px";
         editBtn.innerHTML = `
             <div class="diff-bg-icon">✏️</div>
             <div class="diff-num">✏️ EDITOR STUDIO</div>
-            <div class="diff-label">Crea tu propio mapa</div>
+            <div class="diff-label">Crea y edita tu propio mapa</div>
         `;
         editBtn.onclick = () => {
             closeModal('diff');
-            // Por defecto abrimos el editor en modo 4K
             if(typeof openEditor === 'function') openEditor(song.raw, 4);
-            else alert("Error: editor.js no conectado");
+            else alert("Error: El archivo editor.js no está conectado en el index.html");
         };
         grid.appendChild(editBtn);
     }
+
     openModal('diff');
 };
