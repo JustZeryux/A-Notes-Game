@@ -87,6 +87,28 @@ const SHOP_ITEMS = [
     { id: 'skin_star', name: 'Estrella Pop', price: 4500, type: 'skin', desc: 'Para verdaderos ídolos.', color: '#FFF', fixed: false, shape: 'star' },
     { id: 'skin_hex', name: 'Colmena Hex', price: 3800, type: 'skin', desc: 'Hexágonos tecnológicos.', color: '#FFF', fixed: false, shape: 'hexagon' },
 
+    // Agrega esto dentro de tu arreglo de SHOP_ITEMS:
+    
+    // --- TICKET CUSTOM ---
+    { id: 'tag_custom', name: '🎟️ TICKET TAG CUSTOM', type: 'tag', price: 150000, desc: 'Crea tu propio Tag personalizado. Elige texto, color de fondo y color de letra.' },
+    
+    // --- 16 TAGS PREDEFINIDOS ---
+    { id: 'tag_demon', name: 'DEMON', type: 'tag', price: 5000, css: 'tag-demon' },
+    { id: 'tag_godhand', name: 'GODHAND', type: 'tag', price: 25000, css: 'tag-godhand' },
+    { id: 'tag_cyberpunk', name: 'CYBERPUNK', type: 'tag', price: 15000, css: 'tag-cyberpunk' },
+    { id: 'tag_rhythm', name: 'RHYTHM MASTER', type: 'tag', price: 10000, css: 'tag-rhythm' },
+    { id: 'tag_hacker', name: 'HACKER', type: 'tag', price: 8000, css: 'tag-hacker' },
+    { id: 'tag_legend', name: 'LEGEND', type: 'tag', price: 50000, css: 'tag-legend' },
+    { id: 'tag_ghost', name: 'GHOST', type: 'tag', price: 6000, css: 'tag-ghost' },
+    { id: 'tag_toxic', name: 'TOXIC', type: 'tag', price: 7000, css: 'tag-toxic' },
+    { id: 'tag_ninja', name: 'NINJA', type: 'tag', price: 9000, css: 'tag-ninja' },
+    { id: 'tag_star', name: 'STAR CATCHER', type: 'tag', price: 12000, css: 'tag-star' },
+    { id: 'tag_blood', name: 'BLOODLINE', type: 'tag', price: 11000, css: 'tag-blood' },
+    { id: 'tag_ice', name: 'ICE COLD', type: 'tag', price: 10000, css: 'tag-ice' },
+    { id: 'tag_fire', name: 'ON FIRE', type: 'tag', price: 10000, css: 'tag-fire' },
+    { id: 'tag_void', name: 'THE VOID', type: 'tag', price: 30000, css: 'tag-void' },
+    { id: 'tag_pro', name: 'PRO PLAYER', type: 'tag', price: 20000, css: 'tag-pro' },
+    { id: 'tag_vip', name: 'V.I.P', type: 'tag', price: 100000, css: 'tag-vip' },
     // --- SKINS LEGENDARIAS (Tienen color y forma obligatoria única) ---
     { id: 'skin_demon', name: 'Ira de Demonio', price: 6000, type: 'skin', desc: 'Picos agresivos rojo sangre.', color: '#FF0000', fixed: true, shape: 'demon' },
     { id: 'skin_angel', name: 'Halo Divino', price: 6000, type: 'skin', desc: 'Anillos celestiales de luz.', color: '#00FFFF', fixed: true, shape: 'angel' },
