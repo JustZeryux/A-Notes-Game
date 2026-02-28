@@ -32,13 +32,26 @@ window.updUI = function() {
     const pct = Math.min(100, (user.xp / xpReq) * 100);
     setStyle('p-xp-bar', 'width', pct + "%"); setText('p-xp-txt', `${Math.floor(user.xp)} / ${xpReq} XP`);
     
-    // Avatar
+    // Avatar - LÓGICA DE LIMPIEZA DE "G"
     if(user.avatarData) { 
         const url = `url(${user.avatarData})`;
-        setStyle('m-av', 'backgroundImage', url); setStyle('p-av-big', 'backgroundImage', url); setStyle('ig-av', 'backgroundImage', url);
+        const mAv = document.getElementById('m-av');
+        if(mAv) {
+            mAv.style.backgroundImage = url;
+            mAv.textContent = ""; // Borra la "G" del menú lateral
+        }
+        
+        const pAvBig = document.getElementById('p-av-big');
+        if(pAvBig) {
+            pAvBig.style.backgroundImage = url;
+            pAvBig.textContent = ""; // Borra la "G" del modal de perfil
+        }
+
+        setStyle('ig-av', 'backgroundImage', url);
         const headerBg = document.getElementById('p-header-bg');
         if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
     }
+
     if(user.bg) { const bg = document.getElementById('bg-image'); if(bg) { bg.src = user.bg; bg.style.opacity = 0.3; } }
 
     const rankEl = document.getElementById('p-global-rank');
@@ -120,7 +133,12 @@ window.showUserProfile = async function(targetName) {
         setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP"); setText('p-sp-display', (d.sp || 0).toLocaleString());
         
         const url = d.avatarData ? `url(${d.avatarData})` : "url('icon.png')";
-        const avBig = document.getElementById('p-av-big'); if(avBig) avBig.style.backgroundImage = url;
+        const avBig = document.getElementById('p-av-big'); 
+        if(avBig) {
+            avBig.style.backgroundImage = url;
+            if(d.avatarData) avBig.textContent = ""; // Limpia la G en perfil de otros
+        }
+        
         const headerBg = document.getElementById('p-header-bg'); if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
         
         let skinName = "Default"; let uiName = "Ninguno";
