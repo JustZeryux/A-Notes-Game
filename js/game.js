@@ -393,11 +393,7 @@ function loop() {
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
-    if (window.st.songDuration > 0 && songTime > 0) {
-        const pct = Math.min(100, (songTime / 1000 / window.st.songDuration) * 100);
-        const bar = document.getElementById('top-progress-fill');
-        if(bar) bar.style.width = pct + "%";
-    }
+    
 
     // Lógica de Subtítulos
     if (window.cfg.subtitles && window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
@@ -425,7 +421,26 @@ function loop() {
         const n = window.st.notes[i];
         if (n.s) continue; 
         
-        if (n.t - now < 1500) { 
+        i// === ACTUALIZACIÓN DE BARRA Y RELOJ ===
+    if (window.st.songDuration > 0 && songTime > 0) {
+        let currentSec = songTime / 1000;
+        let totalSec = window.st.songDuration;
+        if (currentSec > totalSec) currentSec = totalSec;
+
+        // 1. Llenar la barra de color
+        const pct = Math.min(100, (currentSec / totalSec) * 100);
+        const bar = document.getElementById('top-progress-fill');
+        if(bar) bar.style.width = pct + "%";
+
+        // 2. Actualizar el reloj (Ej: 1:05 / 3:20)
+        let curM = Math.floor(currentSec / 60);
+        let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
+        let totM = Math.floor(totalSec / 60);
+        let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
+        
+        const timeText = document.getElementById('top-progress-time');
+        if (timeText) timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
+    }f (n.t - now < 1500) { 
             if (n.t - now > -200) { 
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
@@ -983,41 +998,3 @@ window.initMobileTouchControls = function(keyCount) {
     }
 };
 
-window.updateSongProgress = function() {
-    // Si el juego no está corriendo o el motor de audio no está listo, no hacemos nada
-    if (typeof st === 'undefined' || !st.isPlaying || !st.ctx || !st.startTime) return;
-
-    // Calculamos el tiempo actual (Tiempo del motor de audio - Tiempo en el que empezó la canción)
-    let currentSec = st.ctx.currentTime - st.startTime;
-    
-    // Obtenemos la duración total del buffer de audio
-    let totalSec = st.audioBuffer ? st.audioBuffer.duration : 0; 
-    
-    // Evitamos números locos (negativos al inicio o que se pase del límite)
-    if (currentSec < 0) currentSec = 0;
-    if (totalSec > 0 && currentSec > totalSec) currentSec = totalSec;
-
-    // Formateamos los segundos a formato Reloj (Ej: 1:05)
-    let curM = Math.floor(currentSec / 60);
-    let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
-    let totM = Math.floor(totalSec / 60);
-    let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
-
-    // Actualizamos el texto en el HTML
-    const timeText = document.getElementById('top-progress-time');
-    if (timeText) {
-        // Solo mostramos si hay una canción cargada
-        if (totalSec > 0) {
-            timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
-        } else {
-            timeText.innerText = `0:00 / 0:00`;
-        }
-    }
-
-    // Actualizamos el ancho de la barra de progreso (fill)
-    const fillBar = document.getElementById('top-progress-fill');
-    if (fillBar && totalSec > 0) {
-        let percent = (currentSec / totalSec) * 100;
-        fillBar.style.width = `${percent}%`;
-    }
-};
