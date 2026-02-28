@@ -15,7 +15,6 @@ window.searchOsu = async function() {
     results.innerHTML = "";
 
     try {
-        // Consultamos la API espejo (m=3 significa solo Osu! Mania)
         const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(query)}&m=3`);
         const data = await res.json();
 
@@ -29,8 +28,8 @@ window.searchOsu = async function() {
         status.style.color = "var(--good)";
 
         data.forEach(set => {
-            // Buscamos la dificultad de Mania
-            const maniaBeatmaps = set.beatmaps.filter(b => b.mode === 3);
+            // FIX VITAL: Corrección de mode_int para que no rechace las canciones
+            const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
             if(maniaBeatmaps.length === 0) return;
 
             const coverUrl = `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`;
@@ -45,7 +44,7 @@ window.searchOsu = async function() {
                     <div class="song-author" style="color:#ff66aa; font-weight:bold; margin-top:5px;">Dificultades: ${maniaBeatmaps.length}</div>
                 </div>
             `;
-            // Al hacer clic, descargamos el mapa mágico
+            // Al hacer clic, descargamos el mapa
             card.onclick = () => downloadAndPlayOsu(set.id, set.title, coverUrl);
             results.appendChild(card);
         });
