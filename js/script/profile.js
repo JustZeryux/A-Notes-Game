@@ -154,6 +154,38 @@ window.showUserProfile = async function(targetName) {
         const d = doc.data();
         
         setText('p-name', targetName);
+        // LÓGICA DE TAGS (Predefinidos, Custom y Especiales Top)
+        const tagEl = document.getElementById('p-user-tag');
+        if (tagEl) {
+            tagEl.style.display = 'none'; // Ocultar por defecto
+            tagEl.className = 'player-tag'; // Resetear clases
+            tagEl.style.background = ''; tagEl.style.color = ''; // Reset custom CSS
+            
+            // 1. Prioridad: ¿Es Top Global? (Se lo asignamos temporalmente, esto sobrescribe los comprados)
+            let isTop = false;
+            // Evaluamos el Top en la promesa de abajo, pero aquí cargamos su Tag normal:
+            
+            if (d.equipped && d.equipped.tag) {
+                tagEl.style.display = 'inline-block';
+                
+                if (d.equipped.tag === 'tag_custom' && d.customTagData) {
+                    // Es un Tag Customizado
+                    tagEl.classList.add('tag-custom');
+                    tagEl.innerText = d.customTagData.text || "CUSTOM";
+                    tagEl.style.background = d.customTagData.bg || "#ff66aa";
+                    tagEl.style.color = d.customTagData.color || "#ffffff";
+                } else {
+                    // Es un Tag comprado de la tienda
+                    const sItem = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS.find(x => x.id === d.equipped.tag) : null;
+                    if (sItem) {
+                        tagEl.classList.add(sItem.css);
+                        tagEl.innerText = sItem.name;
+                    } else {
+                        tagEl.style.display = 'none';
+                    }
+                }
+            }
+        }
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
         setText('p-plays', (d.plays || 0).toLocaleString());
