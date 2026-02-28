@@ -1700,6 +1700,7 @@ window.debounceSearch = function(val) {
 
 // --- CARGA DE CANCIONES (FIREBASE + OSU POR DEFECTO) ---
 // --- CARGA BLINDADA (TODOS LOS MAPAS POR DEFECTO) ---
+// --- CARGA BLINDADA (TODAS LAS CANCIONES POR DEFECTO) ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
     grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Cargando Galería Global... ⏳</div>';
@@ -1707,7 +1708,7 @@ window.fetchUnifiedData = async function(query = "") {
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. Firebase (Tus canciones)
+    // 1. Firebase (Tus canciones de la comunidad)
     try {
         if(window.db) {
             let snapshot = await window.db.collection("globalSongs").limit(50).get();
@@ -1724,20 +1725,22 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error DB Local"); }
 
-    // 2. Osu! Mania (Carga TODOS por defecto)
+    // 2. Osu! Mania (Carga Masiva Automática)
     try {
-        // FIX DEFINITIVO: Si está vacío, no mandamos el parámetro "q=". 
-        // Esto le dice a la API: "Dame la lista global de TODOS los mapas".
-        let apiUrl = "https://api.nerinyan.moe/search?m=3";
-        if (query.trim() !== "") {
-            apiUrl += `&q=${encodeURIComponent(query.trim())}`;
+        // TRUCO MAESTRO: Si la barra está vacía, elegimos una categoría popular al azar.
+        // Esto evita que la API devuelva "0 resultados" y hace que el menú principal siempre esté vivo.
+        let safeQuery = query.trim();
+        if (safeQuery === "") {
+            const secretTerms = ["anime", "fnf", "vocaloid", "camellia", "remix", "nightcore", "a", "e"];
+            safeQuery = secretTerms[Math.floor(Math.random() * secretTerms.length)];
         }
         
-        const res = await fetch(apiUrl);
+        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
         const data = await res.json();
         
         if (data && data.length > 0) {
             data.forEach(set => {
+                // Confirmamos que el mapa sea de modo Mania
                 const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
                 
                 if(maniaBeatmaps.length > 0) {
@@ -1753,7 +1756,7 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error Osu API"); }
 
-    // Juntamos todo (Osu primero, Firebase después)
+    // Juntamos las canciones de Osu y las tuyas, y las mandamos a dibujar
     window.unifiedSongs = [...osuSongs, ...fbSongs];
     renderUnifiedGrid();
 };
