@@ -1829,25 +1829,26 @@ window.debounceSearch = function(val) {
 };
 
 // --- CARGA BLINDADA (ESPERA A FIREBASE Y EVITA CRASHEOS) ---
+// --- CARGA MASIVA: DOUBLE FETCH Y MEZCLA ALEATORIA ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
     if(!grid) return;
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#00ffff; font-size:1.5rem; font-weight:bold;">Sincronizando Nube Global... ⏳</div>';
+    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#00ffff; font-size:1.5rem; font-weight:bold;">Descargando Galería Masiva... ⏳</div>';
     
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. ESPERAR A QUE FIREBASE DESPIERTE (Soluciona que tus canciones desaparezcan)
+    // 1. ESPERA A FIREBASE
     let retries = 0;
     while(!window.db && retries < 15) {
         await new Promise(r => setTimeout(r, 100));
         retries++;
     }
 
-    // 2. Traer canciones de tu Comunidad
+    // 2. Traer canciones de tu Comunidad (Aumentado a 100)
     try {
         if(window.db) {
-            let snapshot = await window.db.collection("globalSongs").limit(50).get();
+            let snapshot = await window.db.collection("globalSongs").limit(100).get();
             snapshot.forEach(doc => {
                 let data = doc.data();
                 if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
@@ -1861,32 +1862,62 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error DB Local", e); }
 
-    // 3. Traer mapas de Osu!
+    // 3. Traer mapas de Osu! (MODO DOUBLE FETCH)
     try {
-        // Palabra 100% segura para que siempre traiga mapas chulos
-        let safeQuery = query.trim() !== "" ? query.trim() : "vocaloid"; 
+        let safeQuery = query.trim();
+        let rawOsuData = [];
         
-        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
-        const data = await res.json();
-        
-        if (Array.isArray(data)) {
-            data.forEach(set => {
-                const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
-                if(maniaBeatmaps.length > 0) {
-                    let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
-                    osuSongs.push({
-                        id: set.id, title: set.title, 
-                        artist: `Subido por: ${set.creator}`, 
-                        imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
-                        isOsu: true, keysAvailable: keys, raw: set
-                    });
-                }
-            });
+        if (safeQuery === "") {
+            // Palabras clave para llenar la pantalla
+            const terms = ["camellia", "miku", "fnf", "vocaloid", "touhou", "remix", "nightcore", "osu", "kpop", "rock", "pop", "electronic"];
+            // Las revolvemos para elegir 2 al azar diferentes cada vez que abres el juego
+            const shuffled = terms.sort(() => 0.5 - Math.random());
+            
+            // Hacemos 2 búsquedas AL MISMO TIEMPO para traer el doble de resultados
+            const [res1, res2] = await Promise.all([
+                fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(shuffled[0])}&m=3`),
+                fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(shuffled[1])}&m=3`)
+            ]);
+            
+            const d1 = await res1.json();
+            const d2 = await res2.json();
+            
+            if(Array.isArray(d1)) rawOsuData = rawOsuData.concat(d1);
+            if(Array.isArray(d2)) rawOsuData = rawOsuData.concat(d2);
+            
+        } else {
+            // Si el jugador escribió algo específico, busca normal
+            const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
+            const d = await res.json();
+            if(Array.isArray(d)) rawOsuData = d;
         }
+
+        // Limpiar canciones repetidas (por si las dos búsquedas traen la misma)
+        const uniqueOsuData = Array.from(new Map(rawOsuData.map(item => [item.id, item])).values());
+        
+        uniqueOsuData.forEach(set => {
+            const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
+            if(maniaBeatmaps.length > 0) {
+                let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
+                osuSongs.push({
+                    id: set.id, title: set.title, 
+                    artist: `Subido por: ${set.creator}`, 
+                    imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
+                    isOsu: true, keysAvailable: keys, raw: set
+                });
+            }
+        });
     } catch(e) { console.warn("Error Osu API", e); }
 
-    // Unimos TODO (Tus canciones primero, luego las de Osu)
-    window.unifiedSongs = [...fbSongs, ...osuSongs]; 
+    // 4. EL TOQUE MÁGICO: Unimos tus canciones y las de Osu, ¡y las REVOLVEMOS!
+    let finalMix = [...fbSongs, ...osuSongs];
+    
+    // Si el usuario NO está buscando nada específico, revolvemos toda la galería para que luzca épico
+    if (query.trim() === "") {
+        finalMix = finalMix.sort(() => 0.5 - Math.random());
+    }
+
+    window.unifiedSongs = finalMix; 
     renderUnifiedGrid();
 };
 
