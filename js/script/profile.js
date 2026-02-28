@@ -108,58 +108,116 @@ window.toggleProfileSettings = function(show) {
 };
 
 window.showUserProfile = async function(targetName) {
-    // Aseguramos que la base de datos esté lista
     if (!window.db) {
         console.error("Base de datos no inicializada.");
-        return notify("Error de conexión", "error");
+        return;
     }
-    
+
+    // 1. Preparar la vista del modal
     window.toggleProfileSettings(false);
-    const m = document.getElementById('modal-profile'); if(m) m.style.display='flex';
-    document.getElementById('login-view').style.display = 'none';
-    document.getElementById('profile-view').style.display = 'block';
+    const m = document.getElementById('modal-profile'); 
+    if(m) m.style.display = 'flex';
     
-    setText('p-name', "Cargando..."); setText('p-lvl-txt', "LVL ?");
+    // Ocultar login y mostrar perfil
+    const loginView = document.getElementById('login-view');
+    const profileView = document.getElementById('profile-view');
+    if(loginView) loginView.style.display = 'none';
+    if(profileView) profileView.style.display = 'block';
     
-    const isMe = (targetName === window.user.name);
-    document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
-    document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
-    document.getElementById('p-av-big').style.cursor = isMe ? 'pointer' : 'default';
-    document.getElementById('avatar-upload-input').disabled = !isMe;
+    // 2. Estado inicial de carga (Reset de la "G")
+    setText('p-name', "Cargando...");
+    setText('p-lvl-txt', "LVL ?");
+    const avBig = document.getElementById('p-av-big');
+    if(avBig) {
+        avBig.style.backgroundImage = "none";
+        avBig.textContent = "G"; // Reaparece la G mientras descarga la nueva
+    }
+
+    // Identificar si es mi propio perfil para mostrar botones de edición
+    const isMe = (window.user && targetName === window.user.name);
+    const ownerActions = document.getElementById('p-owner-actions');
+    const visitorActions = document.getElementById('p-visitor-actions');
+    const avUploadInput = document.getElementById('avatar-upload-input');
+
+    if(ownerActions) ownerActions.style.display = isMe ? 'flex' : 'none';
+    if(visitorActions) visitorActions.style.display = isMe ? 'none' : 'flex';
+    if(avBig) avBig.style.cursor = isMe ? 'pointer' : 'default';
+    if(avUploadInput) avUploadInput.disabled = !isMe;
 
     try {
+        // 3. Obtener datos de Firestore
         const doc = await window.db.collection('users').doc(targetName).get();
-        if (!doc.exists) return notify("Usuario no encontrado", "error");
+        if (!doc.exists) {
+            setText('p-name', "No encontrado");
+            return;
+        }
         
         const d = doc.data();
-        setText('p-name', targetName); setText('p-lvl-txt', "LVL " + (d.lvl || 1));
-        setText('p-score', (d.score || 0).toLocaleString()); setText('p-plays', (d.plays || 0).toLocaleString());
-        setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP"); setText('p-sp-display', (d.sp || 0).toLocaleString());
+
+        // 4. Rellenar Textos y Stats
+        setText('p-name', targetName);
+        setText('p-lvl-txt', "LVL " + (d.lvl || 1));
+        setText('p-score', (d.score || 0).toLocaleString());
+        setText('p-plays', (d.plays || 0).toLocaleString());
+        setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
+        setText('p-sp-display', (d.sp || 0).toLocaleString());
         
+        // 5. Cargar Avatar y QUITAR LA "G"
         const url = d.avatarData ? `url(${d.avatarData})` : "url('icon.png')";
-        const avBig = document.getElementById('p-av-big'); 
         if(avBig) {
             avBig.style.backgroundImage = url;
-            if(d.avatarData) avBig.textContent = ""; // Limpia la G en perfil de otros
+            if(d.avatarData) avBig.textContent = ""; // ¡Aquí borramos la G físicamente!
         }
-        
-        const headerBg = document.getElementById('p-header-bg'); if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
-        
-        let skinName = "Default"; let uiName = "Ninguno";
-        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
-            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin); if(sItem) skinName = sItem.name;
-            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui); if(uItem) uiName = uItem.name;
-        }
-        setText('p-equipped-skin', skinName); setText('p-equipped-ui', uiName);
-        if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
 
+        const headerBg = document.getElementById('p-header-bg');
+        if(headerBg) {
+            headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
+        }
+        
+        // 6. Skins y Marcos Visuales
+        let skinName = "Default"; 
+        let uiName = "Ninguno";
+        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
+            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
+            if(sItem) skinName = sItem.name;
+            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
+            if(uItem) uiName = uItem.name;
+        }
+        setText('p-equipped-skin', skinName);
+        setText('p-equipped-ui', uiName);
+        
+        if (typeof applyUIFrameVisuals === 'function') {
+            applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        }
+
+        // 7. Lógica de Amigos (solo para visitantes)
         if (!isMe) {
             const btnAdd = document.getElementById('btn-add-friend');
             const isFriend = window.user.friends && window.user.friends.includes(targetName);
-            if (isFriend) { btnAdd.innerText = "✅ AMIGOS"; btnAdd.style.background = "#333"; btnAdd.style.color = "#888"; btnAdd.onclick = null; } 
-            else { btnAdd.innerText = "➕ AGREGAR AMIGO"; btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black"; btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); }; }
-            document.getElementById('btn-chat-user').onclick = () => { window.openFloatingChat(targetName); window.closeModal('profile'); };
-            document.getElementById('btn-challenge-user').onclick = () => { window.challengeFriend(targetName); };
+            if (btnAdd) {
+                if (isFriend) {
+                    btnAdd.innerText = "✅ AMIGOS";
+                    btnAdd.style.background = "#333";
+                    btnAdd.style.color = "#888";
+                    btnAdd.onclick = null;
+                } else {
+                    btnAdd.innerText = "➕ AGREGAR AMIGO";
+                    btnAdd.style.background = "var(--good)";
+                    btnAdd.style.color = "black";
+                    btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
+                }
+            }
+            
+            const btnChat = document.getElementById('btn-chat-user');
+            if(btnChat) {
+                btnChat.onclick = () => { 
+                    window.openFloatingChat(targetName); 
+                    window.closeModal('profile'); 
+                };
+            }
         }
-    } catch(e) { console.error(e); }
+    } catch(e) {
+        console.error("Error al cargar el perfil:", e);
+        setText('p-name', "Error de red");
+    }
 };
