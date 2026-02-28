@@ -1700,6 +1700,25 @@ window.debounceSearch = function(val) {
 
 // Carga principal al abrir el juego
 // Carga principal al abrir el juego
+window.currentFilters = { type: 'all', key: 'all' };
+window.unifiedSongs = [];
+window.searchTimeout = null;
+
+window.setFilter = function(category, val) {
+    window.currentFilters[category] = val;
+    document.querySelectorAll(`.filter-btn[data-type="${category}"]`).forEach(btn => {
+        btn.classList.remove('active');
+        if(btn.getAttribute('data-val') === val) btn.classList.add('active');
+    });
+    renderUnifiedGrid();
+};
+
+window.debounceSearch = function(val) {
+    clearTimeout(window.searchTimeout);
+    window.searchTimeout = setTimeout(() => fetchUnifiedData(val), 500);
+};
+
+// --- CARGA DE CANCIONES (FIREBASE + OSU POR DEFECTO) ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
     grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#888; font-size:1.5rem; font-weight:bold;">Conectando a los servidores... ⏳</div>';
@@ -1707,10 +1726,9 @@ window.fetchUnifiedData = async function(query = "") {
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. OBTENER DE FIREBASE (Tu Comunidad)
+    // 1. Firebase (Tu Comunidad)
     try {
         if(window.db) {
-            // FIX: Quitamos el orderBy('createdAt') para que Firebase no oculte las canciones antiguas
             let snapshot = await window.db.collection("globalSongs").limit(50).get();
             snapshot.forEach(doc => {
                 let data = doc.data();
@@ -1718,29 +1736,27 @@ window.fetchUnifiedData = async function(query = "") {
                     fbSongs.push({
                         id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
                         imageURL: data.imageURL || 'icon.png', isOsu: false,
-                        keysAvailable: [4, 6, 7, 9], 
-                        raw: { ...data, id: doc.id }
+                        keysAvailable: [4, 6, 7, 9], raw: { ...data, id: doc.id }
                     });
                 }
             });
         }
     } catch(e) { console.warn("Error DB Local"); }
 
-    // 2. OBTENER DE OSU! DIRECT (API)
+    // 2. Osu! Mania (Carga cientos por defecto si no hay búsqueda)
     try {
-        // FIX: Buscamos 'mania' por defecto para que siempre salgan mapas chulos al inicio
-        let q = query ? encodeURIComponent(query) : 'mania';
+        // 'stars>0' trae una galería inmensa de mapas si la barra está vacía
+        let q = query ? encodeURIComponent(query) : 'stars>0'; 
         const res = await fetch(`https://api.nerinyan.moe/search?q=${q}&m=3`);
         const data = await res.json();
         
         if (data && data.length > 0) {
             data.forEach(set => {
-                // FIX VITAL: La API de Osu usa "mode_int" o "mania" en texto.
                 const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
                 if(maniaBeatmaps.length > 0) {
                     let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
                     osuSongs.push({
-                        id: set.id, title: set.title, artist: `Artista: ${set.artist}`,
+                        id: set.id, title: set.title, artist: `Subido por: ${set.creator} (Osu!)`,
                         imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
                         isOsu: true, keysAvailable: keys, raw: set
                     });
@@ -1749,9 +1765,103 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error Osu API"); }
 
-    // Unimos ambas bases de datos
-    window.unifiedSongs = [...osuSongs, ...fbSongs];
+    window.unifiedSongs = [...fbSongs, ...osuSongs];
     renderUnifiedGrid();
+};
+
+// --- DIBUJAR LAS TARJETAS CON TU DISEÑO EXACTO ---
+window.renderUnifiedGrid = function() {
+    const grid = document.getElementById('song-grid');
+    grid.innerHTML = '';
+
+    let filtered = window.unifiedSongs.filter(song => {
+        if (window.currentFilters.type === 'osu' && !song.isOsu) return false;
+        if (window.currentFilters.type === 'com' && song.isOsu) return false;
+        if (window.currentFilters.key !== 'all') {
+            let reqKey = parseInt(window.currentFilters.key);
+            if (!song.keysAvailable.includes(reqKey)) return false;
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-weight:bold; font-size:1.5rem;">No se encontraron mapas. 🌸</div>';
+        return;
+    }
+
+    filtered.forEach(song => {
+        const card = document.createElement('div');
+        card.className = 'song-card';
+        if(song.isOsu) card.classList.add('osu-card-style'); // Aplica el aura rosa
+        
+        // Construimos los botones de K exactamente como en tu captura
+        let badgesHTML = song.keysAvailable.map(k => `<div class="diff-badge">${k}K</div>`).join('');
+        
+        // Agregamos la etiqueta de Osu! si es necesario
+        if(song.isOsu) {
+            badgesHTML += `<div class="diff-badge badge-osu" style="margin-left:auto;">🌸 OSU!</div>`;
+        }
+
+        card.innerHTML = `
+            <div class="song-bg" style="background-image: url('${song.imageURL}'), url('icon.png');"></div>
+            <div class="song-info">
+                <div class="song-title">${song.title}</div>
+                <div class="song-author">${song.artist}</div>
+                <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center;">
+                    ${badgesHTML}
+                </div>
+            </div>
+        `;
+        
+        // Al hacer clic, abre el menú de dificultad en lugar de iniciar
+        card.onclick = () => openUnifiedDiffModal(song);
+        grid.appendChild(card);
+    });
+};
+
+// --- MENÚ DE MODOS DINÁMICO ---
+window.openUnifiedDiffModal = function(song) {
+    document.getElementById('diff-song-title').innerText = song.title;
+    document.getElementById('diff-song-cover').style.backgroundImage = `url('${song.imageURL}')`;
+    
+    const grid = document.querySelector('.diff-grid');
+    grid.innerHTML = ''; 
+    
+    const colors = {4: '#00FFFF', 6: '#12FA05', 7: '#FFD700', 9: '#F9393F'};
+    const labels = {4: 'EASY', 6: 'NORMAL', 7: 'INSANE', 9: 'DEMON'};
+    
+    // Muestra SOLAMENTE los modos de teclas que la canción soporta (Si es de Osu 4K, solo sale 4K)
+    song.keysAvailable.forEach(k => {
+        let c = colors[k] || '#ff66aa';
+        let l = labels[k] || 'CUSTOM';
+        
+        let btn = document.createElement('div');
+        btn.className = 'diff-card';
+        btn.style.borderColor = c; btn.style.color = c;
+        btn.innerHTML = `
+            <div class="diff-bg-icon">${k}K</div>
+            <div class="diff-num">${k}K</div>
+            <div class="diff-label">${l}</div>
+        `;
+        
+        btn.onclick = () => {
+            closeModal('diff');
+            if(song.isOsu) {
+                // Si es de Osu, llamamos al descompresor pasándole la tecla elegida
+                if(typeof downloadAndPlayOsu === 'function') {
+                    downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
+                } else {
+                    alert("Error: Archivo osu.js no conectado");
+                }
+            } else {
+                // Si es de Firebase, inicia normal
+                window.curSongData = song.raw;
+                startGame(k);
+            }
+        };
+        grid.appendChild(btn);
+    });
+    openModal('diff');
 };
 
 window.renderUnifiedGrid = function() {
