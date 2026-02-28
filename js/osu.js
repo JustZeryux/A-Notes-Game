@@ -13,16 +13,13 @@ window.searchOsu = async function() {
     results.innerHTML = "";
 
     try {
-        // Fallback robusto para evitar lista vacía
-        let apiUrl = query 
-            ? `https://api.nerinyan.moe/search?q=${encodeURIComponent(query)}&m=3` 
-            : `https://api.nerinyan.moe/search?q=status%3Dranked&m=3`;
-
-        const res = await fetch(apiUrl);
+        // Fallback robusto con "anime" para garantizar mapas chulos
+        let safeQuery = query ? query : "anime";
+        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
         const data = await res.json();
 
         if(!data || data.length === 0) {
-            status.innerText = "No se encontraron mapas de Mania para esta búsqueda.";
+            status.innerText = "No se encontraron mapas de Mania.";
             status.style.color = "var(--miss)";
             return;
         }
@@ -30,8 +27,13 @@ window.searchOsu = async function() {
         status.innerText = `✅ ¡Se encontraron ${data.length} resultados!`;
         status.style.color = "var(--good)";
 
+        // FORZAMOS LA CUADRICULA DEL JUEGO DENTRO DE LA VENTANA ROSA
+        results.style.display = 'grid';
+        results.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
+        results.style.gap = '15px';
+
         data.forEach(set => {
-            const maniaBeatmaps = set.beatmaps.filter(b => b.cs >= 4 && b.cs <= 10);
+            const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3);
             if(maniaBeatmaps.length === 0) return;
 
             let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
@@ -39,7 +41,9 @@ window.searchOsu = async function() {
             
             const card = document.createElement('div');
             // Mismo diseño exacto que en la página principal
-            card.className = 'song-card osu-card-style'; 
+            card.className = 'song-card'; 
+            card.style.borderColor = '#ff66aa';
+            card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.15)';
             
             let keysHTML = keys.map(k => `<div class="diff-badge">${k}K</div>`).join('');
 
@@ -50,12 +54,12 @@ window.searchOsu = async function() {
                     <div class="song-author">Subido por: ${set.creator}</div>
                     <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center;">
                         ${keysHTML}
-                        <div class="diff-badge badge-osu" style="margin-left:auto;">🌸 OSU!</div>
+                        <div class="diff-badge" style="margin-left:auto; border-color:#ff66aa; color:#ff66aa; box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>
                     </div>
                 </div>
             `;
             
-            // En vez de arrancar el juego de golpe, abre el menú de elegir modo (4K, 7K, etc)
+            // Abre el menú de elegir modo (4K, 7K, etc)
             card.onclick = () => {
                 closeModal('osu'); 
                 let songObj = {
