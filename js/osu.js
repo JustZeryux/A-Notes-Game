@@ -13,8 +13,7 @@ window.searchOsu = async function() {
     results.innerHTML = "";
 
     try {
-        // Fallback robusto con "anime" para garantizar mapas chulos
-        let safeQuery = query ? query : "anime";
+        let safeQuery = query ? query : "ranked";
         const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
         const data = await res.json();
 
@@ -27,39 +26,40 @@ window.searchOsu = async function() {
         status.innerText = `✅ ¡Se encontraron ${data.length} resultados!`;
         status.style.color = "var(--good)";
 
-        // FORZAMOS LA CUADRICULA DEL JUEGO DENTRO DE LA VENTANA ROSA
+        // FORZAMOS LA CUADRICULA PARA QUE NO SE APLASTEN
         results.style.display = 'grid';
         results.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
         results.style.gap = '15px';
+        results.style.padding = '10px';
 
         data.forEach(set => {
-            const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3);
+            const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
             if(maniaBeatmaps.length === 0) return;
 
             let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
             const coverUrl = `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`;
             
             const card = document.createElement('div');
-            // Mismo diseño exacto que en la página principal
             card.className = 'song-card'; 
-            card.style.borderColor = '#ff66aa';
-            card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.15)';
+            card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid #ff66aa; box-shadow: 0 0 15px rgba(255, 102, 170, 0.2); transition: transform 0.2s, box-shadow 0.2s; background: #111;';
             
-            let keysHTML = keys.map(k => `<div class="diff-badge">${k}K</div>`).join('');
+            let keysHTML = keys.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('');
 
             card.innerHTML = `
-                <div class="song-bg" style="background-image: url('${coverUrl}'), url('icon.png');"></div>
-                <div class="song-info">
-                    <div class="song-title">${set.title}</div>
-                    <div class="song-author">Subido por: ${set.creator}</div>
-                    <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center;">
+                <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${coverUrl}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div>
+                <div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);">
+                    <div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${set.title}</div>
+                    <div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">Subido por: ${set.creator}</div>
+                    <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
                         ${keysHTML}
-                        <div class="diff-badge" style="margin-left:auto; border-color:#ff66aa; color:#ff66aa; box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>
+                        <div class="diff-badge" style="margin-left:auto; border: 1px solid #ff66aa; color: #ff66aa; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; background: rgba(255,102,170,0.1); box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>
                     </div>
                 </div>
             `;
             
-            // Abre el menú de elegir modo (4K, 7K, etc)
+            card.onmouseenter = () => { card.style.transform = 'scale(1.03)'; card.style.boxShadow = '0 0 25px rgba(255, 102, 170, 0.5)'; };
+            card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.2)'; };
+
             card.onclick = () => {
                 closeModal('osu'); 
                 let songObj = {
