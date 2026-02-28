@@ -114,24 +114,24 @@ window.showUserProfile = async function(targetName) {
     const m = document.getElementById('modal-profile'); 
     if(m) m.style.display = 'flex';
     
-    document.getElementById('login-view').style.display = 'none';
-    document.getElementById('profile-view').style.display = 'block';
-    
-    // Reset visual antes de cargar
+    // Reset visual y estado de carga
     setText('p-name', "Cargando...");
-    setText('p-global-rank', "#--"); // Reset del ranking
+    setText('p-global-rank', "#--");
     const avBig = document.getElementById('p-av-big');
-    if(avBig) { avBig.style.backgroundImage = "none"; avBig.textContent = "G"; }
-
-    const isMe = (window.user && targetName === window.user.name);
-    document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
-    document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
+    if(avBig) { 
+        avBig.style.backgroundImage = "none"; 
+        avBig.textContent = "G"; 
+        avBig.style.border = "4px solid #333"; // Reset medalla
+    }
 
     try {
+        // 1. OBTENER DATOS DEL USUARIO (De cualquier posición)
         const doc = await window.db.collection('users').doc(targetName).get();
         if (!doc.exists) return notify("Usuario no encontrado", "error");
         
         const d = doc.data();
+        
+        // Rellenar estadísticas base
         setText('p-name', targetName);
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
@@ -139,39 +139,51 @@ window.showUserProfile = async function(targetName) {
         setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
         setText('p-sp-display', (d.sp || 0).toLocaleString());
         
-        // Avatar y Limpieza de "G"
+        // Avatar y limpieza de "G"
         const url = d.avatarData ? `url(${d.avatarData})` : "url('icon.png')";
         if(avBig) {
             avBig.style.backgroundImage = url;
             if(d.avatarData) avBig.textContent = ""; 
         }
 
-        // --- LÓGICA DE RANKING GLOBAL ---
-        // Buscamos la posición del usuario comparando su PP con el resto
-        window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
-            let rank = "#100+";
-            let index = 1;
-            snap.forEach(userDoc => {
-                if(userDoc.id === targetName) {
-                    rank = "#" + index;
-                }
-                index++;
-            });
-            setText('p-global-rank', rank); // Actualiza el #1 estático por el real
+        // 2. CALCULAR RANKING GLOBAL Y MEDALLAS
+        // Consultamos la colección completa para encontrar la posición real
+        const rankingSnap = await window.db.collection("users").orderBy("pp", "desc").get();
+        let rankPos = 0;
+        let finalRank = "#100+";
+
+        rankingSnap.forEach((userDoc, index) => {
+            if(userDoc.id === targetName) {
+                rankPos = index + 1;
+                finalRank = "#" + rankPos;
+            }
         });
 
-        // Skins y Marcos
-        let skinName = "Default"; 
-        let uiName = "Ninguno";
-        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
-            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
-            if(sItem) skinName = sItem.name;
-            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
-            if(uItem) uiName = uItem.name;
-        }
-        setText('p-equipped-skin', skinName);
-        setText('p-equipped-ui', uiName);
-        if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        setText('p-global-rank', finalRank);
 
-    } catch(e) { console.error(e); }
+        // Lógica de Medallas (Top 3)
+        if(avBig) {
+            if(rankPos === 1) { // ORO
+                avBig.style.border = "4px solid #FFD700";
+                avBig.style.boxShadow = "0 0 20px #FFD700";
+            } else if(rankPos === 2) { // PLATA
+                avBig.style.border = "4px solid #C0C0C0";
+                avBig.style.boxShadow = "0 0 20px #C0C0C0";
+            } else if(rankPos === 3) { // BRONCE
+                avBig.style.border = "4px solid #CD7F32";
+                avBig.style.boxShadow = "0 0 20px #CD7F32";
+            } else {
+                avBig.style.boxShadow = "none"; // Sin medalla para el resto
+            }
+        }
+
+        // 3. Skins y Marcos Visuales
+        if (typeof applyUIFrameVisuals === 'function') {
+            applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        }
+
+    } catch(e) { 
+        console.error("Error cargando perfil:", e);
+        notify("Error al obtener datos", "error");
+    }
 };
