@@ -434,20 +434,17 @@ function updatePreview() {
     const box = document.getElementById('preview-box');
     if (!box) return;
     
+    asegurarModo(4); // PREVIENE EL CRASHEO AL ABRIR AJUSTES
+
     const sampleLane = cfg.modes[4][0];
     const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[sampleLane.s] || PATHS['circle']) : "";
     const scale = cfg.noteScale || 1;
     const opacity = (cfg.noteOp || 100) / 100;
     const splashType = cfg.splashType || 'classic'; 
     
-    // VERIFICACIÓN: Si showSplash es falso, no renderizamos el div de splash
     const splashHTML = cfg.showSplash ? `
         <div class="splash-wrapper" style="position: absolute; top: 50%; left: 50%; z-index: 1;">
-            <div class="splash-${splashType}" style="
-                --c: ${sampleLane.c}; 
-                animation-iteration-count: infinite; 
-                animation-duration: 1.5s;
-            "></div>
+            <div class="splash-${splashType}" style="--c: ${sampleLane.c}; animation-iteration-count: infinite; animation-duration: 1.5s;"></div>
         </div>` : '';
 
     box.innerHTML = `
@@ -968,7 +965,30 @@ function switchProfileTab(tab) {
     if(c) c.style.display = tab === 'cuenta' ? 'block' : 'none';
 }
 
+
+window.asegurarModo = function(k) {
+    if (!cfg.modes) cfg.modes = {};
+    // Si tu memoria no tiene este modo configurado, el juego lo fabrica en 1 milisegundo
+    if (!cfg.modes[k] || cfg.modes[k].length !== k) {
+        const MK = {
+            1: ['Space'], 2: ['KeyF', 'KeyJ'], 3: ['KeyF', 'Space', 'KeyJ'], 4: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'],
+            5: ['KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK'], 6: ['KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL'],
+            7: ['KeyS', 'KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK', 'KeyL'], 8: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyH', 'KeyJ', 'KeyK', 'KeyL'],
+            9: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'Space', 'KeyH', 'KeyJ', 'KeyK', 'KeyL'], 10: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyV', 'KeyN', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon']
+        };
+        cfg.modes[k] = [];
+        for(let j=0; j<k; j++) {
+            let col = (j % 2 === 0) ? '#00FFFF' : '#ff66aa';
+            if(k % 2 !== 0 && j === Math.floor(k/2)) col = '#FFD700'; // Tecla central dorada
+            cfg.modes[k].push({ k: (MK[k] ? MK[k][j] : 'Space'), c: col, s: 'circle' });
+        }
+        if(typeof save === 'function') save(); else localStorage.setItem('cfg', JSON.stringify(cfg));
+    }
+};
+
 function renderLaneConfig(k){ 
+    asegurarModo(k); // PREVIENE EL CRASHEO DEL MENÚ
+
     document.querySelectorAll('.kb-tab').forEach(t=>t.classList.remove('active')); 
     const tab = document.getElementById('tab-'+k);
     if(tab) tab.classList.add('active'); 
@@ -981,7 +1001,7 @@ function renderLaneConfig(k){
         const l = cfg.modes[k][i]; 
         const d=document.createElement('div'); d.className='l-col'; 
         const shapePath = (typeof PATHS !== 'undefined') ? (PATHS[l.s] || PATHS['circle']) : ""; 
-        d.innerHTML=`<div class="key-bind ${remapIdx===i && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; 
+        d.innerHTML=`<div class="key-bind ${typeof remapIdx!=='undefined' && remapIdx===i && typeof remapMode!=='undefined' && remapMode===k?'listening':''}" onclick="remapKey(${k},${i})">${l.k.toUpperCase()}</div><div class="shape-indicator" onclick="cycleShape(${k},${i})"><svg class="shape-svg-icon" viewBox="0 0 100 100"><path d="${shapePath}"/></svg></div><input type="color" class="col-pk" value="${l.c}" onchange="updateLaneColor(${k},${i},this.value)">`; 
         c.appendChild(d); 
     } 
 }
@@ -1811,137 +1831,6 @@ window.debounceSearch = function(val) {
     window.searchTimeout = setTimeout(() => fetchUnifiedData(val), 500);
 };
 
-// --- CARGA DE CANCIONES (FIREBASE + OSU POR DEFECTO) ---
-// --- CARGA BLINDADA (TODOS LOS MAPAS POR DEFECTO) ---
-// --- CARGA BLINDADA (TODAS LAS CANCIONES POR DEFECTO) ---
-window.fetchUnifiedData = async function(query = "") {
-    const grid = document.getElementById('song-grid');
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Cargando Galería Global... ⏳</div>';
-    
-    let fbSongs = [];
-    let osuSongs = [];
-
-    // 1. Firebase (Tus canciones de la comunidad)
-    try {
-        if(window.db) {
-            let snapshot = await window.db.collection("globalSongs").limit(50).get();
-            snapshot.forEach(doc => {
-                let data = doc.data();
-                if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
-                    fbSongs.push({
-                        id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
-                        imageURL: data.imageURL || 'icon.png', isOsu: false,
-                        keysAvailable: [4, 6, 7, 9], raw: { ...data, id: doc.id }
-                    });
-                }
-            });
-        }
-    } catch(e) { console.warn("Error DB Local"); }
-
-    // 2. Osu! Mania (Carga Masiva Automática)
-    try {
-        // TRUCO MAESTRO: Si la barra está vacía, elegimos una categoría popular al azar.
-        // Esto evita que la API devuelva "0 resultados" y hace que el menú principal siempre esté vivo.
-        let safeQuery = query.trim();
-        if (safeQuery === "") {
-            const secretTerms = ["anime", "fnf", "vocaloid", "camellia", "remix", "nightcore", "a", "e"];
-            safeQuery = secretTerms[Math.floor(Math.random() * secretTerms.length)];
-        }
-        
-        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
-        const data = await res.json();
-        
-        if (data && data.length > 0) {
-            data.forEach(set => {
-                // Confirmamos que el mapa sea de modo Mania
-                const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
-                
-                if(maniaBeatmaps.length > 0) {
-                    let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
-                    osuSongs.push({
-                        id: set.id, title: set.title, 
-                        artist: `Subido por: ${set.creator}`, 
-                        imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
-                        isOsu: true, keysAvailable: keys, raw: set
-                    });
-                }
-            });
-        }
-    } catch(e) { console.warn("Error Osu API"); }
-
-    // Juntamos las canciones de Osu y las tuyas, y las mandamos a dibujar
-    window.unifiedSongs = [...osuSongs, ...fbSongs];
-    renderUnifiedGrid();
-};
-// --- DIBUJAR LAS TARJETAS CON TU DISEÑO EXACTO ---
-window.renderUnifiedGrid = function() {
-    const grid = document.getElementById('song-grid');
-    grid.innerHTML = '';
-
-    let filtered = window.unifiedSongs.filter(song => {
-        if (window.currentFilters.type === 'osu' && !song.isOsu) return false;
-        if (window.currentFilters.type === 'com' && song.isOsu) return false;
-        if (window.currentFilters.key !== 'all') {
-            let reqKey = parseInt(window.currentFilters.key);
-            if (!song.keysAvailable.includes(reqKey)) return false;
-        }
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-weight:bold; font-size:1.5rem;">No se encontraron mapas. 🌸</div>';
-        return;
-    }
-
-    filtered.forEach(song => {
-        const card = document.createElement('div');
-        card.className = 'song-card';
-        if(song.isOsu) card.classList.add('osu-card-style'); // Aplica el aura rosa
-        
-        // Construimos los botones de K exactamente como en tu captura
-        let badgesHTML = song.keysAvailable.map(k => `<div class="diff-badge">${k}K</div>`).join('');
-        
-        // Agregamos la etiqueta de Osu! si es necesario
-        if(song.isOsu) {
-            badgesHTML += `<div class="diff-badge badge-osu" style="margin-left:auto;">🌸 OSU!</div>`;
-        }
-
-        card.innerHTML = `
-            <div class="song-bg" style="background-image: url('${song.imageURL}'), url('icon.png');"></div>
-            <div class="song-info">
-                <div class="song-title">${song.title}</div>
-                <div class="song-author">${song.artist}</div>
-                <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center;">
-                    ${badgesHTML}
-                </div>
-            </div>
-        `;
-        
-        // Al hacer clic, abre el menú de dificultad en lugar de iniciar
-        card.onclick = () => openUnifiedDiffModal(song);
-        grid.appendChild(card);
-    });
-};
-
-window.currentFilters = { type: 'all', key: 'all' };
-window.unifiedSongs = [];
-window.searchTimeout = null;
-
-window.setFilter = function(category, val) {
-    window.currentFilters[category] = val;
-    document.querySelectorAll(`.filter-btn[data-type="${category}"]`).forEach(btn => {
-        btn.classList.remove('active');
-        if(btn.getAttribute('data-val') === val) btn.classList.add('active');
-    });
-    renderUnifiedGrid();
-};
-
-window.debounceSearch = function(val) {
-    clearTimeout(window.searchTimeout);
-    window.searchTimeout = setTimeout(() => fetchUnifiedData(val), 500);
-};
-
-// --- CARGA BLINDADA (ESPERA A FIREBASE Y EVITA CRASHEOS) ---
 // --- CARGA MASIVA: DOUBLE FETCH Y MEZCLA ALEATORIA ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
@@ -2100,9 +1989,6 @@ window.openUnifiedDiffModal = function(song) {
     
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
-    
-    // === FIX DE ACOMODACIÓN Y DISEÑO ===
-    // Evita que la ventana crezca infinitamente. Si hay muchos botones, se podrá hacer scroll.
     grid.style.maxHeight = '260px'; 
     grid.style.overflowY = 'auto';
     grid.style.padding = '5px';
@@ -2120,16 +2006,13 @@ window.openUnifiedDiffModal = function(song) {
         btn.className = 'diff-card';
         
         if (song.keysAvailable.includes(k)) {
-            btn.style.borderColor = c; 
-            btn.style.color = c;
-            // FIX ICONOS: Se respeta tu fuente grande para que se vea igual a tu imagen
-            btn.innerHTML = `
-                <div class="diff-bg-icon">${k}K</div>
-                <div class="diff-num" style="font-size:2.2rem; font-weight:900;">${k}K</div>
-                <div class="diff-label">${l}</div>
-            `;
+            btn.style.borderColor = c; btn.style.color = c;
+            btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">${k}K</div><div class="diff-label">${l}</div>`;
+            
             btn.onclick = () => {
                 closeModal('diff');
+                asegurarModo(k); // PREVIENE EL CRASHEO AL CARGAR OSU O CUSTOMS
+
                 if(song.isOsu) {
                     if(typeof downloadAndPlayOsu === 'function') downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
                     else alert("Error: osu.js no conectado");
@@ -2138,40 +2021,19 @@ window.openUnifiedDiffModal = function(song) {
                 }
             };
         } else {
-            btn.style.borderColor = '#333';
-            btn.style.color = '#555';
-            btn.style.background = 'rgba(0,0,0,0.6)';
-            btn.style.cursor = 'not-allowed';
-            btn.style.boxShadow = 'none';
-            btn.innerHTML = `
-                <div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div>
-                <div class="diff-num" style="font-size:2rem; font-weight:900;">🔒 ${k}K</div>
-                <div class="diff-label">NO DISPONIBLE</div>
-            `;
+            btn.style.borderColor = '#333'; btn.style.color = '#555'; btn.style.background = 'rgba(0,0,0,0.6)'; btn.style.cursor = 'not-allowed'; btn.style.boxShadow = 'none';
+            btn.innerHTML = `<div class="diff-bg-icon" style="opacity: 0.1;">${k}K</div><div class="diff-num" style="font-size:2rem; font-weight:900;">🔒 ${k}K</div><div class="diff-label">NO DISPONIBLE</div>`;
         }
         grid.appendChild(btn);
     });
 
     if (!song.isOsu) {
         let editBtn = document.createElement('div');
-        editBtn.className = 'diff-card';
-        editBtn.style.gridColumn = "1 / -1"; 
-        editBtn.style.borderColor = "#ff66aa";
-        editBtn.style.color = "#ff66aa";
-        editBtn.style.marginTop = "10px";
-        editBtn.style.minHeight = "80px";
-        editBtn.innerHTML = `
-            <div class="diff-bg-icon">✏️</div>
-            <div class="diff-num" style="font-size:1.5rem; font-weight:900;">✏️ EDITOR STUDIO</div>
-            <div class="diff-label">Crea y edita tu propio mapa</div>
-        `;
-        editBtn.onclick = () => {
-            closeModal('diff');
-            if(typeof openEditor === 'function') openEditor(song.raw, 4);
-        };
+        editBtn.className = 'diff-card'; editBtn.style.gridColumn = "1 / -1"; editBtn.style.borderColor = "#ff66aa"; editBtn.style.color = "#ff66aa"; editBtn.style.marginTop = "10px"; editBtn.style.minHeight = "80px";
+        editBtn.innerHTML = `<div class="diff-bg-icon">✏️</div><div class="diff-num" style="font-size:1.5rem; font-weight:900;">✏️ EDITOR STUDIO</div><div class="diff-label">Crea y edita tu propio mapa</div>`;
+        editBtn.onclick = () => { closeModal('diff'); if(typeof openEditor === 'function') openEditor(song.raw, 4); };
         grid.appendChild(editBtn);
     }
-
     openModal('diff');
 };
 
@@ -2267,55 +2129,4 @@ window.openStudioDashboard = async function() {
     }
 };
 
-// === MOTOR DEL MENÚ DE TECLAS DINÁMICO ===
-window.renderKeyInputs = function() {
-    const k = parseInt(document.getElementById('k-selector').value);
-    const container = document.getElementById('key-inputs-container');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    // Dibujamos tantos botones como K hayamos elegido
-    for(let i = 0; i < k; i++) {
-        let btn = document.createElement('button');
-        
-        // Limpiamos el texto para que "KeyD" se vea como "D" y "Space" como "ESPACIO"
-        let keyName = window.cfg.keys[k][i].replace('Key', '').replace('Space', 'ESPACIO');
-        
-        btn.style.cssText = 'padding:10px 15px; background:#333; color:white; border:2px solid #555; border-radius:8px; cursor:pointer; font-weight:bold; min-width:45px; transition:0.2s;';
-        btn.innerText = keyName;
-        
-        // Al darle clic al botón, espera la siguiente tecla
-        btn.onclick = function() {
-            btn.innerText = 'PRESIONA...';
-            btn.style.borderColor = '#ff66aa';
-            btn.style.boxShadow = '0 0 10px #ff66aa';
-            
-            const handler = (e) => {
-                e.preventDefault();
-                window.cfg.keys[k][i] = e.code; // Guarda el código de la tecla real
-                btn.innerText = e.code.replace('Key', '').replace('Space', 'ESPACIO');
-                btn.style.borderColor = '#00ffff';
-                btn.style.boxShadow = 'none';
-                document.removeEventListener('keydown', handler);
-            };
-            document.addEventListener('keydown', handler);
-        };
-        container.appendChild(btn);
-    }
-};
-
-window.saveNewKeys = function() {
-    localStorage.setItem('cfg', JSON.stringify(window.cfg));
-    alert("¡Teclas guardadas exitosamente para este modo!");
-};
-
-// Asegurarnos de que dibuje los botones al abrir el modal de ajustes
-const oldOpenModal = window.openModal;
-window.openModal = function(id) {
-    if(oldOpenModal) oldOpenModal(id);
-    else document.getElementById('modal-' + id).style.display = 'flex'; // Tu lógica base
-
-    if(id === 'settings' || id === 'ajustes') {
-        setTimeout(renderKeyInputs, 100); // Llama a dibujar los botones
-    }
-};
+// === MOTOR DEL MENÚ DE TECLAS DINÁMICO ==
