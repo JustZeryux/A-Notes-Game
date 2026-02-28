@@ -1828,16 +1828,23 @@ window.debounceSearch = function(val) {
     window.searchTimeout = setTimeout(() => fetchUnifiedData(val), 500);
 };
 
-// --- CARGA BLINDADA (SIEMPRE TRAERÁ CANCIONES) ---
-// --- CARGA BLINDADA (TODAS LAS CANCIONES POR DEFECTO - 100% SEGURO) ---
+// --- CARGA BLINDADA (ESPERA A FIREBASE Y EVITA CRASHEOS) ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Cargando Galería Global... ⏳</div>';
+    if(!grid) return;
+    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#00ffff; font-size:1.5rem; font-weight:bold;">Sincronizando Nube Global... ⏳</div>';
     
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. Firebase (Tus canciones de la comunidad)
+    // 1. ESPERAR A QUE FIREBASE DESPIERTE (Soluciona que tus canciones desaparezcan)
+    let retries = 0;
+    while(!window.db && retries < 15) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+    }
+
+    // 2. Traer canciones de tu Comunidad
     try {
         if(window.db) {
             let snapshot = await window.db.collection("globalSongs").limit(50).get();
@@ -1852,26 +1859,19 @@ window.fetchUnifiedData = async function(query = "") {
                 }
             });
         }
-    } catch(e) { console.warn("Error DB Local"); }
+    } catch(e) { console.warn("Error DB Local", e); }
 
-    // 2. Osu! Mania (Carga Masiva Automática Reparada)
+    // 3. Traer mapas de Osu!
     try {
-        let safeQuery = query.trim();
-        
-        // FIX MAESTRO: Solo usamos palabras largas. Si usas "a" o "e" la API de Osu crashea.
-        if (safeQuery === "") {
-            const secretTerms = ["camellia", "miku", "fnf", "vocaloid", "touhou", "remix", "nightcore", "osu"];
-            safeQuery = secretTerms[Math.floor(Math.random() * secretTerms.length)];
-        }
+        // Palabra 100% segura para que siempre traiga mapas chulos
+        let safeQuery = query.trim() !== "" ? query.trim() : "vocaloid"; 
         
         const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
         const data = await res.json();
         
-        // FIX DE SEGURIDAD: Comprobamos que Osu nos mandó una lista real y no un error oculto
-        if (Array.isArray(data) && data.length > 0) {
+        if (Array.isArray(data)) {
             data.forEach(set => {
                 const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
-                
                 if(maniaBeatmaps.length > 0) {
                     let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
                     osuSongs.push({
@@ -1883,18 +1883,17 @@ window.fetchUnifiedData = async function(query = "") {
                 }
             });
         }
-    } catch(e) { console.warn("Error Osu API:", e); }
+    } catch(e) { console.warn("Error Osu API", e); }
 
-    // Juntamos las canciones de Osu y las tuyas
-    window.unifiedSongs = [...osuSongs, ...fbSongs];
-    
-    // Si tienes el filtro de OSU activado por defecto, no mostrará nada a menos que llamemos al render normal
+    // Unimos TODO (Tus canciones primero, luego las de Osu)
+    window.unifiedSongs = [...fbSongs, ...osuSongs]; 
     renderUnifiedGrid();
 };
 
-// --- DIBUJADO DE TARJETAS (DISEÑO 100% IDÉNTICO AL ORIGINAL) ---
+// --- DIBUJADO DE TARJETAS (ESTILO FORZADO INQUEBRANTABLE) ---
 window.renderUnifiedGrid = function() {
     const grid = document.getElementById('song-grid');
+    if(!grid) return;
     grid.innerHTML = '';
 
     let filtered = window.unifiedSongs.filter(song => {
@@ -1914,7 +1913,6 @@ window.renderUnifiedGrid = function() {
 
     filtered.forEach(song => {
         const card = document.createElement('div');
-        // Usamos tu clase y forzamos el estilo de la tarjeta principal
         card.className = 'song-card'; 
         card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s, box-shadow 0.2s; background: #111;';
         
@@ -1929,7 +1927,6 @@ window.renderUnifiedGrid = function() {
             badgesHTML += `<div class="diff-badge" style="margin-left:auto; border: 1px solid #ff66aa; color: #ff66aa; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; background: rgba(255,102,170,0.1); box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>`;
         }
 
-        // Diseño interior idéntico: Imagen de fondo cubriendo todo + Degradado oscuro para las letras
         card.innerHTML = `
             <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div>
             <div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);">
@@ -1941,7 +1938,6 @@ window.renderUnifiedGrid = function() {
             </div>
         `;
         
-        // Efecto Hover forzado
         card.onmouseenter = () => { card.style.transform = 'scale(1.03)'; card.style.boxShadow = song.isOsu ? '0 0 25px rgba(255, 102, 170, 0.5)' : '0 0 20px rgba(0, 255, 255, 0.3)'; };
         card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.boxShadow = song.isOsu ? '0 0 15px rgba(255, 102, 170, 0.2)' : 'none'; };
         
@@ -1953,7 +1949,6 @@ window.renderUnifiedGrid = function() {
 window.openUnifiedDiffModal = function(song) {
     document.getElementById('diff-song-title').innerText = song.title;
     document.getElementById('diff-song-cover').style.backgroundImage = `url('${song.imageURL}')`;
-    
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
     
@@ -1963,24 +1958,17 @@ window.openUnifiedDiffModal = function(song) {
     song.keysAvailable.forEach(k => {
         let c = colors[k] || '#ff66aa';
         let l = labels[k] || 'CUSTOM';
-        
         let btn = document.createElement('div');
         btn.className = 'diff-card';
         btn.style.borderColor = c; btn.style.color = c;
-        btn.innerHTML = `
-            <div class="diff-bg-icon">${k}K</div>
-            <div class="diff-num">${k}K</div>
-            <div class="diff-label">${l}</div>
-        `;
-        
+        btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num">${k}K</div><div class="diff-label">${l}</div>`;
         btn.onclick = () => {
             closeModal('diff');
             if(song.isOsu) {
                 if(typeof downloadAndPlayOsu === 'function') downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
-                else alert("Error: Archivo osu.js no conectado");
+                else alert("Error: osu.js no conectado");
             } else {
-                window.curSongData = song.raw;
-                startGame(k);
+                window.curSongData = song.raw; startGame(k);
             }
         };
         grid.appendChild(btn);
