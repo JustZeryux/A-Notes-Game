@@ -179,19 +179,23 @@ window.showUserProfile = async function(targetName) {
             }
         }
 
-        // RANKING Y ANIMACIONES FINALES
+        // RANKING Y ANIMACIONES ÉPICAS FINALES
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
             let rankPos = 0; let index = 1;
             snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
             
             if (rankPos > 0) {
                 setText('p-global-rank', "#" + rankPos);
+                
                 if (rankPos <= 3 && profilePanel) {
                     profilePanel.classList.add(`epic-top-${rankPos}`);
                     if (badge) {
-                        badge.innerText = `#${rankPos}`;
+                        // Textos especiales para los 3 mejores
+                        if (rankPos === 1) badge.innerHTML = `👑 TOP 1`;
+                        else if (rankPos === 2) badge.innerHTML = `🥈 TOP 2`;
+                        else if (rankPos === 3) badge.innerHTML = `🥉 TOP 3`;
+                        
                         badge.style.display = 'block';
-                        badge.style.animation = 'floatBadge 3s infinite ease-in-out alternate';
                     }
                 }
             } else { 
