@@ -70,23 +70,23 @@ function genMap(buf, k) {
     const density = window.cfg.den || 5;
     const step = Math.floor(sampleRate / 60); 
     
-    // 1. CURVA EXPONENCIAL DE DIFICULTAD (Más desafiante del 1 al 10)
-    // Nivel 1 = ~340ms | Nivel 10 = ~140ms | Nivel 20 = ~60ms (Humanamente extremo)
-    let minDistMs = Math.max(60, 350 - (Math.pow(density, 1.35) * 5)); 
+    // 1. CURVA MUCHO MÁS AGRESIVA DESDE EL INICIO
+    // Nivel 1 = ~250ms (Antes 350ms) | Nivel 10 = ~160ms | Nivel 15 = ~80ms | Nivel 20 = ~50ms
+    let minDistMs = Math.max(50, 260 - (Math.pow(density, 1.4) * 4)); 
     
-    // 2. MAYOR FRECUENCIA Y SENSIBILIDAD AL RITMO
-    let thresholdMult = Math.max(0.85, 1.55 - (density * 0.035)); 
+    // 2. MAYOR SENSIBILIDAD PARA LLENAR LOS ESPACIOS VACÍOS
+    // El umbral es más bajo, por lo que detectará más golpes secundarios de la pista
+    let thresholdMult = Math.max(0.80, 1.40 - (density * 0.04)); 
     
     let lastNoteTime = -1000; 
     let lastLane = Math.floor(k/2); 
     let laneFreeTimes = new Array(k).fill(0);
     
-    // Redujimos la historia para que reaccione más rápido a los cambios de ritmo repentinos
     const energyHistory = [];
     let prevInstant = 0; 
 
-    // 3. MÁQUINA DE PATRONES (VARIACIÓN DE GAMEPLAY)
-    let patternType = 'none'; // Puede ser: 'stairs', 'trill', 'jack'
+    // MÁQUINA DE PATRONES
+    let patternType = 'none'; 
     let patternCount = 0;
     let trillLanes = [];
 
@@ -99,11 +99,10 @@ function genMap(buf, k) {
         if(energyHistory.length > 25) energyHistory.shift(); 
         const localAvg = energyHistory.reduce((a,b)=>a+b,0) / energyHistory.length;
 
-        // Calculamos qué tan "fuerte" es el golpe comparado con la música reciente
         let intensity = (localAvg > 0) ? (instant / localAvg) : 0;
 
-        // Detección de impacto (transient) muy sensible
-        if(instant > localAvg * thresholdMult && instant > prevInstant && instant > 0.02) {
+        // Detección más sensible (0.015 en vez de 0.02 permite detectar sonidos más suaves)
+        if(instant > localAvg * thresholdMult && instant > prevInstant && instant > 0.015) {
             const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
             
             if(timeMs - lastNoteTime > minDistMs) {
@@ -111,7 +110,7 @@ function genMap(buf, k) {
                 let length = 0;
                 let lane = -1;
 
-                // --- INYECCIÓN DE PATRONES DE RITMO ---
+                // --- PATRONES CON MAYOR FRECUENCIA ---
                 if (patternCount > 0) {
                     patternCount--;
                     if (patternType === 'stairs') {
@@ -119,38 +118,36 @@ function genMap(buf, k) {
                     } else if (patternType === 'trill' && trillLanes.length === 2) {
                         lane = (lastLane === trillLanes[0]) ? trillLanes[1] : trillLanes[0];
                     } else if (patternType === 'jack') {
-                        lane = lastLane; // Misma tecla repetida (Spicy)
+                        lane = lastLane;
                     }
                 } else {
-                    // Decidir un nuevo patrón aleatorio si la dificultad lo permite
-                    if (density >= 4 && Math.random() > 0.6) {
+                    // Ahora lanza patrones más seguido (probabilidad > 0.4 en vez de 0.6)
+                    if (density >= 3 && Math.random() > 0.4) {
                         let rand = Math.random();
                         if (rand > 0.5) {
                             patternType = 'stairs';
                             patternCount = Math.floor(Math.random() * 4) + 2;
-                        } else if (rand > 0.2 && density >= 7) {
+                        } else if (rand > 0.2 && density >= 5) {
                             patternType = 'trill';
-                            patternCount = Math.floor(Math.random() * 6) + 3; // Lluvia de alternados
+                            patternCount = Math.floor(Math.random() * 6) + 3; 
                             trillLanes = [Math.floor(Math.random()*k), Math.floor(Math.random()*k)];
                             while(trillLanes[0] === trillLanes[1]) trillLanes[1] = Math.floor(Math.random()*k);
-                        } else if (density >= 12 && rand <= 0.2) {
+                        } else if (density >= 10 && rand <= 0.2) {
                             patternType = 'jack';
-                            patternCount = Math.floor(Math.random() * 2) + 1; // 2 o 3 notas en el mismo carril
+                            patternCount = Math.floor(Math.random() * 2) + 1; 
                         }
                     }
                     if(lane === -1) lane = getSmartLane(lastLane, k, laneFreeTimes, timeMs);
                 }
 
-                // Prevención de errores de carril
                 if (lane === -1) { 
                     let bestLane = 0; let minTime = Infinity;
                     for(let x=0; x<k; x++) { if(laneFreeTimes[x] < minTime) { minTime = laneFreeTimes[x]; bestLane = x; } }
                     lane = bestLane; 
                 }
 
-                // --- GESTIÓN DE NOTAS LARGAS (HOLDS) MEJORADA ---
-                // Solo si el golpe inicial es fuerte y el audio se mantiene sostenido
-                if (intensity > 1.4 && Math.random() > 0.5) {
+                // --- HOLDS ---
+                if (intensity > 1.35 && Math.random() > 0.4) {
                     let sustain = 0;
                     for(let h=1; h<12; h++) {
                         let fIdx = i + (step * h);
@@ -165,26 +162,27 @@ function genMap(buf, k) {
                 }
 
                 map.push({ t: timeMs, l: lane, type: type, len: length, h: false });
-                laneFreeTimes[lane] = timeMs + length + 30; 
+                laneFreeTimes[lane] = timeMs + length + 25; 
                 
-                // --- SISTEMA DE ACORDES (NOTAS DOBLES Y TRIPLES) ---
-                if (density >= 6 && type === 'tap') {
-                    // La probabilidad aumenta exponencialmente con la dificultad
-                    let chordChance = (density - 4) * 0.06; 
+                // --- ACORDES: APARECEN MUCHO MÁS TEMPRANO Y MÁS SEGUIDO ---
+                // Ahora empiezan desde nivel 4 en vez de 6
+                if (density >= 4 && type === 'tap') {
+                    // Probabilidad aumentada drásticamente
+                    let chordChance = (density - 2) * 0.08; 
                     
-                    // Si el pico de audio es muy violento (Drop)
-                    if (intensity > 1.5 && Math.random() < chordChance) {
+                    // Umbral bajado a 1.35 para que salgan dobles en casi cualquier golpe de batería fuerte
+                    if (intensity > 1.35 && Math.random() < chordChance) {
                         let l2 = getSmartLane(lane, k, laneFreeTimes, timeMs);
                         if (l2 !== -1 && l2 !== lane) {
                             map.push({ t: timeMs, l: l2, type: 'tap', len: 0, h: false });
-                            laneFreeTimes[l2] = timeMs + 30;
+                            laneFreeTimes[l2] = timeMs + 25;
 
-                            // Acordes Triples para las dificultades extremas (Nivel 15+)
-                            if (density >= 15 && intensity > 2.0 && k >= 6 && Math.random() < 0.35) {
+                            // Acordes Triples ahora empiezan desde el nivel 12
+                            if (density >= 12 && intensity > 1.8 && k >= 6 && Math.random() < 0.4) {
                                 let l3 = getSmartLane(l2, k, laneFreeTimes, timeMs);
                                 if(l3 !== -1 && l3 !== lane && l3 !== l2) {
                                     map.push({ t: timeMs, l: l3, type: 'tap', len: 0, h: false });
-                                    laneFreeTimes[l3] = timeMs + 30;
+                                    laneFreeTimes[l3] = timeMs + 25;
                                 }
                             }
                         }
