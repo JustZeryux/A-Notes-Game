@@ -220,6 +220,17 @@ window.prepareAndPlaySong = async function(k) {
     if(window.currentLobbyId) window.isMultiplayer = true;
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
+    // === NUEVO: INTERCEPTOR DE OSU! PARA MULTIJUGADOR ===
+    // Si la canción viene de la sala online y tiene la etiqueta "osu_"
+    if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
+        let realId = String(window.curSongData.id).replace('osu_', ''); // Le quitamos la etiqueta
+        if(typeof downloadAndPlayOsu === 'function') {
+            // Desviamos la carga hacia el motor descompresor de Osu
+            downloadAndPlayOsu(realId, window.curSongData.title, window.curSongData.imageURL, k);
+            return; // Cortamos la ejecución normal
+        }
+    }
+    
     const loader = document.getElementById('loading-overlay');
     if(loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO PISTA..."; }
 
