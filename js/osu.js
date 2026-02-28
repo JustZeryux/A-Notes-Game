@@ -97,17 +97,12 @@ window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
         if(osuFiles.length === 0) throw new Error("No se encontraron mapas dentro del archivo.");
         
         let selectedOsuText = null;
-        
-        // Magia: Buscar el mapa exacto que coincida con las teclas (Ej: 4K, 7K)
         for(let f of osuFiles) {
             let text = await zip.file(f).async("string");
             if(text.includes(`CircleSize:${targetKeys}`) || text.includes(`CircleSize: ${targetKeys}`)) {
-                selectedOsuText = text;
-                break;
+                selectedOsuText = text; break;
             }
         }
-        
-        // Fallback por si acaso
         if(!selectedOsuText) selectedOsuText = await zip.file(osuFiles[0]).async("string");
         
         loaderText.innerText = "TRADUCIENDO MAPA... 🧠";
@@ -125,11 +120,29 @@ window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
         if(!window.st.ctx) unlockAudio();
         const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
 
+        // === EL ARREGLO DE LOS SUBTÍTULOS ===
+        let fetchedLyrics = null;
+        if (window.cfg && window.cfg.subtitles) {
+            loaderText.innerText = "BUSCANDO LETRAS AUTOMÁTICAS... 🎤";
+            try {
+                // Limpiamos la basura del título (Ej: "Bad Apple!! (feat. nomico)" -> "Bad Apple!!")
+                let cleanTitle = title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                const resLrc = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
+                const dataLrc = await resLrc.json();
+                
+                // Buscamos la mejor coincidencia que tenga subtítulos sincronizados
+                const bestMatch = dataLrc.find(s => s.syncedLyrics);
+                if (bestMatch && bestMatch.syncedLyrics) {
+                    fetchedLyrics = bestMatch.syncedLyrics;
+                }
+            } catch(e) { console.warn("No se encontraron letras"); }
+        }
+
         window.curSongData = {
             id: "osu_" + setId,
-            title: title + ` [${parsed.keys}K]`,
+            title: title, 
             imageURL: coverUrl,
-            lyrics: null
+            lyrics: fetchedLyrics // Inyectamos las letras directamente al juego
         };
 
         const songObj = { 
