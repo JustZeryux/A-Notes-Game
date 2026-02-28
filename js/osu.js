@@ -13,9 +13,10 @@ window.searchOsu = async function() {
     results.innerHTML = "";
 
     try {
-        // Si busca en blanco, trae lo más nuevo
-        let apiUrl = `https://api.nerinyan.moe/search?m=3`;
-        if(query) apiUrl += `&q=${encodeURIComponent(query)}`;
+        // Fallback robusto para evitar lista vacía
+        let apiUrl = query 
+            ? `https://api.nerinyan.moe/search?q=${encodeURIComponent(query)}&m=3` 
+            : `https://api.nerinyan.moe/search?q=status%3Dranked&m=3`;
 
         const res = await fetch(apiUrl);
         const data = await res.json();
@@ -30,14 +31,14 @@ window.searchOsu = async function() {
         status.style.color = "var(--good)";
 
         data.forEach(set => {
-            const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
+            const maniaBeatmaps = set.beatmaps.filter(b => b.cs >= 4 && b.cs <= 10);
             if(maniaBeatmaps.length === 0) return;
 
-            let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
+            let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
             const coverUrl = `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`;
             
             const card = document.createElement('div');
-            // FIX: Le damos las clases de tu diseño principal + el aura rosa
+            // Mismo diseño exacto que en la página principal
             card.className = 'song-card osu-card-style'; 
             
             let keysHTML = keys.map(k => `<div class="diff-badge">${k}K</div>`).join('');
@@ -46,7 +47,7 @@ window.searchOsu = async function() {
                 <div class="song-bg" style="background-image: url('${coverUrl}'), url('icon.png');"></div>
                 <div class="song-info">
                     <div class="song-title">${set.title}</div>
-                    <div class="song-author">Artista: ${set.artist}</div>
+                    <div class="song-author">Subido por: ${set.creator}</div>
                     <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center;">
                         ${keysHTML}
                         <div class="diff-badge badge-osu" style="margin-left:auto;">🌸 OSU!</div>
@@ -54,16 +55,14 @@ window.searchOsu = async function() {
                 </div>
             `;
             
-            // FIX: En lugar de iniciar la canción, cerramos este menú y abrimos el menú de dificultad de ui.js
+            // En vez de arrancar el juego de golpe, abre el menú de elegir modo (4K, 7K, etc)
             card.onclick = () => {
                 closeModal('osu'); 
-                // Le pasamos el objeto formateado exactamente como lo lee tu menú principal
                 let songObj = {
-                    id: set.id, title: set.title, imageURL: coverUrl, isOsu: true, keysAvailable: keys, raw: set
+                    id: set.id, title: set.title, artist: `Subido por: ${set.creator}`, 
+                    imageURL: coverUrl, isOsu: true, keysAvailable: keys, raw: set
                 };
-                if (typeof openUnifiedDiffModal === 'function') {
-                    openUnifiedDiffModal(songObj);
-                }
+                if (typeof openUnifiedDiffModal === 'function') openUnifiedDiffModal(songObj);
             };
             results.appendChild(card);
         });
