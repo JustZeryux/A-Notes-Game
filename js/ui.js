@@ -194,6 +194,37 @@ function updUI() {
                 comboEl.style.opacity = '0';
             }
         }
+        // === RELLENAR LAS ESTADÍSTICAS DEL NUEVO PERFIL ===
+    setText('p-score', (user.score || 0).toLocaleString());
+    setText('p-plays', (user.plays || 0).toLocaleString());
+    setText('p-pp-display', (user.pp || 0).toLocaleString());
+    setText('p-sp-display', (user.sp || 0).toLocaleString());
+    
+    // Banner de perfil igual al avatar si lo tienes
+    const headerBg = document.getElementById('p-header-bg');
+    if(headerBg && user.avatarData) {
+        headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), url(${user.avatarData})`;
+    }
+
+    // === LECTURA DE SKINS Y MARCOS DE UI ===
+    if (user.equipped) {
+        let skinName = "Default";
+        let uiName = "Ninguno";
+        
+        // Buscamos los nombres de los ítems en la tienda
+        if (typeof SHOP_ITEMS !== 'undefined') {
+            const sItem = SHOP_ITEMS.find(x => x.id === user.equipped.skin);
+            if(sItem) skinName = sItem.name;
+            
+            const uItem = SHOP_ITEMS.find(x => x.id === user.equipped.ui);
+            if(uItem) uiName = uItem.name;
+        }
+        
+        setText('p-equipped-skin', skinName);
+        setText('p-equipped-ui', uiName);
+        
+        // ¡APLICAMOS LA MAGIA VISUAL DEL MARCO UI!
+        applyUIFrameVisuals(user.equipped.ui);
     }
 
     // --- GESTIÓN DE PANELES LOGIN/LOGOUT ---
@@ -203,6 +234,30 @@ function updUI() {
     if(locSet) locSet.style.display = isGoogle ? 'none' : 'block';
     if(gooSet) gooSet.style.display = isGoogle ? 'block' : 'none';
 }
+    window.applyUIFrameVisuals = function(uiId) {
+    let color = 'var(--accent)';
+    let isNone = (!uiId || uiId === 'default');
+    
+    if(!isNone && typeof SHOP_ITEMS !== 'undefined') {
+        const item = SHOP_ITEMS.find(x => x.id === uiId);
+        if(item && item.color) color = item.color;
+    }
+    
+    // 1. Aplica el Marco a la foto gigante del Perfil
+    const avBig = document.getElementById('p-av-big');
+    if(avBig) {
+        avBig.style.border = isNone ? '4px solid #333' : `4px solid ${color}`;
+        avBig.style.boxShadow = isNone ? 'none' : `0 0 25px ${color}`;
+    }
+    
+    // 2. Aplica el Marco a la tarjeta de usuario de la barra lateral (¡Se verá genial!)
+    const uCard = document.querySelector('.user-card');
+    if(uCard) {
+        uCard.style.borderLeft = isNone ? '4px solid transparent' : `4px solid ${color}`;
+        uCard.style.background = isNone ? 'rgba(255, 255, 255, 0.05)' : `linear-gradient(90deg, ${color}22, transparent)`;
+        uCard.style.boxShadow = isNone ? 'none' : `-5px 0 15px ${color}44`;
+    }
+};
 
 function updateGlobalRank() {
     if(!db || user.name === "Guest") return;
@@ -2093,8 +2148,6 @@ window.openUnifiedDiffModal = function(song) {
 };
 
 // === MOTOR DEL CREATOR STUDIO ===
-// === MOTOR DEL CREATOR STUDIO (CON DETECTOR DE SESIÓN BLINDADO) ===
-// === MOTOR DEL CREATOR STUDIO (100% SEGURO Y SILENCIOSO) ===
 window.openStudioDashboard = async function() {
     openModal('studio');
     const grid = document.getElementById('studio-grid');
@@ -2102,28 +2155,19 @@ window.openStudioDashboard = async function() {
     grid.innerHTML = '';
     loader.style.display = 'block';
 
-    // === 1. VERIFICACIÓN DE SEGURIDAD ESTRICTA ===
+    // === EL FIX: BUSCAR EL NOMBRE CORRECTO ===
     let myUsername = null;
-
-    // A) Buscar directamente en el núcleo de Firebase (Lo más seguro)
-    if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+    if (window.user && window.user.name && window.user.name !== "Guest") {
+        myUsername = window.user.name; // <--- ¡AQUÍ ESTABA EL ERROR!
+    } else if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
         myUsername = firebase.auth().currentUser.displayName;
     }
 
-    // B) Buscar en la memoria de tu juego (Por si usas login personalizado)
     if (!myUsername) {
-        myUsername = window.username || 
-                     (window.user && window.user.username) || 
-                     localStorage.getItem('username');
-    }
-
-    // C) Si no hay sesión válida, BLOQUEAMOS EL ACCESO. Sin ventanitas falsas.
-    if (!myUsername || myUsername === "Guest" || myUsername.trim() === "") {
         loader.innerHTML = "⚠️ <b>ACCESO DENEGADO</b><br><br>Debes iniciar sesión en la barra lateral para ver y editar tus mapas.";
         loader.style.color = "var(--miss)";
         return;
     }
-
     // === 2. OBTENER MAPAS ===
     try {
         // Le pedimos a Firebase SOLO las canciones de tu usuario verificado
