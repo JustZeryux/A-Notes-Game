@@ -5,17 +5,19 @@ window.openOsuBrowser = function() {
 
 window.searchOsu = async function() {
     const query = document.getElementById('osu-search-inp').value.trim();
-    if(!query) return;
-
     const status = document.getElementById('osu-status');
     const results = document.getElementById('osu-results');
     
-    status.innerText = "Buscando en los servidores de Osu!... ⏳";
+    status.innerText = "Buscando en la base de datos de Osu!... ⏳";
     status.style.color = "var(--gold)";
     results.innerHTML = "";
 
     try {
-        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(query)}&m=3`);
+        // Si busca en blanco, trae lo más nuevo
+        let apiUrl = `https://api.nerinyan.moe/search?m=3`;
+        if(query) apiUrl += `&q=${encodeURIComponent(query)}`;
+
+        const res = await fetch(apiUrl);
         const data = await res.json();
 
         if(!data || data.length === 0) {
@@ -28,34 +30,50 @@ window.searchOsu = async function() {
         status.style.color = "var(--good)";
 
         data.forEach(set => {
-            // FIX VITAL: Corrección de mode_int para que no rechace las canciones
             const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 'mania' || b.mode === 3);
             if(maniaBeatmaps.length === 0) return;
 
+            let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
             const coverUrl = `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`;
             
             const card = document.createElement('div');
-            card.className = 'song-card';
+            // FIX: Le damos las clases de tu diseño principal + el aura rosa
+            card.className = 'song-card osu-card-style'; 
+            
+            let keysHTML = keys.map(k => `<div class="diff-badge">${k}K</div>`).join('');
+
             card.innerHTML = `
                 <div class="song-bg" style="background-image: url('${coverUrl}'), url('icon.png');"></div>
                 <div class="song-info">
-                    <div class="song-title" style="font-size:1.1rem;">${set.title}</div>
+                    <div class="song-title">${set.title}</div>
                     <div class="song-author">Artista: ${set.artist}</div>
-                    <div class="song-author" style="color:#ff66aa; font-weight:bold; margin-top:5px;">Dificultades: ${maniaBeatmaps.length}</div>
+                    <div style="display:flex; gap:5px; margin-top:10px; flex-wrap:wrap; align-items:center;">
+                        ${keysHTML}
+                        <div class="diff-badge badge-osu" style="margin-left:auto;">🌸 OSU!</div>
+                    </div>
                 </div>
             `;
-            // Al hacer clic, descargamos el mapa
-            card.onclick = () => downloadAndPlayOsu(set.id, set.title, coverUrl);
+            
+            // FIX: En lugar de iniciar la canción, cerramos este menú y abrimos el menú de dificultad de ui.js
+            card.onclick = () => {
+                closeModal('osu'); 
+                // Le pasamos el objeto formateado exactamente como lo lee tu menú principal
+                let songObj = {
+                    id: set.id, title: set.title, imageURL: coverUrl, isOsu: true, keysAvailable: keys, raw: set
+                };
+                if (typeof openUnifiedDiffModal === 'function') {
+                    openUnifiedDiffModal(songObj);
+                }
+            };
             results.appendChild(card);
         });
 
     } catch(e) {
         console.error(e);
-        status.innerText = "Error al conectar con Osu!";
+        status.innerText = "Error al conectar con los servidores de Osu!";
         status.style.color = "var(--miss)";
     }
 };
-
 window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
     if(typeof JSZip === 'undefined') return alert("Error: JSZip no está cargado.");
     
