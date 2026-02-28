@@ -2037,5 +2037,25 @@ window.openUnifiedDiffModal = function(song) {
         
         grid.appendChild(btn);
     });
+    // === BOTÓN DE EDITOR (SOLO PARA CANCIONES COMUNITARIAS) ===
+    if (!song.isOsu) {
+        let editBtn = document.createElement('div');
+        editBtn.className = 'diff-card';
+        editBtn.style.gridColumn = "1 / -1"; // Ocupa todo el ancho
+        editBtn.style.borderColor = "#ff66aa";
+        editBtn.style.color = "#ff66aa";
+        editBtn.innerHTML = `
+            <div class="diff-bg-icon">✏️</div>
+            <div class="diff-num">✏️ EDITOR STUDIO</div>
+            <div class="diff-label">Crea tu propio mapa</div>
+        `;
+        editBtn.onclick = () => {
+            closeModal('diff');
+            // Por defecto abrimos el editor en modo 4K
+            if(typeof openEditor === 'function') openEditor(song.raw, 4);
+            else alert("Error: editor.js no conectado");
+        };
+        grid.appendChild(editBtn);
+    }
     openModal('diff');
 };
