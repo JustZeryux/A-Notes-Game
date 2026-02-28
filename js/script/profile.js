@@ -1,17 +1,58 @@
 /* === PROFILE.JS - Sistema de Perfil y HUD del juego === */
 
-window.applyUIFrameVisuals = function(uiId) {
+window.applyUIFrameVisuals = function(uiId, rankPos = 0) {
     let color = 'var(--accent)';
     let isNone = (!uiId || uiId === 'default');
+    
     if(!isNone && typeof SHOP_ITEMS !== 'undefined') {
         const item = SHOP_ITEMS.find(x => x.id === uiId);
         if(item && item.color) color = item.color;
     }
+
+    // Lógica del Aura Top 3 (Se usa como Sombra exterior)
+    let auraShadow = 'none';
+    if(rankPos === 1) auraShadow = '0 0 40px #FFD700'; // Oro
+    else if(rankPos === 2) auraShadow = '0 0 30px #C0C0C0'; // Plata
+    else if(rankPos === 3) auraShadow = '0 0 20px #CD7F32'; // Bronce
+
+    // 1. Aplicar al Avatar Grande del Modal
     const avBig = document.getElementById('p-av-big');
-    if(avBig) { avBig.style.border = isNone ? '4px solid #333' : `4px solid ${color}`; avBig.style.boxShadow = isNone ? 'none' : `0 0 25px ${color}`; }
+    if(avBig) {
+        // La Skin UI da el Borde. Si no hay Skin, el borde es gris o del color del Top.
+        if (isNone) {
+            if(rankPos === 1) avBig.style.border = '4px solid #FFD700';
+            else if(rankPos === 2) avBig.style.border = '4px solid #C0C0C0';
+            else if(rankPos === 3) avBig.style.border = '4px solid #CD7F32';
+            else avBig.style.border = '4px solid #333';
+        } else {
+            avBig.style.border = `4px solid ${color}`; // La UI Skin siempre gana el borde
+        }
+        
+        // Se combinan la sombra de la Skin con la sombra del Top 3 (Aura detrás del borde)
+        avBig.style.boxShadow = isNone ? auraShadow : `0 0 15px ${color}, inset 0 0 20px ${color}, ${auraShadow}`;
+        
+        if(rankPos === 1 && isNone) avBig.style.animation = "gold-pulse 2s infinite alternate";
+        else avBig.style.animation = "none";
+    }
+
+    // 2. Aplicar al Mini-Avatar del Menú Lateral (¡ESTO FALTABA!)
+    const avMini = document.getElementById('m-av');
+    if(avMini) {
+        avMini.style.border = isNone ? 'none' : `3px solid ${color}`;
+        avMini.style.boxShadow = isNone ? 'none' : `0 0 15px ${color}`;
+    }
+
+    // 3. Aplicar a la Tarjeta del Usuario en el Menú
     const uCard = document.querySelector('.user-card');
-    if(uCard) { uCard.style.borderLeft = isNone ? '4px solid transparent' : `4px solid ${color}`; uCard.style.background = isNone ? 'rgba(255, 255, 255, 0.05)' : `linear-gradient(90deg, ${color}22, transparent)`; uCard.style.boxShadow = isNone ? 'none' : `-5px 0 15px ${color}44`; }
+    if(uCard) {
+        uCard.style.borderLeft = isNone ? '4px solid transparent' : `4px solid ${color}`;
+        uCard.style.background = isNone ? 'rgba(255, 255, 255, 0.05)' : `linear-gradient(90deg, ${color}22, transparent)`;
+    }
 };
+
+// Modificación rápida para que al abrir perfiles le pase la posición del ranking a la Skin:
+// Busca en tu `showUserProfile` donde dice applyUIFrameVisuals y cámbialo por esto:
+// applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default', rankPos);
 
 window.updUI = function() {
     if(!window.user || !window.cfg) return;
