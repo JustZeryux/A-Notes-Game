@@ -430,6 +430,22 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 
 /* FIX SUBTÍTULOS (Para que salgan por detrás de las notas) */
 #subtitles-container { z-index: 40 !important; }
+/* Modifica esto en tu style.css */
+@media (max-width: 800px) {
+    .song-card, .beatmap-card {
+        width: 100% !important; /* Asegura que no se salgan de la pantalla */
+        height: auto !important;
+        min-height: 120px;
+    }
+    .settings-panel {
+        width: 98vw !important;
+        height: 90vh !important;
+    }
+    /* El editor debe rotar o compactarse */
+    #editor-layer {
+        flex-direction: column !important;
+    }
+}
 
 @media (max-width: 800px) {
     /* 1. SCROLL DESBLOQUEADO Y ESTRUCTURA SANA */
