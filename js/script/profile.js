@@ -242,3 +242,52 @@ window.openNotifPanel = function() {
     const p = document.getElementById('notif-panel');
     if(p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
 };
+
+// ==========================================
+// SUBIR FOTO DE PERFIL (AVATAR)
+// ==========================================
+window.uploadAvatar = async function(input) {
+    // Verificamos que haya seleccionado un archivo y esté conectado
+    if (!input.files || input.files.length === 0 || !window.user || !window.db) return;
+    
+    const file = input.files[0];
+
+    // Opcional: Validar que no suban imágenes de 50MB que traben la base de datos
+    if (file.size > 2 * 1024 * 1024) {
+        return notify("La imagen es muy pesada. Máximo 2MB.", "error");
+    }
+
+    notify("Subiendo foto de perfil...", "info");
+    
+    try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result;
+            
+            // 1. Guardar en la base de datos de Firebase
+            await window.db.collection('users').doc(window.user.name).update({ 
+                avatarData: base64 
+            });
+            
+            // 2. Actualizar la memoria del juego
+            window.user.avatarData = base64; 
+            
+            // 3. Actualizar la imagen gigante en el modal al instante
+            const avBig = document.getElementById('p-av-big');
+            if(avBig) {
+                avBig.style.backgroundImage = `url(${base64})`;
+                avBig.textContent = ""; // Borramos la letra si la había
+            }
+            
+            // 4. Actualizar el mini-avatar del menú lateral
+            if(typeof updUI === 'function') updUI();
+            
+            notify("¡Foto de perfil actualizada!", "success");
+        };
+        // Leer la imagen y convertirla
+        reader.readAsDataURL(file);
+    } catch(e) { 
+        console.error(e); 
+        notify("Error al subir la imagen", "error"); 
+    }
+};
