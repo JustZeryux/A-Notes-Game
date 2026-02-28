@@ -80,12 +80,7 @@ window.updUI = function() {
 window.toggleProfileSettings = function(show) {
     const mainView = document.getElementById('profile-main-stats'); const settingsView = document.getElementById('profile-account-settings');
     if(mainView && settingsView) {
-        mainView.style.display = show ? 'none' : 'block'; 
-        settingsView.style.display = show ? 'block' : 'none';
-    }
-};
-
-window.showUserProfile = async function(targetName) {
+        mainView.style.display = show ? 'none' : 'blockwindow.showUserProfile = async function(targetName) {
     if (!window.db) return notify("Error de conexión", "error");
     
     window.toggleProfileSettings(false);
@@ -94,14 +89,25 @@ window.showUserProfile = async function(targetName) {
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
     
+    // Reset visual y remover efectos épicos
     setText('p-name', "Cargando...");
     setText('p-global-rank', "#--");
+    const profilePanel = document.querySelector('#modal-profile .modal-panel');
+    profilePanel.className = 'modal-panel'; // Quita las clases epic-top
+    
+    const badge = document.getElementById('p-top-badge');
+    if(badge) badge.style.display = 'none';
+
     const avBig = document.getElementById('p-av-big');
     if(avBig) { avBig.style.backgroundImage = "none"; avBig.textContent = "G"; avBig.style.border = "4px solid #333"; avBig.style.boxShadow = "none"; avBig.style.animation = "none"; }
 
     const isMe = (window.user && targetName === window.user.name);
     document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
     document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
+    
+    // Mostrar u ocultar botón de banner
+    const btnBanner = document.getElementById('btn-edit-banner');
+    if(btnBanner) btnBanner.style.display = isMe ? 'block' : 'none';
 
     try {
         const doc = await window.db.collection('users').doc(targetName).get();
@@ -115,13 +121,18 @@ window.showUserProfile = async function(targetName) {
         setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
         setText('p-sp-display', (d.sp || 0).toLocaleString());
         
-        // Textos Nuevos
         const isOnline = d.online ? "🟢 Conectado" : "⚪ Desconectado";
         setText('p-online-status', isOnline);
         setText('p-custom-status', d.customStatus || "");
         setText('p-bio', d.bio || "Este usuario no ha escrito una biografía.");
 
+        // Cargar Avatar y Banner
         if(d.avatarData && avBig) { avBig.style.backgroundImage = `url(${d.avatarData})`; avBig.textContent = ""; }
+        const headerBg = document.getElementById('p-header-bg');
+        if(headerBg) {
+            const bannerUrl = d.bannerData ? `url(${d.bannerData})` : "url('icon.png')";
+            headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${bannerUrl}`;
+        }
 
         // Privacidad de Ítems
         let skinName = "Oculto", uiName = "Oculto";
@@ -137,37 +148,75 @@ window.showUserProfile = async function(targetName) {
         setText('p-equipped-skin', skinName);
         setText('p-equipped-ui', uiName);
 
-        // Amigos
+        // Lógica de Amigos (Intacta)
         if (!isMe) {
             const btnAdd = document.getElementById('btn-add-friend');
             const friendsList = window.user.friends || [];
             if (btnAdd) {
                 if (friendsList.includes(targetName)) {
-                    btnAdd.innerText = "❌ ELIMINAR AMIGO";
-                    btnAdd.style.background = "#FF3333"; btnAdd.style.color = "white";
+                    btnAdd.innerText = "❌ ELIMINAR AMIGO"; btnAdd.style.background = "#FF3333"; btnAdd.style.color = "white";
                     btnAdd.onclick = () => { window.removeFriend(targetName); window.closeModal('profile'); };
                 } else {
-                    btnAdd.innerText = "➕ AGREGAR AMIGO";
-                    btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black";
+                    btnAdd.innerText = "➕ AGREGAR AMIGO"; btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black";
                     btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
                 }
             }
         }
 
-        // Ranking (Seguro)
+        // RANKING CON ANIMACIONES ÉPICAS
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
             let rankPos = 0; let index = 1;
             snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
             
-            if (rankPos > 0) setText('p-global-rank', "#" + rankPos);
-            else setText('p-global-rank', "#100+");
+            if (rankPos > 0) {
+                setText('p-global-rank', "#" + rankPos);
+                
+                // Si es Top 3, aplicar diseño de leyenda
+                if (rankPos <= 3) {
+                    profilePanel.classList.add(`epic-top-${rankPos}`);
+                    if (badge) {
+                        badge.innerText = `#${rankPos}`;
+                        badge.style.display = 'block';
+                        badge.style.animation = 'floatBadge 3s infinite ease-in-out alternate';
+                    }
+                }
+            } else { 
+                setText('p-global-rank', "#100+"); 
+            }
 
-            // Aplicamos los visuales mandando el item y la posición
             applyUIFrameVisuals(equippedUI, rankPos);
         }).catch(e => console.log("Ranking no disponible", e));
 
     } catch(e) { console.error("Error cargando perfil:", e); }
 };
+
+// Función para subir y guardar el Banner en Firebase
+window.uploadBanner = async function(input) {
+    if(!input.files || input.files.length === 0 || !window.user || !window.db) return;
+    const file = input.files[0];
+    notify("Subiendo banner, espera...", "info");
+    
+    try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result;
+            // Guardar en Firebase
+            await window.db.collection('users').doc(window.user.name).update({ bannerData: base64 });
+            window.user.bannerData = base64; // Actualizar local
+            // Reflejar en pantalla de inmediato
+            document.getElementById('p-header-bg').style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), url(${base64})`;
+            notify("¡Banner actualizado con éxito!", "success");
+        };
+        reader.readAsDataURL(file);
+    } catch(e) { 
+        console.error(e); notify("Error al subir el banner", "error"); 
+    }
+};
+        settingsView.style.display = show ? 'block' : 'none';
+    }
+};
+
+
 
 // 4. FUNCIONES EXTRA
 window.removeFriend = async function(friendName) {
