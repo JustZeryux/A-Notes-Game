@@ -2098,6 +2098,7 @@ const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a20
 };
 
 // === MOTOR DEL CREATOR STUDIO ===
+// === MOTOR DEL CREATOR STUDIO (CON DETECTOR DE SESIÓN BLINDADO) ===
 window.openStudioDashboard = async function() {
     openModal('studio');
     const grid = document.getElementById('studio-grid');
@@ -2105,22 +2106,38 @@ window.openStudioDashboard = async function() {
     grid.innerHTML = '';
     loader.style.display = 'block';
 
-    // Verificamos quién está conectado
-    let myUsername = window.user ? window.user.username : localStorage.getItem('username');
+    // === DETECTOR DE USUARIO TODOTERRENO ===
+    // Busca en todos los "cajones" posibles donde tu juego pudo haber guardado tu sesión
+    let myUsername = window.username || 
+                     window.playerName ||
+                     (window.user && window.user.username) || 
+                     (window.currentUser && window.currentUser.username) || 
+                     localStorage.getItem('username');
 
+    // Si estás usando Firebase Auth clásico
+    if (!myUsername && typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+        myUsername = firebase.auth().currentUser.displayName;
+    }
+
+    // FALLBACK INFALIBLE: Si el código sigue ciego, te lo pregunta directamente en vez de bloquearte
     if (!myUsername) {
-        loader.innerText = "Debes iniciar sesión para ver tus mapas. ❌";
+        myUsername = prompt("Sesión detectada, pero necesito confirmar tu nombre de usuario exacto (Ej: Zeryux):");
+    }
+
+    // Si le das a cancelar en el prompt, detenemos la carga
+    if (!myUsername) {
+        loader.innerText = "Debes indicar tu usuario para ver tus mapas. ❌";
         loader.style.color = "var(--miss)";
         return;
     }
 
     try {
-        // Le pedimos a Firebase SOLO las canciones subidas por TI
+        // Le pedimos a Firebase SOLO las canciones subidas por TI (con tu nombre exacto)
         let snapshot = await window.db.collection("globalSongs").where("uploader", "==", myUsername).get();
         loader.style.display = 'none';
 
         if (snapshot.empty) {
-            grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#aaa; font-size:1.2rem; font-weight:bold;">Aún no has subido ninguna canción. <br><br> ¡Sube tu primer MP3 para empezar a mapear! ☁️</div>';
+            grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:#aaa; font-size:1.2rem; font-weight:bold;">Aún no has subido ninguna canción con el usuario "${myUsername}". <br><br> ¡Sube tu primer MP3 en la barra lateral para empezar a mapear! ☁️</div>`;
             return;
         }
 
@@ -2150,16 +2167,16 @@ window.openStudioDashboard = async function() {
             // Botón de abrir el Editor de tu canción
             card.querySelector('.btn-edit').onclick = () => {
                 closeModal('studio');
-                if(typeof openEditor === 'function') openEditor(song, 4); // Abre el editor en 4 teclas por defecto
+                if(typeof openEditor === 'function') openEditor(song, 4); 
                 else alert("Error: El archivo editor.js no está conectado.");
             };
             
             // Botón para borrar la canción de tu base de datos para siempre
             card.querySelector('.btn-del').onclick = async () => {
-                if(confirm(`¿Seguro que quieres borrar "${song.title}" para siempre? Se eliminará de la base de datos global.`)) {
+                if(confirm(`¿Seguro que quieres borrar "${song.title}" para siempre?`)) {
                     card.style.opacity = '0.5';
                     await window.db.collection('globalSongs').doc(song.id).delete();
-                    openStudioDashboard(); // Recargamos la pantalla para que desaparezca
+                    openStudioDashboard(); // Recargamos la pantalla
                 }
             };
 
