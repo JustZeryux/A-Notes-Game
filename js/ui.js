@@ -7,7 +7,32 @@
 // ==========================================
 // 3. NOTIFICACIONES PERSISTENTES (DESAFÍOS)
 // ==========================================
+// === SET DE TECLAS MAESTRO (EVITA CRASHEOS DE 1K A 10K) ===
+const MASTER_KEYS = {
+    1: ['Space'],
+    2: ['KeyF', 'KeyJ'],
+    3: ['KeyF', 'Space', 'KeyJ'],
+    4: ['KeyD', 'KeyF', 'KeyJ', 'KeyK'],
+    5: ['KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK'],
+    6: ['KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL'],
+    7: ['KeyS', 'KeyD', 'KeyF', 'Space', 'KeyJ', 'KeyK', 'KeyL'],
+    8: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyH', 'KeyJ', 'KeyK', 'KeyL'],
+    9: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'Space', 'KeyH', 'KeyJ', 'KeyK', 'KeyL'],
+    10: ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyV', 'KeyN', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon']
+};
 
+// Nos aseguramos de que la configuración exista
+if(!window.cfg) window.cfg = {};
+if(!window.cfg.keys) window.cfg.keys = {};
+
+// Revisamos del 1 al 10. Si falta alguna tecla, le ponemos la del Set Maestro
+for(let i = 1; i <= 10; i++) {
+    if(!window.cfg.keys[i] || window.cfg.keys[i].length !== i) {
+        window.cfg.keys[i] = MASTER_KEYS[i];
+    }
+}
+// Guardamos para que el motor de juego las detecte de inmediato
+localStorage.setItem('cfg', JSON.stringify(window.cfg));
 window.notifyChallenge = function(fromUser, lobbyId, songName) {
     const area = document.getElementById('notification-area');
     if(!area) return;
@@ -2009,8 +2034,8 @@ window.openUnifiedDiffModal = function(song) {
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
     
-    const colors = {4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F'};
-    const labels = {4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON'};
+const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F', 10: '#ff0000'};
+    const labels = {1: 'RHYTHM', 2: 'BASIC', 3: 'EASY', 4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON', 10: 'IMPOSSIBLE'};
     
     // 1. DIBUJAR LOS BOTONES Y CANDADOS
     const standardModes = [4, 6, 7, 9];
