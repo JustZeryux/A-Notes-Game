@@ -717,3 +717,14 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     .rank-table td, .rank-table th { padding: 10px 5px !important; font-size: 0.9rem; }
     .ml-info .ml-name { font-size: 0.8rem; }
 }
+
+/* Brillo animado para el mejor jugador del mundo */
+.top1-glow {
+    animation: gold-pulse 2s infinite alternate;
+    box-shadow: 0 0 10px #FFD700;
+}
+
+@keyframes gold-pulse {
+    from { box-shadow: 0 0 10px #FFD700; border-color: #FFD700; }
+    to { box-shadow: 0 0 30px #FFD700, 0 0 50px #FFA500; border-color: #FFF; }
+}
