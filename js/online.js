@@ -276,3 +276,16 @@ window.handleLobbyStatus = function(data) {
         }
     }
 };
+
+// ==========================================
+// SISTEMA HEARTBEAT (LATIDO ONLINE CADA 15s)
+// ==========================================
+setInterval(() => {
+    // Si hay un usuario logueado y Firebase está conectado
+    if (window.user && window.user.name && window.db) {
+        window.db.collection('users').doc(window.user.name).update({
+            lastActive: Date.now(), // Guarda el milisegundo exacto actual
+            online: true // Mantenemos el booleano por si acaso
+        }).catch(err => console.log("Latido pausado (Offline local)"));
+    }
+}, 15000); // 15000 milisegundos = 15 segundos
