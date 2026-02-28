@@ -114,24 +114,28 @@ window.showUserProfile = async function(targetName) {
     const m = document.getElementById('modal-profile'); 
     if(m) m.style.display = 'flex';
     
-    // Reset visual y estado de carga
+    // 1. Reset visual inmediato y estado de carga
     setText('p-name', "Cargando...");
     setText('p-global-rank', "#--");
+    setText('p-score', "0"); setText('p-pp-display', "0 PP"); setText('p-sp-display', "0");
+    
     const avBig = document.getElementById('p-av-big');
     if(avBig) { 
         avBig.style.backgroundImage = "none"; 
         avBig.textContent = "G"; 
-        avBig.style.border = "4px solid #333"; // Reset medalla
+        avBig.style.border = "4px solid #333";
+        avBig.style.boxShadow = "none";
+        avBig.classList.remove('top1-glow'); // Quitamos brillo previo
     }
 
     try {
-        // 1. OBTENER DATOS DEL USUARIO (De cualquier posición)
+        // 2. CARGA DE DATOS PRIMORDIAL (Para que no salgan en 0)
         const doc = await window.db.collection('users').doc(targetName).get();
         if (!doc.exists) return notify("Usuario no encontrado", "error");
         
         const d = doc.data();
         
-        // Rellenar estadísticas base
+        // Rellenar puntos inmediatamente
         setText('p-name', targetName);
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
@@ -146,44 +150,39 @@ window.showUserProfile = async function(targetName) {
             if(d.avatarData) avBig.textContent = ""; 
         }
 
-        // 2. CALCULAR RANKING GLOBAL Y MEDALLAS
-        // Consultamos la colección completa para encontrar la posición real
+        // 3. CÁLCULO DE RANKING (Independiente para no bloquear los datos)
         const rankingSnap = await window.db.collection("users").orderBy("pp", "desc").get();
         let rankPos = 0;
-        let finalRank = "#100+";
+        let index = 1;
 
-        rankingSnap.forEach((userDoc, index) => {
-            if(userDoc.id === targetName) {
-                rankPos = index + 1;
-                finalRank = "#" + rankPos;
-            }
+        rankingSnap.forEach((userDoc) => {
+            if(userDoc.id === targetName) rankPos = index;
+            index++;
         });
 
+        const finalRank = rankPos > 0 ? "#" + rankPos : "#100+";
         setText('p-global-rank', finalRank);
 
-        // Lógica de Medallas (Top 3)
-        if(avBig) {
-            if(rankPos === 1) { // ORO
+        // 4. SISTEMA DE MEDALLAS Y BRILLO TOP 1
+        if(avBig && rankPos > 0) {
+            if(rankPos === 1) {
                 avBig.style.border = "4px solid #FFD700";
-                avBig.style.boxShadow = "0 0 20px #FFD700";
-            } else if(rankPos === 2) { // PLATA
+                avBig.classList.add('top1-glow'); // Requiere el CSS de abajo
+            } else if(rankPos === 2) {
                 avBig.style.border = "4px solid #C0C0C0";
-                avBig.style.boxShadow = "0 0 20px #C0C0C0";
-            } else if(rankPos === 3) { // BRONCE
+                avBig.style.boxShadow = "0 0 15px #C0C0C0";
+            } else if(rankPos === 3) {
                 avBig.style.border = "4px solid #CD7F32";
-                avBig.style.boxShadow = "0 0 20px #CD7F32";
-            } else {
-                avBig.style.boxShadow = "none"; // Sin medalla para el resto
+                avBig.style.boxShadow = "0 0 15px #CD7F32";
             }
         }
 
-        // 3. Skins y Marcos Visuales
+        // Skins y marcos
         if (typeof applyUIFrameVisuals === 'function') {
             applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
         }
 
     } catch(e) { 
-        console.error("Error cargando perfil:", e);
-        notify("Error al obtener datos", "error");
+        console.error("Error crítico en perfil:", e);
     }
 };
