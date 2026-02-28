@@ -1861,7 +1861,7 @@ window.fetchUnifiedData = async function(query = "") {
                 let data = doc.data();
                 if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
                     fbSongs.push({
-                        id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`, // Mismo formato de texto
+                        id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
                         imageURL: data.imageURL || 'icon.png', isOsu: false,
                         keysAvailable: [4, 6, 7, 9], raw: { ...data, id: doc.id }
                     });
@@ -1872,24 +1872,22 @@ window.fetchUnifiedData = async function(query = "") {
 
     // 2. Osu! Mania (Carga Extrema Reparada)
     try {
-        // FIX MAESTRO: Si no buscas nada, pide los mapas Rankeados. Así NUNCA vuelve 0 resultados.
-        let apiUrl = query.trim() !== "" 
-            ? `https://api.nerinyan.moe/search?q=${encodeURIComponent(query)}&m=3` 
-            : `https://api.nerinyan.moe/search?q=status%3Dranked&m=3`;
+        // TRUCO MAESTRO: Si la barra está vacía, buscamos "anime" por debajo de la mesa para que traiga la galería principal.
+        let safeQuery = query.trim() !== "" ? query.trim() : "anime";
         
-        const res = await fetch(apiUrl);
+        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
         const data = await res.json();
         
         if (data && data.length > 0) {
             data.forEach(set => {
-                // Filtro hiper-relajado: Si la API lo mandó, y tiene teclas válidas (CS), lo aceptamos.
-                const maniaBeatmaps = set.beatmaps.filter(b => b.cs >= 4 && b.cs <= 10);
+                // Filtramos que de verdad sea Osu Mania
+                const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3);
                 
                 if(maniaBeatmaps.length > 0) {
                     let keys = [...new Set(maniaBeatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b);
                     osuSongs.push({
                         id: set.id, title: set.title, 
-                        artist: `Subido por: ${set.creator}`, // Imita tu estilo visual "Subido por: Gael05"
+                        artist: `Subido por: ${set.creator}`, 
                         imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
                         isOsu: true, keysAvailable: keys, raw: set
                     });
@@ -1925,18 +1923,24 @@ window.renderUnifiedGrid = function() {
 
     filtered.forEach(song => {
         const card = document.createElement('div');
-        card.className = 'song-card';
-        if(song.isOsu) card.classList.add('osu-card-style'); // Aplica el borde rosa
+        // Usamos tu clase exacta para mantener la forma, sombras y efectos hover
+        card.className = 'song-card'; 
         
-        // Las insignias de dificultad azules clásicas tuyas
+        // Si es Osu, le pintamos el borde rosa dinámicamente
+        if(song.isOsu) {
+            card.style.borderColor = '#ff66aa';
+            card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.15)';
+        }
+        
+        // Tus botones azules (4K, 6K) que salen en Overcompensate
         let badgesHTML = song.keysAvailable.map(k => `<div class="diff-badge">${k}K</div>`).join('');
         
-        // Insignia exclusiva de Osu alineada a la derecha
+        // Etiqueta rosa exclusiva de Osu!
         if(song.isOsu) {
-            badgesHTML += `<div class="diff-badge badge-osu" style="margin-left:auto;">🌸 OSU!</div>`;
+            badgesHTML += `<div class="diff-badge" style="margin-left:auto; border-color:#ff66aa; color:#ff66aa; box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>`;
         }
 
-        // Diseño 1:1 con tus tarjetas de Firebase
+        // Estructura HTML exacta a la tuya
         card.innerHTML = `
             <div class="song-bg" style="background-image: url('${song.imageURL}'), url('icon.png');"></div>
             <div class="song-info">
@@ -1994,4 +1998,3 @@ window.openUnifiedDiffModal = function(song) {
     });
     openModal('diff');
 };
-
