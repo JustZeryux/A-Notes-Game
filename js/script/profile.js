@@ -96,37 +96,25 @@ window.updateGlobalRank = function() {
         let rank = "#100+";
         snap.docs.forEach((doc, index) => { if(doc.id === window.user.name) rank = "#" + (index + 1); });
         setText('p-global-rank', rank);
-    }).catch(e => console.log("Rank update limit", e));
-};
-
-window.toggleProfileSettings = function(show) {
-    const mainView = document.getElementById('profile-main-stats'); const settingsView = document.getElementById('profile-account-settings');
-    if(mainView && settingsView) {
-        mainView.style.opacity = show ? "0" : "1"; settingsView.style.opacity = show ? "1" : "0";
-        setTimeout(() => { mainView.style.display = show ? 'none' : 'block'; settingsView.style.display = show ? 'block' : 'none'; }, 100);
-    }
-};
-
-window.showUserProfile = async function(targetName) {
-    if (!window.db) return notify("Error: Base de datos no conectada", "error");
+    window.showUserProfile = async function(targetName) {
+    if (!window.db) return notify("Error de conexión", "error");
     
-    // 1. Mostrar modal y limpiar estados previos
+    // 1. Limpiar vista y mostrar cargando
     window.toggleProfileSettings(false);
     const m = document.getElementById('modal-profile'); 
     if(m) m.style.display = 'flex';
-    
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
     
     setText('p-name', "Cargando...");
-    setText('p-global-rank', "#..."); // Estado de cálculo
-    
+    setText('p-global-rank', "#--");
     const avBig = document.getElementById('p-av-big');
     if(avBig) { 
         avBig.style.backgroundImage = "none"; 
         avBig.textContent = "G"; 
         avBig.style.border = "4px solid #333";
         avBig.style.boxShadow = "none";
+        avBig.style.animation = "none";
     }
 
     const isMe = (window.user && targetName === window.user.name);
@@ -134,12 +122,17 @@ window.showUserProfile = async function(targetName) {
     document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
 
     try {
-        // 2. OBTENER DATOS DEL USUARIO
+        // ==========================================
+        // FASE 1: LECTURA SEGURA DE DATOS REALES
+        // ==========================================
         const doc = await window.db.collection('users').doc(targetName).get();
-        if (!doc.exists) return notify("Usuario no encontrado", "error");
+        if (!doc.exists) {
+            setText('p-name', "Usuario no encontrado");
+            return;
+        }
         const d = doc.data();
         
-        // Rellenar estadísticas de inmediato
+        // Stats
         setText('p-name', targetName);
         setText('p-lvl-txt', "LVL " + (d.lvl || 1));
         setText('p-score', (d.score || 0).toLocaleString());
@@ -147,31 +140,29 @@ window.showUserProfile = async function(targetName) {
         setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
         setText('p-sp-display', (d.sp || 0).toLocaleString());
         
-        // Avatar y limpieza de "G"
-        const url = d.avatarData ? `url(${d.avatarData})` : "url('icon.png')";
-        if(avBig) {
-            avBig.style.backgroundImage = url;
-            if(d.avatarData) avBig.textContent = ""; 
+        // Avatar
+        if(d.avatarData && avBig) {
+            avBig.style.backgroundImage = `url(${d.avatarData})`;
+            avBig.textContent = ""; 
         }
 
-        // 3. CALCULAR RANKING GLOBAL REAL (Sin límites de 100+)
-        // Contamos cuántos usuarios tienen más PP que el perfil actual
-        const leaderboardSnap = await window.db.collection("users")
-            .where("pp", ">", (d.pp || 0))
-            .get();
-        
-        const myRank = leaderboardSnap.size + 1;
-        setText('p-global-rank', "#" + myRank); // ¡Adiós al #100+ genérico!
-
-        // 4. SISTEMA DE MEDALLAS VISUALES
-        if(avBig && myRank <= 3) {
-            const medalColors = {1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32"};
-            avBig.style.border = `4px solid ${medalColors[myRank]}`;
-            avBig.style.boxShadow = `0 0 20px ${medalColors[myRank]}`;
-            if(myRank === 1) avBig.style.animation = "gold-pulse 2s infinite alternate";
+        // ==========================================
+        // FASE 2: EQUIPAMIENTO VISUAL EXACTO
+        // ==========================================
+        let skinName = "Default", uiName = "Ninguno";
+        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
+            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin);
+            if(sItem) skinName = sItem.name;
+            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui);
+            if(uItem) uiName = uItem.name;
         }
+        setText('p-equipped-skin', skinName);
+        setText('p-equipped-ui', uiName);
+        if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
 
-        // 5. FUNCIONES SOCIALES (Restauradas)
+        // ==========================================
+        // FASE 3: FUNCIONES SOCIALES
+        // ==========================================
         if (!isMe) {
             const btnAdd = document.getElementById('btn-add-friend');
             const isFriend = window.user.friends && window.user.friends.includes(targetName);
@@ -186,18 +177,50 @@ window.showUserProfile = async function(targetName) {
                     btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
                 }
             }
-            document.getElementById('btn-chat-user').onclick = () => { 
-                window.openFloatingChat(targetName); 
-                window.closeModal('profile'); 
-            };
-            document.getElementById('btn-challenge-user').onclick = () => { window.challengeFriend(targetName); };
+            const btnChat = document.getElementById('btn-chat-user');
+            if(btnChat) btnChat.onclick = () => { window.openFloatingChat(targetName); window.closeModal('profile'); };
+            const btnChall = document.getElementById('btn-challenge-user');
+            if(btnChall) btnChall.onclick = () => { window.challengeFriend(targetName); };
         }
 
-        // 6. EQUIPAMIENTO
-        if (typeof applyUIFrameVisuals === 'function') applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        // ==========================================
+        // FASE 4: RANKING GLOBAL (BURBUJA AISLADA)
+        // ==========================================
+        // Al usar .then() en lugar de await, si esto falla, NO ROMPE el resto del perfil
+        window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
+            let rankPos = 0;
+            let index = 1;
+            snap.forEach(uDoc => {
+                if(uDoc.id === targetName) rankPos = index;
+                index++;
+            });
+
+            if (rankPos > 0) {
+                setText('p-global-rank', "#" + rankPos);
+                // Medallas
+                if(avBig && rankPos <= 3) {
+                    const colors = {1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32"};
+                    avBig.style.border = `4px solid ${colors[rankPos]}`;
+                    avBig.style.boxShadow = `0 0 20px ${colors[rankPos]}`;
+                    if(rankPos === 1) avBig.style.animation = "gold-pulse 2s infinite alternate";
+                }
+            } else {
+                setText('p-global-rank', "#100+");
+            }
+        }).catch(err => console.log("Ranking temporalmente no disponible", err));
 
     } catch(e) { 
-        console.error("Error en ranking:", e);
-        notify("Error al sincronizar ranking", "error");
+        console.error("Error crítico al cargar perfil:", e);
+    }
+};}).catch(e => console.log("Rank update limit", e));
+};
+
+window.toggleProfileSettings = function(show) {
+    const mainView = document.getElementById('profile-main-stats'); const settingsView = document.getElementById('profile-account-settings');
+    if(mainView && settingsView) {
+        mainView.style.opacity = show ? "0" : "1"; settingsView.style.opacity = show ? "1" : "0";
+        setTimeout(() => { mainView.style.display = show ? 'none' : 'block'; settingsView.style.display = show ? 'block' : 'none'; }, 100);
     }
 };
+
+
