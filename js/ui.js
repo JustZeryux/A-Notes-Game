@@ -2359,19 +2359,12 @@ window.openLeaderboard = function() {
     });
 };
 
-window.showUserProfile = async function(targetName) {
-    if (!window.db) return;
-    
-    // Novedad: Reiniciamos la vista siempre que abrimos un perfil
-    toggleProfileSettings(false);
-
-    // === MOTOR PARA CAMBIAR ENTRE PERFIL Y AJUSTES DE CUENTA ===
+// === MOTOR PARA CAMBIAR ENTRE PERFIL Y AJUSTES DE CUENTA ===
 window.toggleProfileSettings = function(show) {
     const mainView = document.getElementById('profile-main-stats');
     const settingsView = document.getElementById('profile-account-settings');
     
     if(mainView && settingsView) {
-        // Efecto visual suave opcional
         mainView.style.opacity = show ? "0" : "1";
         settingsView.style.opacity = show ? "1" : "0";
         
@@ -2380,6 +2373,88 @@ window.toggleProfileSettings = function(show) {
             settingsView.style.display = show ? 'block' : 'none';
         }, 100);
     }
+};
+
+// === MOTOR DEL SÚPER PERFIL (Tuyo y de otros) ===
+window.showUserProfile = async function(targetName) {
+    if (!window.db) return;
+    
+    // Reiniciamos la vista siempre que abrimos un perfil
+    window.toggleProfileSettings(false);
+    
+    // Mostramos la ventana y la sección de perfil
+    const m = document.getElementById('modal-profile'); if(m) m.style.display='flex';
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('profile-view').style.display = 'block';
+    
+    // Textos de carga mientras descarga datos
+    setText('p-name', "Cargando..."); setText('p-lvl-txt', "LVL ?");
+    
+    const isMe = (targetName === window.user.name);
+    
+    // Mostramos botones correspondientes
+    document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
+    document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
+    
+    // Si soy yo, habilito el click en el avatar para subir foto. Si es otro, lo desactivo.
+    document.getElementById('p-av-big').style.cursor = isMe ? 'pointer' : 'default';
+    document.getElementById('avatar-upload-input').disabled = !isMe;
+
+    try {
+        const doc = await window.db.collection('users').doc(targetName).get();
+        if (!doc.exists) return notify("Usuario no encontrado", "error");
+        
+        const d = doc.data();
+        
+        // Llenar estadísticas
+        setText('p-name', targetName);
+        setText('p-lvl-txt', "LVL " + (d.lvl || 1));
+        setText('p-score', (d.score || 0).toLocaleString());
+        setText('p-plays', (d.plays || 0).toLocaleString());
+        setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
+        setText('p-sp-display', (d.sp || 0).toLocaleString());
+        
+        // Avatar y Fondo
+        const url = d.avatarData ? `url(${d.avatarData})` : "url('icon.png')";
+        const avBig = document.getElementById('p-av-big');
+        if(avBig) avBig.style.backgroundImage = url;
+        
+        const headerBg = document.getElementById('p-header-bg');
+        if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
+        
+        // Skins y Marcos
+        let skinName = "Default"; let uiName = "Ninguno";
+        if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
+            const sItem = SHOP_ITEMS.find(x => x.id === d.equipped.skin); if(sItem) skinName = sItem.name;
+            const uItem = SHOP_ITEMS.find(x => x.id === d.equipped.ui); if(uItem) uiName = uItem.name;
+        }
+        setText('p-equipped-skin', skinName);
+        setText('p-equipped-ui', uiName);
+        
+        // Aplicamos la belleza del Marco UI al perfil
+        if (typeof applyUIFrameVisuals === 'function') {
+            applyUIFrameVisuals(d.equipped ? d.equipped.ui : 'default');
+        }
+
+        // === LÓGICA DE BOTONES PARA VISITANTE ===
+        if (!isMe) {
+            const btnAdd = document.getElementById('btn-add-friend');
+            const isFriend = window.user.friends && window.user.friends.includes(targetName);
+            
+            if (isFriend) {
+                btnAdd.innerText = "✅ AMIGOS";
+                btnAdd.style.background = "#333"; btnAdd.style.color = "#888"; btnAdd.onclick = null;
+            } else {
+                btnAdd.innerText = "➕ AGREGAR AMIGO";
+                btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black";
+                btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
+            }
+            
+            document.getElementById('btn-chat-user').onclick = () => { openFloatingChat(targetName); closeModal('profile'); };
+            document.getElementById('btn-challenge-user').onclick = () => { window.challengeFriend(targetName); closeModal('profile'); };
+        }
+
+    } catch(e) { console.error(e); }
 };
 
 window.openFriends = function() {
