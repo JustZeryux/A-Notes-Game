@@ -190,7 +190,7 @@ function parseOsuFile(text) {
     }
     
     // Osu no necesita el "START_OFFSET" de 3 segundos como tu genMap, pero le agregamos 1 segundo de cortesía
-    map.forEach(n => n.t += 1500);
+    map.forEach(n => n.t += 3000);
 
     return { map, keys, audioFilename };
 }
