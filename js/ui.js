@@ -2058,7 +2058,7 @@ window.renderUnifiedGrid = function() {
         card.onclick = () => openUnifiedDiffModal(song);
         grid.appendChild(card);
     });
-
+};
     // ==============================================
     // EL BOTÓN MÁGICO DE "CARGAR MÁS"
     // ==============================================
