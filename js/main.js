@@ -170,3 +170,5 @@ window.openFloatingChat = function(targetUser) {
         container.appendChild(div);
     }
 };
+
+fetchUnifiedData("");
