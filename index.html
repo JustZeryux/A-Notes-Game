@@ -122,17 +122,25 @@
                     </div>
                 </div>
                 <div id="filter-bar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                    <button class="filter-btn active" data-type="type" data-val="all" onclick="setFilter('type', 'all')">TODO</button>
-                    <button class="filter-btn" data-type="type" data-val="osu" onclick="setFilter('type', 'osu')" style="color:#ff66aa; border-color:#ff66aa; box-shadow: 0 0 5px rgba(255,102,170,0.3);">🌸 OSU!</button>
-                    <button class="filter-btn" data-type="type" data-val="com" onclick="setFilter('type', 'com')">☁️ COMUNIDAD</button>
-                    
-                    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
-                    
-                    <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
-                    <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
-                    <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
-                    <button class="filter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
-                    <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
+    <button class="filter-btn active" data-type="type" data-val="all" onclick="setFilter('type', 'all')">TODO</button>
+    <button class="filter-btn" data-type="type" data-val="osu" onclick="setFilter('type', 'osu')" style="color:#ff66aa; border-color:#ff66aa;">🌸 OSU!</button>
+    <button class="filter-btn" data-type="type" data-val="com" onclick="setFilter('type', 'com')">☁️ COMUNIDAD</button>
+    
+    <button class="filter-btn" data-type="type" data-val="recent" onclick="setFilter('type', 'recent')" style="color:var(--gold); border-color:var(--gold);">🕒 RECIENTES</button>
+    
+    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
+    
+    <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
+    <button class="filter-btn" data-type="key" data-val="1" onclick="setFilter('key', '1')">1K</button>
+    <button class="filter-btn" data-type="key" data-val="2" onclick="setFilter('key', '2')">2K</button>
+    <button class="filter-btn" data-type="key" data-val="3" onclick="setFilter('key', '3')">3K</button>
+    <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
+    <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
+    <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
+    <button class="flter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
+    <button class="filter-btn" data-type="key" data-val="8" onclick="setFilter('key', '8')">8K</button>
+    <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
+    <button class="filter-btn" data-type="key" data-val="10" onclick="setFilter('key', '10')">10K</button>
                 </div>
             </div>
             <div class="song-grid" id="song-grid"></div>
