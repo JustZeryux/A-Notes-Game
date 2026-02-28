@@ -1829,14 +1829,15 @@ window.debounceSearch = function(val) {
 };
 
 // --- CARGA BLINDADA (SIEMPRE TRAERÁ CANCIONES) ---
+// --- CARGA BLINDADA (TODAS LAS CANCIONES POR DEFECTO - 100% SEGURO) ---
 window.fetchUnifiedData = async function(query = "") {
     const grid = document.getElementById('song-grid');
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Cargando tu Nube y Osu!... ⏳</div>';
+    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-size:1.5rem; font-weight:bold;">Cargando Galería Global... ⏳</div>';
     
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. Firebase (Tus canciones)
+    // 1. Firebase (Tus canciones de la comunidad)
     try {
         if(window.db) {
             let snapshot = await window.db.collection("globalSongs").limit(50).get();
@@ -1853,15 +1854,21 @@ window.fetchUnifiedData = async function(query = "") {
         }
     } catch(e) { console.warn("Error DB Local"); }
 
-    // 2. Osu! Mania (Carga Garantizada)
+    // 2. Osu! Mania (Carga Masiva Automática Reparada)
     try {
-        // FIX: Si la barra está vacía, buscamos mapas "Ranked" que estén garantizados de existir
-        let safeQuery = query.trim() !== "" ? query.trim() : "ranked";
+        let safeQuery = query.trim();
+        
+        // FIX MAESTRO: Solo usamos palabras largas. Si usas "a" o "e" la API de Osu crashea.
+        if (safeQuery === "") {
+            const secretTerms = ["camellia", "miku", "fnf", "vocaloid", "touhou", "remix", "nightcore", "osu"];
+            safeQuery = secretTerms[Math.floor(Math.random() * secretTerms.length)];
+        }
         
         const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
         const data = await res.json();
         
-        if (data && data.length > 0) {
+        // FIX DE SEGURIDAD: Comprobamos que Osu nos mandó una lista real y no un error oculto
+        if (Array.isArray(data) && data.length > 0) {
             data.forEach(set => {
                 const maniaBeatmaps = set.beatmaps.filter(b => b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
                 
@@ -1876,10 +1883,12 @@ window.fetchUnifiedData = async function(query = "") {
                 }
             });
         }
-    } catch(e) { console.warn("Error Osu API"); }
+    } catch(e) { console.warn("Error Osu API:", e); }
 
-    // Juntamos todo
+    // Juntamos las canciones de Osu y las tuyas
     window.unifiedSongs = [...osuSongs, ...fbSongs];
+    
+    // Si tienes el filtro de OSU activado por defecto, no mostrará nada a menos que llamemos al render normal
     renderUnifiedGrid();
 };
 
