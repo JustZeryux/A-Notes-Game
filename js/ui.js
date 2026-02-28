@@ -1832,69 +1832,103 @@ window.debounceSearch = function(val) {
 };
 
 // --- CARGA MASIVA: DOUBLE FETCH Y MEZCLA ALEATORIA ---
-window.fetchUnifiedData = async function(query = "") {
+// ==============================================================
+// MOTOR DE BÚSQUEDA Y PAGINACIÓN INFINITA (100 EN 100)
+// ==============================================================
+window.currentFilters = { type: 'all', key: 'all' };
+window.unifiedSongs = [];
+window.searchTimeout = null;
+window.currentOsuPage = 0; // Rastrea en qué página de Osu vamos
+window.lastQuery = "";     // Guarda lo que escribiste para cargar más de lo mismo
+
+window.setFilter = function(category, val) {
+    window.currentFilters[category] = val;
+    document.querySelectorAll(`.filter-btn[data-type="${category}"]`).forEach(btn => {
+        btn.classList.remove('active');
+        if(btn.getAttribute('data-val') === val) btn.classList.add('active');
+    });
+    renderUnifiedGrid();
+};
+
+window.debounceSearch = function(val) {
+    clearTimeout(window.searchTimeout);
+    // Al buscar escribiendo, limpiamos todo y buscamos desde cero (append = false)
+    window.searchTimeout = setTimeout(() => fetchUnifiedData(val, false), 500);
+};
+
+// --- CARGA DE CANCIONES (MASIVA CON BOTÓN "CARGAR MÁS") ---
+window.fetchUnifiedData = async function(query = "", append = false) {
     const grid = document.getElementById('song-grid');
     if(!grid) return;
-    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#00ffff; font-size:1.5rem; font-weight:bold;">Descargando Galería Masiva... ⏳</div>';
-    
+
+    // Si es una búsqueda nueva, limpiamos la pantalla y variables
+    if (!append) {
+        window.unifiedSongs = [];
+        window.currentOsuPage = 0;
+        window.lastQuery = query.trim();
+        grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#00ffff; font-size:1.5rem; font-weight:bold;">Descargando Galería Masiva... ⏳</div>';
+    } else {
+        // Si le dimos a "Cargar Más", cambiamos el texto del botón
+        const btnLoad = document.getElementById('btn-load-more');
+        if (btnLoad) btnLoad.innerText = "DESCARGANDO 100 MÁS... 🌐";
+    }
+
     let fbSongs = [];
     let osuSongs = [];
 
-    // 1. ESPERA A FIREBASE
-    let retries = 0;
-    while(!window.db && retries < 15) {
-        await new Promise(r => setTimeout(r, 100));
-        retries++;
+    // 1. Firebase (Tus canciones): Solo se cargan en la página 1 para no duplicarlas
+    if (!append) {
+        let retries = 0;
+        while(!window.db && retries < 15) { await new Promise(r => setTimeout(r, 100)); retries++; }
+        
+        try {
+            if(window.db) {
+                let snapshot = await window.db.collection("globalSongs").limit(100).get();
+                snapshot.forEach(doc => {
+                    let data = doc.data();
+                    if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
+                        fbSongs.push({
+                            id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
+                            imageURL: data.imageURL || 'icon.png', isOsu: false,
+                            keysAvailable: [4, 6, 7, 9], raw: { ...data, id: doc.id }
+                        });
+                    }
+                });
+            }
+        } catch(e) { console.warn("Error DB Local", e); }
     }
 
-    // 2. Traer canciones de tu Comunidad (Aumentado a 100)
+    // 2. Osu! Mania (Carga Masiva Paginada)
     try {
-        if(window.db) {
-            let snapshot = await window.db.collection("globalSongs").limit(100).get();
-            snapshot.forEach(doc => {
-                let data = doc.data();
-                if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
-                    fbSongs.push({
-                        id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
-                        imageURL: data.imageURL || 'icon.png', isOsu: false,
-                        keysAvailable: [4, 6, 7, 9], raw: { ...data, id: doc.id }
-                    });
-                }
-            });
-        }
-    } catch(e) { console.warn("Error DB Local", e); }
-
-    // 3. Traer mapas de Osu! (MODO DOUBLE FETCH)
-    try {
-        let safeQuery = query.trim();
-        let rawOsuData = [];
+        let safeQuery = window.lastQuery;
         
+        // Si está vacío, elegimos algo épico la primera vez y lo mantenemos
         if (safeQuery === "") {
-            // Palabras clave para llenar la pantalla
-            const terms = ["camellia", "miku", "fnf", "vocaloid", "touhou", "remix", "nightcore", "osu", "kpop", "rock", "pop", "electronic"];
-            // Las revolvemos para elegir 2 al azar diferentes cada vez que abres el juego
-            const shuffled = terms.sort(() => 0.5 - Math.random());
-            
-            // Hacemos 2 búsquedas AL MISMO TIEMPO para traer el doble de resultados
-            const [res1, res2] = await Promise.all([
-                fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(shuffled[0])}&m=3`),
-                fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(shuffled[1])}&m=3`)
-            ]);
-            
-            const d1 = await res1.json();
-            const d2 = await res2.json();
-            
-            if(Array.isArray(d1)) rawOsuData = rawOsuData.concat(d1);
-            if(Array.isArray(d2)) rawOsuData = rawOsuData.concat(d2);
-            
-        } else {
-            // Si el jugador escribió algo específico, busca normal
-            const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3`);
-            const d = await res.json();
-            if(Array.isArray(d)) rawOsuData = d;
+            if (!append) {
+                const terms = ["anime", "fnf", "vocaloid", "camellia", "remix", "nightcore", "osu", "kpop", "rock", "pop"];
+                window.lastQuery = terms[Math.floor(Math.random() * terms.length)];
+            }
+            safeQuery = window.lastQuery;
         }
 
-        // Limpiar canciones repetidas (por si las dos búsquedas traen la misma)
+        // Hacemos 2 peticiones a 2 páginas distintas al mismo tiempo para asegurar 100 canciones de golpe
+        const pageA = window.currentOsuPage;
+        const pageB = window.currentOsuPage + 1;
+        window.currentOsuPage += 2; // Avanzamos la página para el próximo clic
+
+        const [res1, res2] = await Promise.all([
+            fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3&p=${pageA}`),
+            fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&m=3&p=${pageB}`)
+        ]);
+        
+        const d1 = await res1.json();
+        const d2 = await res2.json();
+        
+        let rawOsuData = [];
+        if(Array.isArray(d1)) rawOsuData = rawOsuData.concat(d1);
+        if(Array.isArray(d2)) rawOsuData = rawOsuData.concat(d2);
+
+        // Limpiar canciones repetidas
         const uniqueOsuData = Array.from(new Map(rawOsuData.map(item => [item.id, item])).values());
         
         uniqueOsuData.forEach(set => {
@@ -1911,15 +1945,14 @@ window.fetchUnifiedData = async function(query = "") {
         });
     } catch(e) { console.warn("Error Osu API", e); }
 
-    // 4. EL TOQUE MÁGICO: Unimos tus canciones y las de Osu, ¡y las REVOLVEMOS!
-    let finalMix = [...fbSongs, ...osuSongs];
+    // UNIMOS LAS NUEVAS A LAS QUE YA TENÍAMOS
+    window.unifiedSongs = [...window.unifiedSongs, ...fbSongs, ...osuSongs];
     
-    // Si el usuario NO está buscando nada específico, revolvemos toda la galería para que luzca épico
-    if (query.trim() === "") {
-        finalMix = finalMix.sort(() => 0.5 - Math.random());
+    // Si es la carga inicial y no busco nada en concreto, revolvemos un poco para que se vea variado
+    if (!append && query.trim() === "") {
+        window.unifiedSongs = window.unifiedSongs.sort(() => 0.5 - Math.random());
     }
 
-    window.unifiedSongs = finalMix; 
     renderUnifiedGrid();
 };
 
@@ -1944,6 +1977,7 @@ window.renderUnifiedGrid = function() {
         return;
     }
 
+    // Dibujar todas las canciones actuales
     filtered.forEach(song => {
         const card = document.createElement('div');
         card.className = 'song-card'; 
@@ -1977,6 +2011,27 @@ window.renderUnifiedGrid = function() {
         card.onclick = () => openUnifiedDiffModal(song);
         grid.appendChild(card);
     });
+
+    // ==============================================
+    // EL BOTÓN MÁGICO DE "CARGAR MÁS"
+    // ==============================================
+    const loadMoreContainer = document.createElement('div');
+    loadMoreContainer.style.gridColumn = "1 / -1"; // Forzamos a que ocupe todo el ancho
+    loadMoreContainer.style.textAlign = "center";
+    loadMoreContainer.style.padding = "30px";
+    
+    loadMoreContainer.innerHTML = `
+        <button id="btn-load-more" class="action btn-acc" style="width: 400px; padding: 15px; font-size: 1.2rem; box-shadow: 0 0 25px rgba(0,255,255,0.4); border-radius: 12px;">
+            ⬇️ CARGAR MÁS CANCIONES ⬇️
+        </button>
+    `;
+    
+    // Al darle click, llamamos la función diciéndole (query actual, append = true)
+    loadMoreContainer.querySelector('button').onclick = () => {
+        fetchUnifiedData(window.lastQuery, true);
+    };
+
+    grid.appendChild(loadMoreContainer);
 };
 
 // --- MENÚ DE DIFICULTADES UNIFICADO (CON CANDADOS) ---
