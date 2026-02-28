@@ -587,3 +587,20 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     box-shadow: 0 0 8px rgba(255,102,170,0.4);
     background: rgba(255,102,170,0.1);
 }
+
+/* === ESTILO UNIFICADO PARA CARTAS OSU! === */
+.song-card.osu-card-style {
+    border: 2px solid rgba(255, 102, 170, 0.4);
+    box-shadow: 0 0 15px rgba(255, 102, 170, 0.15);
+}
+.song-card.osu-card-style:hover {
+    border-color: #ff66aa;
+    box-shadow: 0 0 25px rgba(255, 102, 170, 0.6);
+    transform: translateY(-5px) scale(1.02);
+}
+.diff-badge.badge-osu {
+    border-color: #ff66aa !important;
+    color: #ff66aa !important;
+    background: rgba(255,102,170,0.1);
+    box-shadow: 0 0 8px rgba(255,102,170,0.4);
+}
