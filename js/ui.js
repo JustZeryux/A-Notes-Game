@@ -1979,7 +1979,65 @@ window.fetchUnifiedData = async function(query = "", append = false) {
                 osuSongs.push({
                     id: set.id, title: set.title, 
                     artist: `Subido por: ${set.creator}`, 
-                    imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
+        window.renderUnifiedGrid = function() {
+    const grid = document.getElementById('song-grid'); 
+    if(!grid) return; 
+    grid.innerHTML = '';
+    
+    // 1. ELEGIR LISTA: Masiva o Recientes
+    let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
+
+    // 2. FILTRAR
+    let filtered = baseList.filter(song => {
+        if (window.currentFilters.type === 'recent') return true; 
+        if (window.currentFilters.type === 'osu' && !song.isOsu) return false;
+        if (window.currentFilters.type === 'com' && song.isOsu) return false;
+        if (window.currentFilters.key !== 'all') { 
+            if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
+        }
+        return true;
+    });
+
+    // 3. SI NO HAY RESULTADOS
+    if (filtered.length === 0) { 
+        grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">${window.currentFilters.type === 'recent' ? 'Aún no has jugado ninguna canción. 🕒' : 'No se encontraron mapas. 🌸'}</div>`; 
+        return; 
+    }
+
+    // 4. BUCLE PARA DIBUJAR TARJETAS (Esto es lo que seguramente se borró)
+    filtered.forEach(song => {
+        const card = document.createElement('div'); 
+        card.className = 'song-card'; 
+        card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s, box-shadow 0.2s; background: #111;';
+        
+        if(song.isOsu) { 
+            card.style.borderColor = '#ff66aa'; 
+            card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.2)'; 
+        }
+        
+        let badgesHTML = song.keysAvailable.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('');
+        if(song.isOsu) badgesHTML += `<div class="diff-badge" style="margin-left:auto; border: 1px solid #ff66aa; color: #ff66aa; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; background: rgba(255,102,170,0.1); box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>`;
+
+        card.innerHTML = `<div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div><div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);"><div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div><div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">${song.artist}</div><div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">${badgesHTML}</div></div>`;
+        
+        card.onmouseenter = () => { card.style.transform = 'scale(1.03)'; card.style.boxShadow = song.isOsu ? '0 0 25px rgba(255, 102, 170, 0.5)' : '0 0 20px rgba(0, 255, 255, 0.3)'; };
+        card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.boxShadow = song.isOsu ? '0 0 15px rgba(255, 102, 170, 0.2)' : 'none'; };
+        card.onclick = () => openUnifiedDiffModal(song);
+        
+        grid.appendChild(card);
+    });
+
+    // 5. BOTÓN DE CARGAR MÁS (Oculto en recientes)
+    if (window.currentFilters.type !== 'recent') {
+        const loadMore = document.createElement('div'); 
+        loadMore.style.gridColumn = "1 / -1"; 
+        loadMore.style.textAlign = "center"; 
+        loadMore.style.padding = "30px";
+        loadMore.innerHTML = `<button id="btn-load-more" class="action btn-acc" style="width: 400px; max-width:90%; padding: 15px; font-size: 1.2rem; box-shadow: 0 0 25px rgba(0,255,255,0.4); border-radius: 12px;">⬇️ CARGAR MÁS CANCIONES ⬇️</button>`;
+        loadMore.querySelector('button').onclick = () => fetchUnifiedData(window.lastQuery, true);
+        grid.appendChild(loadMore);
+    }
+}; // <--- AQUÍ ESTÁ EL CIERRE VITAL            imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
                     isOsu: true, keysAvailable: keys, raw: set
                 });
             }
@@ -1998,67 +2056,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 };
 
 // --- DIBUJADO DE TARJETAS (ESTILO FORZADO INQUEBRANTABLE) ---
-window.renderUnifiedGrid = function() {
-    const grid = document.getElementById('song-grid');
-    if(!grid) return;
-    grid.innerHTML = '';
 
-    // ELEGIR QUÉ LISTA DIBUJAR: La masiva o la de Recientes (Memoria Local)
-    let baseList = window.currentFilters.type === 'recent' 
-        ? JSON.parse(localStorage.getItem('recentSongs') || '[]') 
-        : window.unifiedSongs;
-
-    let filtered = baseList.filter(song => {
-        if (window.currentFilters.type === 'recent') return true; // En recientes mostramos todo lo guardado
-        if (window.currentFilters.type === 'osu' && !song.isOsu) return false;
-        if (window.currentFilters.type === 'com' && song.isOsu) return false;
-        if (window.currentFilters.key !== 'all') {
-            let reqKey = parseInt(window.currentFilters.key);
-            if (!song.keysAvailable.includes(reqKey)) return false;
-        }
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">${window.currentFilters.type === 'recent' ? 'Aún no has jugado ninguna canción. 🕒' : 'No se encontraron mapas con estos filtros. 🌸'}</div>`;
-        return;
-    }
-
-    // Dibujar todas las canciones actuales
-    filtered.forEach(song => {
-        const card = document.createElement('div');
-        card.className = 'song-card'; 
-        card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s, box-shadow 0.2s; background: #111;';
-        
-        if(song.isOsu) {
-            card.style.borderColor = '#ff66aa';
-            card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.2)';
-        }
-        
-        let badgesHTML = song.keysAvailable.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('');
-        
-        if(song.isOsu) {
-            badgesHTML += `<div class="diff-badge" style="margin-left:auto; border: 1px solid #ff66aa; color: #ff66aa; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; background: rgba(255,102,170,0.1); box-shadow:0 0 8px rgba(255,102,170,0.4);">🌸 OSU!</div>`;
-        }
-
-        card.innerHTML = `
-            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div>
-            <div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);">
-                <div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div>
-                <div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">${song.artist}</div>
-                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
-                    ${badgesHTML}
-                </div>
-            </div>
-        `;
-        
-        card.onmouseenter = () => { card.style.transform = 'scale(1.03)'; card.style.boxShadow = song.isOsu ? '0 0 25px rgba(255, 102, 170, 0.5)' : '0 0 20px rgba(0, 255, 255, 0.3)'; };
-        card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.boxShadow = song.isOsu ? '0 0 15px rgba(255, 102, 170, 0.2)' : 'none'; };
-        
-        card.onclick = () => openUnifiedDiffModal(song);
-        grid.appendChild(card);
-    });
-};
     // ==============================================
     // EL BOTÓN MÁGICO DE "CARGAR MÁS"
     // ==============================================
