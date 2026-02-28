@@ -997,48 +997,69 @@ window.openSongSelectorForLobby = function() {
     renderLobbySongList();
 };
 
-window.renderLobbySongList = function(filter="") {
+// === BUSCADOR DE CANCIONES PARA SALAS ONLINE ===
+window.renderLobbySongList = function(query = "") {
     const grid = document.getElementById('lobby-song-grid');
-    if(!grid || !db) return;
+    if(!grid) return;
+    grid.innerHTML = '';
 
-    grid.innerHTML = '<div style="color:#888; text-align:center;">Cargando canciones...</div>';
+    // Usamos la lista masiva unificada (Firebase + Osu)
+    let source = window.unifiedSongs || [];
+    let filtered = source.filter(s => {
+        if(!query) return true;
+        return s.title.toLowerCase().includes(query.toLowerCase()) || 
+               s.artist.toLowerCase().includes(query.toLowerCase());
+    });
 
-    db.collection("globalSongs").orderBy("createdAt", "desc").limit(20).get().then(snapshot => {
-        grid.innerHTML = '';
-        if(snapshot.empty) {
-            grid.innerHTML = '<div style="padding:20px; text-align:center;">No hay canciones.</div>';
-            return;
-        }
+    filtered.forEach(song => {
+        const card = document.createElement('div');
+        card.style.display = 'flex';
+        card.style.alignItems = 'center';
+        card.style.justifyContent = 'space-between';
+        card.style.background = '#111';
+        card.style.padding = '10px';
+        card.style.marginBottom = '10px';
+        card.style.borderRadius = '8px';
+        // Borde rosa brillante si es de Osu!
+        card.style.border = song.isOsu ? '1px solid #ff66aa' : '1px solid #333';
 
-        snapshot.forEach(doc => {
-            const s = doc.data();
-            // Filtrado simple por texto
-            if(filter && !s.title.toLowerCase().includes(filter.toLowerCase())) return;
-
-            const div = document.createElement('div');
-            // Usamos un estilo de lista más compacto para este modal
-            div.style.cssText = "display:flex; align-items:center; gap:10px; background:#111; padding:10px; margin-bottom:5px; border-radius:8px; cursor:pointer; border:1px solid #333; transition:0.2s;";
-            div.onmouseover = function(){ this.style.borderColor = 'var(--accent)'; this.style.background = '#222'; };
-            div.onmouseout = function(){ this.style.borderColor = '#333'; this.style.background = '#111'; };
-            
-            // Imagen pequeña
-            const bg = s.imageURL ? `url(${s.imageURL})` : 'linear-gradient(45deg, #333, #000)';
-            
-            div.innerHTML = `
-                <div style="width:50px; height:50px; border-radius:6px; background:${bg}; background-size:cover; background-position:center; flex-shrink:0;"></div>
-                <div style="flex:1; overflow:hidden;">
-                    <div style="font-weight:900; color:white; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.title}</div>
-                    <div style="font-size:0.8rem; color:#888;">${s.uploader}</div>
+        card.innerHTML = `
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div style="width:50px; height:50px; border-radius:8px; background-image:url('${song.imageURL}'), url('icon.png'); background-size:cover; background-position:center;"></div>
+                <div>
+                    <div style="font-weight:bold; font-size:1.1rem; color:white;">${song.title}</div>
+                    <div style="font-size:0.8rem; color:#aaa;">${song.artist} ${song.isOsu ? '<span style="color:#ff66aa; font-weight:bold; margin-left:5px;">🌸 OSU!</span>' : ''}</div>
                 </div>
-                <button class="btn-small btn-add">ELEGIR</button>
-            `;
+            </div>
+            <button class="action" style="width:auto; padding:5px 20px; font-size:0.9rem; ${song.isOsu ? 'background:#ff66aa; color:black;' : ''}">ELEGIR</button>
+        `;
+        
+        card.querySelector('button').onclick = () => {
+            closeModal('song-selector');
+            
+            // Empaquetamos los datos para que tu servidor multijugador lo entienda
+            let lobbyData = song.isOsu ? {
+                id: "osu_" + song.id, // Marca clave para que el otro jugador sepa descargar el ZIP
+                title: song.title,
+                imageURL: song.imageURL,
+                isOsu: true
+            } : song.raw;
 
-            div.onclick = () => selectSongForLobby(doc.id, s);
-            grid.appendChild(div);
-        });
+            window.curSongData = lobbyData;
+            
+            // Enviar la canción a la sala
+            if(typeof window.selectSongForLobby === 'function') {
+                window.selectSongForLobby(lobbyData);
+            } else {
+                const rs = document.getElementById('room-song');
+                if(rs) rs.innerText = song.title;
+                openModal('host');
+            }
+        };
+        
+        grid.appendChild(card);
     });
 };
-
 window.selectSongForLobby = function(id, data) {
     // Guardamos la canción seleccionada globalmente
     curSongData = { id: id, ...data };
