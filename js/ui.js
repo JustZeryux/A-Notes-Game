@@ -1678,5 +1678,161 @@ window.checkGameStart = function(lobbyData) {
         }
     }
 };
+// === MOTOR UNIFICADO (FIREBASE + OSU!) ===
+window.currentFilters = { type: 'all', key: 'all' };
+window.unifiedSongs = [];
+window.searchTimeout = null;
 
+window.setFilter = function(category, val) {
+    window.currentFilters[category] = val;
+    // Actualizar color de los botones visualmente
+    document.querySelectorAll(`.filter-btn[data-type="${category}"]`).forEach(btn => {
+        btn.classList.remove('active');
+        if(btn.getAttribute('data-val') === val) btn.classList.add('active');
+    });
+    renderUnifiedGrid();
+};
+
+window.debounceSearch = function(val) {
+    clearTimeout(window.searchTimeout);
+    window.searchTimeout = setTimeout(() => fetchUnifiedData(val), 500);
+};
+
+// Carga principal al abrir el juego
+window.fetchUnifiedData = async function(query = "") {
+    const grid = document.getElementById('song-grid');
+    grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#888; font-size:1.5rem; font-weight:bold;">Conectando a los servidores... ⏳</div>';
+    
+    let fbSongs = [];
+    let osuSongs = [];
+
+    // 1. OBTENER DE FIREBASE (Tu Comunidad)
+    try {
+        if(window.db) {
+            let snapshot = await window.db.collection("globalSongs").orderBy('createdAt', 'desc').limit(50).get();
+            snapshot.forEach(doc => {
+                let data = doc.data();
+                if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
+                    fbSongs.push({
+                        id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`,
+                        imageURL: data.imageURL || 'icon.png', isOsu: false,
+                        keysAvailable: [4, 6, 7, 9], // Firebase genera todas por defecto
+                        raw: { ...data, id: doc.id }
+                    });
+                }
+            });
+        }
+    } catch(e) { console.warn("Error DB Local"); }
+
+    // 2. OBTENER DE OSU! DIRECT (API)
+    try {
+        // Si no hay búsqueda, traemos los más populares ("stars>3"). Si hay búsqueda, la usamos.
+        let q = query ? encodeURIComponent(query) : 'stars>3';
+        const res = await fetch(`https://api.nerinyan.moe/search?q=${q}&m=3`);
+        const data = await res.json();
+        
+        if (data && data.length > 0) {
+            data.forEach(set => {
+                const maniaBeatmaps = set.beatmaps.filter(b => b.mode === 3);
+                if(maniaBeatmaps.length > 0) {
+                    // Extraer qué dificultades (teclas) tiene realmente este mapa de Osu
+                    let keys = [...new Set(maniaBeatmaps.map(b => b.cs))].sort((a,b)=>a-b);
+                    osuSongs.push({
+                        id: set.id, title: set.title, artist: `Artista: ${set.artist}`,
+                        imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`,
+                        isOsu: true, keysAvailable: keys, raw: set
+                    });
+                }
+            });
+        }
+    } catch(e) { console.warn("Error Osu API"); }
+
+    // Unimos ambas bases de datos
+    window.unifiedSongs = [...osuSongs, ...fbSongs];
+    renderUnifiedGrid();
+};
+
+window.renderUnifiedGrid = function() {
+    const grid = document.getElementById('song-grid');
+    grid.innerHTML = '';
+
+    // Aplicar Filtros (TODO, OSU, COMUNIDAD, 4K, 6K...)
+    let filtered = window.unifiedSongs.filter(song => {
+        if (window.currentFilters.type === 'osu' && !song.isOsu) return false;
+        if (window.currentFilters.type === 'com' && song.isOsu) return false;
+        if (window.currentFilters.key !== 'all') {
+            let reqKey = parseInt(window.currentFilters.key);
+            if (!song.keysAvailable.includes(reqKey)) return false;
+        }
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div style="width:100%; text-align:center; padding:50px; color:#ff66aa; font-weight:bold; font-size:1.5rem;">No se encontraron mapas con estos filtros. 🌸</div>';
+        return;
+    }
+
+    filtered.forEach(song => {
+        const card = document.createElement('div');
+        card.className = `song-card ${song.isOsu ? 'osu-card' : ''}`; // Aura Rosa si es de Osu
+        
+        let keysHTML = song.keysAvailable.map(k => `<div class="diff-badge">${k}K</div>`).join('');
+        let osuBadgeHTML = song.isOsu ? `<div class="diff-badge osu-badge" style="margin-left:auto;">🌸 OSU</div>` : '';
+
+        card.innerHTML = `
+            <div class="song-bg" style="background-image: url('${song.imageURL}'), url('icon.png');"></div>
+            <div class="song-info">
+                <div class="song-title">${song.title}</div>
+                <div class="song-author">${song.artist}</div>
+                <div style="display:flex; gap:5px; margin-top:10px; align-items:center; flex-wrap:wrap;">
+                    ${keysHTML}
+                    ${osuBadgeHTML}
+                </div>
+            </div>
+        `;
+        card.onclick = () => openUnifiedDiffModal(song);
+        grid.appendChild(card);
+    });
+};
+
+// Modificador del Modal de Dificultad Dinámico
+window.openUnifiedDiffModal = function(song) {
+    document.getElementById('diff-song-title').innerText = song.title;
+    document.getElementById('diff-song-cover').style.backgroundImage = `url('${song.imageURL}')`;
+    
+    const grid = document.querySelector('.diff-grid');
+    grid.innerHTML = ''; 
+    
+    const colors = {4: '#00FFFF', 6: '#12FA05', 7: '#FFD700', 9: '#F9393F'};
+    const labels = {4: 'EASY', 6: 'NORMAL', 7: 'INSANE', 9: 'DEMON'};
+    
+    // Solo muestra los botones de los carriles (4K, 6K) que el mapa realmente soporta
+    song.keysAvailable.forEach(k => {
+        let c = colors[k] || '#ff66aa';
+        let l = labels[k] || 'CUSTOM';
+        
+        let btn = document.createElement('div');
+        btn.className = 'diff-card';
+        btn.style.borderColor = c; btn.style.color = c;
+        btn.innerHTML = `
+            <div class="diff-bg-icon">${k}K</div>
+            <div class="diff-num">${k}K</div>
+            <div class="diff-label">${l}</div>
+        `;
+        
+        btn.onclick = () => {
+            closeModal('diff');
+            if(song.isOsu) {
+                // Despierta al motor de Osu
+                downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
+            } else {
+                // Despierta al motor de Firebase Normal
+                window.curSongData = song.raw;
+                startGame(k);
+            }
+        };
+        grid.appendChild(btn);
+    });
+    openModal('diff');
+};
 
