@@ -691,3 +691,29 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     /* Textos más legibles en tarjetas de ranking/amigos */
     .rank-card-text { font-size: 1rem !important; }
 }
+
+/* === ESTILOS PARA ESTADO ONLINE === */
+.status-dot {
+    width: 14px; height: 14px; border-radius: 50%; display: inline-block;
+    border: 2px solid #111; margin-right: 8px; vertical-align: middle;
+}
+.status-online { background-color: var(--good); box-shadow: 0 0 10px var(--good); }
+.status-offline { background-color: #555; }
+
+/* === ARREGLOS MÓVILES DEFINITIVOS === */
+@media (max-width: 800px) {
+    /* Forzar que las tarjetas de Osu y Ajustes no se salgan de la pantalla */
+    .song-card, .beatmap-card { width: 100% !important; height: auto !important; min-height: 140px; }
+    .settings-panel { width: 95vw !important; height: 85vh !important; }
+    
+    /* Reparación del Editor Studio para Celular */
+    #editor-layer { flex-direction: column !important; }
+    #editor-layer > div:nth-child(2) { flex-direction: column !important; overflow-y: auto; }
+    #editor-layer .width-250px { width: 100% !important; padding: 15px !important; border-right: none !important; border-bottom: 2px solid #333; }
+    #ed-scroll-area { min-height: 400px; width: 100%; overflow-x: auto; }
+    #ed-grid, #ed-playhead { width: 100% !important; min-width: 320px; }
+    
+    /* El Ranking también debe encogerse */
+    .rank-table td, .rank-table th { padding: 10px 5px !important; font-size: 0.9rem; }
+    .ml-info .ml-name { font-size: 0.8rem; }
+}
