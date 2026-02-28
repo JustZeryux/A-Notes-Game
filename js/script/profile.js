@@ -361,3 +361,43 @@ window.openNotifPanel = function() {
 // ==========================================
 // SUBIR FOTO DE PERFIL (AVATAR)
 // ==========================================
+
+window.checkCustomTag = function() {
+    const sel = document.getElementById('sel-equip-tag').value;
+    document.getElementById('custom-tag-creator').style.display = (sel === 'tag_custom') ? 'block' : 'none';
+};
+
+// Necesitas actualizar tu función `saveProfilePrivacy` actual para que guarde esto:
+const oldSave = window.saveProfilePrivacy;
+window.saveProfilePrivacy = async function() {
+    if(!window.user || !window.db) return;
+    
+    // Obtenemos los valores de los tags
+    const eqTag = document.getElementById('sel-equip-tag').value;
+    const tagText = document.getElementById('inp-tag-text').value;
+    const tagBg = document.getElementById('inp-tag-bg').value;
+    const tagColor = document.getElementById('inp-tag-color').value;
+
+    try {
+        if(!window.user.equipped) window.user.equipped = {};
+        window.user.equipped.tag = (eqTag === 'none') ? null : eqTag;
+
+        let customData = window.user.customTagData || {};
+        if (eqTag === 'tag_custom') {
+            customData = { text: tagText.toUpperCase(), bg: tagBg, color: tagColor };
+        }
+
+        // Guárdalo junto a la bio y el estado que ya tenías
+        await window.db.collection('users').doc(window.user.name).update({
+            "equipped.tag": window.user.equipped.tag,
+            customTagData: customData
+        });
+        
+        window.user.customTagData = customData;
+        notify("Perfil y Tags actualizados", "success");
+        if(oldSave) oldSave(); // Ejecuta lo que ya tenías (Bio, Privacidad)
+        showUserProfile(window.user.name);
+    } catch(e) { console.error(e); notify("Error guardando tag", "error"); }
+};
+
+// Modifica `toggleProfileSettings(true)` para que llene la lista de tags que tienes comprados
