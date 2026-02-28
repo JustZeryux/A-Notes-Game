@@ -21,45 +21,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <div id="editor-layer" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a0a; z-index:9000; color:white; flex-direction:column;">
-        
-        <div style="height: 60px; background: #111; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; padding: 0 20px;">
-            <div style="display:flex; gap:15px; align-items:center;">
-                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeEditor()">SALIR</button>
-                <div id="ed-title" style="font-weight:bold; font-size:1.2rem;">Editor Mode</div>
-            </div>
-            
-            <audio id="ed-audio" controls style="height: 40px; outline:none;"></audio>
-            
-            <button class="action btn-acc" style="width:auto; padding:5px 20px;" onclick="saveEditorMap()">💾 GUARDAR MAPA</button>
-        </div>
-
-        <div style="flex:1; display:flex; overflow:hidden;">
-            <div style="width:250px; background:#111; border-right:1px solid #333; padding:20px; display:flex; flex-direction:column; gap:20px;">
-                <div style="color:var(--gold); font-weight:bold;">🛠️ HERRAMIENTAS</div>
-                
-                <div>
-                    <div style="margin-bottom:5px; font-size:0.9rem;">ZOOM (Línea de tiempo)</div>
-                    <input type="range" id="ed-zoom" min="10" max="100" value="30" style="width:100%;" oninput="drawEditorGrid()">
-                </div>
-
-                <div style="background:#222; padding:10px; border-radius:8px; font-size:0.8rem; color:#aaa;">
-                    <b>Controles:</b><br>
-                    - Clic en la pista: Poner Nota<br>
-                    - Clic en nota: Borrar Nota<br>
-                    - Barra Espaciadora: Play/Pausa
-                </div>
-                
-                <button class="action secondary" onclick="clearEditorMap()" style="border-color:#F9393F; color:#F9393F; margin-top:auto;">🗑️ BORRAR TODO</button>
-            </div>
-
-            <div id="ed-scroll-area" style="flex:1; background:#1a1a1a; overflow-y:scroll; position:relative; display:flex; justify-content:center;">
-                <div id="ed-grid" style="position:relative; width:400px; background:#000; border-left:2px solid #444; border-right:2px solid #444; cursor:crosshair;">
-                    </div>
-                <div id="ed-playhead" style="position:absolute; width:400px; height:2px; background:red; z-index:100; pointer-events:none; top:0; box-shadow: 0 0 10px red;"></div>
-            </div>
-        </div>
-    </div>
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
@@ -72,6 +33,37 @@
     <div id="loading-overlay" style="display:none;">
         <div class="loader"></div>
         <div id="loading-text">Cargando...</div>
+    </div>
+
+    <div id="editor-layer" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a0a; z-index:9000; color:white; flex-direction:column;">
+        <div style="height: 60px; background: #111; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; padding: 0 20px;">
+            <div style="display:flex; gap:15px; align-items:center;">
+                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeEditor()">SALIR</button>
+                <div id="ed-title" style="font-weight:bold; font-size:1.2rem;">Editor Mode</div>
+            </div>
+            <audio id="ed-audio" controls style="height: 40px; outline:none;"></audio>
+            <button class="action btn-acc" style="width:auto; padding:5px 20px;" onclick="saveEditorMap()">💾 GUARDAR MAPA</button>
+        </div>
+        <div style="flex:1; display:flex; overflow:hidden;">
+            <div style="width:250px; background:#111; border-right:1px solid #333; padding:20px; display:flex; flex-direction:column; gap:20px;">
+                <div style="color:var(--gold); font-weight:bold;">🛠️ HERRAMIENTAS</div>
+                <div>
+                    <div style="margin-bottom:5px; font-size:0.9rem;">ZOOM (Línea de tiempo)</div>
+                    <input type="range" id="ed-zoom" min="10" max="100" value="30" style="width:100%;" oninput="drawEditorGrid()">
+                </div>
+                <div style="background:#222; padding:10px; border-radius:8px; font-size:0.8rem; color:#aaa;">
+                    <b>Controles:</b><br>
+                    - Clic en la pista: Poner Nota<br>
+                    - Clic en nota: Borrar Nota<br>
+                    - Barra Espaciadora: Play/Pausa
+                </div>
+                <button class="action secondary" onclick="clearEditorMap()" style="border-color:#F9393F; color:#F9393F; margin-top:auto;">🗑️ BORRAR TODO</button>
+            </div>
+            <div id="ed-scroll-area" style="flex:1; background:#1a1a1a; overflow-y:scroll; position:relative; display:flex; justify-content:center;">
+                <div id="ed-grid" style="position:relative; width:400px; background:#000; border-left:2px solid #444; border-right:2px solid #444; cursor:crosshair;"></div>
+                <div id="ed-playhead" style="position:absolute; width:400px; height:2px; background:red; z-index:100; pointer-events:none; top:0; box-shadow: 0 0 10px red;"></div>
+            </div>
+        </div>
     </div>
     
     <div id="bg-layer">
@@ -102,45 +94,52 @@
                 <button class="nav-btn" id="nav-rank" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
                 <button class="nav-btn" id="nav-friends" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openFriends()">👥 AMIGOS</button>
     
-    <button class="nav-btn" onclick="openStudioDashboard()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
-        ✏️ CREATOR STUDIO
-    </button>
+                <button class="nav-btn" onclick="openStudioDashboard()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
+                    ✏️ CREATOR STUDIO
+                </button>
 
-            <button class="import-btn" id="imp-btn" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openCustomUploadModal()">
-                <span id="imp-txt">☁️ SUBIR CANCIÓN</span>
-            </button>
-            <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
+                <button class="import-btn" id="imp-btn" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openCustomUploadModal()">
+                    <span id="imp-txt">☁️ SUBIR CANCIÓN</span>
+                </button>
+                <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
+            </div>
         </aside>
 
         <main class="content-area">
             <div class="top-bar" style="flex-direction:column; align-items:stretch; gap:15px; height:auto; padding-bottom:15px;">
+                
                 <div style="display:flex; gap:10px; width:100%; align-items:center;">
                     <input type="text" id="main-search-inp" class="search-inp" style="flex:1;" placeholder="Buscar en la Nube y en Osu! Mania..." oninput="debounceSearch(this.value)">
+                    
+                    <div id="notif-bell" onclick="openNotifPanel()" style="position:relative; cursor:pointer; font-size:1.8rem; margin:0 15px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));">
+                        🔔<span id="notif-badge" style="display:none; position:absolute; top:-5px; right:-10px; background:#F9393F; color:white; border-radius:10px; padding:2px 6px; font-size:0.7rem; font-weight:900; border:2px solid #0a0a0a;">0</span>
+                    </div>
+
                     <div style="display:flex; gap:20px; align-items:center;">
                          <div style="font-weight:900; color:var(--gold);">SP: <span id="h-sp" style="color:white; font-size:1.5rem;">0</span></div>
                          <div style="font-weight:900; color:#aaa;">PP: <span id="h-pp" style="color:white; font-size:1.5rem;">0</span></div>
                     </div>
                 </div>
+
                 <div id="filter-bar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-    <button class="filter-btn active" data-type="type" data-val="all" onclick="setFilter('type', 'all')">TODO</button>
-    <button class="filter-btn" data-type="type" data-val="osu" onclick="setFilter('type', 'osu')" style="color:#ff66aa; border-color:#ff66aa;">🌸 OSU!</button>
-    <button class="filter-btn" data-type="type" data-val="com" onclick="setFilter('type', 'com')">☁️ COMUNIDAD</button>
-    
-    <button class="filter-btn" data-type="type" data-val="recent" onclick="setFilter('type', 'recent')" style="color:var(--gold); border-color:var(--gold);">🕒 RECIENTES</button>
-    
-    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
-    
-    <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
-    <button class="filter-btn" data-type="key" data-val="1" onclick="setFilter('key', '1')">1K</button>
-    <button class="filter-btn" data-type="key" data-val="2" onclick="setFilter('key', '2')">2K</button>
-    <button class="filter-btn" data-type="key" data-val="3" onclick="setFilter('key', '3')">3K</button>
-    <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
-    <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
-    <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
-    <button class="flter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
-    <button class="filter-btn" data-type="key" data-val="8" onclick="setFilter('key', '8')">8K</button>
-    <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
-    <button class="filter-btn" data-type="key" data-val="10" onclick="setFilter('key', '10')">10K</button>
+                    <button class="filter-btn active" data-type="type" data-val="all" onclick="setFilter('type', 'all')">TODO</button>
+                    <button class="filter-btn" data-type="type" data-val="osu" onclick="setFilter('type', 'osu')" style="color:#ff66aa; border-color:#ff66aa;">🌸 OSU!</button>
+                    <button class="filter-btn" data-type="type" data-val="com" onclick="setFilter('type', 'com')">☁️ COMUNIDAD</button>
+                    <button class="filter-btn" data-type="type" data-val="recent" onclick="setFilter('type', 'recent')" style="color:var(--gold); border-color:var(--gold);">🕒 RECIENTES</button>
+                    
+                    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
+                    
+                    <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
+                    <button class="filter-btn" data-type="key" data-val="1" onclick="setFilter('key', '1')">1K</button>
+                    <button class="filter-btn" data-type="key" data-val="2" onclick="setFilter('key', '2')">2K</button>
+                    <button class="filter-btn" data-type="key" data-val="3" onclick="setFilter('key', '3')">3K</button>
+                    <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
+                    <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
+                    <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
+                    <button class="flter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
+                    <button class="filter-btn" data-type="key" data-val="8" onclick="setFilter('key', '8')">8K</button>
+                    <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
+                    <button class="filter-btn" data-type="key" data-val="10" onclick="setFilter('key', '10')">10K</button>
                 </div>
             </div>
             <div class="song-grid" id="song-grid"></div>
@@ -194,9 +193,7 @@
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     </div>
 
-    <div id="modal-settings" class="modal-overlay">
-        <div class="modal-panel settings-panel"></div>
-    </div>
+    <div id="modal-settings" class="modal-overlay"><div class="modal-panel settings-panel"></div></div>
 
     <div id="modal-diff" class="modal-overlay">
         <div class="modal-panel" style="width:1000px;">
@@ -281,7 +278,6 @@
 
                     <input type="hidden" id="up-url" value="">
                     <input type="hidden" id="up-lyrics" value="">
-
                 </div> 
                 <div style="width: 250px; display:flex; flex-direction:column; gap:10px;">
                     <div style="color:var(--gold); font-weight:900;">🖼️ PORTADA (Opcional)</div>
@@ -328,7 +324,7 @@
         </div>
     </div>
     
-<div id="modal-osu" class="modal-overlay">
+    <div id="modal-osu" class="modal-overlay">
         <div class="modal-panel" style="width:900px; height:85vh; display:flex; flex-direction:column;">
             <div class="m-title" style="color:#ff66aa; border-bottomColor:#ff66aa;">🌸 OSU! MANIA BROWSER</div>
             <div style="display:flex; gap:10px; margin-bottom:20px;">
@@ -340,6 +336,7 @@
             <button class="action secondary" style="margin-top:20px;" onclick="closeModal('osu')">CERRAR</button>
         </div>
     </div>
+
     <div id="modal-news" class="modal-overlay">
         <div class="modal-panel" style="width:600px;">
             <div class="m-title">NOVEDADES ULTRA</div>
@@ -354,31 +351,15 @@
         </div>
     </div>
 
-    <div id="modal-friends" class="modal-overlay">
-        <div class="modal-panel" style="width:650px;">
-            <div class="m-title">AMIGOS</div>
-            <input type="text" id="friend-inp" class="log-inp" placeholder="Usuario...">
-            <button class="btn-small btn-add" onclick="sendFriendRequest()">AGREGAR</button>
-            <div id="req-list" class="friend-list"></div>
-            <div id="friend-list" class="friend-list"></div>
-            <button class="action secondary" onclick="closeModal('friends')">CERRAR</button>
-        </div>
-    </div>
-
     <div id="modal-studio" class="modal-overlay">
         <div class="modal-panel" style="width:900px; height:85vh; display:flex; flex-direction:column;">
             <div class="m-title" style="color:#00ffff; border-bottomColor:#00ffff;">✏️ MIS CREACIONES</div>
-            
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <div style="color:#aaa;">Aquí están todas las canciones que has subido a la Nube. ¡Añádeles notas!</div>
                 <button class="action" style="width:auto; padding:5px 20px;" onclick="closeModal('studio'); openModal('upload')">☁️ SUBIR NUEVA CANCIÓN</button>
             </div>
-            
             <div id="studio-loading" style="text-align:center; color:var(--gold); padding:20px; font-weight:bold;">Buscando tus canciones en la Nube... ⏳</div>
-            
-            <div id="studio-grid" class="song-grid" style="flex:1; overflow-y:auto; padding:10px; border:1px solid #333; border-radius:10px;">
-                </div>
-            
+            <div id="studio-grid" class="song-grid" style="flex:1; overflow-y:auto; padding:10px; border:1px solid #333; border-radius:10px;"></div>
             <button class="action secondary" style="margin-top:20px;" onclick="closeModal('studio')">CERRAR STUDIO</button>
         </div>
     </div>
@@ -398,18 +379,7 @@
         </div>
     </div>
 
-    <div id="modal-rank" class="modal-overlay">
-        <div class="modal-panel">
-            <div class="m-title">RANKING</div>
-            <table class="rank-table">
-                <thead><tr><th>#</th><th>JUGADOR</th><th>PP</th></tr></thead>
-                <tbody id="rank-list"></tbody>
-            </table>
-            <button class="action secondary" onclick="closeModal('rank')">CERRAR</button>
-        </div>
-    </div>
-
-<div id="modal-profile" class="modal-overlay">
+    <div id="modal-profile" class="modal-overlay">
         <div class="modal-panel" style="width: 95%; max-width: 800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
             
             <div id="login-view" style="padding: 40px; text-align:center;">
@@ -432,12 +402,16 @@
                 <div style="padding: 0 5% 40px 5%; position:relative; top:-60px;">
                     
                     <div class="profile-header-flex" style="display:flex; align-items:flex-end; gap:25px;">
-                        <label class="prof-av-big" id="p-av-big" style="width:130px; height:130px; border-radius:20px; border:4px solid var(--accent); box-shadow:0 0 20px var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative;">
+                        <label class="prof-av-big" id="p-av-big" style="width:130px; height:130px; border-radius:20px; border:4px solid var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative; z-index:2; cursor:pointer;">
                             <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
                         </label>
                         <div style="flex:1; padding-bottom: 10px;">
                             <h2 id="p-name" style="margin:0; font-size:3rem; font-weight:900; text-shadow:0 4px 10px rgba(0,0,0,0.8); color:white; line-height: 1;">User</h2>
-                            <div id="p-lvl-txt" style="color:var(--gold); font-weight:900; font-size:1.2rem; letter-spacing: 2px;">LVL 1</div>
+                            <div style="display:flex; gap:15px; align-items:center; margin-top:5px;">
+                                <div id="p-lvl-txt" style="color:var(--gold); font-weight:900; font-size:1.2rem; letter-spacing: 2px;">LVL 1</div>
+                                <div id="p-online-status" style="font-size: 13px; font-weight:bold; background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:10px;">⚪ Offline</div>
+                            </div>
+                            <div id="p-custom-status" style="color: var(--accent); font-style: italic; font-size: 14px; margin-top: 5px;"></div>
                         </div>
                         <div style="text-align:right; padding-bottom: 10px;">
                             <div style="font-size:0.9rem; color:#888; font-weight:bold; letter-spacing: 1px;">RANKING GLOBAL</div>
@@ -445,175 +419,169 @@
                         </div>
                     </div>
 
-                    <div id="profile-main-stats">
-                        <div class="xp-container" style="margin-top:25px; height:18px; background:#1a1a1a; border-radius:10px; border: 1px solid #333; overflow:hidden;">
-                            <div class="xp-fill" id="p-xp-bar" style="height:100%; background:linear-gradient(90deg, #ff66aa, #00ffff); width:0%; transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);"></div>
-                        </div>
-                        <div class="xp-text" id="p-xp-txt" style="text-align:right; font-size:0.85rem; color:#aaa; margin-top:5px; font-weight:bold;">0 / 1000 XP</div>
+                    <div id="p-bio" style="font-size: 14px; color: #ddd; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 3px solid var(--accent); line-height:1.5;"></div>
 
-                        <div class="profile-stats-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:15px; margin-top:30px;">
-                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">PERFORMANCE</div>
+                    <div id="profile-main-stats">
+                        <div class="xp-container" style="margin-top:20px; height:18px; background:#1a1a1a; border-radius:10px; border: 1px solid #333; overflow:hidden;">
+                            <div class="xp-fill" id="p-xp-bar" style="height:100%; background:linear-gradient(90deg, #ff66aa, #00ffff); width:0%; transition: width 0.5s;"></div>
+                        </div>
+
+                        <div class="profile-stats-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:15px; margin-top:25px;">
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">PERFORMANCE</div>
                                 <div id="p-pp-display" style="color:var(--accent); font-size:1.8rem; font-weight:900;">0 <span style="font-size:1rem;">PP</span></div>
                             </div>
-                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">TOTAL SCORE</div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">TOTAL SCORE</div>
                                 <div id="p-score" style="color:white; font-size:1.8rem; font-weight:900;">0</div>
                             </div>
-                            <div id="p-online-status" style="font-size: 12px; margin-bottom: 5px;">⚪ Offline</div>
-<div id="p-custom-status" style="color: var(--accent); font-style: italic; font-size: 14px; margin-bottom: 10px;"></div>
-<div id="p-bio" style="font-size: 13px; color: #ccc; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px; margin-bottom: 15px;"></div>
-                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">PARTIDAS</div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">PARTIDAS</div>
                                 <div id="p-plays" style="color:var(--blue); font-size:1.8rem; font-weight:900;">0</div>
                             </div>
-                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222; box-shadow: inset 0 0 20px rgba(0,0,0,0.5);">
-                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; letter-spacing:1px; margin-bottom:5px;">SP AHORRADO</div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">SP AHORRADO</div>
                                 <div id="p-sp-display" style="color:var(--gold); font-size:1.8rem; font-weight:900;">0</div>
                             </div>
                         </div>
 
                         <div class="profile-equip-flex" style="margin-top:20px; display:flex; gap:15px;">
-                            <div style="flex:1; background:#111; padding:15px 20px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
-                                <div style="font-size:2.5rem; filter: drop-shadow(0 0 10px rgba(0,255,255,0.5));">🎨</div>
-                                <div>
-                                    <div style="color:#888; font-size:0.75rem; font-weight:bold;">SKIN DE NOTAS</div>
-                                    <div id="p-equipped-skin" style="font-weight:900; font-size:1.2rem; color:#00ffff;">Default</div>
-                                </div>
+                            <div style="flex:1; background:#111; padding:15px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:2rem;">🎨</div>
+                                <div><div style="color:#888; font-size:0.75rem;">SKIN DE NOTAS</div><div id="p-equipped-skin" style="font-weight:900; color:#00ffff;">Default</div></div>
                             </div>
-                            <div style="flex:1; background:#111; padding:15px 20px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
-                                <div style="font-size:2.5rem; filter: drop-shadow(0 0 10px rgba(255,102,170,0.5));">🖼️</div>
-                                <div>
-                                    <div style="color:#888; font-size:0.75rem; font-weight:bold;">MARCO EQUIPADO</div>
-                                    <div id="p-equipped-ui" style="font-weight:900; font-size:1.2rem; color:#ff66aa;">Ninguno</div>
-                                </div>
+                            <div style="flex:1; background:#111; padding:15px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:2rem;">🖼️</div>
+                                <div><div style="color:#888; font-size:0.75rem;">MARCO EQUIPADO</div><div id="p-equipped-ui" style="font-weight:900; color:#ff66aa;">Ninguno</div></div>
                             </div>
                         </div>
                         
-                        <div id="p-owner-actions" style="display:none; gap:15px; margin-top:30px;">
-                            <button class="action secondary" style="flex:1;" onclick="toggleProfileSettings(true)">⚙️ AJUSTES DE CUENTA</button>
-                            <button class="action secondary" style="flex:1; border-color:#F9393F; color:#F9393F;" onclick="logout()">CERRAR SESIÓN</button>
+                        <div id="p-owner-actions" style="display:none; gap:15px; margin-top:25px;">
+                            <button class="action secondary" style="flex:1;" onclick="toggleProfileSettings(true)">⚙️ AJUSTES Y PRIVACIDAD</button>
                         </div>
 
-                        <div id="p-visitor-actions" style="display:none; gap:15px; margin-top:30px;">
+                        <div id="p-visitor-actions" style="display:none; gap:15px; margin-top:25px;">
                             <button class="action" style="flex:1; background:var(--good); color:black;" id="btn-add-friend">➕ AGREGAR AMIGO</button>
                             <button class="action" style="flex:1; background:var(--blue); color:white;" id="btn-chat-user">💬 CHATEAR</button>
                             <button class="action" style="flex:1; background:var(--gold); color:black;" id="btn-challenge-user">⚔️ DESAFIAR</button>
                         </div>
                     </div>
 
-                    <div id="profile-account-settings" style="display:none; margin-top:30px; background:#111; padding:30px; border-radius:12px; border:1px solid #333;">
-                        <h3 style="color:var(--accent); margin-top:0; font-size:1.5rem;">⚙️ AJUSTES DE CUENTA</h3>
+                    <div id="profile-account-settings" style="display:none; margin-top:20px; background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
+                        <h3 style="color:var(--accent); margin-top:0;">⚙️ PRIVACIDAD Y ESTADO</h3>
+                        <input type="text" id="inp-custom-status" class="log-inp" placeholder="Escribe un estado (Ej: Jugando Osu!)">
+                        <textarea id="inp-bio" class="log-inp" placeholder="Escribe tu biografía aquí..." style="height:80px; resize:none;"></textarea>
                         
-                        <div id="local-acc-settings">
-                            <label style="color:#888; font-weight:bold; font-size:0.9rem;">Nueva Contraseña</label>
-                            <input type="password" id="new-pass" class="log-inp" placeholder="Escribe tu nueva contraseña">
-                            <button class="action secondary" style="width:100%; margin-bottom:20px;" onclick="changePassword()">ACTUALIZAR CONTRASEÑA</button>
+                        <div class="ranked-toggle" style="margin-bottom:20px;">
+                            <input type="checkbox" id="chk-hide-items">
+                            <label for="chk-hide-items" style="margin-left:10px; color:white;">Ocultar mis Ítems (Skins/Marcos) a los demás</label>
+                        </div>
+                        
+                        <button class="action secondary" style="width:100%; margin-bottom:10px;" onclick="saveProfilePrivacy()">GUARDAR CAMBIOS</button>
+                        
+                        <div id="acc-mgmt-area" style="padding-top:20px; border-top:1px solid #333; margin-top:20px;">
+                            <button class="action secondary" style="width:100%; border-color:#F9393F; color:#F9393F;" onclick="logout()">CERRAR SESIÓN DE LA CUENTA</button>
                         </div>
 
-                        <div id="google-acc-settings" style="display:none; margin-bottom:20px; padding:15px; background:rgba(255,255,255,0.05); border-radius:8px;">
-                            <div style="color:var(--blue); font-weight:bold;">✅ Cuenta vinculada con Google.</div>
-                        </div>
-
-                        <div id="acc-mgmt-area" style="padding-top:20px; border-top:1px solid #333;">
-                            <button class="btn-google" onclick="linkGoogleAccount()" style="width:100%; margin-bottom:20px;">VINCULAR CON GOOGLE</button>
-                            
-                            <label style="color:#888; font-weight:bold; font-size:0.9rem;">Cambiar Nombre Público</label>
-                            <input type="text" id="new-username" class="log-inp" placeholder="Nuevo Nombre">
-                            <button class="action secondary" style="width:100%;" onclick="changeUsername()">ACTUALIZAR NOMBRE</button>
-                        </div>
-
-                        <button class="action" style="width:100%; margin-top:30px; background:#444; color:white; border:none;" onclick="toggleProfileSettings(false)">⬅ VOLVER AL PERFIL</button>
+                        <button class="action" style="width:100%; background:#444; color:white; margin-top:15px;" onclick="toggleProfileSettings(false)">⬅ VOLVER</button>
                     </div>
-
                 </div>
             </div>
         </div>
-    </div>
-    
-    <div id="modal-rank" class="modal-overlay">
-        <div class="modal-panel" style="width:700px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
-            <div style="padding:20px 30px; background:#111; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:white; font-weight:900; font-size:1.8rem;">🏆 RANKING GLOBAL</h2>
-                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeModal('rank')">CERRAR</button>
-            </div>
-            <div id="rank-list" style="padding:20px; max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
-        </div>
-    </div>
 
-    <div id="modal-friends" class="modal-overlay">
-        <div class="modal-panel" style="width:650px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
-            <div style="padding:20px 30px; background:#111; border-bottom:2px solid #00ffff; display:flex; justify-content:space-between; align-items:center;">
-                <h2 style="margin:0; color:white; font-weight:900; font-size:1.8rem;">👥 AMIGOS</h2>
-                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeModal('friends')">CERRAR</button>
-            </div>
-            <div style="padding:20px;">
-                <div style="display:flex; gap:10px; margin-bottom:20px;">
-                    <input type="text" id="friend-inp" class="log-inp" style="margin:0; flex:1;" placeholder="Usuario a buscar...">
-                    <button class="action" style="width:auto; background:#00ffff; color:black; padding:0 30px;" onclick="sendFriendRequest()">AGREGAR</button>
+        <div id="modal-rank" class="modal-overlay">
+            <div class="modal-panel" style="width:700px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
+                <div style="padding:20px 30px; background:#111; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center;">
+                    <h2 style="margin:0; color:white; font-weight:900; font-size:1.8rem;">🏆 RANKING GLOBAL</h2>
+                    <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeModal('rank')">CERRAR</button>
                 </div>
-                
-                <div style="color:var(--accent); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">SOLICITUDES PENDIENTES</div>
-                <div id="req-list" style="margin-bottom:20px;"></div>
-                
-                <div style="color:var(--good); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">TU LISTA DE AMIGOS</div>
-                <div id="friend-list" style="display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto;"></div>
+                <div id="rank-list" style="padding:20px; max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
             </div>
         </div>
-    </div>
 
-    <div id="modal-pause" class="modal-overlay">
-        <div class="modal-panel login-box">
-            <div class="m-title">PAUSA</div>
-            <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">100%</span></div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
-                <div style="color:var(--sick)">SICK: <span id="p-sick">0</span></div>
-                <div style="color:var(--good)">GOOD: <span id="p-good">0</span></div>
-                <div style="color:var(--bad)">BAD: <span id="p-bad">0</span></div>
-                <div style="color:var(--miss)">MISS: <span id="p-miss">0</span></div>
+        <div id="modal-friends" class="modal-overlay">
+            <div class="modal-panel" style="width:650px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
+                <div style="padding:20px 30px; background:#111; border-bottom:2px solid #00ffff; display:flex; justify-content:space-between; align-items:center;">
+                    <h2 style="margin:0; color:white; font-weight:900; font-size:1.8rem;">👥 AMIGOS</h2>
+                    <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeModal('friends')">CERRAR</button>
+                </div>
+                <div style="padding:20px;">
+                    <div style="display:flex; gap:10px; margin-bottom:20px;">
+                        <input type="text" id="friend-inp" class="log-inp" style="margin:0; flex:1;" placeholder="Usuario a buscar...">
+                        <button class="action" style="width:auto; background:#00ffff; color:black; padding:0 30px;" onclick="sendFriendRequest()">AGREGAR</button>
+                    </div>
+                    
+                    <div style="color:var(--accent); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">SOLICITUDES PENDIENTES</div>
+                    <div id="req-list" style="margin-bottom:20px;"></div>
+                    
+                    <div style="color:var(--good); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">TU LISTA DE AMIGOS</div>
+                    <div id="friend-list" style="display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto;"></div>
+                </div>
             </div>
-            <button class="action" onclick="resumeGame()">CONTINUAR</button>
-            <button class="action secondary" onclick="toMenu()">SALIR</button>
         </div>
-    </div>
 
-    <div id="modal-res" class="modal-overlay">
-        <div class="modal-panel login-box" style="width:600px;">
-            <div class="m-title">RESULTADOS</div>
-            <div class="res-rank" id="res-rank">S</div>
-            <div id="winner-msg" style="display:none;">¡GANASTE!</div>
-            <div style="font-size:4rem; font-weight:900;" id="res-score">0</div>
-            <div style="color:#aaa; font-size:1.5rem;">ACC: <span id="res-acc" style="color:white;">100%</span></div>
-            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px;">+0 PP</div>
-            <div style="display:flex; justify-content:space-around; margin-top:15px;">
-                <div style="color:var(--blue);">+<span id="res-xp">0</span> XP</div>
-                <div style="color:var(--gold);">+<span id="res-sp">0</span> SP</div>
+        <div id="modal-pause" class="modal-overlay">
+            <div class="modal-panel login-box">
+                <div class="m-title">PAUSA</div>
+                <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">100%</span></div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
+                    <div style="color:var(--sick)">SICK: <span id="p-sick">0</span></div>
+                    <div style="color:var(--good)">GOOD: <span id="p-good">0</span></div>
+                    <div style="color:var(--bad)">BAD: <span id="p-bad">0</span></div>
+                    <div style="color:var(--miss)">MISS: <span id="p-miss">0</span></div>
+                </div>
+                <button class="action" onclick="resumeGame()">CONTINUAR</button>
+                <button class="action secondary" onclick="toMenu()">SALIR</button>
             </div>
-            <button class="action" onclick="toMenu()">VOLVER</button>
         </div>
-    </div>
 
-<script src="js/globals.js"></script>
-    <script src="js/script/core.js"></script>
-    <script src="js/script/modals.js"></script>
+        <div id="modal-res" class="modal-overlay">
+            <div class="modal-panel login-box" style="width:600px;">
+                <div class="m-title">RESULTADOS</div>
+                <div class="res-rank" id="res-rank">S</div>
+                <div id="winner-msg" style="display:none;">¡GANASTE!</div>
+                <div style="font-size:4rem; font-weight:900;" id="res-score">0</div>
+                <div style="color:#aaa; font-size:1.5rem;">ACC: <span id="res-acc" style="color:white;">100%</span></div>
+                <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px;">+0 PP</div>
+                <div style="display:flex; justify-content:space-around; margin-top:15px;">
+                    <div style="color:var(--blue);">+<span id="res-xp">0</span> XP</div>
+                    <div style="color:var(--gold);">+<span id="res-sp">0</span> SP</div>
+                </div>
+                <button class="action" onclick="toMenu()">VOLVER</button>
+            </div>
+        </div>
 
-    <script src="js/auth.js"></script>
-    <script src="js/online.js"></script>
+        <div id="notif-panel" style="display:none; position:absolute; top:80px; right:50px; width:350px; background:#111; border:2px solid #333; border-radius:10px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
+            <div style="background:#0a0a0a; padding:15px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0; color:white;">Notificaciones</h3>
+                <button style="background:none; border:none; color:#888; cursor:pointer;" onclick="if(typeof clearAllNotifs==='function')clearAllNotifs()">Limpiar Todo</button>
+            </div>
+            <div id="notif-list-content" style="max-height:400px; overflow-y:auto; padding:10px;">
+                <div style="text-align:center; color:#666; padding:20px;">No tienes notificaciones nuevas.</div>
+            </div>
+        </div>
 
-    <script src="js/script/profile.js"></script>
-    <script src="js/script/settings.js"></script>
-    <script src="js/script/controls.js"></script>
-    <script src="js/script/song_browser.js"></script>
-    <script src="js/script/diff_modals.js"></script>
-    <script src="js/script/socials.js"></script>
-    <script src="js/script/chat_notify.js"></script>
-    <script src="js/script/multiplayer.js"></script>
-    <script src="js/script/studio_upload.js"></script>
-    <script src="js/script/shop_audio.js"></script>
+        <script src="js/globals.js"></script>
+        <script src="js/script/core.js"></script>
+        <script src="js/script/modals.js"></script>
 
-    <script src="js/game.js"></script>
-    <script src="js/osu.js"></script>
-    <script src="js/editor.js"></script>
-    <script src="js/main.js"></script>
-</body>
+        <script src="js/auth.js"></script>
+        <script src="js/online.js"></script>
+
+        <script src="js/script/profile.js"></script>
+        <script src="js/script/settings.js"></script>
+        <script src="js/script/controls.js"></script>
+        <script src="js/script/song_browser.js"></script>
+        <script src="js/script/diff_modals.js"></script>
+        <script src="js/script/socials.js"></script>
+        <script src="js/script/chat_notify.js"></script>
+        <script src="js/script/multiplayer.js"></script>
+        <script src="js/script/studio_upload.js"></script>
+        <script src="js/script/shop_audio.js"></script>
+
+        <script src="js/game.js"></script>
+        <script src="js/osu.js"></script>
+        <script src="js/editor.js"></script>
+        <script src="js/main.js"></script>
+    </body>
 </html>
