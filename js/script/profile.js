@@ -160,8 +160,35 @@ window.showUserProfile = async function(targetName) {
         setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
         setText('p-sp-display', (d.sp || 0).toLocaleString());
         
-        const isOnline = d.online ? "🟢 Conectado" : "⚪ Desconectado";
-        setText('p-online-status', isOnline);
+        // Lógica real de Online/Offline con la regla de latidos (Heartbeat)
+let isOnlineText = "⚪ Offline";
+let bgStatus = "rgba(0,0,0,0.5)"; // Fondo gris por defecto
+
+if (d.lastActive) {
+    const timeSinceLastSignal = Date.now() - d.lastActive;
+    // Si la última señal fue hace menos de 25 segundos (15s de latido + 10s de margen por lag de internet)
+    if (timeSinceLastSignal <= 25000) {
+        isOnlineText = "🟢 Conectado";
+        bgStatus = "rgba(0, 255, 0, 0.15)"; // Fondo verdecito brillante
+    }
+} else if (d.online === true) { 
+    // Respaldo por si usabas un booleano en lugar de tiempo
+    isOnlineText = "🟢 Conectado";
+    bgStatus = "rgba(0, 255, 0, 0.15)";
+}
+
+const statusEl = document.getElementById('p-online-status');
+if (statusEl) {
+    statusEl.innerText = isOnlineText;
+    statusEl.style.background = bgStatus;
+    if(isOnlineText.includes('Conectado')) {
+        statusEl.style.border = "1px solid var(--good)";
+        statusEl.style.color = "var(--good)";
+    } else {
+        statusEl.style.border = "1px solid #444";
+        statusEl.style.color = "#aaa";
+    }
+}
         setText('p-custom-status', d.customStatus || "");
         setText('p-bio', d.bio || "Este usuario no ha escrito una biografía.");
 
