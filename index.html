@@ -496,6 +496,28 @@
                             <input type="checkbox" id="chk-hide-items">
                             <label for="chk-hide-items" style="margin-left:10px; color:white;">Ocultar mis Ítems a los demás</label>
                         </div>
+
+                        <div id="custom-tag-creator" style="display:none; background:rgba(255,102,170,0.1); border: 1px solid var(--accent); padding:15px; border-radius:10px; margin-bottom:20px;">
+    <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">🎟️ CREADOR DE TAG CUSTOM</div>
+    <input type="text" id="inp-tag-text" class="log-inp" placeholder="Texto del Tag (Max 12 letras)" maxlength="12">
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <div style="flex:1;">
+            <label style="font-size:0.8rem; color:#aaa;">Color Fondo</label>
+            <input type="color" id="inp-tag-bg" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+        </div>
+        <div style="flex:1;">
+            <label style="font-size:0.8rem; color:#aaa;">Color Letra</label>
+            <input type="color" id="inp-tag-color" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+        </div>
+    </div>
+</div>
+
+<div style="margin-bottom:20px;">
+    <label style="color:#888; font-weight:bold; font-size:0.9rem;">Equipar Tag de mi Inventario</label>
+    <select id="sel-equip-tag" class="log-inp" style="background:#222; color:white; border:1px solid #444;" onchange="checkCustomTag()">
+        <option value="none">Ninguno</option>
+        </select>
+</div>
                         
                         <button class="action secondary" style="width:100%; margin-bottom:10px;" onclick="saveProfilePrivacy()">GUARDAR CAMBIOS</button>
                         
