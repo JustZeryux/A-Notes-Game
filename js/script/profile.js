@@ -38,6 +38,7 @@ window.updUI = function() {
         setStyle('m-av', 'backgroundImage', url); setStyle('p-av-big', 'backgroundImage', url); setStyle('ig-av', 'backgroundImage', url);
         const headerBg = document.getElementById('p-header-bg');
         if(headerBg) headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${url}`;
+        avatarElem.textContent = "";
     }
     if(user.bg) { const bg = document.getElementById('bg-image'); if(bg) { bg.src = user.bg; bg.style.opacity = 0.3; } }
 
