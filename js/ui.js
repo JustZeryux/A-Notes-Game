@@ -330,37 +330,68 @@ function switchSetTab(tab) {
         html += `<input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="loadMissSound(this)">`;
     }
 else if (tab === 'controls') {
-        // Generar opciones del selector
+        // 1. Generar opciones del selector de Notas
         let skinOptions = `<option value="default">Default (Sin Skin)</option>`;
+        // 2. Generar opciones del selector de Interfaz/Overlay (Marcos)
+        let uiOptions = `<option value="default">Default (Sin Marco)</option>`;
+
         if (user.inventory) {
             user.inventory.forEach(itemId => {
                 const item = SHOP_ITEMS.find(x => x.id === itemId);
-                if (item && item.type === 'skin') {
-                    const isEquipped = user.equipped && user.equipped.skin === item.id;
-                    skinOptions += `<option value="${item.id}" ${isEquipped ? 'selected' : ''}>${item.name}</option>`;
+                if (item) {
+                    // Cargar las skins de notas
+                    if (item.type === 'skin') {
+                        const isEquipped = user.equipped && user.equipped.skin === item.id;
+                        skinOptions += `<option value="${item.id}" ${isEquipped ? 'selected' : ''}>${item.name}</option>`;
+                    } 
+                    // Cargar los marcos / UI de tu tienda
+                    else if (item.type === 'ui' || item.type === 'overlay') { 
+                        const isEquipped = user.equipped && user.equipped.ui === item.id;
+                        uiOptions += `<option value="${item.id}" ${isEquipped ? 'selected' : ''}>${item.name}</option>`;
+                    }
                 }
             });
         }
 
         html += `
-        <div class="kb-tabs">
+        <div class="kb-tabs" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:15px;">
+            <div class="kb-tab" id="tab-1" onclick="renderLaneConfig(1)">1K</div>
+            <div class="kb-tab" id="tab-2" onclick="renderLaneConfig(2)">2K</div>
+            <div class="kb-tab" id="tab-3" onclick="renderLaneConfig(3)">3K</div>
             <div class="kb-tab active" id="tab-4" onclick="renderLaneConfig(4)">4K</div>
+            <div class="kb-tab" id="tab-5" onclick="renderLaneConfig(5)">5K</div>
             <div class="kb-tab" id="tab-6" onclick="renderLaneConfig(6)">6K</div>
             <div class="kb-tab" id="tab-7" onclick="renderLaneConfig(7)">7K</div>
+            <div class="kb-tab" id="tab-8" onclick="renderLaneConfig(8)">8K</div>
             <div class="kb-tab" id="tab-9" onclick="renderLaneConfig(9)">9K</div>
+            <div class="kb-tab" id="tab-10" onclick="renderLaneConfig(10)">10K</div>
         </div>
         
         <div class="lane-cfg-box">
             <div id="lanes-container" class="lanes-view"></div>
             
-            <div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
-                <div style="font-weight:900; color:var(--accent); margin-bottom:10px; font-size:1.2rem;">🎨 SKIN DE NOTAS</div>
-                <select class="skin-selector" onchange="equipSkinFromSettings(this.value)">
-                    ${skinOptions}
-                </select>
-                <div style="color:#888; font-size:0.9rem; margin-top:10px; font-style:italic;">
-                    ⚠️ Si usas una skin "Color Fijo", los colores de arriba serán ignorados.
+            <div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                
+                <div>
+                    <div style="font-weight:900; color:var(--accent); margin-bottom:10px; font-size:1.1rem;">🎨 SKIN DE NOTAS</div>
+                    <select class="skin-selector" onchange="equipSkinFromSettings(this.value)" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #ff66aa; border-radius:5px; outline:none; font-weight:bold;">
+                        ${skinOptions}
+                    </select>
+                    <div style="color:#888; font-size:0.8rem; margin-top:10px; font-style:italic;">
+                        ⚠️ Si usas una skin "Color Fijo", los colores de arriba serán ignorados.
+                    </div>
                 </div>
+
+                <div>
+                    <div style="font-weight:900; color:#00ffff; margin-bottom:10px; font-size:1.1rem;">🖼️ MARCOS DE UI</div>
+                    <select class="skin-selector" onchange="equipUIFromSettings(this.value)" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #00ffff; border-radius:5px; outline:none; font-weight:bold;">
+                        ${uiOptions}
+                    </select>
+                    <div style="color:#888; font-size:0.8rem; margin-top:10px; font-style:italic;">
+                        💡 Cambia los bordes y el aspecto de tu HUD durante el juego.
+                    </div>
+                </div>
+
             </div>
         </div>`;
         
@@ -370,7 +401,6 @@ else if (tab === 'controls') {
     content.innerHTML = html;
     updatePreview(); 
 }
-
 window.equipSkinFromSettings = function(skinId) {
     if (!user.equipped) user.equipped = {};
     user.equipped.skin = skinId;
@@ -410,6 +440,24 @@ function updatePreview() {
         ${splashHTML}
     `;
 }
+
+window.equipUIFromSettings = function(uiId) {
+    if(!window.user) return;
+    if(!window.user.equipped) window.user.equipped = {}; // Por si acaso no existe
+    
+    // Lo guardamos en tu personaje
+    window.user.equipped.ui = uiId;
+    
+    // Lo subimos a Firebase
+    if(window.db && window.user.username) {
+        window.db.collection('users').doc(window.user.username).update({
+            'equipped.ui': uiId
+        }).then(() => {
+            console.log("¡Marco equipado guardado en la nube!");
+            alert("¡Marco de interfaz equipado!");
+        });
+    }
+};
 // Helpers para generar HTML de los ajustes
 function renderToggle(label, key) {
     const val = cfg[key];
