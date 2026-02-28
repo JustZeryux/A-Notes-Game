@@ -108,9 +108,13 @@ window.toggleProfileSettings = function(show) {
 };
 
 window.showUserProfile = async function(targetName) {
-    if (!window.db) return;
-    window.toggleProfileSettings(false);
+    // Aseguramos que la base de datos esté lista
+    if (!window.db) {
+        console.error("Base de datos no inicializada.");
+        return notify("Error de conexión", "error");
+    }
     
+    window.toggleProfileSettings(false);
     const m = document.getElementById('modal-profile'); if(m) m.style.display='flex';
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
