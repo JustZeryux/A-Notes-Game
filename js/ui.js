@@ -226,7 +226,7 @@ function updUI() {
         // ¡APLICAMOS LA MAGIA VISUAL DEL MARCO UI!
         applyUIFrameVisuals(user.equipped.ui);
     }
-
+    }
     // --- GESTIÓN DE PANELES LOGIN/LOGOUT ---
     const isGoogle = user.pass === "google-auth";
     const locSet = document.getElementById('local-acc-settings');
