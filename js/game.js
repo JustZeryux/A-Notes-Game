@@ -982,3 +982,42 @@ window.initMobileTouchControls = function(keyCount) {
         touchContainer.appendChild(zone);
     }
 };
+
+window.updateSongProgress = function() {
+    // Si el juego no está corriendo o el motor de audio no está listo, no hacemos nada
+    if (typeof st === 'undefined' || !st.isPlaying || !st.ctx || !st.startTime) return;
+
+    // Calculamos el tiempo actual (Tiempo del motor de audio - Tiempo en el que empezó la canción)
+    let currentSec = st.ctx.currentTime - st.startTime;
+    
+    // Obtenemos la duración total del buffer de audio
+    let totalSec = st.audioBuffer ? st.audioBuffer.duration : 0; 
+    
+    // Evitamos números locos (negativos al inicio o que se pase del límite)
+    if (currentSec < 0) currentSec = 0;
+    if (totalSec > 0 && currentSec > totalSec) currentSec = totalSec;
+
+    // Formateamos los segundos a formato Reloj (Ej: 1:05)
+    let curM = Math.floor(currentSec / 60);
+    let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
+    let totM = Math.floor(totalSec / 60);
+    let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
+
+    // Actualizamos el texto en el HTML
+    const timeText = document.getElementById('top-progress-time');
+    if (timeText) {
+        // Solo mostramos si hay una canción cargada
+        if (totalSec > 0) {
+            timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
+        } else {
+            timeText.innerText = `0:00 / 0:00`;
+        }
+    }
+
+    // Actualizamos el ancho de la barra de progreso (fill)
+    const fillBar = document.getElementById('top-progress-fill');
+    if (fillBar && totalSec > 0) {
+        let percent = (currentSec / totalSec) * 100;
+        fillBar.style.width = `${percent}%`;
+    }
+};
