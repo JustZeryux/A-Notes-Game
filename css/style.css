@@ -1041,3 +1041,57 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     text-align: center; font-weight: bold; border: 2px solid #ffaa00; border-top: none;
     transition: top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* =========================================
+   PARCHE VISUAL: PAUSA, RESULTADOS Y ALERTA NEÓN
+========================================= */
+
+/* 1. Viñeta de Muerte Inminente (Pulsating Red) */
+#near-death-vignette {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 700; /* Debajo de las notas, pero sobre el HUD */
+    pointer-events: none; opacity: 0;
+    box-shadow: inset 0 0 150px 50px #F9393F; /* Rojo agresivo */
+    transition: opacity 0.3s ease;
+}
+#near-death-vignette.danger-active {
+    animation: vignettePulse 1.5s infinite ease-in-out;
+}
+@keyframes vignettePulse {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 0.8; }
+}
+
+/* 2. Rediseño de Modales (Pausa y Resultados) */
+.modal-overlay { z-index: 99999 !important; }
+
+#modal-pause .modal-panel, #modal-res .modal-panel {
+    width: 600px; padding: 0; background: #0a0a0a;
+    border-radius: 15px; border: 2px solid var(--accent);
+    box-shadow: 0 0 50px rgba(255,102,170,0.3);
+    overflow: hidden;
+}
+
+/* Encabezados de Modal */
+.modal-neon-header {
+    background: linear-gradient(180deg, #111, #0a0a0a);
+    padding: 20px 30px; border-bottom: 2px solid var(--accent);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.modal-neon-title { margin:0; color:white; font-weight:900; font-size:1.8rem; text-shadow: 0 0 10px white; }
+
+/* Contenido y Botones */
+.modal-neon-content { padding: 30px; text-align: center; }
+.modal-neon-buttons { padding: 20px 30px; background: #080808; border-top: 1px solid #222; display: flex; gap: 10px; }
+.modal-neon-buttons .action { flex: 1; }
+
+/* Estilos Específicos de Resultados */
+#modal-res .modal-neon-header { border-bottom-color: var(--gold); }
+#modal-res .rank-big { font-size: 6rem !important; font-weight: 900; }
+#modal-res #res-score { font-size: 4rem; font-weight: 900; }
+#modal-res #winner-msg { font-size: 2rem; color: #12FA05; margin-bottom: 20px; text-transform: uppercase; font-weight: 900; }
+#modal-res #loser-msg { font-size: 2rem; color: #F9393F; margin-bottom: 20px; text-transform: uppercase; font-weight: 900;}
+
+/* Cajas de Estadísticas */
+.res-stats-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:25px; }
+.res-stat-box { background:#111; padding:15px; border-radius:8px; border:1px solid #333; font-weight:bold; }
