@@ -76,51 +76,67 @@ window.renderUnifiedGrid = function() {
     let filtered = baseList.filter(song => {
         if (window.currentFilters.type === 'recent') return true; 
         if (window.currentFilters.type === 'com' && song.isOsu) return false;
+        
+        // Filtros de Osu!
         if (window.currentFilters.type === 'osu_mania' && (!song.isOsu || song.originalMode !== 'mania')) return false;
         if (window.currentFilters.type === 'osu_standard' && (!song.isOsu || song.originalMode !== 'standard')) return false;
         if (window.currentFilters.type === 'osu_taiko' && (!song.isOsu || song.originalMode !== 'taiko')) return false;
         if (window.currentFilters.type === 'osu_catch' && (!song.isOsu || song.originalMode !== 'catch')) return false;
-        if (window.currentFilters.key !== 'all' && song.originalMode === 'mania') { if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; }
+
+        // Si es Mania, aplicamos filtro de teclas. Si no es Mania, ignoramos el filtro de teclas.
+        if (window.currentFilters.key !== 'all' && (song.originalMode === 'mania' || !song.isOsu)) { 
+            if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
+        }
         return true;
     });
 
-    if (filtered.length === 0) { grid.innerHTML = `<div style="text-align:center; padding:50px; color:var(--gold); font-size:1.5rem;">No hay mapas aquí.</div>`; return; }
-
     filtered.forEach(song => {
-        let modeColor = '#00ffff'; let modeIcon = '☁️'; let modeText = 'COMUNIDAD';
+        let modeColor = '#00ffff'; let modeIcon = '☁️';
         if (song.isOsu) {
-            if (song.originalMode === 'standard') { modeColor = '#ff44b9'; modeIcon = '🎯'; modeText = 'STANDARD'; }
-            else if (song.originalMode === 'taiko') { modeColor = '#f95555'; modeIcon = '🥁'; modeText = 'TAIKO'; }
-            else if (song.originalMode === 'catch') { modeColor = '#44b9ff'; modeIcon = '🍎'; modeText = 'CATCH'; }
-            else { modeColor = '#ff66aa'; modeIcon = '🌸'; modeText = 'MANIA'; }
+            if (song.originalMode === 'standard') { modeColor = '#ff44b9'; modeIcon = '🎯'; }
+            else if (song.originalMode === 'taiko') { modeColor = '#f95555'; modeIcon = '🥁'; }
+            else if (song.originalMode === 'catch') { modeColor = '#44b9ff'; modeIcon = '🍎'; }
+            else { modeColor = '#ff66aa'; modeIcon = '🌸'; }
+        }
+
+        // --- CÁLCULO DE DIFICULTAD ---
+        let difficultyHTML = "";
+        if (song.isOsu) {
+            // Usar estrellas reales de Osu!
+            let stars = song.starRating || (song.raw?.beatmaps?.[0]?.difficulty_rating) || 0;
+            let starCol = stars >= 6 ? '#F9393F' : (stars >= 4 ? '#FFD700' : '#12FA05');
+            difficultyHTML = `<div class="diff-badge" style="border-color:${starCol}; color:${starCol}; background:rgba(0,0,0,0.8);">⭐ ${parseFloat(stars).toFixed(1)}</div>`;
+        } else {
+            // Calcular dificultad para comunidad: Notas / Duración
+            let noteCount = song.raw?.notes?.length || 0;
+            let duration = 180; // Default 3 min
+            let calcStars = Math.min(10, (noteCount / duration) * 0.5).toFixed(1);
+            difficultyHTML = `<div class="diff-badge" style="border-color:var(--gold); color:var(--gold);">⭐ ${calcStars}</div>`;
         }
 
         const card = document.createElement('div'); card.className = 'song-card'; 
-        card.style.cssText = `position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid ${modeColor}44; background: #111;`;
+        card.style.cssText = `position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid ${modeColor}33; background: #111; animation: fadeIn 0.5s ease-out;`;
         
-        // 🚨 SI ES MANIA MUESTRA TECLAS, SI ES OTRO MODO MUESTRA ESTRELLAS
-        let badgesHTML = "";
-        if (song.originalMode === 'mania' || !song.isOsu) {
-            badgesHTML = song.keysAvailable.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('');
-        } else {
-            let starCol = song.starRating >= 6 ? '#F9393F' : (song.starRating >= 4 ? '#FFD700' : '#12FA05');
-            badgesHTML = `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid ${starCol}; color: ${starCol}; border-radius: 5px; font-size: 0.8rem; font-weight: bold; background:rgba(0,0,0,0.8);">⭐ ${song.starRating}</div>`;
+        // 🚨 MOSTRAR TECLAS SOLO SI ES MANIA O COMUNIDAD
+        let keysHTML = "";
+        if (!song.isOsu || song.originalMode === 'mania') {
+            keysHTML = song.keysAvailable.map(k => `<div class="diff-badge" style="border-color:#00ffff; color:#00ffff;">${k}K</div>`).join('');
         }
 
-        badgesHTML += `<div class="diff-badge" style="margin-left:auto; border: 1px solid ${modeColor}; color: ${modeColor}; padding: 2px 8px; border-radius: 5px; font-size: 0.8rem; font-weight: bold; background: rgba(0,0,0,0.8);">${modeIcon} ${modeText}</div>`;
-
-        card.innerHTML = `<div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div><div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);"><div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div><div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">${song.artist}</div><div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">${badgesHTML}</div></div>`;
-        card.onmouseenter = () => { card.style.transform = 'scale(1.03)'; card.style.boxShadow = `0 0 20px ${modeColor}88`; };
-        card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.boxShadow = 'none'; };
+        card.innerHTML = `
+            <div class="song-bg" style="background-image: url('${song.imageURL}'), url('icon.png'); opacity: 0.7;"></div>
+            <div class="song-info" style="background: linear-gradient(to top, rgba(0,0,0,0.95), transparent);">
+                <div class="song-title">${song.title}</div>
+                <div class="song-author">${song.artist}</div>
+                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+                    ${difficultyHTML}
+                    ${keysHTML}
+                    <div class="diff-badge" style="margin-left:auto; border-color:${modeColor}; color:${modeColor}; background:rgba(0,0,0,0.8);">${modeIcon} ${song.originalMode?.toUpperCase() || 'MANIA'}</div>
+                </div>
+            </div>`;
+        
         card.onclick = () => { if(typeof window.openUnifiedDiffModal === 'function') window.openUnifiedDiffModal(song); };
         grid.appendChild(card);
     });
-
-    if (window.currentFilters.type !== 'recent') {
-        const loadMoreContainer = document.createElement('div'); loadMoreContainer.style.gridColumn = "1 / -1"; loadMoreContainer.style.textAlign = "center"; loadMoreContainer.style.padding = "30px";
-        loadMoreContainer.innerHTML = `<button id="btn-load-more" class="action btn-acc" style="width: 400px; padding: 15px; font-size: 1.2rem; border-radius: 12px;">⬇️ CARGAR MÁS ⬇️</button>`;
-        loadMoreContainer.querySelector('button').onclick = () => window.fetchUnifiedData(window.lastQuery, true);
-        grid.appendChild(loadMoreContainer);
-    }
 };
 window.renderMenu = function(filter="") { if(typeof window.fetchUnifiedData === 'function') window.fetchUnifiedData(filter); };
