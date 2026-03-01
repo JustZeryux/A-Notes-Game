@@ -881,50 +881,77 @@ window.toMenu = function() {
 };
 
 // === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS (V-FINAL) ===
+// === js/game.js - SISTEMA SWIPE FLUIDO PARA MÓVILES ===
 window.initMobileTouchControls = function(keyCount) {
-    let oldContainer = document.getElementById('mobile-touch-zones');
-    if (oldContainer) oldContainer.remove(); 
-
+    let oldContainer = document.getElementById('mobile-touch-zones'); if (oldContainer) oldContainer.remove(); 
     if (window.innerWidth > 800 && !('ontouchstart' in window)) return;
 
     const touchContainer = document.createElement('div');
     touchContainer.id = 'mobile-touch-zones';
-    touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 800; display: flex; flex-direction: row; pointer-events: auto;';
+    // touch-action: none es vital para que el navegador no intente hacer scroll al deslizar
+    touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 800; display: flex; flex-direction: row; touch-action: none; pointer-events: auto;';
     document.body.appendChild(touchContainer); 
 
     let currentKeys = [];
     if (window.cfg && window.cfg.modes && window.cfg.modes[keyCount]) {
-        for(let i = 0; i < keyCount; i++) currentKeys.push(window.cfg.modes[keyCount][i].k);
+        for(let i=0; i<keyCount; i++) currentKeys.push(window.cfg.modes[keyCount][i].k.toLowerCase());
     } else {
         currentKeys = keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k'];
     }
 
+    // Dibujar carriles visuales
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
-        zone.style.flex = '1';
-        zone.style.height = '100%';
+        zone.style.flex = '1'; zone.style.height = '100%';
         zone.style.borderRight = '1px solid rgba(255,255,255,0.05)';
-        
-        const targetKey = currentKeys[i].toLowerCase();
-
-        zone.addEventListener('touchstart', (e) => {
-            e.preventDefault(); 
-            zone.style.background = 'rgba(255,255,255,0.1)'; 
-            if(typeof window.onKd === 'function') window.onKd({ key: targetKey, preventDefault: ()=>{} });
-        }, { passive: false });
-
-        zone.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            zone.style.background = 'transparent';
-            if(typeof window.onKu === 'function') window.onKu({ key: targetKey, preventDefault: ()=>{} });
-        }, { passive: false });
-
-        zone.addEventListener('touchcancel', (e) => {
-            e.preventDefault();
-            zone.style.background = 'transparent';
-            if(typeof window.onKu === 'function') window.onKu({ key: targetKey, preventDefault: ()=>{} });
-        }, { passive: false });
-
         touchContainer.appendChild(zone);
     }
+
+    let activeTouches = {}; // Rastrea en qué carril está cada dedo
+
+    // Cálculo matemático ultra-rápido para saber en qué carril está el dedo
+    function getLane(x) {
+        return Math.max(0, Math.min(Math.floor((x / window.innerWidth) * keyCount), keyCount - 1));
+    }
+
+    function handleTouchMove(e) {
+        e.preventDefault();
+        for(let i = 0; i < e.changedTouches.length; i++) {
+            let t = e.changedTouches[i];
+            let newLane = getLane(t.clientX);
+            
+            // Si el dedo cambió de carril, soltamos la tecla vieja
+            if(activeTouches[t.identifier] !== undefined && activeTouches[t.identifier] !== newLane) {
+                let oldLane = activeTouches[t.identifier];
+                if(typeof window.onKu === 'function') window.onKu({ key: currentKeys[oldLane], preventDefault: ()=>{} });
+                if(touchContainer.children[oldLane]) touchContainer.children[oldLane].style.background = 'transparent';
+            }
+            
+            // Y presionamos la tecla nueva
+            if(activeTouches[t.identifier] !== newLane) {
+                activeTouches[t.identifier] = newLane;
+                touchContainer.children[newLane].style.background = 'rgba(255,255,255,0.1)';
+                if(typeof window.onKd === 'function') window.onKd({ key: currentKeys[newLane], preventDefault: ()=>{} });
+            }
+        }
+    }
+
+    function handleTouchEnd(e) {
+        e.preventDefault();
+        for(let i = 0; i < e.changedTouches.length; i++) {
+            let t = e.changedTouches[i];
+            let oldLane = activeTouches[t.identifier];
+            if(oldLane !== undefined) {
+                if(typeof window.onKu === 'function') window.onKu({ key: currentKeys[oldLane], preventDefault: ()=>{} });
+                if(touchContainer.children[oldLane]) touchContainer.children[oldLane].style.background = 'transparent';
+                delete activeTouches[t.identifier];
+            }
+        }
+    }
+
+    // Escuchar el deslizamiento sin interrupciones
+    touchContainer.addEventListener('touchstart', handleTouchMove, { passive: false });
+    touchContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+    touchContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
+    touchContainer.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 };
