@@ -200,16 +200,23 @@ window.renderLaneConfig = function(k) {
 // 3. ACTIVAR EL MODO DE ESPERA
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
-    if(!btn) return;
+    btn.blur(); btn.innerText = "...";
     
-    btn.blur(); // Quita el foco
-    btn.innerText = '?';
-    btn.style.background = '#F9393F';
-    btn.style.borderColor = '#ffaa00';
-    btn.style.boxShadow = '0 0 15px #F9393F';
-    
-    // Encendemos la trampa global
-    window.assigningKeyInfo = { k: k, lane: lane };
+    // CAPTURADOR GLOBAL (Evita que el juego o el navegador roben la tecla)
+    const keyHandler = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        
+        let key = e.key.toLowerCase();
+        if(e.code === "Space") key = " ";
+
+        window.cfg.modes[k][lane].k = key;
+        if(typeof save === 'function') save();
+
+        window.renderLaneConfig(k);
+        window.removeEventListener('keydown', keyHandler, true);
+    };
+
+    window.addEventListener('keydown', keyHandler, true); // El 'true' le da prioridad absoluta
 };
 
 window.updateLaneColor = function(k, l, color) { window.cfg.modes[k][l].c = color; if(typeof window.updatePreview === 'function') window.updatePreview(); };
