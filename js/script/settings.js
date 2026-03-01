@@ -125,6 +125,9 @@ window.updateCfgVal = function(key, val) {
 // ==========================================
 // EL MOTOR DE CONFIGURACIÓN DE TECLAS (BLINDADO)
 // ==========================================
+// ==========================================
+// EL MOTOR DE CONFIGURACIÓN DE TECLAS (REPARACIÓN ABSOLUTA)
+// ==========================================
 window.renderLaneConfig = function(k) {
     document.querySelectorAll('.kb-tab').forEach(b => b.classList.remove('active'));
     const t = document.getElementById('tab-'+k); if(t) t.classList.add('active');
@@ -142,18 +145,10 @@ window.renderLaneConfig = function(k) {
     for(let i=0; i<k; i++) {
         let l = window.cfg.modes[k][i];
         
-        // 🚨 AUTO-LIMPIADOR DE TECLAS VIEJAS
-        // Convierte "KeyD" en "d" y "Space" en " " para que game.js lo detecte perfectamente
-        if (typeof l.k === 'string') {
-            if (l.k.startsWith('Key')) l.k = l.k.replace('Key', '').toLowerCase();
-            if (l.k === 'Space') l.k = ' ';
-        } else {
-            l.k = ' ';
-        }
-        
-        // Formateo visual limpio para el botón (Ej: "d" -> "D", " " -> "SPC")
-        let displayKey = l.k.toUpperCase();
-        if(displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
+        // LIMPIADOR EXTREMO: Quita la palabra "Key" y "Space"
+        let displayKey = String(l.k).toUpperCase();
+        if (displayKey.startsWith('KEY')) displayKey = displayKey.replace('KEY', '');
+        if (displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
         
         html += `
         <div class="lane-col" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
@@ -178,35 +173,36 @@ window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
     if(!btn) return;
     
-    // 🚨 QUITA-FOCO: Evita que la tecla Espacio o Enter vuelvan a dar clic al botón por accidente
+    // Quitar el foco para que el clic no interfiera
     btn.blur(); 
     
-    // Estado de "Escuchando" (Rojo brillante)
     btn.innerText = '...';
     btn.style.background = '#F9393F';
     btn.style.borderColor = '#ffaa00';
     btn.style.boxShadow = '0 0 15px #F9393F';
     
-    const handler = function(e) {
-        // ESCUDO DE PRIORIDAD MÁXIMA: Evita que el juego u otros scripts roben la tecla
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
+    // EL TRUCO MAGICO: Esperar 200ms antes de escuchar el teclado
+    setTimeout(() => {
+        const handler = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
 
-        let newKey = e.key;
-        if(newKey === " ") newKey = " "; // Normalizar espacio
-        
-        // Guardamos la tecla exacta en minúscula (Como le gusta a game.js)
-        window.cfg.modes[k][lane].k = newKey.toLowerCase();
-        
-        // Remover el escuchador y volver a dibujar los botones limpios
-        window.removeEventListener('keydown', handler, true);
-        window.renderLaneConfig(k);
-        if(typeof window.updatePreview === 'function') window.updatePreview();
-    };
+            let newKey = e.key;
+            if(e.code === "Space") newKey = "Space";
+            
+            // Guardar configuración
+            window.cfg.modes[k][lane].k = newKey;
+            if(typeof save === 'function') save(); // Guardar en disco al instante
+            
+            // Remover el escuchador y redibujar
+            document.removeEventListener('keydown', handler, true);
+            window.renderLaneConfig(k);
+            if(typeof window.updatePreview === 'function') window.updatePreview();
+        };
 
-    // Al poner "true", escuchamos en "Fase de Captura", ganando prioridad absoluta ante cualquier otro archivo.
-    window.addEventListener('keydown', handler, true);
+        document.addEventListener('keydown', handler, true);
+    }, 200); // <-- Este pequeño retraso soluciona todo el congelamiento
 };
 
 window.updateLaneColor = function(k, l, color) { window.cfg.modes[k][l].c = color; if(typeof window.updatePreview === 'function') window.updatePreview(); };
