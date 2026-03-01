@@ -150,3 +150,61 @@ window.openFriends = function() {
         }
     });
 };
+// ==========================================================
+// PARCHE: SISTEMA DE CHAT Y DESAFÍOS PvP (GOD MODE)
+// ==========================================================
+
+// 1. Destruir el bucle infinito y crear un Chat Seguro
+window.openFloatingChat = function(targetUser) {
+    let chatBox = document.getElementById('global-chat-box');
+    if (!chatBox) {
+        chatBox = document.createElement('div');
+        chatBox.id = 'global-chat-box';
+        chatBox.style.cssText = 'position:fixed; bottom:20px; right:20px; width:320px; height:450px; background:#0a0a0a; border:2px solid var(--blue); border-radius:10px; z-index:999999; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,0.9); overflow:hidden; transition: 0.3s;';
+        document.body.appendChild(chatBox);
+    }
+    
+    chatBox.style.display = 'flex';
+    chatBox.innerHTML = `
+        <div style="background:linear-gradient(90deg, #111, var(--blue)); padding:15px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333;">
+            <strong style="color:white; font-size:1.1rem; text-shadow: 0 0 5px black;">💬 ${targetUser}</strong>
+            <button onclick="document.getElementById('global-chat-box').style.display='none'" style="background:none; border:none; color:white; font-weight:bold; cursor:pointer; font-size:1.2rem;">X</button>
+        </div>
+        <div id="chat-messages-area" style="flex:1; overflow-y:auto; padding:15px; color:#ccc; font-size:0.9rem; display:flex; flex-direction:column; gap:10px; background:#111;">
+            <div style="text-align:center; color:#666; font-size:0.8rem; padding:10px; background:rgba(0,0,0,0.5); border-radius:5px;">Conectando con ${targetUser}...</div>
+        </div>
+        <div style="padding:10px; display:flex; gap:5px; background:#050505; border-top:1px solid #222;">
+            <input type="text" id="chat-input-msg" style="flex:1; background:#222; border:1px solid #444; color:white; padding:10px; border-radius:5px; outline:none;" placeholder="Escribe aquí..." onkeydown="if(event.key==='Enter') window.sendDirectMsg('${targetUser}')">
+            <button class="action" style="width:auto; padding:10px 15px; background:var(--blue); color:white;" onclick="window.sendDirectMsg('${targetUser}')">▶</button>
+        </div>
+    `;
+    setTimeout(() => document.getElementById('chat-input-msg').focus(), 100);
+};
+
+window.sendDirectMsg = function(target) {
+    const inp = document.getElementById('chat-input-msg');
+    const txt = inp.value.trim();
+    if(!txt) return;
+    
+    const area = document.getElementById('chat-messages-area');
+    area.innerHTML += `<div style="align-self:flex-end; background:var(--blue); color:white; padding:8px 12px; border-radius:12px 12px 0 12px; max-width:80%; word-wrap:break-word; box-shadow:0 2px 5px rgba(0,0,0,0.5);">${txt}</div>`;
+    inp.value = '';
+    area.scrollTop = area.scrollHeight;
+    
+    // Aquí se conectaría con Firebase para enviar a la base de datos (Futura BD de mensajes)
+    if(window.notify) window.notify("Mensaje enviado a " + target, "success");
+};
+
+// 2. Sistema de Desafíos (PvP)
+window.challengeUser = function(targetName) {
+    // Definimos a quién vamos a desafiar
+    window.lobbyTargetFriend = targetName;
+    
+    // Abrimos el selector de canciones igual que cuando creas una sala
+    window.notify(`⚔️ Preparando desafío contra ${targetName}... Elige un mapa.`, "info");
+    if (typeof openSongSelectorForLobby === 'function') {
+        openSongSelectorForLobby();
+    } else {
+        alert("Error: multiplayer.js no está cargado correctamente.");
+    }
+};
