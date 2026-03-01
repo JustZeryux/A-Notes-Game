@@ -1,4 +1,4 @@
-/* === js/engine_catch.js - MOTOR CATCH THE BEAT PRO 🍎 === */
+/* === js/engine_catch.js - MOTOR CATCH THE BEAT PRO 🍎 (FIXED) === */
 
 window.startCatchEngine = async function(songObj) {
     const loader = document.getElementById('loading-overlay');
@@ -21,7 +21,10 @@ window.startCatchEngine = async function(songObj) {
         if (loader) loader.style.display = 'none';
         document.getElementById('menu-container').classList.add('hidden');
         runCatchGame(audioBuffer, parsed.hitObjects, songObj);
-    } catch (e) { alert("Error Catch: " + e.message); if(loader) loader.style.display='none'; }
+    } catch (e) { 
+        alert("Error Catch: " + e.message); 
+        if(loader) loader.style.display='none'; 
+    }
 };
 
 function parseCatchMap(text) {
@@ -42,11 +45,20 @@ function runCatchGame(audioBuffer, map, songObj) {
     document.getElementById('game-layer').style.display = 'none';
     window.st.act = true; window.st.paused = false;
 
-    let canvas = document.getElementById('std-canvas'); 
+    // === SOLUCIÓN AL CRASHEO: CREAR EL CANVAS SI NO EXISTE ===
+    let canvas = document.getElementById('catch-canvas'); 
+    if (!canvas) {
+        canvas = document.createElement('canvas'); 
+        canvas.id = 'catch-canvas';
+        canvas.style.cssText = 'position:fixed; top:0; left:0; z-index:8000;';
+        document.body.appendChild(canvas);
+    }
     canvas.style.display = 'block';
     const ctx = canvas.getContext('2d');
 
-    let ui = document.getElementById('catch-ui') || document.createElement('div');
+    let ui = document.getElementById('catch-ui');
+    if (ui) ui.remove(); // Limpiar UI anterior por si acaso
+    ui = document.createElement('div');
     ui.id = 'catch-ui'; ui.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; z-index:9000; pointer-events:none;";
     
     const avUrl = (window.user && window.user.avatarData) ? window.user.avatarData : 'icon.png';
@@ -178,8 +190,10 @@ function runCatchGame(audioBuffer, map, songObj) {
         document.getElementById('ct-acc').innerText = acc + "%";
         
         const hpBar = document.getElementById('engine-hp-fill');
-        hpBar.style.width = Math.max(0, window.st.hp) + "%";
-        hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
+        if (hpBar) {
+            hpBar.style.width = Math.max(0, window.st.hp) + "%";
+            hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
+        }
         
         const vign = document.getElementById('near-death-vignette');
         if(window.st.hp < 20) vign.style.opacity = '0.8'; else vign.style.opacity = '0';
@@ -195,7 +209,14 @@ function runCatchGame(audioBuffer, map, songObj) {
     };
     window.onkeydown = (e) => handleKey(e, true);
     window.onkeyup = (e) => handleKey(e, false);
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    
+    // Auto-ajustar al inicio
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
     function toggleEnginePause() {
         window.st.paused = !window.st.paused;
@@ -227,6 +248,7 @@ function runCatchGame(audioBuffer, map, songObj) {
         try{ window.st.src.stop(); }catch(e){}
         canvas.style.display = 'none'; ui.remove();
         window.onkeydown = null; window.onkeyup = null;
+        window.removeEventListener('resize', resizeCanvas);
         
         const modal = document.getElementById('modal-res');
         if(modal) {
