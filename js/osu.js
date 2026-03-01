@@ -77,19 +77,59 @@ window.searchOsu = async function() {
         status.style.color = "var(--miss)";
     }
 };
-window.downloadAndPlayOsu = async function(setId, title, coverUrl, targetKeys) {
-    if(typeof JSZip === 'undefined') return alert("Error: JSZip no está cargado.");
-    
+window.downloadAndPlayOsu = async function(setId, title, imageURL, k) {
     const loader = document.getElementById('loading-overlay');
-    const loaderText = document.getElementById('loading-text');
-    loader.style.display = 'flex';
-    
-    try {
-        loaderText.innerText = "DESCARGANDO MAPA DE OSU!... 🌐";
-        const res = await fetch(`https://api.nerinyan.moe/d/${setId}`);
-        const blob = await res.blob();
+    if (loader) {
+        loader.style.display = 'flex';
+        document.getElementById('loading-text').innerText = "DESCARGANDO MAPA DE OSU!...";
+    }
 
-        loaderText.innerText = "DESCOMPRIMIENDO MAPA... 📦";
+    try {
+        // ========================================================
+        // 🚨 FIX 2: SISTEMA DE DESCARGA MULTI-MIRROR ANTI-CORRUPCIÓN
+        // ========================================================
+        const mirrors = [
+            `https://api.nerinyan.moe/d/${setId}`,
+            `https://catboy.best/d/${setId}`,
+            `https://api.chimu.moe/v1/download/${setId}`
+        ];
+
+        let response = null;
+        let downloaded = false;
+
+        // Intentar descargar probando un servidor a la vez
+        for (let url of mirrors) {
+            try {
+                console.log("Intentando descargar de: " + url);
+                response = await fetch(url);
+                if (response.ok) {
+                    downloaded = true;
+                    break; // Si tiene éxito, salimos del ciclo
+                }
+            } catch (e) {
+                console.warn("Falló el servidor: " + url);
+            }
+        }
+
+        if (!downloaded || !response) {
+            if (loader) loader.style.display = 'none';
+            alert("Los servidores de Osu! están saturados en este momento. Intenta con otra canción o más tarde.");
+            return;
+        }
+
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // Verificación de seguridad: Asegurarse de que SÍ es un ZIP (Empieza con "PK")
+        const header = new Uint8Array(arrayBuffer.slice(0, 4));
+        if (header[0] !== 80 || header[1] !== 75) { // 80 75 = "PK" en ASCII
+            if (loader) loader.style.display = 'none';
+            alert("El archivo descargado está corrupto o fue bloqueado por el servidor. Intenta con otra canción.");
+            return;
+        }
+
+        if (loader) {
+            document.getElementById('loading-text').innerText = "PROCESANDO MAPA...";
+        }
         const zip = await JSZip.loadAsync(blob);
         const files = Object.keys(zip.files);
         
