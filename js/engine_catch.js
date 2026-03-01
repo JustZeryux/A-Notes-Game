@@ -1,6 +1,9 @@
-/* === js/engine_catch.js - CATCH PRO (LAG-FREE + GAME.JS UI) 🍎 === */
+/* ==========================================================================
+   ENGINE CATCH V-PRO (CRASH FIXED + SKINS + LYRICS + MOBILE UI) 🍎
+   ========================================================================== */
 
 window.startCatchEngine = async function(songObj) {
+    if(window.currentLobbyId) window.isMultiplayer = true;
     const loader = document.getElementById('loading-overlay');
     if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO FRUTAS..."; }
 
@@ -21,6 +24,18 @@ window.startCatchEngine = async function(songObj) {
 
         if (loader) loader.style.display = 'none';
         document.getElementById('menu-container').classList.add('hidden');
+        
+        if (window.cfg && window.cfg.subtitles && !songObj.lyrics) {
+            try {
+                let cleanTitle = songObj.title.replace(/\([^)]*\)/g, '').trim();
+                const r2 = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
+                const data = await r2.json();
+                const bestMatch = data.find(s => s.syncedLyrics);
+                if (bestMatch) songObj.lyrics = bestMatch.syncedLyrics;
+            } catch(e) {}
+        }
+
+        if(window.currentLobbyId && typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         runCatchGame(audioBuffer, parsed.hitObjects, songObj);
     } catch (e) { alert("Error Catch: " + e.message); if(loader) loader.style.display='none'; }
 };
@@ -47,7 +62,7 @@ function runCatchGame(audioBuffer, map, songObj) {
     if (!canvas) {
         canvas = document.createElement('canvas'); 
         canvas.id = 'catch-canvas';
-        canvas.style.cssText = 'position:fixed; top:0; left:0; z-index:8000;';
+        canvas.style.cssText = 'position:fixed; top:0; left:0; z-index:8000; touch-action:none;';
         document.body.appendChild(canvas);
     }
     canvas.style.display = 'block';
@@ -78,40 +93,70 @@ function runCatchGame(audioBuffer, map, songObj) {
         <div style="position:absolute; top:20px; right:30px; text-align:right;">
             <div id="ct-score" style="color:white; font-size:4rem; font-weight:900; text-shadow:0 0 15px white; line-height:1;">0</div>
             <div id="ct-acc" style="color:#00ffff; font-size:2rem; font-weight:bold;">100.00%</div>
+            <div id="hud-fc" style="color:cyan; font-size:1.2rem; font-weight:bold; margin-top:5px;">PFC</div>
         </div>
         <div id="ct-combo" style="position:absolute; bottom:30px; left:30px; color:white; font-size:6rem; font-weight:900; text-shadow:0 0 30px #00ffff;">0x</div>
-        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s;"></div>
+        <div id="subtitles-container" style="position:absolute; bottom:25%; left:0; width:100%; text-align:center; display:none;">
+            <div id="subtitles-text" style="display:inline-block; background:rgba(0,0,0,0.7); padding:10px 20px; border-radius:10px; color:white; font-size:2rem; font-weight:bold; border:2px solid var(--blue); text-shadow:0 0 10px var(--blue);"></div>
+        </div>
+        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s; box-shadow: inset 0 0 150px 50px rgba(249,57,63,0.8);"></div>
+        
+        <div id="ct-mobile-controls" style="position:absolute; bottom:20px; right:20px; display:none; pointer-events:auto; gap:10px; z-index:9100;">
+            <button id="btn-left" style="width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; font-size:2rem; border:2px solid white;">◀</button>
+            <button id="btn-dash" style="width:70px; height:70px; border-radius:50%; background:rgba(255,0,85,0.4); color:white; font-size:1rem; border:2px solid #ff0055; font-weight:bold;">DASH</button>
+            <button id="btn-right" style="width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; font-size:2rem; border:2px solid white;">▶</button>
+        </div>
     `;
     document.body.appendChild(ui);
 
+    if('ontouchstart' in window) document.getElementById('ct-mobile-controls').style.display = 'flex';
+
+    // VARIABLES MAESTRAS (EVITAR CRASHEO DE STATS)
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
-    window.st.stats = { s:0, g:0, b:0, m:0 };
+    window.st.stats = { s:0, g:0, b:0, m:0 }; // s = caught, m = missed
+    window.st.fcStatus = "PFC";
     window.st.trueMaxScore = map.length * 300;
-    let stats = { catcherX: 256, speed: 10 };
+    let catcherX = 256; let speed = 10;
     let keys = { left: false, right: false, shift: false };
     let isRunning = true;
     const catcherWidth = 100;
     
-    // COLA DE FRUTAS
     window.st.nextNote = 0;
     window.st.spawned = [];
-    
-    let dashTrail = [];
-    let particles = [];
+    let dashTrail = []; let particles = [];
+
+    // Skin
+    let activeSkin = null;
+    if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    }
+
+    if (window.cfg && window.cfg.subtitles && songObj.lyrics) {
+        document.getElementById('subtitles-container').style.display = 'block';
+        window.st.parsedLyrics = []; window.st.currentLyricIdx = 0;
+        const lines = songObj.lyrics.split('\n');
+        lines.forEach(l => {
+            const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/);
+            if(match) window.st.parsedLyrics.push({ t: (parseInt(match[1])*60 + parseFloat(match[2])) * 1000, tx: match[3].trim() });
+        });
+        window.st.parsedLyrics.sort((a,b) => a.t - b.t);
+    }
 
     const bgImg = new Image(); if(songObj.imageURL) bgImg.src = songObj.imageURL;
 
     if(window.st.src) try { window.st.src.stop(); } catch(e){}
     window.st.src = window.st.ctx.createBufferSource();
-    window.st.src.buffer = audioBuffer; window.st.src.connect(window.st.ctx.destination);
+    window.st.src.buffer = audioBuffer; 
+    const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
+    window.st.src.connect(g); g.connect(window.st.ctx.destination);
+    
     window.st.t0 = window.st.ctx.currentTime;
     window.st.src.start(window.st.t0 + 3);
     window.st.src.onended = () => { if(isRunning && window.st.act) endEngine(false); };
 
     function spawnExplosion(x, y) {
-        for(let i=0; i<10; i++) {
-            particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1 });
-        }
+        if(particles.length > 20) particles.splice(0,5);
+        for(let i=0; i<8; i++) particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1 });
     }
 
     function loop() {
@@ -119,8 +164,18 @@ function runCatchGame(audioBuffer, map, songObj) {
         if(window.st.paused) { window.st.animId = requestAnimationFrame(loop); return; }
 
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        
-        // COLA: Extraer frutas necesarias del mapa
+        let songTime = now - 3000;
+
+        if (window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
+            let idx = window.st.currentLyricIdx;
+            if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
+                const subEl = document.getElementById('subtitles-text');
+                subEl.innerText = window.st.parsedLyrics[idx].tx;
+                subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
+                window.st.currentLyricIdx++;
+            }
+        }
+
         while(window.st.nextNote < map.length && map[window.st.nextNote].t - now <= 1500) {
             window.st.spawned.push(map[window.st.nextNote]);
             window.st.nextNote++;
@@ -129,16 +184,16 @@ function runCatchGame(audioBuffer, map, songObj) {
         ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.globalAlpha = 0.3;
+        ctx.globalAlpha = (window.cfg && window.cfg.bgEffects === false) ? 0.05 : 0.25;
         if(bgImg.complete) ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
         ctx.globalAlpha = 1.0;
 
-        let currentSpeed = keys.shift ? stats.speed * 2.5 : stats.speed;
-        if(keys.left) stats.catcherX = Math.max(0, stats.catcherX - currentSpeed);
-        if(keys.right) stats.catcherX = Math.min(512, stats.catcherX + currentSpeed);
+        let currentSpeed = keys.shift ? speed * 2.5 : speed;
+        if(keys.left) catcherX = Math.max(0, catcherX - currentSpeed);
+        if(keys.right) catcherX = Math.min(512, catcherX + currentSpeed);
 
         const scale = canvas.height / 600; 
-        const screenCatcherX = (canvas.width / 2) + (stats.catcherX - 256) * scale;
+        const screenCatcherX = (canvas.width / 2) + (catcherX - 256) * scale;
         const catcherY = canvas.height - 100;
 
         if (keys.shift && (keys.left || keys.right)) dashTrail.push({ x: screenCatcherX, life: 1 });
@@ -151,10 +206,9 @@ function runCatchGame(audioBuffer, map, songObj) {
         }
         ctx.globalAlpha = 1.0;
 
-        ctx.fillStyle = keys.shift ? '#ff0055' : '#00e5ff';
-        ctx.shadowBlur = 20; ctx.shadowColor = ctx.fillStyle;
+        let baseColor = activeSkin && activeSkin.fixed ? activeSkin.color : '#00e5ff';
+        ctx.fillStyle = keys.shift ? '#ff0055' : baseColor;
         ctx.fillRect(screenCatcherX - (catcherWidth*scale/2), catcherY, catcherWidth*scale, 15);
-        ctx.shadowBlur = 0;
 
         for(let i=particles.length-1; i>=0; i--) {
             let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
@@ -170,7 +224,7 @@ function runCatchGame(audioBuffer, map, songObj) {
             const timeDiff = f.t - now;
 
             if (timeDiff < -100) {
-                f.missed = true; window.st.cmb = 0; window.st.stats.m++; window.st.hp -= 10;
+                f.missed = true; window.st.cmb = 0; window.st.stats.m++; window.st.hp -= 10; window.st.fcStatus = "CLEAR";
                 window.st.spawned.splice(i, 1);
                 updateHUD(); checkDeath();
                 continue;
@@ -180,7 +234,7 @@ function runCatchGame(audioBuffer, map, songObj) {
             const y = ((dropTime - timeDiff) / dropTime) * catcherY;
 
             ctx.beginPath(); ctx.arc(x, y, 20 * scale, 0, Math.PI * 2);
-            ctx.fillStyle = '#ff44aa'; ctx.fill();
+            ctx.fillStyle = activeSkin && activeSkin.fixed ? activeSkin.color : '#ff44aa'; ctx.fill();
             ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
 
             if(y >= catcherY - 20 && y <= catcherY + 10) {
@@ -201,21 +255,20 @@ function runCatchGame(audioBuffer, map, songObj) {
     function updateHUD() {
         document.getElementById('ct-score').innerText = window.st.sc.toLocaleString();
         document.getElementById('ct-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
-        const total = window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m;
+        const total = window.st.stats.s + window.st.stats.m;
         const acc = total > 0 ? ((window.st.stats.s / total) * 100).toFixed(2) : "100.00";
         document.getElementById('ct-acc').innerText = acc + "%";
         
+        const fcEl = document.getElementById('hud-fc');
+        fcEl.innerText = window.st.fcStatus; 
+        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
+
         const hpBar = document.getElementById('engine-hp-fill');
-        if (hpBar) {
-            hpBar.style.width = Math.max(0, window.st.hp) + "%";
-            hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
-        }
+        if (hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
         
         const vign = document.getElementById('near-death-vignette');
-        if(vign) {
-            if(window.st.hp < 20) vign.classList.add('danger-active');
-            else vign.classList.remove('danger-active');
-        }
+        if(vign) { if(window.st.hp < 20) vign.style.opacity = '1'; else vign.style.opacity = '0'; }
+        if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
     }
 
     window.st.ctKeyHandler = (e, down) => {
@@ -224,6 +277,13 @@ function runCatchGame(audioBuffer, map, songObj) {
         if(e.key === "Shift") keys.shift = down;
         if(down && e.key === "Escape") { e.preventDefault(); window.toggleEnginePause(); }
     };
+    
+    // Controles Móviles
+    const btnL = document.getElementById('btn-left'); const btnR = document.getElementById('btn-right'); const btnD = document.getElementById('btn-dash');
+    if(btnL) { btnL.ontouchstart = (e) => { e.preventDefault(); keys.left = true; }; btnL.ontouchend = (e) => { e.preventDefault(); keys.left = false; }; }
+    if(btnR) { btnR.ontouchstart = (e) => { e.preventDefault(); keys.right = true; }; btnR.ontouchend = (e) => { e.preventDefault(); keys.right = false; }; }
+    if(btnD) { btnD.ontouchstart = (e) => { e.preventDefault(); keys.shift = true; }; btnD.ontouchend = (e) => { e.preventDefault(); keys.shift = false; }; }
+
     window.st.ctResizeHandler = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     window.st.ctResizeHandler();
 
@@ -236,14 +296,14 @@ function runCatchGame(audioBuffer, map, songObj) {
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
         let vign = document.getElementById('near-death-vignette');
-        if(vign) vign.classList.remove('danger-active');
+        if(vign) vign.style.opacity = '0';
 
         if(window.st.paused) {
             window.st.pauseTime = performance.now();
             if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
             if(modal) {
                 modal.style.setProperty('display', 'flex', 'important'); modal.style.setProperty('z-index', '999999', 'important');
-                const total = window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m;
+                const total = window.st.stats.s + window.st.stats.m;
                 const acc = total > 0 ? ((window.st.stats.s / total) * 100).toFixed(2) : "100.00";
                 
                 modal.querySelector('.modal-panel').innerHTML = `
@@ -277,12 +337,10 @@ function runCatchGame(audioBuffer, map, songObj) {
         cancelAnimationFrame(window.st.animId);
         try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
         
-        // El onkeyup/down está global en este ejemplo pero se limpiará visualmente
         window.removeEventListener('resize', window.st.ctResizeHandler);
 
         canvas.style.display = 'none'; ui.remove();
-        let vign = document.getElementById('near-death-vignette');
-        if(vign) vign.classList.remove('danger-active');
+        if(window.isMultiplayer) return;
         
         const modal = document.getElementById('modal-res');
         if(modal) {
