@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODAL.JS - Selector de Modos (SOPORTE PARA EL MULTIVERSO)
+   DIFF_MODAL.JS - Selector de Modos (Protegido contra Crashes)
    ========================================================== */
 
 window.openUnifiedDiffModal = function(song) {
@@ -15,34 +15,36 @@ window.openUnifiedDiffModal = function(song) {
     grid.style.overflowY = 'auto';
     grid.style.padding = '5px';
     
+    // RED DE SEGURIDAD: Si el mapa no trae modo, asumimos que es Mania
+    let safeMode = song.originalMode ? song.originalMode : 'mania';
+
     // 1. SI ES UN MAPA DE OSU STANDARD, TAIKO O CATCH (Nuevos Motores)
-    if (song.isOsu && song.originalMode !== 'mania') {
+    if (song.isOsu && safeMode !== 'mania') {
         let btn = document.createElement('div');
         btn.className = 'diff-card';
-        btn.style.gridColumn = "1 / -1"; // Ocupar todo el ancho
+        btn.style.gridColumn = "1 / -1"; 
         
-        if (song.originalMode === 'standard') {
+        if (safeMode === 'standard') {
             btn.style.borderColor = "#ff44b9"; btn.style.color = "#ff44b9";
             btn.innerHTML = `<div class="diff-bg-icon">🎯</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">🎯 STANDARD</div><div class="diff-label">Apuntar y Hacer Clic</div>`;
         } 
-        else if (song.originalMode === 'taiko') {
+        else if (safeMode === 'taiko') {
             btn.style.borderColor = "#f95555"; btn.style.color = "#f95555";
             btn.innerHTML = `<div class="diff-bg-icon">🥁</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">🥁 TAIKO</div><div class="diff-label">Tambores Rojos y Azules</div>`;
         }
-        else if (song.originalMode === 'catch') {
+        else if (safeMode === 'catch') {
             btn.style.borderColor = "#44b9ff"; btn.style.color = "#44b9ff";
             btn.innerHTML = `<div class="diff-bg-icon">🍎</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">🍎 CATCH</div><div class="diff-label">Atrapar las Frutas</div>`;
         }
 
         btn.onclick = () => {
             window.closeModal('diff');
-            window.notify("Iniciando Motor: " + song.originalMode.toUpperCase() + "...", "info");
+            window.notify("Iniciando Motor: " + safeMode.toUpperCase() + "...", "info");
             
-            // AQUI CONECTAREMOS LOS NUEVOS MOTORES EN EL SIGUIENTE PASO
             if (typeof startNewEngine === 'function') {
                 startNewEngine(song);
             } else {
-                alert(`El motor para ${song.originalMode.toUpperCase()} está en construcción. ¡Pronto en la próxima actualización!`);
+                alert(`El motor para ${safeMode.toUpperCase()} está en construcción.`);
             }
         };
         grid.appendChild(btn);
@@ -87,7 +89,6 @@ window.openUnifiedDiffModal = function(song) {
         });
     }
 
-    // Botón de Editor (Solo mapas de la comunidad)
     if (!song.isOsu) {
         let editBtn = document.createElement('div');
         editBtn.className = 'diff-card'; 
