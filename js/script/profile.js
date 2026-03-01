@@ -86,12 +86,41 @@ window.updUI = function() {
 window.toggleProfileSettings = function(show) {
     const mainView = document.getElementById('profile-main-stats'); 
     const settingsView = document.getElementById('profile-account-settings');
+    
     if(mainView && settingsView) {
         mainView.style.display = show ? 'none' : 'block'; 
         settingsView.style.display = show ? 'block' : 'none';
+        
+        // POBLAR INVENTARIO DE TAGS AL ABRIR LOS AJUSTES
+        if (show) {
+            const sel = document.getElementById('sel-equip-tag');
+            if (sel && window.user && window.user.inventory) {
+                sel.innerHTML = '<option value="none">Ninguno</option>';
+                
+                // Agregar Ticket Custom si lo compró
+                if (window.user.inventory.includes('tag_custom')) {
+                    sel.innerHTML += `<option value="tag_custom">🎟️ TAG CUSTOM</option>`;
+                }
+                
+                // Agregar los tags normales
+                window.user.inventory.forEach(itemId => {
+                    if (itemId.startsWith('tag_') && itemId !== 'tag_custom') {
+                        const item = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS.find(x => x.id === itemId) : null;
+                        if (item) sel.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                    }
+                });
+                
+                // Seleccionar el que tiene equipado actualmente
+                if (window.user.equipped && window.user.equipped.tag) {
+                    sel.value = window.user.equipped.tag;
+                }
+                
+                // Mostrar el creador de custom si está seleccionado
+                if(typeof checkCustomTag === 'function') checkCustomTag();
+            }
+        }
     }
 };
-
 // 4. MOSTRAR EL PERFIL CON ESTADOS Y ANIMACIONES ÉPICAS
 
                 
