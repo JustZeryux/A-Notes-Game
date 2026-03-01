@@ -1,8 +1,8 @@
-/* === js/engine_standard.js - MOTOR STANDARD ULTRA HD 🎯 === */
+/* === js/engine_standard.js - MOTOR STANDARD OPTIMIZADO 🎯 (NO LAG/CRASH) === */
 
 window.startNewEngine = async function(songObj) {
     const loader = document.getElementById('loading-overlay');
-    if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO MOTOR STANDARD..."; }
+    if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO STANDARD..."; }
 
     try {
         let response = null;
@@ -22,7 +22,9 @@ window.startNewEngine = async function(songObj) {
         const audioKey = files.find(f => f.toLowerCase().includes(parsed.audioFile.toLowerCase()));
         const audioArrayBuffer = await (await zip.file(audioKey).async("blob")).arrayBuffer();
         
-        if(!window.st.ctx) { window.st.ctx = new (window.AudioContext || window.webkitAudioContext)(); window.st.ctx.resume(); }
+        if(!window.st.ctx) { window.st.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+        if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
+        
         const audioBuffer = await window.st.ctx.decodeAudioData(audioArrayBuffer);
 
         if (loader) loader.style.display = 'none';
@@ -61,6 +63,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     document.getElementById('game-layer').style.display = 'none';
     window.st.act = true; window.st.paused = false;
 
+    // CREACIÓN LIMPIA DEL CANVAS
     let canvas = document.getElementById('std-canvas');
     if (!canvas) {
         canvas = document.createElement('canvas'); canvas.id = 'std-canvas';
@@ -68,7 +71,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         document.body.appendChild(canvas);
     }
     canvas.style.display = 'block';
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false }); // Optimización: Fondo opaco mejora rendimiento
 
     let uiLayer = document.getElementById('std-ui-layer');
     if(uiLayer) uiLayer.remove();
@@ -82,13 +85,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
     uiLayer.innerHTML = `
         <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; backdrop-filter:blur(8px);">
-            <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white; box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
+            <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white;"></div>
             <div style="display:flex; flex-direction:column; justify-content:center; padding-right:10px;">
                 <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; letter-spacing:1px; line-height:1;">${uName}</div>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
                     <div style="color:var(--gold); font-weight:900; font-size:0.7rem;">LVL ${uLvl}</div>
-                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333; box-shadow:inset 0 0 5px black;">
-                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s; box-shadow:0 0 10px var(--good);"></div>
+                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333;">
+                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s;"></div>
                     </div>
                 </div>
             </div>
@@ -99,7 +102,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         </div>
         <div id="std-combo" style="position:absolute; bottom:20px; left:30px; color:white; font-size:5rem; font-weight:900; text-shadow:0 0 30px var(--accent); transition:transform 0.1s;">0x</div>
         <div id="std-judgements" style="position:absolute; top:0; left:0; width:100%; height:100%;"></div>
-        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; box-shadow:inset 0 0 150px 50px #F9393F; opacity:0; transition:0.3s;"></div>
+        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle, transparent 50%, rgba(249,57,63,0.4) 100%); opacity:0; transition:0.3s;"></div>
     `;
     document.body.appendChild(uiLayer);
 
@@ -107,14 +110,12 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     const radius = 54.4 - 4.48 * CS;
     let scale = 1, offsetX = 0, offsetY = 0;
     
-    // Core Engine Stats
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
     window.st.stats = { s:0, g:0, b:0, m:0 };
-    window.st.fcStatus = "PFC"; window.st.trueMaxScore = map.length * 300;
-    
     let isRunning = true;
     let particles = [];
     let cursorTrail = [];
+    let animationId;
 
     const bgImg = new Image(); let bgLoaded = false;
     if(songObj.imageURL) { bgImg.src = songObj.imageURL; bgImg.onload = () => bgLoaded = true; }
@@ -125,13 +126,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if (screenRatio > osuRatio) { scale = canvas.height / 384; offsetX = (canvas.width - (512 * scale)) / 2; offsetY = 0; } 
         else { scale = canvas.width / 512; offsetX = 0; offsetY = (canvas.height - (384 * scale)) / 2; }
     }
-    resize(); window.addEventListener('resize', resize);
+    resize(); 
 
+    if(window.st.src) try { window.st.src.stop(); } catch(e){}
     window.st.src = window.st.ctx.createBufferSource();
     window.st.src.buffer = audioBuffer; window.st.src.connect(window.st.ctx.destination);
     window.st.t0 = window.st.ctx.currentTime;
     window.st.src.start(window.st.t0 + 3);
-
     window.st.src.onended = () => { if(isRunning && window.st.act) endEngine(false); };
 
     function spawnRipple(x, y, color) { particles.push({ x, y, life: 1, color }); }
@@ -140,40 +141,42 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         const jContainer = document.getElementById('std-judgements');
         const el = document.createElement('div');
         el.innerText = txt;
-        el.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%, -50%); color:${color}; font-size:3rem; font-weight:900; text-shadow:0 0 20px ${color}; pointer-events:none; animation: popFade 0.5s forwards;`;
+        el.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%, -50%); color:${color}; font-size:3rem; font-weight:900; text-shadow:0 0 10px ${color}; pointer-events:none; animation: popFade 0.4s forwards;`;
         jContainer.appendChild(el);
-        setTimeout(() => el.remove(), 500);
+        setTimeout(() => el.remove(), 400);
     }
 
     function updateHUD() {
         document.getElementById('std-score').innerText = window.st.sc.toLocaleString();
         const cmb = document.getElementById('std-combo');
         cmb.innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
-        cmb.style.transform = "scale(1.2)"; setTimeout(()=> cmb.style.transform="scale(1)", 100);
         
         const total = window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m;
         const acc = total > 0 ? (((window.st.stats.s*300 + window.st.stats.g*100 + window.st.stats.b*50) / (total*300))*100).toFixed(2) : "100.00";
         document.getElementById('std-acc').innerText = acc + "%";
         
         const hpBar = document.getElementById('engine-hp-fill');
-        hpBar.style.width = Math.max(0, window.st.hp) + "%";
-        hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
+        if(hpBar) {
+            hpBar.style.width = Math.max(0, window.st.hp) + "%";
+            hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
+        }
         
         const vign = document.getElementById('near-death-vignette');
-        if(window.st.hp < 20) vign.style.opacity = '0.8'; else vign.style.opacity = '0';
-        
-        if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+        if(vign) vign.style.opacity = window.st.hp < 20 ? '1' : '0';
     }
 
     function draw() {
         if (!isRunning || !window.st.act) return;
-        if (window.st.paused) { requestAnimationFrame(draw); return; }
+        if (window.st.paused) { animationId = requestAnimationFrame(draw); return; }
 
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // PINTAR FONDO OPACO PARA BORRAR FRAME ANTERIOR Y OPTIMIZAR GPU
+        ctx.fillStyle = '#0a0a0a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         if(bgLoaded) {
-            ctx.globalAlpha = 0.3; 
+            ctx.globalAlpha = 0.2; 
             const bgRatio = bgImg.width / bgImg.height; const cvRatio = canvas.width / canvas.height;
             let drawW, drawH;
             if(cvRatio > bgRatio) { drawW = canvas.width; drawH = canvas.width / bgRatio; } else { drawH = canvas.height; drawW = canvas.height * bgRatio; }
@@ -184,18 +187,20 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 2;
         ctx.strokeRect(offsetX, offsetY, 512 * scale, 384 * scale);
 
-        // Cursor Trail
+        // Cursor Trail Optimizada
         if (window.mouseX && window.mouseY) {
             cursorTrail.push({x: window.mouseX, y: window.mouseY, life: 1});
+            if(cursorTrail.length > 20) cursorTrail.shift(); // Limitar array
         }
+        
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         if(cursorTrail.length > 0) {
             ctx.beginPath(); ctx.moveTo(cursorTrail[0].x, cursorTrail[0].y);
             for(let i=1; i<cursorTrail.length; i++) {
                 ctx.lineTo(cursorTrail[i].x, cursorTrail[i].y);
-                cursorTrail[i].life -= 0.05;
+                cursorTrail[i].life -= 0.08; // Desvanece más rápido
             }
-            ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)'; ctx.lineWidth = 8; ctx.stroke();
+            ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)'; ctx.lineWidth = 6; ctx.stroke();
             cursorTrail = cursorTrail.filter(t => t.life > 0);
         }
 
@@ -217,40 +222,38 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 ctx.globalAlpha = alpha;
                 
                 ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(10,10,15,0.8)'; ctx.fill(); 
-                ctx.lineWidth = 4 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
+                ctx.fillStyle = 'rgba(10,10,15,0.9)'; ctx.fill(); 
+                ctx.lineWidth = 3 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
                 
                 ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
                 ctx.fillStyle = circle.color; ctx.fill();
 
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
                 ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
-                ctx.strokeStyle = circle.color; ctx.lineWidth = 4 * scale; ctx.stroke();
+                ctx.strokeStyle = circle.color; ctx.lineWidth = 3 * scale; ctx.stroke();
             }
         }
         ctx.globalAlpha = 1.0;
 
-        // Ripples
+        // Ripples Optimizados
         for(let i=particles.length-1; i>=0; i--) {
-            let p = particles[i]; p.life -= 0.04;
-            ctx.beginPath(); ctx.arc(p.x, p.y, (radius * scale) + (50 * (1-p.life)), 0, Math.PI*2);
-            ctx.strokeStyle = p.color; ctx.globalAlpha = Math.max(0, p.life); ctx.lineWidth = 6 * p.life; ctx.stroke();
+            let p = particles[i]; p.life -= 0.05;
+            ctx.beginPath(); ctx.arc(p.x, p.y, (radius * scale) + (40 * (1-p.life)), 0, Math.PI*2);
+            ctx.strokeStyle = p.color; ctx.globalAlpha = Math.max(0, p.life); ctx.lineWidth = 4 * p.life; ctx.stroke();
             if(p.life <= 0) particles.splice(i,1);
         }
         ctx.globalAlpha = 1.0;
 
-        // Draw Cursor
+        // Cursor Hitbox
         if(window.mouseX && window.mouseY) {
-            ctx.beginPath(); ctx.arc(window.mouseX, window.mouseY, 15, 0, Math.PI*2);
+            ctx.beginPath(); ctx.arc(window.mouseX, window.mouseY, 12, 0, Math.PI*2);
             ctx.fillStyle = '#00e5ff'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
         }
 
-        requestAnimationFrame(draw);
+        animationId = requestAnimationFrame(draw);
     }
     
-    function checkDeath() {
-        if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); }
-    }
+    function checkDeath() { if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); } }
 
     function handleHit(clientX, clientY) {
         if(!isRunning || window.st.paused) return;
@@ -286,20 +289,19 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         }
     }
 
-    window.addEventListener('mousemove', (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; });
-    canvas.addEventListener('pointerdown', (e) => handleHit(e.clientX, e.clientY));
-    
+    // === MANEJO SEGURO DE EVENTOS PARA EVITAR MEMORY LEAKS ===
+    const mouseMoveHandler = (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; };
+    const pointerDownHandler = (e) => handleHit(e.clientX, e.clientY);
     const keyHitHandler = (e) => {
-        if(e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') {
-            handleHit(window.mouseX || canvas.width/2, window.mouseY || canvas.height/2);
-        }
-        if(e.key === "Escape" && isRunning) {
-            e.preventDefault(); toggleEnginePause();
-        }
+        if(e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') { handleHit(window.mouseX || canvas.width/2, window.mouseY || canvas.height/2); }
+        if(e.key === "Escape" && isRunning) { e.preventDefault(); toggleEnginePause(); }
     };
+
+    window.addEventListener('resize', resize);
+    window.addEventListener('mousemove', mouseMoveHandler);
+    canvas.addEventListener('pointerdown', pointerDownHandler);
     window.addEventListener('keydown', keyHitHandler);
 
-    // Sistema Interno de Pausa / Game Over
     function toggleEnginePause() {
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
@@ -312,9 +314,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 modal.querySelector('.modal-panel').innerHTML = `
                     <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
                     <div class="modal-neon-content">
-                        <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
-                            ACCURACY<br><span style="color:white; font-size:4.5rem;">${acc}</span>
-                        </div>
+                        <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">ACCURACY<br><span style="color:white; font-size:4.5rem;">${acc}</span></div>
                     </div>
                     <div class="modal-neon-buttons">
                         <button class="action" onclick="window.resumeEngineGame()">▶️ CONTINUAR</button>
@@ -329,14 +329,20 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if(window.st.pauseTime) { window.st.t0 += (performance.now() - window.st.pauseTime)/1000; window.st.pauseTime = null; }
         window.st.paused = false;
         if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
-        requestAnimationFrame(draw);
     };
 
     function endEngine(died) {
         isRunning = false; window.st.act = false;
-        try{ window.st.src.stop(); }catch(e){}
-        canvas.style.display = 'none'; uiLayer.remove();
+        cancelAnimationFrame(animationId);
+        try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
+        
+        // DESTRUIR EVENTOS (VITAL PARA NO LAGEAR EL JUEGO AL REINICIAR)
+        window.removeEventListener('resize', resize);
+        window.removeEventListener('mousemove', mouseMoveHandler);
+        canvas.removeEventListener('pointerdown', pointerDownHandler);
         window.removeEventListener('keydown', keyHitHandler);
+
+        canvas.style.display = 'none'; uiLayer.remove();
         
         const modal = document.getElementById('modal-res');
         if(modal) {
@@ -347,7 +353,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             const titleHTML = died ? `<div id="loser-msg" style="color:#F9393F; font-size:2rem; font-weight:900;">💀 JUEGO TERMINADO</div>` : `<div id="winner-msg" style="color:#12FA05; font-size:2rem; font-weight:900;">¡MAPA COMPLETADO!</div>`;
             
             modal.querySelector('.modal-panel').innerHTML = `
-                <div class="modal-neon-header" style="border-bottom-color: ${c};"><h2 class="modal-neon-title" style="color:${c};">🏆 RESULTADOS</h2></div>
+                <div class="modal-neon-header" style="border-bottom-color: ${c};"><h2 class="modal-neon-title" style="color:${c};">🏆 RESULTADOS STANDARD</h2></div>
                 <div class="modal-neon-content">
                     ${titleHTML}
                     <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin: 25px 0;">
@@ -363,5 +369,5 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         }
     }
 
-    requestAnimationFrame(draw);
+    animationId = requestAnimationFrame(draw);
 };
