@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE TAIKO V-PRO (TOUCH ZONES + SKINS + LYRICS + MOBILE) 🥁
+   ENGINE TAIKO V-PRO (ANTI-CRASH + TOUCH ZONES + SKINS + LYRICS) 🥁
    ========================================================================== */
 
 window.startTaikoEngine = async function(songObj) {
@@ -26,7 +26,6 @@ window.startTaikoEngine = async function(songObj) {
         
         if(!window.st.ctx) { window.st.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
         if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
-        
         const audioBuffer = await window.st.ctx.decodeAudioData(audioArrayBuffer);
 
         if (loader) loader.style.display = 'none';
@@ -134,17 +133,12 @@ function runTaikoEngine(audioBuffer, map, songObj) {
     window.st.stats = { s:0, g:0, b:0, m:0 };
     window.st.fcStatus = "PFC";
     window.st.trueMaxScore = map.length * 300;
-    window.st.nextNote = 0;
-    window.st.spawned = [];
+    window.st.nextNote = 0; window.st.spawned = [];
     
     let isRunning = true;
-    const scrollSpeed = 0.9;
-    const receptorX = 200;
-    const laneY = window.innerHeight / 2;
-    let drumScale = 1;
-    let particles = [];
+    const scrollSpeed = 0.9; const receptorX = 200; let laneY = window.innerHeight / 2;
+    let drumScale = 1; let particles = [];
 
-    // Integración de Skins
     let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
@@ -190,8 +184,10 @@ function runTaikoEngine(audioBuffer, map, songObj) {
             let idx = window.st.currentLyricIdx;
             if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
                 const subEl = document.getElementById('subtitles-text');
-                subEl.innerText = window.st.parsedLyrics[idx].tx;
-                subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
+                if(subEl) {
+                    subEl.innerText = window.st.parsedLyrics[idx].tx;
+                    subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
+                }
                 window.st.currentLyricIdx++;
             }
         }
@@ -248,31 +244,35 @@ function runTaikoEngine(audioBuffer, map, songObj) {
         window.st.animId = requestAnimationFrame(draw);
     }
 
-    function checkDeath() { if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); } }
+    function checkDeath() { if(window.st.hp <= 0 && isRunning) { window.st.hp = 0; endEngine(true); } }
 
     function showTkJudgement(txt, col) {
+        if(!isRunning) return; // BLINDAJE CONTRA DOM LEAK
         const el = document.getElementById('tk-judgement');
+        if(!el) return;
         el.innerText = txt; el.style.color = col; el.style.textShadow = `0 0 10px ${col}`;
         el.style.animation = 'none'; void el.offsetWidth; el.style.animation = 'popFade 0.4s forwards';
     }
 
     function updateTkHUD() {
-        document.getElementById('tk-score').innerText = window.st.sc.toLocaleString();
-        document.getElementById('tk-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
-        const total = window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m;
-        const acc = total > 0 ? (((window.st.stats.s*300 + window.st.stats.g*150) / (total*300))*100).toFixed(2) : "100.00";
-        document.getElementById('tk-acc').innerText = acc + "%";
+        if(!isRunning) return; // BLINDAJE CONTRA DOM LEAK
+        try {
+            document.getElementById('tk-score').innerText = window.st.sc.toLocaleString();
+            document.getElementById('tk-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
+            const total = window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m;
+            const acc = total > 0 ? (((window.st.stats.s*300 + window.st.stats.g*150) / (total*300))*100).toFixed(2) : "100.00";
+            document.getElementById('tk-acc').innerText = acc + "%";
 
-        const fcEl = document.getElementById('hud-fc');
-        fcEl.innerText = window.st.fcStatus; 
-        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
-        
-        const hpBar = document.getElementById('engine-hp-fill');
-        if (hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
-        
-        const vign = document.getElementById('near-death-vignette');
-        if (vign) { if (window.st.hp < 20) vign.style.opacity = '1'; else vign.style.opacity = '0'; }
-        if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+            const fcEl = document.getElementById('hud-fc');
+            if(fcEl) { fcEl.innerText = window.st.fcStatus; fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"))); }
+            
+            const hpBar = document.getElementById('engine-hp-fill');
+            if (hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
+            
+            const vign = document.getElementById('near-death-vignette');
+            if (vign) { if (window.st.hp < 20) vign.style.opacity = '1'; else vign.style.opacity = '0'; }
+            if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+        } catch(e) {}
     }
 
     function handleTkInput(isBlue) {
@@ -297,34 +297,34 @@ function runTaikoEngine(audioBuffer, map, songObj) {
             else { window.st.sc += 150; window.st.cmb++; window.st.stats.g++; showTkJudgement("GOOD", "#12FA05"); if(window.st.fcStatus==="PFC") window.st.fcStatus="GFC"; }
             
             window.st.hp = Math.min(100, window.st.hp + 3);
-            if(window.st.hitBuf && window.st.ctx) { const s = window.st.ctx.createBufferSource(); s.buffer = window.st.hitBuf; s.connect(window.st.ctx.destination); s.start(0); }
+            try { if(typeof window.playHit === 'function') window.playHit(); } catch(e){}
             window.st.spawned.splice(targetIdx, 1);
         } else {
             window.st.cmb = 0; window.st.hp -= 2; window.st.fcStatus = "CLEAR"; checkDeath();
+            try { if(typeof window.playMiss === 'function') window.playMiss(); } catch(e){}
         }
     }
 
-    // EVENTOS TECLADO Y TOUCH
     window.st.tkKeyHandler = (e) => {
-        if (e.key === 'Escape') { e.preventDefault(); window.toggleEnginePause(); return; }
+        if (e.key === 'Escape' && isRunning) { e.preventDefault(); e.stopPropagation(); window.toggleEnginePause(); return; }
         if (!e.repeat) {
             if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') handleTkInput(false);
             if (e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'k') handleTkInput(true);
         }
     };
-    window.addEventListener('keydown', window.st.tkKeyHandler);
+    window.addEventListener('keydown', window.st.tkKeyHandler, {capture: true}); // Evitar que game.js lo lea
 
-    document.getElementById('tk-zone-blue-l').ontouchstart = (e) => { e.preventDefault(); handleTkInput(true); };
-    document.getElementById('tk-zone-blue-r').ontouchstart = (e) => { e.preventDefault(); handleTkInput(true); };
-    document.getElementById('tk-zone-red-l').ontouchstart = (e) => { e.preventDefault(); handleTkInput(false); };
-    document.getElementById('tk-zone-red-r').ontouchstart = (e) => { e.preventDefault(); handleTkInput(false); };
+    const zBlueL = document.getElementById('tk-zone-blue-l'); if(zBlueL) zBlueL.ontouchstart = (e) => { e.preventDefault(); handleTkInput(true); };
+    const zBlueR = document.getElementById('tk-zone-blue-r'); if(zBlueR) zBlueR.ontouchstart = (e) => { e.preventDefault(); handleTkInput(true); };
+    const zRedL = document.getElementById('tk-zone-red-l'); if(zRedL) zRedL.ontouchstart = (e) => { e.preventDefault(); handleTkInput(false); };
+    const zRedR = document.getElementById('tk-zone-red-r'); if(zRedR) zRedR.ontouchstart = (e) => { e.preventDefault(); handleTkInput(false); };
 
-    window.st.tkResizeHandler = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.st.tkResizeHandler = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; laneY = window.innerHeight / 2; };
     window.st.tkResizeHandler();
     window.addEventListener('resize', window.st.tkResizeHandler);
 
     window.toggleEnginePause = function() {
-        if(!window.st.act) return;
+        if(!window.st.act || !isRunning) return;
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
         let vign = document.getElementById('near-death-vignette');
@@ -342,11 +342,12 @@ function runTaikoEngine(audioBuffer, map, songObj) {
                     <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
                     <div class="modal-neon-content">
                         <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
-                            ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${acc}%</span>
+                            ACCURACY<br><span style="color:white; font-size:4.5rem;">${acc}%</span>
                         </div>
                         <div class="res-stats-grid">
                             <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
                             <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                            <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
                             <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
                         </div>
                     </div>
@@ -362,18 +363,20 @@ function runTaikoEngine(audioBuffer, map, songObj) {
         document.getElementById('modal-pause').style.setProperty('display', 'none', 'important');
         if(window.st.pauseTime) { window.st.t0 += (performance.now() - window.st.pauseTime)/1000; window.st.pauseTime = null; }
         window.st.paused = false;
-        if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
+        if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
     };
 
     function endEngine(died) {
+        if(!isRunning) return; // FIX DE SEGURIDAD DEFINITIVO
         isRunning = false; window.st.act = false;
         cancelAnimationFrame(window.st.animId);
         try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
         
-        window.removeEventListener('keydown', window.st.tkKeyHandler);
+        window.removeEventListener('keydown', window.st.tkKeyHandler, {capture: true});
         window.removeEventListener('resize', window.st.tkResizeHandler);
 
-        canvas.style.display = 'none'; ui.remove();
+        if(canvas) canvas.style.display = 'none'; 
+        if(ui) ui.remove();
         if(window.isMultiplayer) return;
         
         const modal = document.getElementById('modal-res');
@@ -389,7 +392,11 @@ function runTaikoEngine(audioBuffer, map, songObj) {
             } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
             
             let xpGain = 0;
-            if (!died && window.user && window.user.name !== "Guest") { xpGain = Math.floor(window.st.sc / 250); window.user.xp += xpGain; if(typeof save === 'function') save(); }
+            if (!died && window.user && window.user.name !== "Guest") { 
+                xpGain = Math.floor(window.st.sc / 250); 
+                window.user.xp = (window.user.xp || 0) + xpGain; 
+                if(typeof save === 'function') save(); 
+            }
 
             modal.querySelector('.modal-panel').innerHTML = `
                 <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
@@ -408,6 +415,7 @@ function runTaikoEngine(audioBuffer, map, songObj) {
                     <div class="res-stats-grid">
                         <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
                         <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                        <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
                         <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
                     </div>
                     <div style="display:flex; justify-content:space-around; background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; font-weight:bold;">
