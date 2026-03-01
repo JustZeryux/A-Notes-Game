@@ -1,8 +1,11 @@
-/* === js/engine_standard.js - STANDARD ENGINE (LAG-FREE + GAME.JS UI) 🎯 === */
+/* ==========================================================================
+   ENGINE STANDARD V-PRO (ULTRA PERFORMANCE + SKINS + LYRICS + MOBILE) 🎯
+   ========================================================================== */
 
 window.startNewEngine = async function(songObj) {
+    if(window.currentLobbyId) window.isMultiplayer = true;
     const loader = document.getElementById('loading-overlay');
-    if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO STANDARD..."; }
+    if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO OSU! STANDARD..."; }
 
     try {
         let response = null;
@@ -29,6 +32,19 @@ window.startNewEngine = async function(songObj) {
 
         if (loader) loader.style.display = 'none';
         document.getElementById('menu-container').classList.add('hidden');
+        
+        // Obtener letras si están activadas
+        if (window.cfg && window.cfg.subtitles && !songObj.lyrics) {
+            try {
+                let cleanTitle = songObj.title.replace(/\([^)]*\)/g, '').trim();
+                const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
+                const data = await res.json();
+                const bestMatch = data.find(s => s.syncedLyrics);
+                if (bestMatch) songObj.lyrics = bestMatch.syncedLyrics;
+            } catch(e) {}
+        }
+        
+        if(window.currentLobbyId && typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         runStandardEngine(audioBuffer, parsed.hitObjects, parsed.CS, parsed.AR, songObj);
     } catch (e) {
         if (loader) loader.style.display = 'none';
@@ -56,7 +72,6 @@ function parseStandardMap(text) {
             hitObjects.push({ x: parseInt(p[0]), y: parseInt(p[1]), t: parseInt(p[2]) + 3000, clicked: false, missed: false, color: colors[cIdx] });
         }
     }
-    // IMPORTANTE: Ordenar por tiempo para la cola de rendimiento
     return { hitObjects: hitObjects.sort((a,b) => a.t - b.t), audioFile, CS, AR };
 }
 
@@ -67,7 +82,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     let canvas = document.getElementById('std-canvas');
     if (!canvas) {
         canvas = document.createElement('canvas'); canvas.id = 'std-canvas';
-        canvas.style.cssText = 'position:fixed; top:0; left:0; z-index:8000; cursor:none;';
+        canvas.style.cssText = 'position:fixed; top:0; left:0; z-index:8000; cursor:none; touch-action:none;';
         document.body.appendChild(canvas);
     }
     canvas.style.display = 'block';
@@ -83,6 +98,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     const uName = window.user ? window.user.name : 'Guest';
     const uLvl = window.user ? window.user.lvl : 1;
 
+    // UI Calcada de game.js
     uiLayer.innerHTML = `
         <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; backdrop-filter:blur(8px);">
             <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white;"></div>
@@ -99,10 +115,14 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         <div style="position:absolute; top:20px; right:30px; text-align:right;">
             <div id="std-score" style="color:white; font-size:4rem; font-weight:900; text-shadow:0 0 15px white; line-height:1;">0</div>
             <div id="std-acc" style="color:#00ffff; font-size:2rem; font-weight:bold;">100.00%</div>
+            <div id="hud-fc" style="color:cyan; font-size:1.2rem; font-weight:bold; margin-top:5px;">PFC</div>
         </div>
         <div id="std-combo" style="position:absolute; bottom:20px; left:30px; color:white; font-size:5rem; font-weight:900; text-shadow:0 0 30px var(--accent); transition:transform 0.1s;">0x</div>
         <div id="std-judgements" style="position:absolute; top:0; left:0; width:100%; height:100%;"></div>
-        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s;"></div>
+        <div id="subtitles-container" style="position:absolute; bottom:15%; left:0; width:100%; text-align:center; display:none;">
+            <div id="subtitles-text" style="display:inline-block; background:rgba(0,0,0,0.7); padding:10px 20px; border-radius:10px; color:white; font-size:2rem; font-weight:bold; border:2px solid var(--blue); text-shadow:0 0 10px var(--blue);"></div>
+        </div>
+        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s; box-shadow: inset 0 0 150px 50px rgba(249,57,63,0.8);"></div>
     `;
     document.body.appendChild(uiLayer);
 
@@ -110,18 +130,35 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     const radius = 54.4 - 4.48 * CS;
     let scale = 1, offsetX = 0, offsetY = 0;
     
-    // VARIABLES GLOBALES DEL JUEGO
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
     window.st.stats = { s:0, g:0, b:0, m:0 };
+    window.st.fcStatus = "PFC";
     window.st.trueMaxScore = map.length * 300;
-    
-    // COLA DE NOTAS (El Fix Definitivo)
     window.st.nextNote = 0;
     window.st.spawned = [];
+    window.st.songDuration = audioBuffer.duration;
     
     let isRunning = true;
     let particles = [];
     let cursorTrail = [];
+
+    // Lógica de Skins
+    let activeSkin = null;
+    if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    }
+
+    // Lógica de Lyrics
+    if (window.cfg && window.cfg.subtitles && songObj.lyrics) {
+        document.getElementById('subtitles-container').style.display = 'block';
+        window.st.parsedLyrics = []; window.st.currentLyricIdx = 0;
+        const lines = songObj.lyrics.split('\n');
+        lines.forEach(l => {
+            const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/);
+            if(match) window.st.parsedLyrics.push({ t: (parseInt(match[1])*60 + parseFloat(match[2])) * 1000, tx: match[3].trim() });
+        });
+        window.st.parsedLyrics.sort((a,b) => a.t - b.t);
+    }
 
     const bgImg = new Image(); let bgLoaded = false;
     if(songObj.imageURL) { bgImg.src = songObj.imageURL; bgImg.onload = () => bgLoaded = true; }
@@ -136,7 +173,10 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
     if(window.st.src) try { window.st.src.stop(); } catch(e){}
     window.st.src = window.st.ctx.createBufferSource();
-    window.st.src.buffer = audioBuffer; window.st.src.connect(window.st.ctx.destination);
+    window.st.src.buffer = audioBuffer; 
+    const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
+    window.st.src.connect(g); g.connect(window.st.ctx.destination);
+    
     window.st.t0 = window.st.ctx.currentTime;
     window.st.src.start(window.st.t0 + 3);
     window.st.src.onended = () => { if(isRunning && window.st.act) endEngine(false); };
@@ -160,17 +200,17 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         const acc = total > 0 ? (((window.st.stats.s*300 + window.st.stats.g*100 + window.st.stats.b*50) / (total*300))*100).toFixed(2) : "100.00";
         document.getElementById('std-acc').innerText = acc + "%";
         
+        const fcEl = document.getElementById('hud-fc');
+        fcEl.innerText = window.st.fcStatus; 
+        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
+
         const hpBar = document.getElementById('engine-hp-fill');
-        if(hpBar) {
-            hpBar.style.width = Math.max(0, window.st.hp) + "%";
-            hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
-        }
+        if(hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
         
         const vign = document.getElementById('near-death-vignette');
-        if(vign) {
-            if (window.st.hp < 20) vign.classList.add('danger-active');
-            else vign.classList.remove('danger-active');
-        }
+        if(vign) vign.style.opacity = window.st.hp < 20 ? '1' : '0';
+        
+        if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
     }
 
     function draw() {
@@ -178,8 +218,20 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if (window.st.paused) { window.st.animId = requestAnimationFrame(draw); return; }
 
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
+        let songTime = now - 3000;
+
+        // Letras
+        if (window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
+            let idx = window.st.currentLyricIdx;
+            if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
+                const subEl = document.getElementById('subtitles-text');
+                subEl.innerText = window.st.parsedLyrics[idx].tx;
+                subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
+                window.st.currentLyricIdx++;
+            }
+        }
         
-        // --- COLA DE NOTAS (PREVIENE QUE SE PARE DE SPAWNEAR) ---
+        // Cola de Notas (Anti-Lag)
         while(window.st.nextNote < map.length && map[window.st.nextNote].t - now <= preempt) {
             window.st.spawned.push(map[window.st.nextNote]);
             window.st.nextNote++;
@@ -189,7 +241,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         if(bgLoaded) {
-            ctx.globalAlpha = 0.2; 
+            ctx.globalAlpha = (window.cfg && window.cfg.bgEffects === false) ? 0.05 : 0.2; 
             const bgRatio = bgImg.width / bgImg.height; const cvRatio = canvas.width / canvas.height;
             let drawW, drawH;
             if(cvRatio > bgRatio) { drawW = canvas.width; drawH = canvas.width / bgRatio; } else { drawH = canvas.height; drawW = canvas.height * bgRatio; }
@@ -208,21 +260,18 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         if(cursorTrail.length > 0) {
             ctx.beginPath(); ctx.moveTo(cursorTrail[0].x, cursorTrail[0].y);
-            for(let i=1; i<cursorTrail.length; i++) {
-                ctx.lineTo(cursorTrail[i].x, cursorTrail[i].y);
-                cursorTrail[i].life -= 0.08; 
-            }
+            for(let i=1; i<cursorTrail.length; i++) { ctx.lineTo(cursorTrail[i].x, cursorTrail[i].y); cursorTrail[i].life -= 0.08; }
             ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)'; ctx.lineWidth = 6; ctx.stroke();
             cursorTrail = cursorTrail.filter(t => t.life > 0);
         }
 
-        // --- RENDERIZAR SOLO NOTAS ACTIVAS ---
+        // Renderizar Notas
         for(let i = window.st.spawned.length - 1; i >= 0; i--) {
             const circle = window.st.spawned[i];
             const timeDiff = circle.t - now;
 
             if (timeDiff < -150) {
-                circle.missed = true; window.st.stats.m++; window.st.hp -= 10; window.st.cmb = 0;
+                circle.missed = true; window.st.stats.m++; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR";
                 showJudgment("MISS", "#F9393F", offsetX + (circle.x * scale), offsetY + (circle.y * scale));
                 window.st.spawned.splice(i, 1);
                 updateHUD(); checkDeath(); continue;
@@ -233,16 +282,18 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             const alpha = Math.min(1, 1 - (timeDiff / preempt));
             ctx.globalAlpha = alpha;
             
+            let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
+
             ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(10,10,15,0.9)'; ctx.fill(); 
             ctx.lineWidth = 3 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
             
             ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
-            ctx.fillStyle = circle.color; ctx.fill();
+            ctx.fillStyle = drawColor; ctx.fill();
 
             const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
             ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
-            ctx.strokeStyle = circle.color; ctx.lineWidth = 3 * scale; ctx.stroke();
+            ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
         }
         ctx.globalAlpha = 1.0;
 
@@ -268,16 +319,14 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if(!isRunning || window.st.paused) return;
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         
-        let targetCircle = null;
-        let targetIdx = -1;
+        let targetCircle = null; let targetIdx = -1;
         for(let i=0; i<window.st.spawned.length; i++) {
             const circle = window.st.spawned[i];
             if(!circle.clicked && !circle.missed) {
                 const screenX = offsetX + (circle.x * scale);
                 const screenY = offsetY + (circle.y * scale);
                 if (Math.hypot(clientX - screenX, clientY - screenY) <= radius * scale * 1.5) {
-                    targetCircle = circle; targetIdx = i;
-                    break; 
+                    targetCircle = circle; targetIdx = i; break; 
                 }
             }
         }
@@ -288,9 +337,9 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             
             let points = 50, txt = "BAD", color = "#FFD700";
             if (diff < 50) { points=300; txt="SICK!!"; color="#00FFFF"; window.st.stats.s++; }
-            else if (diff < 100) { points=100; txt="GOOD"; color="#12FA05"; window.st.stats.g++; }
-            else if (diff < 150) { points=50; txt="BAD"; color="#FFD700"; window.st.stats.b++; }
-            else { points=0; txt="MISS"; color="#F9393F"; window.st.stats.m++; }
+            else if (diff < 100) { points=100; txt="GOOD"; color="#12FA05"; window.st.stats.g++; if(window.st.fcStatus==="PFC") window.st.fcStatus="GFC"; }
+            else if (diff < 150) { points=50; txt="BAD"; color="#FFD700"; window.st.stats.b++; if(window.st.fcStatus!=="CLEAR") window.st.fcStatus="FC"; }
+            else { points=0; txt="MISS"; color="#F9393F"; window.st.stats.m++; window.st.fcStatus="CLEAR"; }
             
             if (points > 0) {
                 window.st.cmb++; window.st.sc += points * (1 + (window.st.cmb/25));
@@ -306,9 +355,9 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         }
     }
 
-    // EVENTOS AISLADOS Y SEGUROS
+    // EVENTOS MULTI-TOUCH Y TECLADO BLINDADOS
     window.st.mouseMoveHandler = (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; };
-    window.st.pointerDownHandler = (e) => handleHit(e.clientX, e.clientY);
+    window.st.pointerDownHandler = (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; handleHit(e.clientX, e.clientY); };
     window.st.keyHitHandler = (e) => {
         if(e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') { handleHit(window.mouseX || canvas.width/2, window.mouseY || canvas.height/2); }
         if(e.key === "Escape" && isRunning) { e.preventDefault(); window.toggleEnginePause(); }
@@ -325,7 +374,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
         let vign = document.getElementById('near-death-vignette');
-        if(vign) vign.classList.remove('danger-active');
+        if(vign) vign.style.opacity = '0';
 
         if(window.st.paused) {
             window.st.pauseTime = performance.now();
@@ -374,8 +423,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         window.removeEventListener('keydown', window.st.keyHitHandler);
 
         canvas.style.display = 'none'; uiLayer.remove();
-        let vign = document.getElementById('near-death-vignette');
-        if(vign) vign.classList.remove('danger-active');
+        if(window.isMultiplayer) return; // Termina en silencio si es online
         
         const modal = document.getElementById('modal-res');
         if(modal) {
@@ -394,7 +442,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
             modal.querySelector('.modal-panel').innerHTML = `
                 <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
-                    <h2 class="modal-neon-title" style="color:var(--gold);">🏆 RESULTADOS OSU!</h2>
+                    <h2 class="modal-neon-title" style="color:var(--gold);">🏆 RESULTADOS OSU! STD</h2>
                 </div>
                 <div class="modal-neon-content">
                     ${titleHTML}
