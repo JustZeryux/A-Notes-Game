@@ -7,7 +7,6 @@
     <meta name="title" content="A Notes Game">
     <meta name="description" content="El mejor juego de ritmo en tu navegador. Juega mapas creados por la comunidad, personaliza tus teclas, sube de nivel y compite en el ranking global online.">
     <meta name="theme-color" content="#ff66aa">
-
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://a-notes-game.pages.dev/">
     <meta property="og:title" content="A Notes Game - Juego de Ritmo">
@@ -26,6 +25,18 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
+    <div id="maintenance-screen">
+        <div class="maint-icon">⚙️</div>
+        <div class="maint-title">MANTENIMIENTO</div>
+        <div class="maint-desc">El servidor está siendo actualizado por Zeryux. Se están añadiendo cosas épicas. Vuelve pronto.</div>
+    </div>
+    
+    <div id="global-announcement">
+        <div style="color:#ffaa00; font-size:0.8rem; letter-spacing:2px; margin-bottom:5px;">📢 MENSAJE DEL ADMINISTRADOR</div>
+        <div id="ga-title" style="font-size:1.5rem; font-weight:900; margin-bottom:5px;">TÍTULO</div>
+        <div id="ga-msg" style="font-size:1rem; color:#f0f0f0;">Mensaje...</div>
+    </div>
 
     <div id="notification-area"></div>
     <div id="chat-overlay-container"></div>
@@ -104,6 +115,8 @@
                     <span id="imp-txt">☁️ SUBIR CANCIÓN</span>
                 </button>
                 <button class="news-btn" onclick="openModal('news')">📰 NOVEDADES</button>
+                
+                <button class="nav-btn" id="nav-admin" style="display:none; color: #ff003c; border-left: 3px solid #ff003c; background: rgba(255, 0, 60, 0.1);" onclick="openAdminPanel()">🚨 ADMIN PANEL</button>
             </div>
         </aside>
 
@@ -138,7 +151,7 @@
                     <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
                     <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
                     <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
-                    <button class="flter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
+                    <button class="filter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
                     <button class="filter-btn" data-type="key" data-val="8" onclick="setFilter('key', '8')">8K</button>
                     <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
                     <button class="filter-btn" data-type="key" data-val="10" onclick="setFilter('key', '10')">10K</button>
@@ -517,6 +530,50 @@
         </div>
     </div>
 
+    <div id="modal-admin" class="modal-overlay">
+        <div class="modal-panel admin-panel-container" style="width: 800px; padding:0; background:#0a0a0a; overflow:hidden;">
+            <div class="admin-header">
+                <h2 style="margin:0; font-size:2rem; font-weight:900; color:white; text-shadow:0 0 10px white;">💻 GOD MODE: PANEL DE CONTROL</h2>
+            </div>
+            
+            <div style="padding: 20px; max-height: 70vh; overflow-y:auto;">
+                
+                <div class="admin-section">
+                    <h3 style="color:#ff003c; margin-top:0;">⚙️ ESTADO DEL SERVIDOR</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>Bloquea el acceso a todos los jugadores excepto a ti.</div>
+                        <div style="font-size:1.2rem; font-weight:bold;">ESTADO: <span id="admin-maint-status" style="color:#12FA05;">APAGADO</span></div>
+                    </div>
+                    <button class="action" style="width:100%; margin-top:15px; background:#ff003c; color:white; border:none;" onclick="toggleMaintenance()">ENCENDER / APAGAR MANTENIMIENTO</button>
+                </div>
+
+                <div class="admin-section">
+                    <h3 style="color:#00ffff; margin-top:0;">📢 ENVIAR ANUNCIO GLOBAL EN VIVO</h3>
+                    <p style="color:#888; font-size:0.8rem; margin:0 0 10px 0;">Saldrá en la pantalla de todos los que estén jugando ahora mismo.</p>
+                    <input type="text" id="admin-ann-title" class="log-inp" placeholder="Título (Ej: ¡NUEVA ACTUALIZACIÓN!)">
+                    <textarea id="admin-ann-msg" class="log-inp" placeholder="Mensaje para todos los jugadores..." style="height:60px; resize:none;"></textarea>
+                    <button class="action btn-acc" style="width:100%; margin-top:10px;" onclick="sendGlobalAnnouncement()">ENVIAR ANUNCIO</button>
+                </div>
+
+                <div class="admin-section" style="border-color:var(--gold);">
+                    <h3 style="color:var(--gold); margin-top:0;">💰 GESTIÓN DE JUGADORES (SP / BAN)</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="text" id="admin-target-user" class="log-inp" style="flex:1; margin:0;" placeholder="Nombre del Jugador">
+                        <input type="number" id="admin-target-sp" class="log-inp" style="width:150px; margin:0;" placeholder="Cant. SP">
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="action" style="flex:1; background:var(--gold); color:black;" onclick="adminGiveSP()">REGALAR SP</button>
+                        <button class="action" style="flex:1; background:#8a0021; color:white;" onclick="adminWipeUser()">BORRAR CUENTA (BAN)</button>
+                    </div>
+                </div>
+
+            </div>
+            <div style="padding:15px; background:#111; text-align:center; border-top:1px solid #333;">
+                <button class="action secondary" onclick="closeModal('admin')">CERRAR PANEL</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-clans" class="modal-overlay">
         <div class="modal-panel" style="width: 850px; max-width: 95%; max-height: 85vh; overflow-y: auto;">
             
@@ -532,8 +589,10 @@
                     <div class="clan-box" style="--c: var(--gold);">
                         <h3 style="color:var(--gold); margin-top:0;">👑 CREAR CLAN</h3>
                         <p style="color:#888; font-size:0.9rem;">Costo: <span style="color:var(--gold); font-weight:bold;">50,000 SP</span></p>
+                        
                         <input type="text" id="c-new-name" class="log-inp" placeholder="Nombre (Ej: Osu Masters)">
                         <input type="text" id="c-new-tag" class="log-inp" placeholder="Tag [Max 4 Letras] (Ej: OSU)" maxlength="4" style="text-transform:uppercase;">
+                        
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
                             <label style="color:#aaa; font-size:0.9rem;">Color del Tag:</label>
                             <input type="color" id="c-new-color" value="#ff66aa" style="border:none; background:none; cursor:pointer; height:40px; width:100%;">
@@ -572,13 +631,14 @@
                             <input type="number" id="c-donate-amount" class="log-inp" placeholder="Cant. SP" style="margin:0; flex:1;">
                             <button class="action" style="width:auto; padding:0 20px; background:#12FA05; color:black;" onclick="donateToClan()">DONAR</button>
                         </div>
+
                         <h3 style="margin-top:25px; color:#aaa; font-size:1rem;">👥 MIEMBROS</h3>
                         <div id="c-dash-members-list" style="background:#0a0a0a; border:1px solid #333; padding:10px; border-radius:8px; max-height:150px; overflow-y:auto; font-size:0.9rem;"></div>
                     </div>
 
                     <div class="clan-box" style="--c: var(--accent);">
                         <h3 style="margin-top:0; color:var(--accent);">⭐ MEJORAS GLOBALES</h3>
-                        <p style="font-size:0.8rem; color:#888;">El líder puede comprar mejoras usando el SP del banco.</p>
+                        <p style="font-size:0.8rem; color:#888;">El líder puede comprar mejoras usando el SP del banco para todos los miembros.</p>
                         
                         <div class="clan-upgrade">
                             <div>
@@ -624,8 +684,10 @@
                     <input type="text" id="friend-inp" class="log-inp" style="margin:0; flex:1;" placeholder="Usuario a buscar...">
                     <button class="action" style="width:auto; background:#00ffff; color:black; padding:0 30px;" onclick="sendFriendRequest()">AGREGAR</button>
                 </div>
+                
                 <div style="color:var(--accent); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">SOLICITUDES PENDIENTES</div>
                 <div id="req-list" style="margin-bottom:20px;"></div>
+                
                 <div style="color:var(--good); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">TU LISTA DE AMIGOS</div>
                 <div id="friend-list" style="display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto;"></div>
             </div>
@@ -663,7 +725,7 @@
         </div>
     </div>
 
-    <div id="notif-panel" style="display:none; position:absolute; top:80px; right:50px; width:350px; background:#111; border:2px solid #333; border-radius:10px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
+    <div id="notif-panel" style="display:none; position:absolute; top:80px; right:50px; width:350px; background:#111; border:2px solid #333; border-radius:10px; z-index:99999; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
         <div style="background:#0a0a0a; padding:15px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
             <h3 style="margin:0; color:white;">Notificaciones</h3>
             <button style="background:none; border:none; color:#888; cursor:pointer;" onclick="if(typeof clearAllNotifs==='function')clearAllNotifs()">Limpiar Todo</button>
@@ -692,6 +754,7 @@
     <script src="js/script/shop_audio.js"></script>
 
     <script src="js/script/clans.js"></script>
+    <script src="js/script/admin.js"></script>
 
     <script src="js/game.js"></script>
     <script src="js/osu.js"></script>
