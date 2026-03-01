@@ -50,7 +50,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
                 snapshot.forEach(doc => {
                     let data = doc.data();
                     if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
-                        fbSongs.push({ id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`, imageURL: data.imageURL || 'icon.png', isOsu: false, keysAvailable: [4, 6, 7, 9], raw: { ...data, id: doc.id } });
+                        fbSongs.push({ id: doc.id, title: data.title, artist: `Subido por: ${data.uploader}`, imageURL: data.imageURL || 'icon.png', isOsu: false, keysAvailable: [4, 6, 7, 9], originalMode: 'mania', raw: { ...data, id: doc.id } });
                     }
                 });
             }
@@ -65,7 +65,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         }
 
         const pageA = window.currentOsuPage; const pageB = window.currentOsuPage + 1; window.currentOsuPage += 2;
-        // Quitamos el &m=3 para traer todos los modos
+        // Quitamos el filtro &m=3 para que el buscador traiga todos los modos de Osu!
         const [res1, res2] = await Promise.all([
             fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&p=${pageA}`),
             fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&p=${pageB}`)
@@ -77,9 +77,8 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         
         uniqueOsuData.forEach(set => {
             if(set.beatmaps && set.beatmaps.length > 0) {
-                // Identificamos el modo original y la dificultad
                 let mNum = set.beatmaps[0].mode_int !== undefined ? set.beatmaps[0].mode_int : set.beatmaps[0].mode;
-                let mName = (mNum === 1) ? 'taiko' : (mNum === 2 ? 'catch' : (mNum === 3 ? 'mania' : 'standard'));
+                let mName = (mNum === 1) ? 'taiko' : (mNum === 2 ? 'catch' : (mNum === 3 || mNum === 'mania' ? 'mania' : 'standard'));
                 let stars = set.beatmaps[0].difficulty_rating || 0;
                 let keys = mName === 'mania' ? [...new Set(set.beatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b) : [];
                 
@@ -95,20 +94,16 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 
 window.renderUnifiedGrid = function() {
     const grid = document.getElementById('song-grid'); if(!grid) return; grid.innerHTML = '';
-    
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
     let filtered = baseList.filter(song => {
         if (window.currentFilters.type === 'recent') return true; 
-        // Filtros específicos para los nuevos modos
-        if (window.currentFilters.type === 'osu_mania' && (!song.isOsu || song.originalMode !== 'mania')) return false;
-        if (window.currentFilters.type === 'osu_standard' && (!song.isOsu || song.originalMode !== 'standard')) return false;
-        if (window.currentFilters.type === 'osu_taiko' && (!song.isOsu || song.originalMode !== 'taiko')) return false;
-        if (window.currentFilters.type === 'osu_catch' && (!song.isOsu || song.originalMode !== 'catch')) return false;
-        
-        if (window.currentFilters.type === 'osu' && !song.isOsu) return false;
+        if (window.currentFilters.type === 'osu_mania' && song.originalMode !== 'mania') return false;
+        if (window.currentFilters.type === 'osu_standard' && song.originalMode !== 'standard') return false;
+        if (window.currentFilters.type === 'osu_taiko' && song.originalMode !== 'taiko') return false;
+        if (window.currentFilters.type === 'osu_catch' && song.originalMode !== 'catch') return false;
         if (window.currentFilters.type === 'com' && song.isOsu) return false;
-        if (window.currentFilters.key !== 'all' && (song.originalMode === 'mania' || !song.isOsu)) { 
+        if (window.currentFilters.key !== 'all' && song.originalMode === 'mania') { 
             if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
         }
         return true;
@@ -117,27 +112,37 @@ window.renderUnifiedGrid = function() {
     if (filtered.length === 0) { grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">${window.currentFilters.type === 'recent' ? 'Aún no has jugado ninguna canción. 🕒' : 'No se encontraron mapas.'}</div>`; return; }
 
     filtered.forEach(song => {
-        const card = document.createElement('div'); card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`; 
-        card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s, box-shadow 0.2s; background: #111;';
-        if(song.isOsu) { card.style.borderColor = '#ff66aa'; card.style.boxShadow = '0 0 15px rgba(255, 102, 170, 0.2)'; }
+        const card = document.createElement('div'); 
+        card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`; // Aplicamos tu clase original
         
-        // Estrellas solo para Osu
-        let starsHTML = "";
-        if(song.isOsu) {
-            let s = parseFloat(song.starRating || 0).toFixed(1);
-            starsHTML = `<div class="diff-badge" style="border-color:gold; color:gold;">⭐ ${s}</div>`;
+        // --- CÁLCULO DE ESTRELLAS ⭐ ---
+        let stars = song.starRating || 0;
+        if(!song.isOsu) {
+            let noteCount = (song.raw && song.raw.notes) ? song.raw.notes.length : 0;
+            stars = (noteCount / 200) + 1.2; 
         }
+        let starCol = stars >= 6 ? '#F9393F' : (stars >= 4 ? '#FFD700' : '#12FA05');
+        let diffBadge = `<div class="diff-badge" style="border:1px solid ${starCol}; color:${starCol}; box-shadow:0 0 8px ${starCol}44;">⭐ ${parseFloat(stars).toFixed(1)}</div>`;
 
-        let badgesHTML = starsHTML + (song.originalMode === 'mania' || !song.isOsu ? song.keysAvailable.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('') : "");
-        if(song.isOsu) {
-            let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🌸'));
-            badgesHTML += `<div class="diff-badge osu-badge" style="margin-left:auto;">${mIcon} ${song.originalMode.toUpperCase()}</div>`;
-        }
+        // --- ICONOS DE MODO ---
+        let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🌸'));
+        let maniaKeys = (song.originalMode === 'mania' || !song.isOsu) ? song.keysAvailable.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('') : "";
 
-        card.innerHTML = `<div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div><div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);"><div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div><div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">${song.artist}</div><div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">${badgesHTML}</div></div>`;
-        card.onmouseenter = () => { card.style.transform = 'scale(1.03)'; card.style.boxShadow = song.isOsu ? '0 0 25px rgba(255, 102, 170, 0.5)' : '0 0 20px rgba(0, 255, 255, 0.3)'; };
-        card.onmouseleave = () => { card.style.transform = 'scale(1)'; card.style.boxShadow = song.isOsu ? '0 0 15px rgba(255, 102, 170, 0.2)' : 'none'; };
-        card.onclick = () => { if(typeof window.openUnifiedDiffModal === 'function') window.openUnifiedDiffModal(song); };
+        let osuBadge = song.isOsu ? `<div class="diff-badge osu-badge" style="margin-left:auto;">${mIcon} ${song.originalMode.toUpperCase()}</div>` : `<div class="diff-badge" style="margin-left:auto; border:1px solid #00ffff; color:#00ffff;">☁️ COMUNIDAD</div>`;
+
+        card.innerHTML = `
+            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div>
+            <div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);">
+                <div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div>
+                <div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">${song.artist}</div>
+                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+                    ${diffBadge}
+                    ${maniaKeys}
+                    ${osuBadge}
+                </div>
+            </div>`;
+        
+        card.onclick = () => window.openUnifiedDiffModal(song);
         grid.appendChild(card);
     });
 
