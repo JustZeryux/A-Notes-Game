@@ -128,6 +128,36 @@ window.updateCfgVal = function(key, val) {
 // ==========================================
 // EL MOTOR DE CONFIGURACIÓN DE TECLAS (REPARACIÓN ABSOLUTA)
 // ==========================================
+// ==========================================
+// EL MOTOR DE CONFIGURACIÓN DE TECLAS (TRAMPA GLOBAL)
+// ==========================================
+
+// 1. EL SECUESTRADOR GLOBAL (Trampa absoluta de teclado)
+window.assigningKeyInfo = null;
+window.addEventListener('keydown', function(e) {
+    if (window.assigningKeyInfo) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        let k = window.assigningKeyInfo.k;
+        let lane = window.assigningKeyInfo.lane;
+        window.assigningKeyInfo = null; // Apagamos la trampa
+
+        let newKey = e.key;
+        if(newKey === " ") newKey = "Space";
+        
+        // Guardar la tecla en el sistema
+        window.cfg.modes[k][lane].k = newKey.toLowerCase();
+        if(typeof save === 'function') save(); 
+        
+        // Actualizar pantalla
+        window.renderLaneConfig(k);
+        if(typeof window.updatePreview === 'function') window.updatePreview();
+    }
+}, true); // El 'true' asegura que atrape la tecla ANTES que game.js
+
+// 2. DIBUJAR LOS BOTONES LIMPIOS
 window.renderLaneConfig = function(k) {
     document.querySelectorAll('.kb-tab').forEach(b => b.classList.remove('active'));
     const t = document.getElementById('tab-'+k); if(t) t.classList.add('active');
@@ -145,14 +175,14 @@ window.renderLaneConfig = function(k) {
     for(let i=0; i<k; i++) {
         let l = window.cfg.modes[k][i];
         
-        // LIMPIADOR EXTREMO: Quita la palabra "Key" y "Space"
+        // LIMPIEZA VISUAL PERFECTA (Ej: "keyd" -> "D", "space" -> "SPC")
         let displayKey = String(l.k).toUpperCase();
-        if (displayKey.startsWith('KEY')) displayKey = displayKey.replace('KEY', '');
-        if (displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
+        if(displayKey.startsWith('KEY')) displayKey = displayKey.replace('KEY', '');
+        if(displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
         
         html += `
         <div class="lane-col" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
-            <button class="key-btn" id="kb-btn-${k}-${i}" onclick="window.waitForKey(${k}, ${i})" style="width:50px; height:50px; border-radius:8px; background:#111; color:white; border:2px solid #555; font-weight:900; font-size:1.2rem; cursor:pointer; transition:0.2s;">
+            <button class="key-btn" id="kb-btn-${k}-${i}" onclick="window.waitForKey(${k}, ${i})" style="width:50px; height:50px; border-radius:8px; background:#111; color:white; border:2px solid #555; font-weight:900; font-size:1.2rem; cursor:pointer; transition:0.2s; text-shadow:0 0 5px rgba(255,255,255,0.5);">
                 ${displayKey}
             </button>
             <input type="color" value="${l.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" style="width:30px; height:30px; border:none; background:none; cursor:pointer;">
@@ -161,48 +191,25 @@ window.renderLaneConfig = function(k) {
                 <option value="bar" ${l.s==='bar'?'selected':''}>Bar</option>
                 <option value="arrow_up" ${l.s==='arrow_up'?'selected':''}>Up</option>
                 <option value="arrow_down" ${l.s==='arrow_down'?'selected':''}>Dwn</option>
-                <option value="arrow_left" ${l.s==='arrow_left'?'selected':''}>Lft</option>
-                <option value="arrow_right" ${l.s==='arrow_right'?'selected':''}>Rgt</option>
             </select>
         </div>`;
     }
     cont.innerHTML = html;
 };
 
+// 3. ACTIVAR EL MODO DE ESPERA
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
     if(!btn) return;
     
-    // Quitar el foco para que el clic no interfiera
-    btn.blur(); 
-    
-    btn.innerText = '...';
+    btn.blur(); // Quita el foco
+    btn.innerText = '?';
     btn.style.background = '#F9393F';
     btn.style.borderColor = '#ffaa00';
     btn.style.boxShadow = '0 0 15px #F9393F';
     
-    // EL TRUCO MAGICO: Esperar 200ms antes de escuchar el teclado
-    setTimeout(() => {
-        const handler = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-
-            let newKey = e.key;
-            if(e.code === "Space") newKey = "Space";
-            
-            // Guardar configuración
-            window.cfg.modes[k][lane].k = newKey;
-            if(typeof save === 'function') save(); // Guardar en disco al instante
-            
-            // Remover el escuchador y redibujar
-            document.removeEventListener('keydown', handler, true);
-            window.renderLaneConfig(k);
-            if(typeof window.updatePreview === 'function') window.updatePreview();
-        };
-
-        document.addEventListener('keydown', handler, true);
-    }, 200); // <-- Este pequeño retraso soluciona todo el congelamiento
+    // Encendemos la trampa global
+    window.assigningKeyInfo = { k: k, lane: lane };
 };
 
 window.updateLaneColor = function(k, l, color) { window.cfg.modes[k][l].c = color; if(typeof window.updatePreview === 'function') window.updatePreview(); };
