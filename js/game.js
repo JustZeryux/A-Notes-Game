@@ -664,113 +664,94 @@ function miss(n) {
 // 7. HUD Y FINALIZACIÓN
 // ==========================================
 function updHUD() {
-    const scEl = document.getElementById('g-score');
-    if(scEl) scEl.innerText = window.st.sc.toLocaleString();
-    
-    const cEl = document.getElementById('g-combo');
-    if(cEl) {
-        if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0;
-    }
-    
+    const scEl = document.getElementById('g-score'); if(scEl) scEl.innerText = window.st.sc.toLocaleString();
+    const cEl = document.getElementById('g-combo'); if(cEl) { if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0; }
     document.getElementById('health-fill').style.height = window.st.hp + "%";
-    
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
     document.getElementById('g-acc').innerText = acc + "%";
-    
-    const fcEl = document.getElementById('hud-fc');
-    if(fcEl) {
-        fcEl.innerText = window.st.fcStatus || "GFC";
-        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
-    }
-
+    const fcEl = document.getElementById('hud-fc'); if(fcEl) { fcEl.innerText = window.st.fcStatus || "GFC"; fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"))); }
     const hSick = document.getElementById('h-sick'); if(hSick) hSick.innerText = window.st.stats.s;
     const hGood = document.getElementById('h-good'); if(hGood) hGood.innerText = window.st.stats.g;
     const hBad = document.getElementById('h-bad'); if(hBad) hBad.innerText = window.st.stats.b;
     const hMiss = document.getElementById('h-miss'); if(hMiss) hMiss.innerText = window.st.stats.m;
-    
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+
+    // SISTEMA DE ALERTA DE MUERTE INMINENTE (Pulsating Danger Vignette)
+    let vign = document.getElementById('near-death-vignette');
+    if(!vign) { 
+        vign = document.createElement('div'); vign.id = 'near-death-vignette';
+        document.getElementById('game-layer').insertBefore(vign, document.getElementById('top-progress-bar'));
+    }
+
+    if (window.st.hp < 20) { // Si la salud está por debajo de 20
+        vign.classList.add('danger-active'); // Empieza a palpitar en rojo
+    } else {
+        vign.classList.remove('danger-active'); // Se quita si te recuperas
+    }
 }
 
 function end(died) {
-    window.st.act = false;
-    if(window.st.src) try{ window.st.src.stop(); }catch(e){}
+    window.st.act = false; if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
-    let touchZones = document.getElementById('mobile-touch-zones'); 
-    if(touchZones) touchZones.style.display = 'none';               
-    
-    if(window.isMultiplayer) {
-        if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
-        if(window.isLobbyHost && window.db && window.currentLobbyId && !died) {
-             setTimeout(() => {
-                window.db.collection("lobbies").doc(window.currentLobbyId).update({ status: 'finished' });
-             }, 2000); 
-        }
-        return; 
-    }
+    // Apagar la viñeta de peligro al terminar
+    let vign = document.getElementById('near-death-vignette');
+    if(vign) vign.classList.remove('danger-active');
+
+    let touchZones = document.getElementById('mobile-touch-zones'); if(touchZones) touchZones.style.display = 'none';               
+    if(window.isMultiplayer) { /* Lógica multi */ return; }
 
     document.getElementById('game-layer').style.display = 'none';
     const modal = document.getElementById('modal-res');
-    
     if(modal) {
         modal.style.display = 'flex';
-        const totalMax = window.st.trueMaxScore || 1;
-        const finalAcc = Math.round((window.st.sc / totalMax) * 1000) / 10;
-        let r="D", c="red";
+        const totalMax = window.st.trueMaxScore || 1; const finalAcc = Math.round((window.st.sc / totalMax) * 1000) / 10;
+        let r="D", c="#F9393F", titleHTML="";
         
         if (!died) {
-            if (finalAcc >= 98) { r="SS"; c="cyan" }
-            else if (finalAcc >= 95) { r="S"; c="gold" }
-            else if (finalAcc >= 90) { r="A"; c="lime" }
-            else if (finalAcc >= 80) { r="B"; c="yellow" }
-            else if (finalAcc >= 70) { r="C"; c="orange" }
-        } else { r="F"; c="red"; }
+            if (finalAcc >= 98) { r="SS"; c="#00FFFF" } else if (finalAcc >= 95) { r="S"; c="var(--gold)" } else if (finalAcc >= 90) { r="A"; c="#12FA05" } else if (finalAcc >= 80) { r="B"; c="yellow" } else if (finalAcc >= 70) { r="C"; c="orange" }
+            titleHTML = `<div id="winner-msg">¡CANCION COMPLETADA!</div>`;
+        } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
         
         let xpGain = 0;
-        if (!died && window.user && window.user.name !== "Guest") {
-            xpGain = Math.floor(window.st.sc / 250);
-            window.user.xp += xpGain;
-            if(typeof save === 'function') save();
-        }
-
-        let fcBadgeHTML = "";
-        if(!died) {
-            if(window.st.fcStatus === "PFC") fcBadgeHTML = `<div style="background:cyan; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px cyan;">🏆 PERFECT FULL COMBO</div>`;
-            else if(window.st.fcStatus === "GFC") fcBadgeHTML = `<div style="background:gold; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px gold;">🌟 GOOD FULL COMBO</div>`;
-            else if(window.st.fcStatus === "FC") fcBadgeHTML = `<div style="background:#12FA05; color:black; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px; box-shadow:0 0 15px #12FA05;">✅ FULL COMBO</div>`;
-            else fcBadgeHTML = `<div style="background:#444; color:white; padding:5px 15px; border-radius:8px; font-weight:900; display:inline-block; margin-top:10px;">CLEAR</div>`;
-        }
+        if (!died && window.user && window.user.name !== "Guest") { xpGain = Math.floor(window.st.sc / 250); window.user.xp += xpGain; if(typeof save === 'function') save(); }
 
         const panel = modal.querySelector('.modal-panel');
         if(panel) {
             panel.innerHTML = `
-                <div class="m-title">RESULTADOS</div>
-                <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
-                    <div class="rank-big" style="color:${c}; font-size:6rem; font-weight:900;">${r}</div>
-                    <div style="text-align:left;">
-                        <div style="font-size:3rem; font-weight:900;">${window.st.sc.toLocaleString()}</div>
-                        <div style="color:#aaa; font-size:1.5rem;">ACC: <span style="color:white">${finalAcc}%</span></div>
-                        ${fcBadgeHTML}
+                <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
+                    <h2 class="modal-neon-title" style="color:var(--gold);">🏆 RESULTADOS</h2>
+                </div>
+                <div class="modal-neon-content">
+                    ${titleHTML}
+                    <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
+                        <div class="rank-big" style="color:${c}; text-shadow:0 0 20px ${c};">${r}</div>
+                        <div style="text-align:left;">
+                            <div id="res-score">${window.st.sc.toLocaleString()}</div>
+                            <div style="color:#aaa; font-size:1.5rem; font-weight:900;">ACC: <span style="color:white">${finalAcc}%</span></div>
+                            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; font-size:1.1rem; margin-top:5px;">+0 PP <span style="font-weight:normal; color:#888;">(Ranked)</span></div>
+                        </div>
+                    </div>
+                    <div class="res-stats-grid">
+                        <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                        <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                        <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                        <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-around; background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; font-weight:bold;">
+                        <div style="color:var(--blue); font-size:1.3rem;">💙 +<span id="res-xp">${xpGain}</span> XP GAINED</div>
+                        <div style="color:var(--gold); font-size:1.3rem;">💰 +<span id="res-sp">0</span> SP SAVED</div>
                     </div>
                 </div>
-                
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; background:#111; padding:15px; border-radius:10px; border:1px solid #333; text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:25px;">
-                    <div style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
-                    <div style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
-                    <div style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
-                    <div style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
-                </div>
-
-                <div class="modal-buttons-row">
-                    <button class="action secondary" onclick="toMenu()">MENU</button>
-                    <button class="action secondary" onclick="restartSong()">REINTENTAR</button>
+                <div class="modal-neon-buttons">
+                    <button class="action" onclick="toMenu()">VOLVER AL MENU</button>
+                    <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
                 </div>
             `;
         }
     }
 }
-
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
