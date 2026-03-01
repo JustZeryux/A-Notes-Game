@@ -1,3 +1,4 @@
+// === NAVEGADOR Y BUSCADOR DE OSU! ===
 window.openOsuBrowser = function() {
     openModal('osu');
     setTimeout(() => document.getElementById('osu-search-inp').focus(), 100);
@@ -26,7 +27,7 @@ window.searchOsu = async function() {
         status.innerText = `✅ ¡Se encontraron ${data.length} resultados!`;
         status.style.color = "var(--good)";
 
-        // FORZAMOS LA CUADRICULA PARA QUE NO SE APLASTEN
+        // Cuadrícula visual
         results.style.display = 'grid';
         results.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
         results.style.gap = '15px';
@@ -77,17 +78,17 @@ window.searchOsu = async function() {
         status.style.color = "var(--miss)";
     }
 };
+
+// === MOTOR DESCOMPRESOR ANTI-CORRUPCIÓN ===
 window.downloadAndPlayOsu = async function(setId, title, imageURL, k) {
     const loader = document.getElementById('loading-overlay');
+    const loaderText = document.getElementById('loading-text');
     if (loader) {
         loader.style.display = 'flex';
-        document.getElementById('loading-text').innerText = "DESCARGANDO MAPA DE OSU!...";
+        if(loaderText) loaderText.innerText = "DESCARGANDO MAPA DE OSU!...";
     }
 
     try {
-        // ========================================================
-        // 🚨 FIX 2: SISTEMA DE DESCARGA MULTI-MIRROR ANTI-CORRUPCIÓN
-        // ========================================================
         const mirrors = [
             `https://api.nerinyan.moe/d/${setId}`,
             `https://catboy.best/d/${setId}`,
@@ -104,7 +105,7 @@ window.downloadAndPlayOsu = async function(setId, title, imageURL, k) {
                 response = await fetch(url);
                 if (response.ok) {
                     downloaded = true;
-                    break; // Si tiene éxito, salimos del ciclo
+                    break; 
                 }
             } catch (e) {
                 console.warn("Falló el servidor: " + url);
@@ -117,20 +118,18 @@ window.downloadAndPlayOsu = async function(setId, title, imageURL, k) {
             return;
         }
 
-        const arrayBuffer = await response.arrayBuffer();
+        let oszBuffer = await response.arrayBuffer();
         
-        // Verificación de seguridad: Asegurarse de que SÍ es un ZIP (Empieza con "PK")
-        const header = new Uint8Array(arrayBuffer.slice(0, 4));
-        if (header[0] !== 80 || header[1] !== 75) { // 80 75 = "PK" en ASCII
+        // Verificación de seguridad: Asegurarse de que SÍ es un ZIP
+        const header = new Uint8Array(oszBuffer.slice(0, 4));
+        if (header[0] !== 80 || header[1] !== 75) { 
             if (loader) loader.style.display = 'none';
             alert("El archivo descargado está corrupto o fue bloqueado por el servidor. Intenta con otra canción.");
             return;
         }
 
-        if (loader) {
-            document.getElementById('loading-text').innerText = "PROCESANDO MAPA...";
-        }
-        const zip = await JSZip.loadAsync(blob);
+        if (loaderText) loaderText.innerText = "PROCESANDO MAPA...";
+        const zip = await JSZip.loadAsync(oszBuffer); // FIX APLICADO
         const files = Object.keys(zip.files);
         
         const osuFiles = files.filter(f => f.endsWith('.osu'));
@@ -139,38 +138,36 @@ window.downloadAndPlayOsu = async function(setId, title, imageURL, k) {
         let selectedOsuText = null;
         for(let f of osuFiles) {
             let text = await zip.file(f).async("string");
-            if(text.includes(`CircleSize:${targetKeys}`) || text.includes(`CircleSize: ${targetKeys}`)) {
+            if(text.includes(`CircleSize:${k}`) || text.includes(`CircleSize: ${k}`)) { // FIX APLICADO
                 selectedOsuText = text; break;
             }
         }
         if(!selectedOsuText) selectedOsuText = await zip.file(osuFiles[0]).async("string");
         
-        loaderText.innerText = "TRADUCIENDO MAPA... 🧠";
+        if (loaderText) loaderText.innerText = "TRADUCIENDO MAPA... 🧠";
         const parsed = parseOsuFile(selectedOsuText);
         
-        loaderText.innerText = "PROCESANDO AUDIO... 🎵";
+        if (loaderText) loaderText.innerText = "PROCESANDO AUDIO... 🎵";
         const audioFileMatcher = new RegExp(parsed.audioFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         const audioKey = files.find(f => audioFileMatcher.test(f));
         
         if(!audioKey) throw new Error("No se encontró el archivo de audio.");
         
         const audioBlob = await zip.file(audioKey).async("blob");
-        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioArrayBuffer = await audioBlob.arrayBuffer(); // FIX DE VARIABLE
         
         if(!window.st.ctx) unlockAudio();
-        const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
+        const audioBuffer = await window.st.ctx.decodeAudioData(audioArrayBuffer);
 
-        // === EL ARREGLO DE LOS SUBTÍTULOS ===
+        // Letras automáticas
         let fetchedLyrics = null;
         if (window.cfg && window.cfg.subtitles) {
-            loaderText.innerText = "BUSCANDO LETRAS AUTOMÁTICAS... 🎤";
+            if (loaderText) loaderText.innerText = "BUSCANDO LETRAS AUTOMÁTICAS... 🎤";
             try {
-                // Limpiamos la basura del título (Ej: "Bad Apple!! (feat. nomico)" -> "Bad Apple!!")
                 let cleanTitle = title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
                 const resLrc = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
                 const dataLrc = await resLrc.json();
                 
-                // Buscamos la mejor coincidencia que tenga subtítulos sincronizados
                 const bestMatch = dataLrc.find(s => s.syncedLyrics);
                 if (bestMatch && bestMatch.syncedLyrics) {
                     fetchedLyrics = bestMatch.syncedLyrics;
@@ -178,10 +175,10 @@ window.downloadAndPlayOsu = async function(setId, title, imageURL, k) {
             } catch(e) { console.warn("No se encontraron letras"); }
         }
 
-window.curSongData = {
+        window.curSongData = {
             id: "osu_" + setId,
             title: title, 
-            imageURL: coverUrl,
+            imageURL: imageURL, // FIX DE VARIABLE
             lyrics: fetchedLyrics 
         };
 
@@ -192,21 +189,18 @@ window.curSongData = {
             kVersion: parsed.keys 
         };
 
-        // ESTO ES VITAL PARA EL MULTIJUGADOR:
         window.preparedSong = songObj; 
-        loader.style.display = 'none';
+        if(loader) loader.style.display = 'none';
 
         if(window.currentLobbyId) {
-             // Si estamos en online, le avisamos al servidor que ya descomprimimos todo
              if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         } else {
-             // Si estamos solos, empezamos directo
              playSongInternal(songObj);
         }
 
     } catch(e) {
         console.error(e);
-        loader.style.display = 'none';
+        if(loader) loader.style.display = 'none';
         alert("Fallo al cargar mapa de Osu!: " + e.message);
     }
 };
@@ -218,14 +212,12 @@ function parseOsuFile(text) {
     let keys = 4;
     let audioFilename = "audio.mp3";
     
-    // Buscar configuración de teclas y audio
     for(let i = 0; i < hitObjectsIdx; i++) {
         if(lines[i].startsWith('CircleSize:')) keys = parseInt(lines[i].split(':')[1]);
         if(lines[i].startsWith('AudioFilename:')) audioFilename = lines[i].split(':')[1].trim();
     }
 
     const map = [];
-    // Leer cada nota escrita a mano por la comunidad
     for(let i = hitObjectsIdx + 1; i < lines.length; i++) {
         if(!lines[i]) continue;
         const parts = lines[i].split(',');
@@ -234,7 +226,6 @@ function parseOsuFile(text) {
             const time = parseInt(parts[2]);
             const typeFlag = parseInt(parts[3]);
             
-            // Convertimos la coordenada X de Osu (0 a 512) al carril de tu juego (0, 1, 2, 3...)
             let lane = Math.floor(Math.max(0, Math.min(511, x)) * keys / 512);
             
             const isHold = (typeFlag & 128) !== 0;
@@ -251,7 +242,6 @@ function parseOsuFile(text) {
         }
     }
     
-    // Osu no necesita el "START_OFFSET" de 3 segundos como tu genMap, pero le agregamos 1 segundo de cortesía
     map.forEach(n => n.t += 3000);
 
     return { map, keys, audioFilename };
