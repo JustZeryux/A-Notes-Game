@@ -1012,3 +1012,32 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 /* 6. Animación suave para botones */
 .action, .filter-btn, .nav-btn, .clan-box { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .action:active { transform: scale(0.95); }
+
+/* =========================================
+   SISTEMA DE ADMINISTRADOR (GOD MODE) 🚨
+========================================= */
+/* Pantalla de Mantenimiento (Cubre todo) */
+#maintenance-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(10, 0, 0, 0.98); z-index: 9999999;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; backdrop-filter: blur(10px);
+}
+.maint-icon { font-size: 6rem; animation: pulseBadge 2s infinite; filter: drop-shadow(0 0 20px #ff003c); }
+.maint-title { color: #ff003c; font-size: 4rem; font-weight: 900; margin-top: 20px; text-transform: uppercase; letter-spacing: 5px; }
+.maint-desc { color: #ccc; font-size: 1.2rem; max-width: 600px; margin-top: 15px; }
+
+/* El Modal del Admin */
+.admin-panel-container { border: 2px solid #ff003c !important; box-shadow: 0 0 30px rgba(255, 0, 60, 0.4) !important; }
+.admin-header { background: linear-gradient(90deg, #300, #ff003c); padding: 20px; text-align: center; border-bottom: 2px solid #ff003c; }
+.admin-section { background: #111; padding: 20px; border-radius: 8px; border-left: 4px solid #ff003c; margin-bottom: 15px; }
+
+/* Notificación Global (Anuncio del Admin) */
+#global-announcement {
+    position: fixed; top: -150px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(to right, #ff003c, #aa0022);
+    color: white; padding: 20px 40px; border-radius: 0 0 20px 20px;
+    box-shadow: 0 10px 40px rgba(255,0,60,0.6); z-index: 999999;
+    text-align: center; font-weight: bold; border: 2px solid #ffaa00; border-top: none;
+    transition: top 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
