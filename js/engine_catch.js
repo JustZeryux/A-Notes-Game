@@ -1,4 +1,4 @@
-/* === js/engine_catch.js - MOTOR CATCH THE BEAT 🍎 === */
+/* === js/engine_catch.js - MOTOR CATCH THE BEAT PRO 🍎 === */
 
 window.startCatchEngine = async function(songObj) {
     const loader = document.getElementById('loading-overlay');
@@ -38,107 +38,220 @@ function parseCatchMap(text) {
     return { hitObjects, audioFile };
 }
 
-function runCatchGame(audioBuffer, map, song) {
+function runCatchGame(audioBuffer, map, songObj) {
     document.getElementById('game-layer').style.display = 'none';
-    let canvas = document.getElementById('std-canvas'); // Reusamos el canvas
+    window.st.act = true; window.st.paused = false;
+
+    let canvas = document.getElementById('std-canvas'); 
     canvas.style.display = 'block';
     const ctx = canvas.getContext('2d');
 
-    // UI Superior (Stats)
     let ui = document.getElementById('catch-ui') || document.createElement('div');
     ui.id = 'catch-ui'; ui.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; z-index:9000; pointer-events:none;";
+    
+    const avUrl = (window.user && window.user.avatarData) ? window.user.avatarData : 'icon.png';
+    const uName = window.user ? window.user.name : 'Guest';
+    const uLvl = window.user ? window.user.lvl : 1;
+
     ui.innerHTML = `
-        <div style="position:absolute; top:20px; right:30px; text-align:right; color:white; font-family:Arial;">
-            <div id="ct-score" style="font-size:3.5rem; font-weight:900; text-shadow:0 0 15px white;">0</div>
-            <div id="ct-acc" style="font-size:1.5rem; color:#44b9ff; font-weight:bold;">100.00%</div>
+        <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; backdrop-filter:blur(8px);">
+            <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white; box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
+            <div style="display:flex; flex-direction:column; justify-content:center; padding-right:10px;">
+                <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; letter-spacing:1px; line-height:1;">${uName}</div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
+                    <div style="color:var(--gold); font-weight:900; font-size:0.7rem;">LVL ${uLvl}</div>
+                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333; box-shadow:inset 0 0 5px black;">
+                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s; box-shadow:0 0 10px var(--good);"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="ct-combo" style="position:absolute; bottom:30px; left:30px; color:white; font-size:5rem; font-weight:900; text-shadow:0 0 20px #44b9ff;">0x</div>
+        <div style="position:absolute; top:20px; right:30px; text-align:right;">
+            <div id="ct-score" style="color:white; font-size:4rem; font-weight:900; text-shadow:0 0 15px white; line-height:1;">0</div>
+            <div id="ct-acc" style="color:#00ffff; font-size:2rem; font-weight:bold;">100.00%</div>
+        </div>
+        <div id="ct-combo" style="position:absolute; bottom:30px; left:30px; color:white; font-size:6rem; font-weight:900; text-shadow:0 0 30px #00ffff;">0x</div>
+        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; box-shadow:inset 0 0 150px 50px #F9393F; opacity:0; transition:0.3s;"></div>
     `;
     document.body.appendChild(ui);
 
-    let stats = { score: 0, combo: 0, caught: 0, total: 0, catcherX: 256, speed: 8 };
+    window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
+    let stats = { caught: 0, total: 0, catcherX: 256, speed: 10 };
     let keys = { left: false, right: false, shift: false };
     let isRunning = true;
-    const catcherWidth = 80;
-    const bgImg = new Image(); if(song.imageURL) bgImg.src = song.imageURL;
+    const catcherWidth = 100;
+    
+    let dashTrail = [];
+    let particles = [];
 
-    const src = window.st.ctx.createBufferSource();
-    src.buffer = audioBuffer; src.connect(window.st.ctx.destination);
-    const startTime = window.st.ctx.currentTime;
-    src.start(startTime + 3);
+    const bgImg = new Image(); if(songObj.imageURL) bgImg.src = songObj.imageURL;
+
+    window.st.src = window.st.ctx.createBufferSource();
+    window.st.src.buffer = audioBuffer; window.st.src.connect(window.st.ctx.destination);
+    window.st.t0 = window.st.ctx.currentTime;
+    window.st.src.start(window.st.t0 + 3);
+    window.st.src.onended = () => { if(isRunning && window.st.act) endEngine(false); };
+
+    function spawnExplosion(x, y) {
+        for(let i=0; i<10; i++) {
+            particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1 });
+        }
+    }
 
     function loop() {
-        if(!isRunning) return;
-        const now = (window.st.ctx.currentTime - startTime) * 1000;
+        if(!isRunning || !window.st.act) return;
+        if(window.st.paused) { requestAnimationFrame(loop); return; }
+
+        const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Fondo Borroso
-        ctx.globalAlpha = 0.25;
+        ctx.globalAlpha = 0.3;
         if(bgImg.complete) ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
         ctx.globalAlpha = 1.0;
 
-        // Movimiento Catcher
-        let currentSpeed = keys.shift ? stats.speed * 2 : stats.speed;
-        if(keys.left) stats.catcherX = Math.max(40, stats.catcherX - currentSpeed);
-        if(keys.right) stats.catcherX = Math.min(472, stats.catcherX + currentSpeed);
+        let currentSpeed = keys.shift ? stats.speed * 2.5 : stats.speed;
+        if(keys.left) stats.catcherX = Math.max(0, stats.catcherX - currentSpeed);
+        if(keys.right) stats.catcherX = Math.min(512, stats.catcherX + currentSpeed);
 
-        const scale = canvas.height / 600; // Escala interna
+        const scale = canvas.height / 600; 
         const screenCatcherX = (canvas.width / 2) + (stats.catcherX - 256) * scale;
-        const catcherY = canvas.height - 80;
+        const catcherY = canvas.height - 100;
 
-        // Dibujar Catcher (Plato)
-        ctx.fillStyle = '#44b9ff';
-        ctx.shadowBlur = 15; ctx.shadowColor = '#44b9ff';
+        if (keys.shift && (keys.left || keys.right)) dashTrail.push({ x: screenCatcherX, life: 1 });
+
+        for(let i=dashTrail.length-1; i>=0; i--) {
+            let t = dashTrail[i]; t.life -= 0.1;
+            ctx.fillStyle = '#00ffff'; ctx.globalAlpha = t.life * 0.5;
+            ctx.fillRect(t.x - (catcherWidth*scale/2), catcherY, catcherWidth*scale, 15);
+            if(t.life <= 0) dashTrail.splice(i,1);
+        }
+        ctx.globalAlpha = 1.0;
+
+        ctx.fillStyle = keys.shift ? '#ff0055' : '#00e5ff';
+        ctx.shadowBlur = 20; ctx.shadowColor = ctx.fillStyle;
         ctx.fillRect(screenCatcherX - (catcherWidth*scale/2), catcherY, catcherWidth*scale, 15);
         ctx.shadowBlur = 0;
 
-        // Frutas
+        for(let i=particles.length-1; i>=0; i--) {
+            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 6*p.life, 0, Math.PI*2);
+            ctx.fillStyle = '#ffcc00'; ctx.globalAlpha = p.life; ctx.fill();
+            if(p.life <= 0) particles.splice(i,1);
+        }
+        ctx.globalAlpha = 1.0;
+
         map.forEach(f => {
             if(f.caught || f.missed) return;
-            const dropTime = 800; // Tiempo de caída
+            const dropTime = 1000; 
             const timeDiff = f.t - now;
 
             if(timeDiff <= dropTime && timeDiff > -100) {
                 const x = (canvas.width / 2) + (f.x - 256) * scale;
                 const y = ((dropTime - timeDiff) / dropTime) * catcherY;
 
-                // Dibujar Fruta
                 ctx.beginPath(); ctx.arc(x, y, 20 * scale, 0, Math.PI * 2);
-                ctx.fillStyle = '#ff4444'; ctx.fill();
+                ctx.fillStyle = '#ff44aa'; ctx.fill();
                 ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
 
-                // Detección de Colisión
                 if(y >= catcherY - 20 && y <= catcherY + 10) {
-                    if(Math.abs(x - screenCatcherX) < (catcherWidth * scale / 1.5)) {
-                        f.caught = true; stats.score += 300; stats.combo++; stats.caught++; stats.total++;
-                        updateHUD();
+                    if(Math.abs(x - screenCatcherX) < (catcherWidth * scale / 1.2)) {
+                        f.caught = true; window.st.sc += 300; window.st.cmb++; stats.caught++; stats.total++;
+                        window.st.hp = Math.min(100, window.st.hp + 2);
+                        spawnExplosion(x, catcherY); updateHUD();
                     }
                 }
             } else if (timeDiff < -100) {
-                f.missed = true; stats.combo = 0; stats.total++;
-                updateHUD();
+                f.missed = true; window.st.cmb = 0; stats.total++; window.st.hp -= 10;
+                updateHUD(); checkDeath();
             }
         });
 
         requestAnimationFrame(loop);
     }
 
+    function checkDeath() { if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); } }
+
     function updateHUD() {
-        document.getElementById('ct-score').innerText = stats.score.toLocaleString();
-        document.getElementById('ct-combo').innerText = stats.combo + "x";
+        document.getElementById('ct-score').innerText = window.st.sc.toLocaleString();
+        document.getElementById('ct-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
         const acc = stats.total > 0 ? ((stats.caught / stats.total) * 100).toFixed(2) : "100.00";
         document.getElementById('ct-acc').innerText = acc + "%";
+        
+        const hpBar = document.getElementById('engine-hp-fill');
+        hpBar.style.width = Math.max(0, window.st.hp) + "%";
+        hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
+        
+        const vign = document.getElementById('near-death-vignette');
+        if(window.st.hp < 20) vign.style.opacity = '0.8'; else vign.style.opacity = '0';
+        
+        if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
     }
 
     const handleKey = (e, down) => {
         if(e.key === "ArrowLeft") keys.left = down;
         if(e.key === "ArrowRight") keys.right = down;
         if(e.key === "Shift") keys.shift = down;
-        if(down && e.key === "Escape") { isRunning = false; src.stop(); canvas.style.display = 'none'; ui.remove(); document.getElementById('menu-container').classList.remove('hidden'); }
+        if(down && e.key === "Escape") { e.preventDefault(); toggleEnginePause(); }
     };
     window.onkeydown = (e) => handleKey(e, true);
     window.onkeyup = (e) => handleKey(e, false);
-    
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+
+    function toggleEnginePause() {
+        window.st.paused = !window.st.paused;
+        const modal = document.getElementById('modal-pause');
+        if(window.st.paused) {
+            window.st.pauseTime = performance.now();
+            if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
+            if(modal) {
+                modal.style.setProperty('display', 'flex', 'important'); modal.style.setProperty('z-index', '999999', 'important');
+                const acc = document.getElementById('ct-acc').innerText;
+                modal.querySelector('.modal-panel').innerHTML = `
+                    <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
+                    <div class="modal-neon-content"><div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">ACCURACY<br><span style="color:white; font-size:4.5rem;">${acc}</span></div></div>
+                    <div class="modal-neon-buttons"><button class="action" onclick="window.resumeEngineGame()">▶️ CONTINUAR</button><button class="action secondary" onclick="window.toMenu()">🚪 SALIR</button></div>`;
+            }
+        } else { window.resumeEngineGame(); }
+    }
+
+    window.resumeEngineGame = function() {
+        document.getElementById('modal-pause').style.setProperty('display', 'none', 'important');
+        if(window.st.pauseTime) { window.st.t0 += (performance.now() - window.st.pauseTime)/1000; window.st.pauseTime = null; }
+        window.st.paused = false;
+        if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
+        requestAnimationFrame(loop);
+    };
+
+    function endEngine(died) {
+        isRunning = false; window.st.act = false;
+        try{ window.st.src.stop(); }catch(e){}
+        canvas.style.display = 'none'; ui.remove();
+        window.onkeydown = null; window.onkeyup = null;
+        
+        const modal = document.getElementById('modal-res');
+        if(modal) {
+            modal.style.display = 'flex';
+            const acc = document.getElementById('ct-acc').innerText;
+            const r = died ? "F" : (parseFloat(acc) >= 95 ? "S" : (parseFloat(acc)>=90 ? "A" : "B"));
+            const c = died ? "#F9393F" : (r==="S" ? "var(--gold)" : "var(--good)");
+            const titleHTML = died ? `<div id="loser-msg" style="color:#F9393F; font-size:2rem; font-weight:900;">💀 JUEGO TERMINADO</div>` : `<div id="winner-msg" style="color:#12FA05; font-size:2rem; font-weight:900;">¡MAPA COMPLETADO!</div>`;
+            
+            modal.querySelector('.modal-panel').innerHTML = `
+                <div class="modal-neon-header" style="border-bottom-color: ${c};"><h2 class="modal-neon-title" style="color:${c};">🏆 RESULTADOS CATCH</h2></div>
+                <div class="modal-neon-content">
+                    ${titleHTML}
+                    <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin: 25px 0;">
+                        <div class="rank-big" style="color:${c}; font-size:6rem; font-weight:900; text-shadow:0 0 20px ${c};">${r}</div>
+                        <div style="text-align:left;">
+                            <div style="font-size:3rem; font-weight:900; color:white;">${window.st.sc.toLocaleString()}</div>
+                            <div style="color:#aaa; font-size:1.5rem; font-weight:900;">ACC: <span style="color:white">${acc}</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-neon-buttons"><button class="action" onclick="window.toMenu()">VOLVER AL MENU</button></div>
+            `;
+        }
+    }
+
     loop();
 };
