@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE CATCH V-PRO (CRASH FIXED + SKINS + LYRICS + MOBILE UI) 🍎
+   ENGINE CATCH V-PRO (ANTI-CRASH + SKINS + LYRICS + MOBILE UI) 🍎
    ========================================================================== */
 
 window.startCatchEngine = async function(songObj) {
@@ -111,9 +111,8 @@ function runCatchGame(audioBuffer, map, songObj) {
 
     if('ontouchstart' in window) document.getElementById('ct-mobile-controls').style.display = 'flex';
 
-    // VARIABLES MAESTRAS (EVITAR CRASHEO DE STATS)
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
-    window.st.stats = { s:0, g:0, b:0, m:0 }; // s = caught, m = missed
+    window.st.stats = { s:0, g:0, b:0, m:0 }; 
     window.st.fcStatus = "PFC";
     window.st.trueMaxScore = map.length * 300;
     let catcherX = 256; let speed = 10;
@@ -125,7 +124,6 @@ function runCatchGame(audioBuffer, map, songObj) {
     window.st.spawned = [];
     let dashTrail = []; let particles = [];
 
-    // Skin
     let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
@@ -170,8 +168,10 @@ function runCatchGame(audioBuffer, map, songObj) {
             let idx = window.st.currentLyricIdx;
             if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
                 const subEl = document.getElementById('subtitles-text');
-                subEl.innerText = window.st.parsedLyrics[idx].tx;
-                subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
+                if(subEl) {
+                    subEl.innerText = window.st.parsedLyrics[idx].tx;
+                    subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
+                }
                 window.st.currentLyricIdx++;
             }
         }
@@ -225,6 +225,7 @@ function runCatchGame(audioBuffer, map, songObj) {
 
             if (timeDiff < -100) {
                 f.missed = true; window.st.cmb = 0; window.st.stats.m++; window.st.hp -= 10; window.st.fcStatus = "CLEAR";
+                try { if(typeof window.playMiss === 'function') window.playMiss(); } catch(e){}
                 window.st.spawned.splice(i, 1);
                 updateHUD(); checkDeath();
                 continue;
@@ -241,6 +242,7 @@ function runCatchGame(audioBuffer, map, songObj) {
                 if(Math.abs(x - screenCatcherX) < (catcherWidth * scale / 1.2)) {
                     f.caught = true; window.st.sc += 300; window.st.cmb++; window.st.stats.s++;
                     window.st.hp = Math.min(100, window.st.hp + 2);
+                    try { if(typeof window.playHit === 'function') window.playHit(); } catch(e){}
                     spawnExplosion(x, catcherY); updateHUD();
                     window.st.spawned.splice(i, 1);
                 }
@@ -250,35 +252,36 @@ function runCatchGame(audioBuffer, map, songObj) {
         window.st.animId = requestAnimationFrame(loop);
     }
 
-    function checkDeath() { if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); } }
+    function checkDeath() { if(window.st.hp <= 0 && isRunning) { window.st.hp = 0; endEngine(true); } }
 
     function updateHUD() {
-        document.getElementById('ct-score').innerText = window.st.sc.toLocaleString();
-        document.getElementById('ct-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
-        const total = window.st.stats.s + window.st.stats.m;
-        const acc = total > 0 ? ((window.st.stats.s / total) * 100).toFixed(2) : "100.00";
-        document.getElementById('ct-acc').innerText = acc + "%";
-        
-        const fcEl = document.getElementById('hud-fc');
-        fcEl.innerText = window.st.fcStatus; 
-        fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red")));
+        if(!isRunning) return; // BLINDAJE CONTRA DOM LEAK
+        try {
+            document.getElementById('ct-score').innerText = window.st.sc.toLocaleString();
+            document.getElementById('ct-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
+            const total = window.st.stats.s + window.st.stats.m;
+            const acc = total > 0 ? ((window.st.stats.s / total) * 100).toFixed(2) : "100.00";
+            document.getElementById('ct-acc').innerText = acc + "%";
+            
+            const fcEl = document.getElementById('hud-fc');
+            if(fcEl) { fcEl.innerText = window.st.fcStatus; fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"))); }
 
-        const hpBar = document.getElementById('engine-hp-fill');
-        if (hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
-        
-        const vign = document.getElementById('near-death-vignette');
-        if(vign) { if(window.st.hp < 20) vign.style.opacity = '1'; else vign.style.opacity = '0'; }
-        if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+            const hpBar = document.getElementById('engine-hp-fill');
+            if (hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
+            
+            const vign = document.getElementById('near-death-vignette');
+            if(vign) { if(window.st.hp < 20) vign.style.opacity = '1'; else vign.style.opacity = '0'; }
+            if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
+        } catch(e) {}
     }
 
     window.st.ctKeyHandler = (e, down) => {
+        if(e.key === "Escape" && down && isRunning) { e.preventDefault(); e.stopPropagation(); window.toggleEnginePause(); return; }
         if(e.key === "ArrowLeft") keys.left = down;
         if(e.key === "ArrowRight") keys.right = down;
         if(e.key === "Shift") keys.shift = down;
-        if(down && e.key === "Escape") { e.preventDefault(); window.toggleEnginePause(); }
     };
     
-    // Controles Móviles
     const btnL = document.getElementById('btn-left'); const btnR = document.getElementById('btn-right'); const btnD = document.getElementById('btn-dash');
     if(btnL) { btnL.ontouchstart = (e) => { e.preventDefault(); keys.left = true; }; btnL.ontouchend = (e) => { e.preventDefault(); keys.left = false; }; }
     if(btnR) { btnR.ontouchstart = (e) => { e.preventDefault(); keys.right = true; }; btnR.ontouchend = (e) => { e.preventDefault(); keys.right = false; }; }
@@ -287,12 +290,12 @@ function runCatchGame(audioBuffer, map, songObj) {
     window.st.ctResizeHandler = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     window.st.ctResizeHandler();
 
-    window.addEventListener('keydown', (e) => window.st.ctKeyHandler(e, true));
-    window.addEventListener('keyup', (e) => window.st.ctKeyHandler(e, false));
+    window.addEventListener('keydown', (e) => window.st.ctKeyHandler(e, true), {capture: true});
+    window.addEventListener('keyup', (e) => window.st.ctKeyHandler(e, false), {capture: true});
     window.addEventListener('resize', window.st.ctResizeHandler);
 
     window.toggleEnginePause = function() {
-        if(!window.st.act) return;
+        if(!window.st.act || !isRunning) return;
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
         let vign = document.getElementById('near-death-vignette');
@@ -310,7 +313,7 @@ function runCatchGame(audioBuffer, map, songObj) {
                     <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
                     <div class="modal-neon-content">
                         <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
-                            ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${acc}%</span>
+                            ACCURACY<br><span style="color:white; font-size:4.5rem;">${acc}%</span>
                         </div>
                         <div class="res-stats-grid">
                             <div class="res-stat-box" style="color:var(--sick)">CATCH<br><span style="color:white">${window.st.stats.s}</span></div>
@@ -329,17 +332,21 @@ function runCatchGame(audioBuffer, map, songObj) {
         document.getElementById('modal-pause').style.setProperty('display', 'none', 'important');
         if(window.st.pauseTime) { window.st.t0 += (performance.now() - window.st.pauseTime)/1000; window.st.pauseTime = null; }
         window.st.paused = false;
-        if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
+        if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
     };
 
     function endEngine(died) {
+        if(!isRunning) return; // FIX DE SEGURIDAD DEFINITIVO
         isRunning = false; window.st.act = false;
         cancelAnimationFrame(window.st.animId);
         try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
         
         window.removeEventListener('resize', window.st.ctResizeHandler);
+        window.removeEventListener('keydown', window.st.ctKeyHandler, {capture: true});
+        window.removeEventListener('keyup', window.st.ctKeyHandler, {capture: true});
 
-        canvas.style.display = 'none'; ui.remove();
+        if(canvas) canvas.style.display = 'none'; 
+        if(ui) ui.remove();
         if(window.isMultiplayer) return;
         
         const modal = document.getElementById('modal-res');
@@ -355,7 +362,11 @@ function runCatchGame(audioBuffer, map, songObj) {
             } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
             
             let xpGain = 0;
-            if (!died && window.user && window.user.name !== "Guest") { xpGain = Math.floor(window.st.sc / 250); window.user.xp += xpGain; if(typeof save === 'function') save(); }
+            if (!died && window.user && window.user.name !== "Guest") { 
+                xpGain = Math.floor(window.st.sc / 250); 
+                window.user.xp = (window.user.xp || 0) + xpGain; 
+                if(typeof save === 'function') save(); 
+            }
 
             modal.querySelector('.modal-panel').innerHTML = `
                 <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
