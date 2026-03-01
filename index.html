@@ -93,6 +93,8 @@
                 <button class="nav-btn" id="nav-settings" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openModal('settings')">⚙️ AJUSTES</button>
                 <button class="nav-btn" id="nav-rank" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
                 <button class="nav-btn" id="nav-friends" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openFriends()">👥 AMIGOS</button>
+                
+                <button class="nav-btn" id="nav-clans" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openClansModal()">🛡️ CLANES</button>
     
                 <button class="nav-btn" onclick="openStudioDashboard()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
                     ✏️ CREATOR STUDIO
@@ -363,21 +365,6 @@
             <button class="action secondary" style="margin-top:20px;" onclick="closeModal('studio')">CERRAR STUDIO</button>
         </div>
     </div>
-    
-    <div id="modal-friend-profile" class="modal-overlay">
-        <div class="modal-panel login-box">
-            <div id="fp-av" class="prof-av-big"></div>
-            <h2 id="fp-name">...</h2>
-            <div id="fp-lvl">LVL ...</div>
-            <div id="fp-stats"><div class="fp-stat-box">SCORE<br><span id="fp-score">0</span></div></div>
-            <div id="fp-status-text">...</div>
-            <div class="fp-actions">
-                <button class="btn-chat" onclick="openFloatingChat()">💬</button>
-                <button id="btn-challenge" class="btn-add" disabled>⚔️</button>
-            </div>
-            <button class="action secondary" onclick="closeModal('friend-profile')">CERRAR</button>
-        </div>
-    </div>
 
     <div id="modal-profile" class="modal-overlay">
         <div class="modal-panel" style="width: 95%; max-width: 800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
@@ -406,26 +393,24 @@
                 <div style="padding: 0 5% 40px 5%; position:relative; top:-60px;">
                     
                     <div class="profile-header-flex" style="display:flex; align-items:flex-end; gap:35px;">
+                        
                         <div style="position:relative; z-index:10;">
-                            <div style="position:relative; z-index:10;">
                             <label class="prof-av-big" id="p-av-big" style="width:140px; height:140px; border-radius:20px; border:4px solid var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative; display:block; cursor:pointer; overflow:hidden;">
-        
-                            <span id="p-av-letter" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:4rem; font-weight:900; color:#555; z-index:1;"></span>
-        
-                            <div id="p-av-overlay" style="display:none; position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.7); color:white; text-align:center; padding:5px 0; font-size:0.8rem; font-weight:bold; z-index:2; text-transform:uppercase;">CAMBIAR</div>
-        
-                            <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
+                                <span id="p-av-letter" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:4rem; font-weight:900; color:#555; z-index:1;"></span>
+                                <div id="p-av-overlay" style="display:none; position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.7); color:white; text-align:center; padding:5px 0; font-size:0.8rem; font-weight:bold; z-index:2; text-transform:uppercase;">CAMBIAR</div>
+                                <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
                             </label>
-                            </div>
                             <div id="p-top-badge" style="display:none; position:absolute; bottom:-12px; right:-18px; font-size:1.5rem; font-weight:900; z-index:15; padding: 3px 12px; transform: rotate(-8deg);">
                                 👑 #1
                             </div>
                         </div>
                         
-                        <div style="display:flex; align-items:center;">
-    <h2 id="p-name" style="margin:0; font-size:3.5rem; font-weight:900; text-shadow:0 4px 15px rgba(0,0,0,0.8); color:white; line-height: 1;">User</h2>
-    <span id="p-user-tag" class="player-tag" style="display:none;">TAG</span>
-                        </div>
+                        <div style="flex:1; padding-bottom: 10px;">
+                            <div id="p-name-container" style="display:flex; align-items:center;">
+                                <h2 id="p-name" style="margin:0; font-size:3.5rem; font-weight:900; text-shadow:0 4px 15px rgba(0,0,0,0.8); color:white; line-height: 1;">User</h2>
+                                <span id="p-user-tag" class="player-tag" style="display:none;">TAG</span>
+                            </div>
+
                             <div style="display:flex; gap:15px; align-items:center; margin-top:5px;">
                                 <div id="p-lvl-txt" style="color:var(--gold); font-weight:900; font-size:1.2rem; letter-spacing: 2px;">LVL 1</div>
                                 <div id="p-online-status" style="font-size: 13px; font-weight:bold; background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:10px; border: 1px solid #444;">⚪ Offline</div>
@@ -498,26 +483,26 @@
                         </div>
 
                         <div id="custom-tag-creator" style="display:none; background:rgba(255,102,170,0.1); border: 1px solid var(--accent); padding:15px; border-radius:10px; margin-bottom:20px;">
-    <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">🎟️ CREADOR DE TAG CUSTOM</div>
-    <input type="text" id="inp-tag-text" class="log-inp" placeholder="Texto del Tag (Max 12 letras)" maxlength="12">
-    <div style="display:flex; gap:10px; margin-bottom:10px;">
-        <div style="flex:1;">
-            <label style="font-size:0.8rem; color:#aaa;">Color Fondo</label>
-            <input type="color" id="inp-tag-bg" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
-        </div>
-        <div style="flex:1;">
-            <label style="font-size:0.8rem; color:#aaa;">Color Letra</label>
-            <input type="color" id="inp-tag-color" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
-        </div>
-    </div>
-</div>
+                            <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">🎟️ CREADOR DE TAG CUSTOM</div>
+                            <input type="text" id="inp-tag-text" class="log-inp" placeholder="Texto del Tag (Max 12 letras)" maxlength="12">
+                            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:0.8rem; color:#aaa;">Color Fondo</label>
+                                    <input type="color" id="inp-tag-bg" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:0.8rem; color:#aaa;">Color Letra</label>
+                                    <input type="color" id="inp-tag-color" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+                                </div>
+                            </div>
+                        </div>
 
-<div style="margin-bottom:20px;">
-    <label style="color:#888; font-weight:bold; font-size:0.9rem;">Equipar Tag de mi Inventario</label>
-    <select id="sel-equip-tag" class="log-inp" style="background:#222; color:white; border:1px solid #444;" onchange="checkCustomTag()">
-        <option value="none">Ninguno</option>
-        </select>
-</div>
+                        <div style="margin-bottom:20px;">
+                            <label style="color:#888; font-weight:bold; font-size:0.9rem;">Equipar Tag de mi Inventario</label>
+                            <select id="sel-equip-tag" class="log-inp" style="background:#222; color:white; border:1px solid #444;" onchange="if(typeof checkCustomTag==='function')checkCustomTag()">
+                                <option value="none">Ninguno</option>
+                            </select>
+                        </div>
                         
                         <button class="action secondary" style="width:100%; margin-bottom:10px;" onclick="saveProfilePrivacy()">GUARDAR CAMBIOS</button>
                         
@@ -526,6 +511,92 @@
                         </div>
 
                         <button class="action" style="width:100%; background:#444; color:white; margin-top:15px;" onclick="toggleProfileSettings(false)">⬅ VOLVER</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-clans" class="modal-overlay">
+        <div class="modal-panel" style="width: 850px; max-width: 95%; max-height: 85vh; overflow-y: auto;">
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--gold); padding-bottom:15px; margin-bottom:20px;">
+                <h2 style="margin:0; font-size:2rem; font-weight:900; color:var(--gold);">🛡️ CUARTEL DE CLANES</h2>
+                <button class="action secondary" onclick="closeModal('clans')">CERRAR</button>
+            </div>
+
+            <div id="clan-none-view" style="display:none; text-align:center;">
+                <div style="color:#aaa; font-size:1.2rem; margin-bottom:30px;">Únete a un clan o forja tu propia leyenda.</div>
+                
+                <div class="clan-grid">
+                    <div class="clan-box" style="--c: var(--gold);">
+                        <h3 style="color:var(--gold); margin-top:0;">👑 CREAR CLAN</h3>
+                        <p style="color:#888; font-size:0.9rem;">Costo: <span style="color:var(--gold); font-weight:bold;">50,000 SP</span></p>
+                        <input type="text" id="c-new-name" class="log-inp" placeholder="Nombre (Ej: Osu Masters)">
+                        <input type="text" id="c-new-tag" class="log-inp" placeholder="Tag [Max 4 Letras] (Ej: OSU)" maxlength="4" style="text-transform:uppercase;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                            <label style="color:#aaa; font-size:0.9rem;">Color del Tag:</label>
+                            <input type="color" id="c-new-color" value="#ff66aa" style="border:none; background:none; cursor:pointer; height:40px; width:100%;">
+                        </div>
+                        <button class="action" style="width:100%; background:var(--gold); color:black;" onclick="createClan()">FUNDAR CLAN</button>
+                    </div>
+
+                    <div class="clan-box" style="--c: var(--blue);">
+                        <h3 style="color:var(--blue); margin-top:0;">🤝 UNIRSE A UN CLAN</h3>
+                        <p style="color:#888; font-size:0.9rem;">Ingresa el Tag del clan al que quieres unirte.</p>
+                        <input type="text" id="c-join-tag" class="log-inp" placeholder="Ej: OSU" maxlength="4" style="text-transform:uppercase; margin-bottom:20px;">
+                        <button class="action" style="width:100%; background:var(--blue);" onclick="joinClan()">BUSCAR Y UNIRSE</button>
+                        
+                        <div id="top-clans-list" style="margin-top:20px; text-align:left; max-height:150px; overflow-y:auto;">
+                            <div style="font-size:0.8rem; color:#666; margin-bottom:5px; font-weight:bold;">CLANES DESTACADOS</div>
+                            <div id="c-popular-list">Buscando...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="clan-dash-view" style="display:none;">
+                <div style="display:flex; align-items:center; gap:15px; margin-bottom: 20px;">
+                    <span id="c-dash-tag" class="clan-tag" style="font-size:1.5rem; padding:5px 15px;">[TAG]</span>
+                    <div>
+                        <h2 id="c-dash-name" style="margin:0; font-size:2.5rem; color:white;">Nombre del Clan</h2>
+                        <div style="color:var(--gold); font-weight:bold;">Nivel <span id="c-dash-lvl">1</span> • Miembros: <span id="c-dash-members">1</span>/10</div>
+                    </div>
+                </div>
+
+                <div class="clan-grid">
+                    <div class="clan-box" style="--c: #12FA05;">
+                        <h3 style="margin-top:0; color:#12FA05;">💰 BANCO DEL CLAN</h3>
+                        <div style="font-size:2rem; font-weight:900; color:var(--gold);"><span id="c-dash-sp">0</span> SP</div>
+                        <div style="display:flex; gap:10px; margin-top:15px;">
+                            <input type="number" id="c-donate-amount" class="log-inp" placeholder="Cant. SP" style="margin:0; flex:1;">
+                            <button class="action" style="width:auto; padding:0 20px; background:#12FA05; color:black;" onclick="donateToClan()">DONAR</button>
+                        </div>
+                        <h3 style="margin-top:25px; color:#aaa; font-size:1rem;">👥 MIEMBROS</h3>
+                        <div id="c-dash-members-list" style="background:#0a0a0a; border:1px solid #333; padding:10px; border-radius:8px; max-height:150px; overflow-y:auto; font-size:0.9rem;"></div>
+                    </div>
+
+                    <div class="clan-box" style="--c: var(--accent);">
+                        <h3 style="margin-top:0; color:var(--accent);">⭐ MEJORAS GLOBALES</h3>
+                        <p style="font-size:0.8rem; color:#888;">El líder puede comprar mejoras usando el SP del banco.</p>
+                        
+                        <div class="clan-upgrade">
+                            <div>
+                                <div style="font-weight:bold; color:var(--blue);">+10% Experiencia</div>
+                                <div style="font-size:0.8rem; color:#aaa;">Costo: 100,000 SP</div>
+                            </div>
+                            <button id="btn-upg-xp" class="action" style="background:var(--blue);" onclick="buyClanUpgrade('xp')">COMPRAR</button>
+                        </div>
+
+                        <div class="clan-upgrade">
+                            <div>
+                                <div style="font-weight:bold; color:var(--gold);">+5% SP en Partidas</div>
+                                <div style="font-size:0.8rem; color:#aaa;">Costo: 250,000 SP</div>
+                            </div>
+                            <button id="btn-upg-sp" class="action" style="background:var(--gold); color:black;" onclick="buyClanUpgrade('sp')">COMPRAR</button>
+                        </div>
+                        
+                        <button class="action secondary" style="width:100%; margin-top:30px; border-color:#F9393F; color:#F9393F;" onclick="leaveClan()">SALIR DEL CLAN</button>
                     </div>
                 </div>
             </div>
@@ -553,10 +624,8 @@
                     <input type="text" id="friend-inp" class="log-inp" style="margin:0; flex:1;" placeholder="Usuario a buscar...">
                     <button class="action" style="width:auto; background:#00ffff; color:black; padding:0 30px;" onclick="sendFriendRequest()">AGREGAR</button>
                 </div>
-                
                 <div style="color:var(--accent); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">SOLICITUDES PENDIENTES</div>
                 <div id="req-list" style="margin-bottom:20px;"></div>
-                
                 <div style="color:var(--good); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">TU LISTA DE AMIGOS</div>
                 <div id="friend-list" style="display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto;"></div>
             </div>
@@ -607,8 +676,10 @@
     <script src="js/globals.js"></script>
     <script src="js/script/core.js"></script>
     <script src="js/script/modals.js"></script>
+
     <script src="js/auth.js"></script>
     <script src="js/online.js"></script>
+
     <script src="js/script/profile.js"></script>
     <script src="js/script/settings.js"></script>
     <script src="js/script/controls.js"></script>
@@ -619,6 +690,9 @@
     <script src="js/script/multiplayer.js"></script>
     <script src="js/script/studio_upload.js"></script>
     <script src="js/script/shop_audio.js"></script>
+
+    <script src="js/script/clans.js"></script>
+
     <script src="js/game.js"></script>
     <script src="js/osu.js"></script>
     <script src="js/editor.js"></script>
