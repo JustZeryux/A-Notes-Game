@@ -1,6 +1,7 @@
 /* === AUDIO & ENGINE (ULTRA PERFORMANCE + AUTO-LYRICS + FX CAMERA V18) === */
 
 let elTrack = null;
+let gameLoopId; // Variable global para detener el loop y evitar lag
 
 // ==========================================
 // 1. SISTEMA DE AUDIO
@@ -284,6 +285,37 @@ window.playSongInternal = function(s) {
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
     
+    // === INTEGRACIÓN DEL AVATAR CAPSULA (HUD) ===
+    const oldIg = document.getElementById('ig-profile');
+    if (oldIg) oldIg.style.display = 'none'; // Ocultamos el antiguo
+
+    let capsuleUI = document.getElementById('capsule-ui');
+    if(!capsuleUI) {
+        capsuleUI = document.createElement('div');
+        capsuleUI.id = 'capsule-ui';
+        capsuleUI.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:9000; pointer-events:none;';
+        document.getElementById('game-layer').appendChild(capsuleUI);
+    }
+
+    const avUrl = (window.user && window.user.avatarData) ? window.user.avatarData : 'icon.png';
+    const uName = window.user ? window.user.name : 'Guest';
+    const uLvl = window.user ? window.user.lvl : 1;
+
+    capsuleUI.innerHTML = `
+        <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; pointer-events:auto; backdrop-filter:blur(8px);">
+            <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white; box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
+            <div style="display:flex; flex-direction:column; justify-content:center; padding-right:10px;">
+                <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; letter-spacing:1px; line-height:1;">${uName}</div>
+                <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
+                    <div style="color:var(--gold); font-weight:900; font-size:0.7rem;">LVL ${uLvl}</div>
+                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333; box-shadow:inset 0 0 5px black;">
+                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s; box-shadow:0 0 10px var(--good);"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
     const uiToClose = ['modal-res', 'modal-pause', 'modal-lobbies', 'modal-lobby-room', 'modal-song-selector', 'modal-diff', 'loading-overlay'];
     uiToClose.forEach(id => { const m = document.getElementById(id); if(m) m.style.display = 'none'; });
 
@@ -334,7 +366,7 @@ window.playSongInternal = function(s) {
     updHUD(); 
 
     const cd = document.getElementById('countdown');
-    cd.style.display = 'flex'; cd.innerText = "3";
+    if(cd) { cd.style.display = 'flex'; cd.innerText = "3"; }
     
     window.st.src = window.st.ctx.createBufferSource();
     window.st.src.buffer = s.buf;
@@ -348,13 +380,15 @@ window.playSongInternal = function(s) {
     const AUDIO_DELAY = 3; 
     
     window.st.src.start(now + AUDIO_DELAY);
-    requestAnimationFrame(loop);
+    gameLoopId = requestAnimationFrame(loop);
 
     let count = 3;
     const iv = setInterval(() => {
         count--;
-        if (count > 0) cd.innerText = count;
-        else { clearInterval(iv); cd.innerText = "GO!"; setTimeout(() => { cd.style.display = 'none'; }, 500); }
+        if(cd) {
+            if (count > 0) cd.innerText = count;
+            else { clearInterval(iv); cd.innerText = "GO!"; setTimeout(() => { cd.style.display = 'none'; }, 500); }
+        } else { clearInterval(iv); }
     }, 1000);
 }
 
@@ -362,7 +396,10 @@ window.playSongInternal = function(s) {
 // 4. EL LOOP ULTRA-OPTIMIZADO (GPU ACCELERATED)
 // ==========================================
 function loop() {
-    if (!window.st.act || window.st.paused) return;
+    if (!window.st.act || window.st.paused) {
+        gameLoopId = requestAnimationFrame(loop);
+        return;
+    }
     
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
@@ -496,7 +533,7 @@ function loop() {
             }
         }
     }
-    requestAnimationFrame(loop);
+    gameLoopId = requestAnimationFrame(loop);
 }
 
 // ==========================================
@@ -666,11 +703,22 @@ function miss(n) {
 function updHUD() {
     const scEl = document.getElementById('g-score'); if(scEl) scEl.innerText = window.st.sc.toLocaleString();
     const cEl = document.getElementById('g-combo'); if(cEl) { if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0; }
-    document.getElementById('health-fill').style.height = window.st.hp + "%";
+    
+    const hBar = document.getElementById('health-fill');
+    if(hBar) hBar.style.height = window.st.hp + "%"; // Mantiene barra vertical original
+
+    // NUEVA LÓGICA DE BARRA HP DEL AVATAR (CAPSULA)
+    const hpCapsule = document.getElementById('engine-hp-fill');
+    if(hpCapsule) {
+        hpCapsule.style.width = Math.max(0, window.st.hp) + "%";
+        hpCapsule.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)';
+    }
+
     const maxPlayed = (window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m) * 350;
     const playedScore = window.st.stats.s*350 + window.st.stats.g*200 + window.st.stats.b*50;
     const acc = maxPlayed > 0 ? ((playedScore / maxPlayed)*100).toFixed(1) : "100.0";
     document.getElementById('g-acc').innerText = acc + "%";
+    
     const fcEl = document.getElementById('hud-fc'); if(fcEl) { fcEl.innerText = window.st.fcStatus || "GFC"; fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"))); }
     const hSick = document.getElementById('h-sick'); if(hSick) hSick.innerText = window.st.stats.s;
     const hGood = document.getElementById('h-good'); if(hGood) hGood.innerText = window.st.stats.g;
@@ -693,7 +741,9 @@ function updHUD() {
 }
 
 function end(died) {
-    window.st.act = false; if(window.st.src) try{ window.st.src.stop(); }catch(e){}
+    window.st.act = false; 
+    cancelAnimationFrame(gameLoopId); // PREVIENE MEMORY LEAKS
+    if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
     // Apagar la viñeta de peligro al terminar
     let vign = document.getElementById('near-death-vignette');
@@ -859,7 +909,6 @@ window.resumeGame = function() {
     }
     window.st.paused = false;
     if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
-    requestAnimationFrame(loop);
 };
 
 window.toMenu = function() {
@@ -869,6 +918,7 @@ window.toMenu = function() {
     }
     if(window.st.ctx) window.st.ctx.suspend();
     window.st.act = false; window.st.paused = false;
+    cancelAnimationFrame(gameLoopId); // PREVIENE MEMORY LEAKS
     
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
