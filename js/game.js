@@ -821,40 +821,45 @@ window.restartSong = function() { prepareAndPlaySong(window.keys); };
 window.togglePause = function() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
-    
     let modal = document.getElementById('modal-pause');
-    let touchZones = document.getElementById('mobile-touch-zones'); 
+    
+    // Apagar la viñeta de peligro al pausar
+    let vign = document.getElementById('near-death-vignette');
+    if(vign) vign.classList.remove('danger-active');
 
     if(window.st.paused) {
-        if(touchZones) touchZones.style.display = 'none'; 
-        
         window.st.pauseTime = performance.now();
         if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
         
         if(modal) {
-            modal.style.setProperty('display', 'flex', 'important');
-            modal.style.setProperty('z-index', '999999', 'important');
-            modal.style.setProperty('opacity', '1', 'important');
-            
+            modal.style.setProperty('display', 'flex', 'important'); modal.style.setProperty('z-index', '999999', 'important');
             const panel = modal.querySelector('.modal-panel');
             if(panel) {
-                const accEl = document.getElementById('g-acc');
-                const currentAcc = accEl ? accEl.innerText : "100%";
-
+                const accEl = document.getElementById('g-acc'); const currentAcc = accEl ? accEl.innerText : "100%";
                 panel.innerHTML = `
-                    <div class="m-title" style="border-bottom: 2px solid var(--accent); padding-bottom: 10px;">⏸️ PAUSA</div>
-                    <div style="font-size:2.5rem; font-weight:900; color:var(--blue); margin: 20px 0;">ACC: <span id="p-acc" style="color:white;">${currentAcc}</span></div>
-                    <div style="display:flex; flex-direction:column; gap:10px;">
-                        <button class="action" onclick="resumeGame()" style="font-size:1.2rem; padding:15px;">▶️ CONTINUAR</button>
+                    <div class="modal-neon-header">
+                        <h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2>
+                    </div>
+                    <div class="modal-neon-content">
+                        <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
+                            ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${currentAcc}</span>
+                        </div>
+                        <div class="res-stats-grid">
+                            <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                            <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                            <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                            <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                        </div>
+                    </div>
+                    <div class="modal-neon-buttons">
+                        <button class="action" onclick="resumeGame()">▶️ CONTINUAR</button>
                         <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
-                        <button class="action secondary" onclick="toMenu()" style="background:#b32424; color:white; border-color:#ff4d4d;">🚪 SALIR AL MENU</button>
+                        <button class="action secondary" onclick="toMenu()" style="border-color:#F9393F; color:#F9393F;">🚪 SALIR</button>
                     </div>
                 `;
             }
         }
-    } else {
-        resumeGame();
-    }
+    } else { resumeGame(); }
 };
 
 window.resumeGame = function() {
