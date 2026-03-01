@@ -1,20 +1,20 @@
-/* === SETTINGS.JS - Menús y Variables Visuales === */
+/* === js/script/settings.js - Menús y Variables Visuales (REPARADO Y BLINDADO) === */
 
 window.applyCfg = function() {
-    document.documentElement.style.setProperty('--track-alpha', (cfg.trackOp || 10) / 100); 
-    document.documentElement.style.setProperty('--note-op', (cfg.noteOp || 100) / 100);
-    document.documentElement.style.setProperty('--note-scale', cfg.noteScale || 1);
-    document.documentElement.style.setProperty('--judge-y', (cfg.judgeY || 40) + '%'); 
-    document.documentElement.style.setProperty('--judge-x', (cfg.judgeX || 50) + '%'); 
-    document.documentElement.style.setProperty('--judge-scale', (cfg.judgeS || 7)/10); 
-    document.documentElement.style.setProperty('--judge-op', cfg.judgeVis ? 1 : 0);
+    document.documentElement.style.setProperty('--track-alpha', (window.cfg.trackOp || 10) / 100); 
+    document.documentElement.style.setProperty('--note-op', (window.cfg.noteOp || 100) / 100);
+    document.documentElement.style.setProperty('--note-scale', window.cfg.noteScale || 1);
+    document.documentElement.style.setProperty('--judge-y', (window.cfg.judgeY || 40) + '%'); 
+    document.documentElement.style.setProperty('--judge-x', (window.cfg.judgeX || 50) + '%'); 
+    document.documentElement.style.setProperty('--judge-scale', (window.cfg.judgeS || 7)/10); 
+    document.documentElement.style.setProperty('--judge-op', window.cfg.judgeVis ? 1 : 0);
 
     const track = document.getElementById('track');
     if (track) {
-        const fov = cfg.fov || 0;
+        const fov = window.cfg.fov || 0;
         track.style.transform = `rotateX(${fov}deg)`;
         track.style.perspective = `${800 - (fov*10)}px`;
-        if (cfg.middleScroll) track.classList.add('middle-scroll');
+        if (window.cfg.middleScroll) track.classList.add('middle-scroll');
         else track.classList.remove('middle-scroll');
     }
 };
@@ -68,20 +68,20 @@ window.switchSetTab = function(tab) {
 
     let html = '';
     if (tab === 'gameplay') {
-        html += renderToggle('Middlescroll (Centrado)', 'middleScroll');
-        html += renderToggle('Downscroll (Caída abajo)', 'down');
-        html += renderRange('Velocidad (Scroll Speed)', 'spd', 10, 60);
-        html += renderRange('Dificultad', 'den', 1, 20);
-        html += renderRange('Offset Global (ms)', 'off', -200, 200);
+        html += window.renderToggle('Middlescroll (Centrado)', 'middleScroll');
+        html += window.renderToggle('Downscroll (Caída abajo)', 'down');
+        html += window.renderRange('Velocidad (Scroll Speed)', 'spd', 10, 60);
+        html += window.renderRange('Dificultad', 'den', 1, 20);
+        html += window.renderRange('Offset Global (ms)', 'off', -200, 200);
     } 
     else if (tab === 'visuals') {
-        html += renderToggle('Vivid Lights', 'vivid'); html += renderToggle('Screen Shake', 'shake'); html += renderToggle('Lane Flash (Luz Carril)', 'laneFlash'); html += renderToggle('Mostrar Splash Hits', 'showSplash'); html += renderToggle('Subtítulos (Karaoke)', 'subtitles'); html += renderToggle('Efectos de Cámara en Fondo', 'bgEffects');
-        html += `<div class="set-row"><span class="set-label">Tipo de Splash</span><select class="log-inp" style="width:150px; padding:5px;" onchange="updateCfgVal('splashType', this.value)"><option value="classic" ${cfg.splashType=='classic'?'selected':''}>Classic Ring</option><option value="fire" ${cfg.splashType=='fire'?'selected':''}>Fire Burst</option><option value="electric" ${cfg.splashType=='electric'?'selected':''}>Electric</option><option value="star" ${cfg.splashType=='star'?'selected':''}>Star Pop</option><option value="text" ${cfg.splashType=='text'?'selected':''}>Text HIT</option></select></div>`;
-        html += renderRange('Tamaño Nota (Escala)', 'noteScale', 0.5, 1.5, 0.1); html += renderRange('Track FOV (Inclinación 3D)', 'fov', 0, 45); html += renderRange('Posición Juez Y', 'judgeY', 0, 100); html += renderToggle('Mostrar Juez', 'judgeVis'); html += renderToggle('Mostrar FC Status', 'showFC'); html += renderToggle('Mostrar Mean MS', 'showMean'); html += renderRange('Opacidad Carril (%)', 'trackOp', 0, 100); html += renderRange('Opacidad Notas (%)', 'noteOp', 10, 100); html += renderRange('Posición Juez X', 'judgeX', 0, 100);
+        html += window.renderToggle('Vivid Lights', 'vivid'); html += window.renderToggle('Screen Shake', 'shake'); html += window.renderToggle('Lane Flash (Luz Carril)', 'laneFlash'); html += window.renderToggle('Mostrar Splash Hits', 'showSplash'); html += window.renderToggle('Subtítulos (Karaoke)', 'subtitles'); html += window.renderToggle('Efectos de Cámara en Fondo', 'bgEffects');
+        html += `<div class="set-row"><span class="set-label">Tipo de Splash</span><select class="log-inp" style="width:150px; padding:5px;" onchange="window.updateCfgVal('splashType', this.value)"><option value="classic" ${window.cfg.splashType=='classic'?'selected':''}>Classic Ring</option><option value="fire" ${window.cfg.splashType=='fire'?'selected':''}>Fire Burst</option><option value="electric" ${window.cfg.splashType=='electric'?'selected':''}>Electric</option><option value="star" ${window.cfg.splashType=='star'?'selected':''}>Star Pop</option><option value="text" ${window.cfg.splashType=='text'?'selected':''}>Text HIT</option></select></div>`;
+        html += window.renderRange('Tamaño Nota (Escala)', 'noteScale', 0.5, 1.5, 0.1); html += window.renderRange('Track FOV (Inclinación 3D)', 'fov', 0, 45); html += window.renderRange('Posición Juez Y', 'judgeY', 0, 100); html += window.renderToggle('Mostrar Juez', 'judgeVis'); html += window.renderToggle('Mostrar FC Status', 'showFC'); html += window.renderToggle('Mostrar Mean MS', 'showMean'); html += window.renderRange('Opacidad Carril (%)', 'trackOp', 0, 100); html += window.renderRange('Opacidad Notas (%)', 'noteOp', 10, 100); html += window.renderRange('Posición Juez X', 'judgeX', 0, 100);
         html += `<div style="margin-top:20px; border-top:1px solid #333; padding-top:15px;"><button class="btn-small btn-add" style="width:100%" onclick="document.getElementById('bg-file').click()">🖼️ CAMBIAR FONDO DE PANTALLA</button><input type="file" id="bg-file" accept="image/*" style="display:none" onchange="window.handleBg(this)"></div>`;
     } 
     else if (tab === 'audio') {
-        html += renderRange('Volumen Música', 'vol', 0, 100); html += renderToggle('Hit Sounds', 'hitSound'); html += renderRange('Volumen Hits', 'hvol', 0, 100); html += renderToggle('Miss Sounds', 'missSound'); html += renderRange('Volumen Miss', 'missVol', 0, 100);
+        html += window.renderRange('Volumen Música', 'vol', 0, 100); html += window.renderToggle('Hit Sounds', 'hitSound'); html += window.renderRange('Volumen Hits', 'hvol', 0, 100); html += window.renderToggle('Miss Sounds', 'missSound'); html += window.renderRange('Volumen Miss', 'missVol', 0, 100);
         html += `<div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:10px;"><button class="btn-small btn-add" onclick="document.getElementById('hit-file').click()">🔊 HIT SOUND</button><button class="btn-small btn-chat" onclick="document.getElementById('miss-file').click()">🔇 MISS SOUND</button></div>`;
         html += `<input type="file" id="hit-file" accept="audio/*" style="display:none" onchange="window.loadHitSound(this)"><input type="file" id="miss-file" accept="audio/*" style="display:none" onchange="window.loadMissSound(this)">`;
     }
@@ -92,14 +92,14 @@ window.switchSetTab = function(tab) {
                 if(typeof SHOP_ITEMS !== 'undefined') {
                     const item = SHOP_ITEMS.find(x => x.id === itemId);
                     if (item) {
-                        if (item.type === 'skin') skinOptions += `<option value="${item.id}" ${user.equipped && user.equipped.skin === item.id ? 'selected' : ''}>${item.name}</option>`;
-                        else if (item.type === 'ui' || item.type === 'overlay') uiOptions += `<option value="${item.id}" ${user.equipped && user.equipped.ui === item.id ? 'selected' : ''}>${item.name}</option>`;
+                        if (item.type === 'skin') skinOptions += `<option value="${item.id}" ${window.user.equipped && window.user.equipped.skin === item.id ? 'selected' : ''}>${item.name}</option>`;
+                        else if (item.type === 'ui' || item.type === 'overlay') uiOptions += `<option value="${item.id}" ${window.user.equipped && window.user.equipped.ui === item.id ? 'selected' : ''}>${item.name}</option>`;
                     }
                 }
             });
         }
         html += `<div class="kb-tabs" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:15px;">${[1,2,3,4,5,6,7,8,9,10].map(k => `<div class="kb-tab ${k===4?'active':''}" id="tab-${k}" onclick="window.renderLaneConfig(${k})">${k}K</div>`).join('')}</div>`;
-        html += `<div class="lane-cfg-box"><div id="lanes-container" class="lanes-view"></div><div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;"><div><div style="font-weight:900; color:var(--accent); margin-bottom:10px; font-size:1.1rem;">🎨 SKIN DE NOTAS</div><select class="skin-selector" onchange="window.equipSkinFromSettings(this.value)" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #ff66aa; border-radius:5px; outline:none; font-weight:bold;">${skinOptions}</select></div><div><div style="font-weight:900; color:#00ffff; margin-bottom:10px; font-size:1.1rem;">🖼️ MARCOS DE UI</div><select class="skin-selector" onchange="window.equipUIFromSettings(this.value)" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #00ffff; border-radius:5px; outline:none; font-weight:bold;">${uiOptions}</select></div></div></div>`;
+        html += `<div class="lane-cfg-box"><div id="lanes-container" class="lanes-view" style="display:flex; justify-content:center; gap:5px;"></div><div style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;"><div><div style="font-weight:900; color:var(--accent); margin-bottom:10px; font-size:1.1rem;">🎨 SKIN DE NOTAS</div><select class="skin-selector" onchange="window.equipSkinFromSettings(this.value)" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #ff66aa; border-radius:5px; outline:none; font-weight:bold;">${skinOptions}</select></div><div><div style="font-weight:900; color:#00ffff; margin-bottom:10px; font-size:1.1rem;">🖼️ MARCOS DE UI</div><select class="skin-selector" onchange="window.equipUIFromSettings(this.value)" style="width:100%; padding:10px; background:#222; color:white; border:1px solid #00ffff; border-radius:5px; outline:none; font-weight:bold;">${uiOptions}</select></div></div></div>`;
         setTimeout(() => window.renderLaneConfig(4), 50);
     }
     content.innerHTML = html;
@@ -120,4 +120,122 @@ window.updateCfgVal = function(key, val) {
     const disp = document.getElementById('disp-'+key); if(disp) disp.innerText = val;
     if (key.includes('vol')) window.cfg[key] = val / 100; else if (key === 'noteScale') window.cfg[key] = parseFloat(val); else window.cfg[key] = parseInt(val);
     window.applyCfg(); if(typeof window.updatePreview === 'function') window.updatePreview();
+};
+
+// ==========================================
+// EL MOTOR DE CONFIGURACIÓN DE TECLAS (REPARADO)
+// ==========================================
+window.renderLaneConfig = function(k) {
+    document.querySelectorAll('.kb-tab').forEach(b => b.classList.remove('active'));
+    const t = document.getElementById('tab-'+k); if(t) t.classList.add('active');
+    const cont = document.getElementById('lanes-container');
+    if(!cont) return;
+    
+    if(!window.cfg.modes) window.cfg.modes = {};
+    if(!window.cfg.modes[k]) {
+        window.cfg.modes[k] = [];
+        const defaultKeys = ['A','S','D','F','G','H','J','K','L',';'];
+        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defaultKeys[i] || ' ', c: '#00ffff', s: 'circle' });
+    }
+
+    let html = '';
+    for(let i=0; i<k; i++) {
+        let l = window.cfg.modes[k][i];
+        
+        // Limpiador visual de teclas (Quita "KeyA" y lo deja como "A")
+        let displayKey = String(l.k).toUpperCase();
+        if(displayKey.startsWith('KEY')) displayKey = displayKey.replace('KEY', '');
+        if(displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
+        
+        html += `
+        <div class="lane-col" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+            <button class="key-btn" id="kb-btn-${k}-${i}" onclick="window.waitForKey(${k}, ${i})" style="width:50px; height:50px; border-radius:8px; background:#111; color:white; border:2px solid #555; font-weight:900; font-size:1.2rem; cursor:pointer; transition:0.2s;">
+                ${displayKey}
+            </button>
+            <input type="color" value="${l.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" style="width:30px; height:30px; border:none; background:none; cursor:pointer;">
+            <select onchange="window.updateLaneShape(${k}, ${i}, this.value)" style="width:60px; background:#111; color:white; border:1px solid #333; font-size:0.7rem; padding:2px;">
+                <option value="circle" ${l.s==='circle'?'selected':''}>Circ</option>
+                <option value="bar" ${l.s==='bar'?'selected':''}>Bar</option>
+                <option value="arrow_up" ${l.s==='arrow_up'?'selected':''}>Up</option>
+                <option value="arrow_down" ${l.s==='arrow_down'?'selected':''}>Dwn</option>
+                <option value="arrow_left" ${l.s==='arrow_left'?'selected':''}>Lft</option>
+                <option value="arrow_right" ${l.s==='arrow_right'?'selected':''}>Rgt</option>
+            </select>
+        </div>`;
+    }
+    cont.innerHTML = html;
+};
+
+window.waitForKey = function(k, lane) {
+    const btn = document.getElementById(`kb-btn-${k}-${lane}`);
+    if(!btn) return;
+    
+    // Estado de "Escuchando" (Rojo brillante)
+    btn.innerText = '...';
+    btn.style.background = '#F9393F';
+    btn.style.borderColor = '#ffaa00';
+    btn.style.boxShadow = '0 0 15px #F9393F';
+    
+    const handler = function(e) {
+        // EL ESCUDO DE PRIORIDAD (Evita que game.js o atajos del navegador roben la tecla)
+        e.preventDefault();
+        e.stopPropagation();
+
+        let newKey = e.key;
+        if(newKey === " ") newKey = "Space";
+        if(newKey.length === 1) newKey = newKey.toUpperCase(); // Para que guarde "A" en vez de "a"
+        
+        // Guardar configuración
+        window.cfg.modes[k][lane].k = newKey;
+        
+        // Remover el escuchador inmediatamente
+        document.removeEventListener('keydown', handler, true);
+        
+        // Re-renderizar para volver a la normalidad
+        window.renderLaneConfig(k);
+    };
+
+    // Usar 'true' (fase de captura) para interceptar el evento ANTES que cualquier otra cosa en la página
+    document.addEventListener('keydown', handler, true);
+};
+
+window.updateLaneColor = function(k, l, color) { window.cfg.modes[k][l].c = color; if(typeof window.updatePreview === 'function') window.updatePreview(); };
+window.updateLaneShape = function(k, l, shape) { window.cfg.modes[k][l].s = shape; if(typeof window.updatePreview === 'function') window.updatePreview(); };
+
+window.equipSkinFromSettings = function(val) {
+    if(!window.user) return;
+    if(!window.user.equipped) window.user.equipped = {};
+    window.user.equipped.skin = val;
+    window.notify("Skin guardada temporalmente. Usa GUARDAR para fijarla.", "info");
+    if(typeof window.updatePreview === 'function') window.updatePreview();
+};
+
+window.equipUIFromSettings = function(val) {
+    if(!window.user) return;
+    if(!window.user.equipped) window.user.equipped = {};
+    window.user.equipped.ui = val;
+    window.notify("Marco guardado temporalmente. Usa GUARDAR para fijarlo.", "info");
+};
+
+window.updatePreview = function() {
+    const box = document.getElementById('preview-box');
+    if(!box) return;
+    box.innerHTML = '';
+    let sampleKeyCount = 4;
+    if(window.cfg.modes && window.cfg.modes[sampleKeyCount]) {
+        let activeSkin = null;
+        if(window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+            activeSkin = SHOP_ITEMS.find(x => x.id === window.user.equipped.skin);
+        }
+        
+        let c = window.cfg.modes[sampleKeyCount][1].c; 
+        let s = window.cfg.modes[sampleKeyCount][1].s;
+        let p = (typeof PATHS !== 'undefined') ? PATHS[s] || PATHS['circle'] : "M50,10 A40,40 0 1,0 50,90 A40,40 0 1,0 50,10";
+        
+        if (activeSkin) {
+            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) p = SKIN_PATHS[activeSkin.shape];
+            if (activeSkin.fixed) c = activeSkin.color;
+        }
+        box.innerHTML = `<svg viewBox="0 0 100 100" style="width:80%; height:80%; filter:drop-shadow(0 0 10px ${c});"><path d="${p}" fill="${c}" stroke="white" stroke-width="2"/></svg>`;
+    }
 };
