@@ -114,15 +114,34 @@ window.selectSongForLobby = function(id, data) {
     const optsDiv = document.getElementById('create-lobby-opts');
     if(optsDiv) {
         optsDiv.style.display = 'block';
-        optsDiv.innerHTML = `
-            <div style="background:#111; padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid #333;">
-                <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">CONFIGURACIÓN DE SALA</div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span>Dificultad (Densidad):</span>
-                    <input type="number" id="lobby-density-input" value="5" min="1" max="10" class="num-input" style="width:60px;">
+
+        let configHTML = "";
+        
+        // Si es una canción de Osu!, mostramos un diseño especial y ocultamos la densidad
+        if (data.isOsu) {
+            configHTML = `
+                <div style="background:rgba(255,102,170,0.1); padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid #ff66aa; text-align:center;">
+                    <div style="color:#ff66aa; font-weight:900; font-size:1.2rem; margin-bottom:5px;">🌸 MAPA ORIGINAL DE OSU!</div>
+                    <div style="color:#aaa; font-size:0.9rem;">Este mapa está diseñado a mano. La densidad automática no aplica.</div>
+                    <input type="hidden" id="lobby-density-input" value="5">
                 </div>
-                <div style="font-size:0.9rem; color:#888;">1. Selecciona teclas arriba<br>2. Ajusta densidad<br>3. Crea la sala</div>
-            </div>
+            `;
+        } else {
+            // Si es una canción de la Nube, mostramos el ajustador de densidad normal
+            configHTML = `
+                <div style="background:#111; padding:15px; border-radius:10px; margin-bottom:15px; border:1px solid #333;">
+                    <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">CONFIGURACIÓN DE SALA</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <span>Dificultad (Densidad):</span>
+                        <input type="number" id="lobby-density-input" value="5" min="1" max="10" class="num-input" style="width:60px;">
+                    </div>
+                    <div style="font-size:0.9rem; color:#888;">1. Selecciona teclas arriba<br>2. Ajusta densidad<br>3. Crea la sala</div>
+                </div>
+            `;
+        }
+
+        optsDiv.innerHTML = `
+            ${configHTML}
             <button class="action" onclick="window.confirmCreateLobby()">
                 ${window.lobbyTargetFriend ? '⚔️ DESAFIAR A ' + window.lobbyTargetFriend : 'CREAR SALA ONLINE'}
             </button>
@@ -130,7 +149,6 @@ window.selectSongForLobby = function(id, data) {
     }
     setTimeout(() => window.startGame(4), 100);
 };
-
 // === INTERCEPCIÓN DE START GAME ===
 window.startGame = function(k) {
     if (window.isCreatingLobby) {
