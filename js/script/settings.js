@@ -1,4 +1,4 @@
-/* === js/script/settings.js - Menús y Variables Visuales (REPARADO Y BLINDADO) === */
+/* === js/script/settings.js - Menús y Variables Visuales (BLINDADO Y REPARADO) === */
 
 window.applyCfg = function() {
     document.documentElement.style.setProperty('--track-alpha', (window.cfg.trackOp || 10) / 100); 
@@ -123,7 +123,7 @@ window.updateCfgVal = function(key, val) {
 };
 
 // ==========================================
-// EL MOTOR DE CONFIGURACIÓN DE TECLAS (REPARADO)
+// EL MOTOR DE CONFIGURACIÓN DE TECLAS (BLINDADO)
 // ==========================================
 window.renderLaneConfig = function(k) {
     document.querySelectorAll('.kb-tab').forEach(b => b.classList.remove('active'));
@@ -134,7 +134,7 @@ window.renderLaneConfig = function(k) {
     if(!window.cfg.modes) window.cfg.modes = {};
     if(!window.cfg.modes[k]) {
         window.cfg.modes[k] = [];
-        const defaultKeys = ['A','S','D','F','G','H','J','K','L',';'];
+        const defaultKeys = ['a','s','d','f','g','h','j','k','l',';'];
         for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defaultKeys[i] || ' ', c: '#00ffff', s: 'circle' });
     }
 
@@ -142,9 +142,17 @@ window.renderLaneConfig = function(k) {
     for(let i=0; i<k; i++) {
         let l = window.cfg.modes[k][i];
         
-        // Limpiador visual de teclas (Quita "KeyA" y lo deja como "A")
-        let displayKey = String(l.k).toUpperCase();
-        if(displayKey.startsWith('KEY')) displayKey = displayKey.replace('KEY', '');
+        // 🚨 AUTO-LIMPIADOR DE TECLAS VIEJAS
+        // Convierte "KeyD" en "d" y "Space" en " " para que game.js lo detecte perfectamente
+        if (typeof l.k === 'string') {
+            if (l.k.startsWith('Key')) l.k = l.k.replace('Key', '').toLowerCase();
+            if (l.k === 'Space') l.k = ' ';
+        } else {
+            l.k = ' ';
+        }
+        
+        // Formateo visual limpio para el botón (Ej: "d" -> "D", " " -> "SPC")
+        let displayKey = l.k.toUpperCase();
         if(displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
         
         html += `
@@ -170,6 +178,9 @@ window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
     if(!btn) return;
     
+    // 🚨 QUITA-FOCO: Evita que la tecla Espacio o Enter vuelvan a dar clic al botón por accidente
+    btn.blur(); 
+    
     // Estado de "Escuchando" (Rojo brillante)
     btn.innerText = '...';
     btn.style.background = '#F9393F';
@@ -177,26 +188,25 @@ window.waitForKey = function(k, lane) {
     btn.style.boxShadow = '0 0 15px #F9393F';
     
     const handler = function(e) {
-        // EL ESCUDO DE PRIORIDAD (Evita que game.js o atajos del navegador roben la tecla)
+        // ESCUDO DE PRIORIDAD MÁXIMA: Evita que el juego u otros scripts roben la tecla
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
 
         let newKey = e.key;
-        if(newKey === " ") newKey = "Space";
-        if(newKey.length === 1) newKey = newKey.toUpperCase(); // Para que guarde "A" en vez de "a"
+        if(newKey === " ") newKey = " "; // Normalizar espacio
         
-        // Guardar configuración
-        window.cfg.modes[k][lane].k = newKey;
+        // Guardamos la tecla exacta en minúscula (Como le gusta a game.js)
+        window.cfg.modes[k][lane].k = newKey.toLowerCase();
         
-        // Remover el escuchador inmediatamente
-        document.removeEventListener('keydown', handler, true);
-        
-        // Re-renderizar para volver a la normalidad
+        // Remover el escuchador y volver a dibujar los botones limpios
+        window.removeEventListener('keydown', handler, true);
         window.renderLaneConfig(k);
+        if(typeof window.updatePreview === 'function') window.updatePreview();
     };
 
-    // Usar 'true' (fase de captura) para interceptar el evento ANTES que cualquier otra cosa en la página
-    document.addEventListener('keydown', handler, true);
+    // Al poner "true", escuchamos en "Fase de Captura", ganando prioridad absoluta ante cualquier otro archivo.
+    window.addEventListener('keydown', handler, true);
 };
 
 window.updateLaneColor = function(k, l, color) { window.cfg.modes[k][l].c = color; if(typeof window.updatePreview === 'function') window.updatePreview(); };
