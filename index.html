@@ -136,18 +136,21 @@
                     </div>
                 </div>
 
-                <div id="filter-bar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+<div id="filter-bar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     <button class="filter-btn active" data-type="type" data-val="all" onclick="setFilter('type', 'all')">TODO</button>
-                    <button class="filter-btn" data-type="type" data-val="osu" onclick="setFilter('type', 'osu')" style="color:#ff66aa; border-color:#ff66aa;">🌸 OSU!</button>
                     <button class="filter-btn" data-type="type" data-val="com" onclick="setFilter('type', 'com')">☁️ COMUNIDAD</button>
                     <button class="filter-btn" data-type="type" data-val="recent" onclick="setFilter('type', 'recent')" style="color:var(--gold); border-color:var(--gold);">🕒 RECIENTES</button>
                     
                     <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
                     
+                    <button class="filter-btn" data-type="type" data-val="osu_mania" onclick="setFilter('type', 'osu_mania')" style="color:#ff66aa; border-color:#ff66aa;">🌸 MANIA</button>
+                    <button class="filter-btn" data-type="type" data-val="osu_standard" onclick="setFilter('type', 'osu_standard')" style="color:#ff44b9; border-color:#ff44b9;">🎯 STANDARD</button>
+                    <button class="filter-btn" data-type="type" data-val="osu_taiko" onclick="setFilter('type', 'osu_taiko')" style="color:#f95555; border-color:#f95555;">🥁 TAIKO</button>
+                    <button class="filter-btn" data-type="type" data-val="osu_catch" onclick="setFilter('type', 'osu_catch')" style="color:#44b9ff; border-color:#44b9ff;">🍎 CATCH</button>
+                    
+                    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
+                    
                     <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
-                    <button class="filter-btn" data-type="key" data-val="1" onclick="setFilter('key', '1')">1K</button>
-                    <button class="filter-btn" data-type="key" data-val="2" onclick="setFilter('key', '2')">2K</button>
-                    <button class="filter-btn" data-type="key" data-val="3" onclick="setFilter('key', '3')">3K</button>
                     <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
                     <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
                     <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
