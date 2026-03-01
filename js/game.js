@@ -222,12 +222,16 @@ window.prepareAndPlaySong = async function(k) {
     
     // === NUEVO: INTERCEPTOR DE OSU! PARA MULTIJUGADOR ===
     // Si la canción viene de la sala online y tiene la etiqueta "osu_"
+    // === NUEVO: INTERCEPTOR DE OSU! CORREGIDO ===
     if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
-        let realId = String(window.curSongData.id).replace('osu_', ''); // Le quitamos la etiqueta
+        
+        // 🚨 FIX 1: ENCENDER EL MOTOR DE AUDIO ANTES DE MANDARLO A OSU! 🚨
+        if(typeof unlockAudio === 'function') unlockAudio();
+        
+        let realId = String(window.curSongData.id).replace('osu_', '');
         if(typeof downloadAndPlayOsu === 'function') {
-            // Desviamos la carga hacia el motor descompresor de Osu
             downloadAndPlayOsu(realId, window.curSongData.title, window.curSongData.imageURL, k);
-            return; // Cortamos la ejecución normal
+            return; 
         }
     }
     
