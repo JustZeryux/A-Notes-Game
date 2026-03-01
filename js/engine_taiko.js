@@ -1,4 +1,4 @@
-/* === js/engine_taiko.js - MOTOR TAIKO PRO OPTIMIZADO 🥁 (NO LAG/CRASH) === */
+/* === js/engine_taiko.js - TAIKO PRO (LAG-FREE + GAME.JS UI) 🥁 === */
 
 window.startTaikoEngine = async function(songObj) {
     const loader = document.getElementById('loading-overlay');
@@ -53,7 +53,7 @@ function parseTaikoMap(text) {
             hitObjects.push({ t: parseInt(p[2]) + 3000, isBlue: isBlue, clicked: false, missed: false });
         }
     }
-    return { hitObjects, audioFile };
+    return { hitObjects: hitObjects.sort((a,b) => a.t - b.t), audioFile };
 }
 
 function runTaikoEngine(audioBuffer, map, songObj) {
@@ -67,7 +67,7 @@ function runTaikoEngine(audioBuffer, map, songObj) {
         document.body.appendChild(canvas);
     }
     canvas.style.display = 'block';
-    const ctx = canvas.getContext('2d', { alpha: false }); // Renderizado Rápido
+    const ctx = canvas.getContext('2d', { alpha: false }); 
 
     let ui = document.getElementById('taiko-ui');
     if(ui) ui.remove();
@@ -97,19 +97,23 @@ function runTaikoEngine(audioBuffer, map, songObj) {
             <div id="tk-combo" style="color:var(--accent); font-size:3rem; font-weight:900;">0x</div>
         </div>
         <div id="tk-judgement" style="position:absolute; top:40%; left:200px; font-size:4rem; font-weight:900; transform:translate(-50%, -50%);"></div>
-        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(circle, transparent 50%, rgba(249,57,63,0.4) 100%); opacity:0; transition:0.3s;"></div>
+        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s;"></div>
     `;
     document.body.appendChild(ui);
 
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
     window.st.stats = { s:0, g:0, b:0, m:0 };
+    window.st.trueMaxScore = map.length * 300;
+    
+    window.st.nextNote = 0;
+    window.st.spawned = [];
+    
     let isRunning = true;
     const scrollSpeed = 0.9;
     const receptorX = 200;
     const laneY = window.innerHeight / 2;
     let drumScale = 1;
     let particles = [];
-    let animationId;
 
     const bgImg = new Image(); if(songObj.imageURL) bgImg.src = songObj.imageURL;
 
@@ -121,22 +125,26 @@ function runTaikoEngine(audioBuffer, map, songObj) {
     window.st.src.onended = () => { if(isRunning && window.st.act) endEngine(false); };
 
     function spawnHitParticle(col) {
-        if (particles.length > 30) particles.splice(0, 5); // Limitar partículas para evitar lag
+        if (particles.length > 30) particles.splice(0, 5); 
         for(let i=0; i<8; i++) {
             particles.push({
-                x: receptorX, y: laneY,
-                vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12,
-                life: 1, color: col
+                x: receptorX, y: laneY, vx: (Math.random()-0.5)*12, vy: (Math.random()-0.5)*12, life: 1, color: col
             });
         }
     }
 
     function draw() {
         if (!isRunning || !window.st.act) return;
-        if (window.st.paused) { animationId = requestAnimationFrame(draw); return; }
+        if (window.st.paused) { window.st.animId = requestAnimationFrame(draw); return; }
 
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         
+        // COLA DE NOTAS
+        while(window.st.nextNote < map.length && map[window.st.nextNote].t - now <= 2500) {
+            window.st.spawned.push(map[window.st.nextNote]);
+            window.st.nextNote++;
+        }
+
         ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -150,43 +158,40 @@ function runTaikoEngine(audioBuffer, map, songObj) {
         drumScale += (1 - drumScale) * 0.15;
         ctx.beginPath(); ctx.arc(receptorX, laneY, 50 * drumScale, 0, Math.PI * 2);
         ctx.strokeStyle = 'white'; ctx.lineWidth = 6; ctx.stroke();
-        ctx.fillStyle = '#222'; ctx.fill(); // Relleno rápido
+        ctx.fillStyle = '#222'; ctx.fill(); 
 
-        // Partículas Rápidas
         for(let i=particles.length-1; i>=0; i--) {
-            let p = particles[i];
-            p.x += p.vx; p.y += p.vy; p.life -= 0.08;
+            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.08;
             ctx.beginPath(); ctx.arc(p.x, p.y, 6*p.life, 0, Math.PI*2);
             ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life); ctx.fill();
             if(p.life <= 0) particles.splice(i,1);
         }
         ctx.globalAlpha = 1.0;
 
-        // Notas (Pintado Rápido sin Gradiente pesado)
-        map.forEach(n => {
-            if (n.clicked || n.missed) return;
+        for(let i = window.st.spawned.length - 1; i >= 0; i--) {
+            const n = window.st.spawned[i];
             let x = receptorX + (n.t - now) * scrollSpeed;
             
             if (x < -50) { 
                 n.missed = true; window.st.cmb = 0; window.st.stats.m++; window.st.hp -= 10;
                 showTkJudgement("MISS", "#F9393F"); checkDeath();
+                window.st.spawned.splice(i, 1);
+                continue;
             }
 
             if (x < canvas.width + 100) {
                 ctx.beginPath(); ctx.arc(x, laneY, 40, 0, Math.PI * 2);
-                ctx.fillStyle = n.isBlue ? '#00e5ff' : '#ff0055'; // Color sólido en lugar de gradiente
+                ctx.fillStyle = n.isBlue ? '#00e5ff' : '#ff0055'; 
                 ctx.fill();
                 ctx.strokeStyle = 'white'; ctx.lineWidth = 4; ctx.stroke();
             }
-        });
+        }
 
         updateTkHUD();
-        animationId = requestAnimationFrame(draw);
+        window.st.animId = requestAnimationFrame(draw);
     }
 
-    function checkDeath() {
-        if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); }
-    }
+    function checkDeath() { if(window.st.hp <= 0) { window.st.hp = 0; endEngine(true); } }
 
     function showTkJudgement(txt, col) {
         const el = document.getElementById('tk-judgement');
@@ -205,14 +210,24 @@ function runTaikoEngine(audioBuffer, map, songObj) {
         }
         
         const vign = document.getElementById('near-death-vignette');
-        if (vign) vign.style.opacity = window.st.hp < 20 ? '1' : '0';
+        if (vign) {
+            if (window.st.hp < 20) vign.classList.add('danger-active');
+            else vign.classList.remove('danger-active');
+        }
     }
 
     function handleTkInput(isBlue) {
         if(!isRunning || window.st.paused) return;
         drumScale = 1.3;
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        const target = map.find(n => !n.clicked && !n.missed && Math.abs(n.t - now) < 150);
+        
+        let targetIdx = -1;
+        let target = null;
+        for(let i=0; i<window.st.spawned.length; i++) {
+            if(!window.st.spawned[i].clicked && !window.st.spawned[i].missed && Math.abs(window.st.spawned[i].t - now) < 150) {
+                target = window.st.spawned[i]; targetIdx = i; break;
+            }
+        }
 
         if (target && target.isBlue === isBlue) {
             const diff = Math.abs(target.t - now);
@@ -225,39 +240,60 @@ function runTaikoEngine(audioBuffer, map, songObj) {
             
             window.st.hp = Math.min(100, window.st.hp + 3);
             if(window.st.hitBuf && window.st.ctx) { const s = window.st.ctx.createBufferSource(); s.buffer = window.st.hitBuf; s.connect(window.st.ctx.destination); s.start(0); }
+            window.st.spawned.splice(targetIdx, 1);
         } else {
             window.st.cmb = 0; window.st.hp -= 2; checkDeath();
         }
     }
 
-    const tkHandler = (e) => {
-        if (e.key === 'Escape') { e.preventDefault(); toggleEnginePause(); return; }
+    window.st.tkKeyHandler = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); window.toggleEnginePause(); return; }
         if (!e.repeat) {
             if (e.key.toLowerCase() === 'f' || e.key.toLowerCase() === 'j') handleTkInput(false);
             if (e.key.toLowerCase() === 'd' || e.key.toLowerCase() === 'k') handleTkInput(true);
         }
     };
+    window.st.tkResizeHandler = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.st.tkResizeHandler();
 
-    function resizeTk() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    resizeTk();
-    window.addEventListener('resize', resizeTk);
-    window.addEventListener('keydown', tkHandler);
+    window.addEventListener('resize', window.st.tkResizeHandler);
+    window.addEventListener('keydown', window.st.tkKeyHandler);
 
-    function toggleEnginePause() {
+    window.toggleEnginePause = function() {
+        if(!window.st.act) return;
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
+        let vign = document.getElementById('near-death-vignette');
+        if(vign) vign.classList.remove('danger-active');
+
         if(window.st.paused) {
             window.st.pauseTime = performance.now();
             if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
             if(modal) {
                 modal.style.setProperty('display', 'flex', 'important'); modal.style.setProperty('z-index', '999999', 'important');
+                const total = window.st.stats.s + window.st.stats.g + window.st.stats.b + window.st.stats.m;
+                const acc = total > 0 ? (((window.st.stats.s*300 + window.st.stats.g*100 + window.st.stats.b*50) / (total*300))*100).toFixed(2) : "100.00";
+                
                 modal.querySelector('.modal-panel').innerHTML = `
                     <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
-                    <div class="modal-neon-content"><div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">TAMBORES DETENIDOS</div></div>
-                    <div class="modal-neon-buttons"><button class="action" onclick="window.resumeEngineGame()">▶️ CONTINUAR</button><button class="action secondary" onclick="window.toMenu()">🚪 SALIR</button></div>`;
+                    <div class="modal-neon-content">
+                        <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
+                            ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${acc}%</span>
+                        </div>
+                        <div class="res-stats-grid">
+                            <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                            <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                            <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                            <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                        </div>
+                    </div>
+                    <div class="modal-neon-buttons">
+                        <button class="action" onclick="window.resumeEngineGame()">▶️ CONTINUAR</button>
+                        <button class="action secondary" onclick="window.toMenu()" style="border-color:#F9393F; color:#F9393F;">🚪 SALIR</button>
+                    </div>`;
             }
         } else { window.resumeEngineGame(); }
-    }
+    };
 
     window.resumeEngineGame = function() {
         document.getElementById('modal-pause').style.setProperty('display', 'none', 'important');
@@ -268,37 +304,62 @@ function runTaikoEngine(audioBuffer, map, songObj) {
 
     function endEngine(died) {
         isRunning = false; window.st.act = false;
-        cancelAnimationFrame(animationId);
+        cancelAnimationFrame(window.st.animId);
         try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
         
-        // DESTRUCCIÓN VITAL DE EVENTOS (CERO LAG EN EL SIGUIENTE PLAY)
-        window.removeEventListener('keydown', tkHandler);
-        window.removeEventListener('resize', resizeTk);
+        window.removeEventListener('keydown', window.st.tkKeyHandler);
+        window.removeEventListener('resize', window.st.tkResizeHandler);
 
         canvas.style.display = 'none'; ui.remove();
+        let vign = document.getElementById('near-death-vignette');
+        if(vign) vign.classList.remove('danger-active');
         
         const modal = document.getElementById('modal-res');
         if(modal) {
             modal.style.display = 'flex';
-            const r = died ? "F" : "S";
-            const c = died ? "#F9393F" : "var(--gold)";
-            const titleHTML = died ? `<div id="loser-msg" style="color:#F9393F; font-size:2rem; font-weight:900;">💀 JUEGO TERMINADO</div>` : `<div id="winner-msg" style="color:#12FA05; font-size:2rem; font-weight:900;">¡MAPA COMPLETADO!</div>`;
+            const totalMax = window.st.trueMaxScore || 1; 
+            const finalAcc = Math.round((window.st.sc / totalMax) * 1000) / 10 || 0;
+            let r="D", c="#F9393F", titleHTML="";
             
+            if (!died) {
+                if (finalAcc >= 98) { r="SS"; c="#00FFFF" } else if (finalAcc >= 95) { r="S"; c="var(--gold)" } else if (finalAcc >= 90) { r="A"; c="#12FA05" } else if (finalAcc >= 80) { r="B"; c="yellow" } else if (finalAcc >= 70) { r="C"; c="orange" }
+                titleHTML = `<div id="winner-msg">¡MAPA COMPLETADO!</div>`;
+            } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
+            
+            let xpGain = 0;
+            if (!died && window.user && window.user.name !== "Guest") { xpGain = Math.floor(window.st.sc / 250); window.user.xp += xpGain; if(typeof save === 'function') save(); }
+
             modal.querySelector('.modal-panel').innerHTML = `
-                <div class="modal-neon-header" style="border-bottom-color: ${c};"><h2 class="modal-neon-title" style="color:${c};">🏆 RESULTADOS TAIKO</h2></div>
+                <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
+                    <h2 class="modal-neon-title" style="color:var(--gold);">🏆 RESULTADOS TAIKO</h2>
+                </div>
                 <div class="modal-neon-content">
                     ${titleHTML}
-                    <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin: 25px 0;">
-                        <div class="rank-big" style="color:${c}; font-size:6rem; font-weight:900; text-shadow:0 0 20px ${c};">${r}</div>
+                    <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
+                        <div class="rank-big" style="color:${c}; text-shadow:0 0 20px ${c};">${r}</div>
                         <div style="text-align:left;">
-                            <div style="font-size:3rem; font-weight:900; color:white;">${window.st.sc.toLocaleString()}</div>
+                            <div id="res-score">${window.st.sc.toLocaleString()}</div>
+                            <div style="color:#aaa; font-size:1.5rem; font-weight:900;">ACC: <span style="color:white">${finalAcc}%</span></div>
+                            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; font-size:1.1rem; margin-top:5px;">+0 PP <span style="font-weight:normal; color:#888;">(Unranked)</span></div>
                         </div>
                     </div>
+                    <div class="res-stats-grid">
+                        <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                        <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                        <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                        <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-around; background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; font-weight:bold;">
+                        <div style="color:var(--blue); font-size:1.3rem;">💙 +<span id="res-xp">${xpGain}</span> XP GAINED</div>
+                        <div style="color:var(--gold); font-size:1.3rem;">💰 +<span id="res-sp">0</span> SP SAVED</div>
+                    </div>
                 </div>
-                <div class="modal-neon-buttons"><button class="action" onclick="window.toMenu()">VOLVER AL MENU</button></div>
+                <div class="modal-neon-buttons">
+                    <button class="action" onclick="window.toMenu()">VOLVER AL MENU</button>
+                </div>
             `;
         }
     }
 
-    animationId = requestAnimationFrame(draw);
+    window.st.animId = requestAnimationFrame(draw);
 };
