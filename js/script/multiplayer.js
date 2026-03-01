@@ -1,9 +1,44 @@
 /* ==========================================================
-   MULTIPLAYER.JS - Explorador de Salas y Lógica de Host
+   MULTIPLAYER.JS - Explorador de Salas y Lógica de Host (Actualizado con Filtros)
    ========================================================== */
+
+window.currentLobbyFilter = 'all';
 
 window.openLobbyBrowser = function() {
     window.openModal('lobbies');
+    
+    // Inyectar los botones de filtro si no existen
+    if(!document.getElementById('lobby-filters-bar')) {
+        const titleArea = document.querySelector('#modal-lobbies .modal-neon-content');
+        if(titleArea) {
+            const filterHTML = `
+                <div id="lobby-filters-bar" style="display:flex; gap:10px; margin-bottom:15px; justify-content:center;">
+                    <button class="filter-btn active" onclick="window.setLobbyFilter('all', this)" style="padding: 5px 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: white; cursor: pointer;">🌐 TODAS</button>
+                    <button class="filter-btn" onclick="window.setLobbyFilter('waiting', this)" style="padding: 5px 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: white; cursor: pointer;">⏳ ESPERANDO</button>
+                    <button class="filter-btn" onclick="window.setLobbyFilter('playing', this)" style="padding: 5px 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: white; cursor: pointer;">▶️ JUGANDO</button>
+                </div>
+                <input type="text" id="lobby-search-inp" placeholder="Buscar sala o anfitrión..." class="cw-input" style="width:100%; margin-bottom:20px; font-size:1rem; padding: 10px; border-radius: 5px; border: 1px solid #333; background: #111; color: white;" onkeyup="window.refreshLobbies()">
+            `;
+            // Lo insertamos justo al principio del panel de contenido
+            titleArea.insertAdjacentHTML('afterbegin', filterHTML);
+            
+            // Un pequeño estilo para el botón activo
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .filter-btn.active { border-color: var(--accent) !important; background: rgba(255, 0, 85, 0.2) !important; }
+                .filter-btn:hover { background: #222 !important; }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
+    window.refreshLobbies();
+};
+
+window.setLobbyFilter = function(status, btnElement) {
+    window.currentLobbyFilter = status;
+    document.querySelectorAll('#lobby-filters-bar .filter-btn').forEach(b => b.classList.remove('active'));
+    btnElement.classList.add('active');
     window.refreshLobbies();
 };
 
@@ -18,7 +53,10 @@ window.refreshLobbies = function() {
         return;
     }
 
-    window.db.collection("lobbies").where("status", "==", "waiting").get()
+    const searchQ = document.getElementById('lobby-search-inp') ? document.getElementById('lobby-search-inp').value.toLowerCase() : '';
+
+    // Eliminamos el .where("status", "==", "waiting") para poder traer todas y filtrarlas en cliente
+    window.db.collection("lobbies").get()
         .then(snapshot => {
             list.innerHTML = '';
             let visibleCount = 0;
@@ -27,7 +65,21 @@ window.refreshLobbies = function() {
                 const data = doc.data();
                 if (data.isPrivate === true) return; 
 
+                // --- LÓGICA DE FILTROS ---
+                // 1. Filtro de Estado
+                if (window.currentLobbyFilter !== 'all' && data.status !== window.currentLobbyFilter) return;
+                
+                // 2. Filtro de Búsqueda (Host o Título de Canción)
+                if (searchQ) {
+                    const hostMatch = data.host && data.host.toLowerCase().includes(searchQ);
+                    const songMatch = data.songTitle && data.songTitle.toLowerCase().includes(searchQ);
+                    if (!hostMatch && !songMatch) return;
+                }
+
                 visibleCount++;
+                const statusColor = data.status === 'playing' ? 'var(--miss)' : 'var(--good)';
+                const statusText = data.status === 'playing' ? 'EN CURSO' : 'ESPERANDO';
+
                 const div = document.createElement('div');
                 div.className = 'lobby-box';
                 div.innerHTML = `
@@ -36,19 +88,31 @@ window.refreshLobbies = function() {
                         <div>
                             <div style="font-weight:900; font-size:1.2rem; color:white;">${data.songTitle || 'Desconocido'}</div>
                             <div style="color:var(--blue); font-size:0.9rem; font-weight:bold;">HOST: ${data.host}</div>
+                            <div style="font-size:0.8rem; color:${statusColor}; font-weight:bold; margin-top:3px;">${statusText}</div>
                         </div>
                     </div>
                     <div style="text-align:right;">
                         <div style="font-weight:900; font-size:1.5rem; color:white;">${data.players ? data.players.length : 1}/8</div>
                         <div style="font-size:0.8rem; font-weight:bold; color:${data.config?.ranked ? 'var(--gold)' : '#666'}">${data.config?.ranked ? 'RANKED' : 'CASUAL'}</div>
+                        <button class="action ${data.status === 'playing' ? 'secondary' : ''}" style="margin-top:5px; padding: 5px 10px; font-size: 0.8rem;" onclick="event.stopPropagation(); window.joinLobbyData('${doc.id}')" ${data.status === 'playing' ? 'disabled' : ''}>
+                            ${data.status === 'playing' ? 'CERRADA' : 'ENTRAR'}
+                        </button>
                     </div>
                 `;
-                div.onclick = function() { if(window.joinLobbyData) window.joinLobbyData(doc.id); };
+                // Mantenemos el onclick original, pero lo condicionamos a si está esperando
+                if(data.status === 'waiting') {
+                    div.onclick = function() { if(window.joinLobbyData) window.joinLobbyData(doc.id); };
+                    div.style.cursor = 'pointer';
+                } else {
+                    div.style.cursor = 'not-allowed';
+                    div.style.opacity = '0.7';
+                }
+                
                 list.appendChild(div);
             });
 
             if (visibleCount === 0) {
-                list.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No hay salas públicas. ¡Crea una!</div>';
+                list.innerHTML = '<div style="padding:20px; text-align:center; color:#666;">No hay salas que coincidan con la búsqueda.</div>';
             }
         })
         .catch(error => { list.innerHTML = '<div style="padding:20px; text-align:center;">Error al cargar.</div>'; });
@@ -149,6 +213,7 @@ window.selectSongForLobby = function(id, data) {
     }
     setTimeout(() => window.startGame(4), 100);
 };
+
 // === INTERCEPCIÓN DE START GAME ===
 window.startGame = function(k) {
     if (window.isCreatingLobby) {
@@ -247,7 +312,7 @@ window.updateHostPanelUI = function(players, hostName) {
     
     container.innerHTML = ''; 
     let allReady = true;
-    let amIHost = (window.user.name === hostName);
+    let amIHost = (window.user && window.user.name === hostName);
     let myStatus = 'not-ready';
     let playersCount = players.length;
 
@@ -255,7 +320,7 @@ window.updateHostPanelUI = function(players, hostName) {
         const isHost = p.name === hostName;
         const isReady = p.status === 'ready';
         if (!isReady && !isHost) allReady = false; 
-        if (p.name === window.user.name) myStatus = p.status;
+        if (window.user && p.name === window.user.name) myStatus = p.status;
 
         const div = document.createElement('div');
         div.className = 'lobby-p-card';
