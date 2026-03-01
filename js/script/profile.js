@@ -80,6 +80,8 @@ window.updUI = function() {
     } else {
         if (user.equipped) applyUIFrameVisuals(user.equipped.ui, 0);
     }
+    // Activar botón Admin si corresponde
+    if(typeof checkAdminStatus === 'function') checkAdminStatus();
 };
 
 // 3. CAMBIAR VISTAS DENTRO DEL PERFIL
