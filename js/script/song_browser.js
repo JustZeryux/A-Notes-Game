@@ -116,7 +116,10 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 };
 
 window.renderUnifiedGrid = function() {
-    const grid = document.getElementById('song-grid'); if(!grid) return; grid.innerHTML = '';
+    const grid = document.getElementById('song-grid'); 
+    if(!grid) return; 
+    grid.innerHTML = '';
+    
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
     let filtered = baseList.filter(song => {
@@ -133,57 +136,58 @@ window.renderUnifiedGrid = function() {
     });
 
     if (filtered.length === 0) { 
-        grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">${window.currentFilters.type === 'recent' ? 'No has jugado nada recientemente. 🕒' : 'No se encontraron resultados. 🌸'}</div>`; 
+        grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones. 🌸</div>`; 
         return; 
     }
 
     filtered.forEach(song => {
         const card = document.createElement('div'); 
-        card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`; // CLASE ORIGINAL RESTAURADA
-        card.style.cssText = 'position: relative; height: 180px; border-radius: 12px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s, box-shadow 0.2s; background: #111;';
+        card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
         
-        // Estrellas ⭐
+        // --- LÓGICA DE ESTRELLAS ⭐ ---
         let stars = parseFloat(song.starRating || 0).toFixed(1);
         if(!song.isOsu) stars = ((song.raw?.notes?.length || 0) / 250 + 1.2).toFixed(1);
-        let starCol = stars >= 6 ? '#F9393F' : (stars >= 4 ? '#FFD700' : '#12FA05');
-        let diffBadge = `<div class="diff-badge" style="border:1px solid ${starCol}; color:${starCol}; box-shadow:0 0 8px ${starCol}44;">⭐ ${stars}</div>`;
-
-        // Modos y Teclas
-        let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🌸'));
-        let maniaKeys = (song.originalMode === 'mania' || !song.isOsu) ? song.keysAvailable.map(k => `<div class="diff-badge" style="padding: 2px 8px; border: 1px solid #00ffff; color: #00ffff; border-radius: 5px; font-size: 0.8rem; font-weight: bold;">${k}K</div>`).join('') : "";
-        let osuBadge = song.isOsu ? `<div class="diff-badge osu-badge" style="margin-left:auto;">${mIcon} ${song.originalMode.toUpperCase()}</div>` : `<div class="diff-badge" style="margin-left:auto; border:1px solid #00ffff; color:#00ffff;">☁️ COMUNIDAD</div>`;
+        
+        let starCol = stars >= 6 ? '#ff0055' : (stars >= 4 ? '#FFD700' : '#00ffcc');
+        
+        // --- LÓGICA DE BADGES ---
+        let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🎹'));
+        let maniaKeys = (song.originalMode === 'mania' || !song.isOsu) 
+            ? song.keysAvailable.map(k => `<div class="diff-badge" style="border: 1px solid var(--blue); color: var(--blue);">${k}K</div>`).join('') 
+            : "";
+        
+        let sourceBadge = song.isOsu 
+            ? `<div class="diff-badge" style="margin-left:auto; border-color: #ff66aa; color: #ff66aa;">${mIcon} ${song.originalMode.toUpperCase()}</div>` 
+            : `<div class="diff-badge" style="margin-left:auto; border-color: var(--blue); color: var(--blue);">☁️ COMMUNITY</div>`;
 
         card.innerHTML = `
-            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background-image: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; opacity: 0.7;"></div>
-            <div class="song-info" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent);">
-                <div class="song-title" style="font-size: 1.2rem; font-weight: 900; color: white; text-shadow: 0 2px 4px black; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.title}</div>
-                <div class="song-author" style="font-size: 0.9rem; color: #ccc; font-weight: bold; margin-bottom: 10px;">${song.artist}</div>
-                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
-                    ${diffBadge}
+            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; transition: 0.5s; filter: brightness(0.6);"></div>
+            
+            <div class="song-info">
+                <div class="song-title">${song.title}</div>
+                <div class="song-author">by ${song.artist.replace('Subido por: ', '')}</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+                    <div class="diff-badge" style="background: ${starCol}22; border: 1px solid ${starCol}; color: ${starCol};">⭐ ${stars}</div>
                     ${maniaKeys}
-                    ${osuBadge}
+                    ${sourceBadge}
                 </div>
             </div>`;
         
-        card.onmouseenter = () => { 
-            card.style.transform = 'translateY(-5px) scale(1.03)'; 
-            if(song.isOsu) card.style.boxShadow = '0 0 25px rgba(255, 102, 170, 0.5)';
-            else card.style.boxShadow = '0 0 20px rgba(0, 255, 255, 0.3)';
-        };
-        card.onmouseleave = () => { 
-            card.style.transform = 'scale(1)'; 
-            card.style.boxShadow = song.isOsu ? '0 0 15px rgba(255, 102, 170, 0.2)' : 'none'; 
-        };
+        // Hover effects manejados por CSS, pero añadimos el zoom de fondo por JS
+        const bg = card.querySelector('.song-bg');
+        card.onmouseenter = () => { bg.style.transform = 'scale(1.1)'; bg.style.filter = 'brightness(0.9)'; };
+        card.onmouseleave = () => { bg.style.transform = 'scale(1)'; bg.style.filter = 'brightness(0.6)'; };
+        
         card.onclick = () => { if(typeof window.openUnifiedDiffModal === 'function') window.openUnifiedDiffModal(song); };
         grid.appendChild(card);
     });
 
+    // Botón Cargar Más (Estilizado)
     if (window.currentFilters.type !== 'recent') {
         const loadMoreContainer = document.createElement('div'); 
         loadMoreContainer.style.gridColumn = "1 / -1"; 
-        loadMoreContainer.style.textAlign = "center"; 
-        loadMoreContainer.style.padding = "30px";
-        loadMoreContainer.innerHTML = `<button id="btn-load-more" class="action btn-acc" style="width: 400px; padding: 15px; font-size: 1.2rem; box-shadow: 0 0 25px rgba(0,255,255,0.4); border-radius: 12px;">⬇️ CARGAR MÁS CANCIONES ⬇️</button>`;
+        loadMoreContainer.style.padding = "40px";
+        loadMoreContainer.innerHTML = `<button id="btn-load-more" class="import-btn" style="width: 320px; margin: 0 auto;">Cargar más contenido</button>`;
         loadMoreContainer.querySelector('button').onclick = () => window.fetchUnifiedData(window.lastQuery, true);
         grid.appendChild(loadMoreContainer);
     }
