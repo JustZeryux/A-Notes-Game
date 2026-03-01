@@ -70,12 +70,7 @@ function genMap(buf, k) {
     const density = window.cfg.den || 5;
     const step = Math.floor(sampleRate / 60); 
     
-    // 1. CURVA MUCHO MÁS AGRESIVA DESDE EL INICIO
-    // Nivel 1 = ~250ms (Antes 350ms) | Nivel 10 = ~160ms | Nivel 15 = ~80ms | Nivel 20 = ~50ms
     let minDistMs = Math.max(50, 260 - (Math.pow(density, 1.4) * 4)); 
-    
-    // 2. MAYOR SENSIBILIDAD PARA LLENAR LOS ESPACIOS VACÍOS
-    // El umbral es más bajo, por lo que detectará más golpes secundarios de la pista
     let thresholdMult = Math.max(0.80, 1.40 - (density * 0.04)); 
     
     let lastNoteTime = -1000; 
@@ -85,7 +80,6 @@ function genMap(buf, k) {
     const energyHistory = [];
     let prevInstant = 0; 
 
-    // MÁQUINA DE PATRONES
     let patternType = 'none'; 
     let patternCount = 0;
     let trillLanes = [];
@@ -101,7 +95,6 @@ function genMap(buf, k) {
 
         let intensity = (localAvg > 0) ? (instant / localAvg) : 0;
 
-        // Detección más sensible (0.015 en vez de 0.02 permite detectar sonidos más suaves)
         if(instant > localAvg * thresholdMult && instant > prevInstant && instant > 0.015) {
             const timeMs = (i / sampleRate) * 1000 + START_OFFSET;
             
@@ -110,7 +103,6 @@ function genMap(buf, k) {
                 let length = 0;
                 let lane = -1;
 
-                // --- PATRONES CON MAYOR FRECUENCIA ---
                 if (patternCount > 0) {
                     patternCount--;
                     if (patternType === 'stairs') {
@@ -121,7 +113,6 @@ function genMap(buf, k) {
                         lane = lastLane;
                     }
                 } else {
-                    // Ahora lanza patrones más seguido (probabilidad > 0.4 en vez de 0.6)
                     if (density >= 3 && Math.random() > 0.4) {
                         let rand = Math.random();
                         if (rand > 0.5) {
@@ -146,7 +137,6 @@ function genMap(buf, k) {
                     lane = bestLane; 
                 }
 
-                // --- HOLDS ---
                 if (intensity > 1.35 && Math.random() > 0.4) {
                     let sustain = 0;
                     for(let h=1; h<12; h++) {
@@ -164,20 +154,14 @@ function genMap(buf, k) {
                 map.push({ t: timeMs, l: lane, type: type, len: length, h: false });
                 laneFreeTimes[lane] = timeMs + length + 25; 
                 
-                // --- ACORDES: APARECEN MUCHO MÁS TEMPRANO Y MÁS SEGUIDO ---
-                // Ahora empiezan desde nivel 4 en vez de 6
                 if (density >= 4 && type === 'tap') {
-                    // Probabilidad aumentada drásticamente
                     let chordChance = (density - 2) * 0.08; 
-                    
-                    // Umbral bajado a 1.35 para que salgan dobles en casi cualquier golpe de batería fuerte
                     if (intensity > 1.35 && Math.random() < chordChance) {
                         let l2 = getSmartLane(lane, k, laneFreeTimes, timeMs);
                         if (l2 !== -1 && l2 !== lane) {
                             map.push({ t: timeMs, l: l2, type: 'tap', len: 0, h: false });
                             laneFreeTimes[l2] = timeMs + 25;
 
-                            // Acordes Triples ahora empiezan desde el nivel 12
                             if (density >= 12 && intensity > 1.8 && k >= 6 && Math.random() < 0.4) {
                                 let l3 = getSmartLane(l2, k, laneFreeTimes, timeMs);
                                 if(l3 !== -1 && l3 !== lane && l3 !== l2) {
@@ -197,10 +181,10 @@ function genMap(buf, k) {
     }
     return map;
 }
+
 // ==========================================
 // 3. CORE (SYNC & VISUALS)
 // ==========================================
-
 function playHit() {
     if (window.hitBuf && window.cfg.hitSound && window.st.ctx) {
         const s = window.st.ctx.createBufferSource(); s.buffer = window.hitBuf;
@@ -220,9 +204,7 @@ window.prepareAndPlaySong = async function(k) {
     if(window.currentLobbyId) window.isMultiplayer = true;
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
-    // === NUEVO: INTERCEPTOR DE OSU! PARA MULTIJUGADOR ===
-    // Si la canción viene de la sala online y tiene la etiqueta "osu_"
-    // === NUEVO: INTERCEPTOR DE OSU! CORREGIDO ===
+    // === FIX: INTERCEPTOR DE OSU! CORREGIDO ===
     if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
         
         // 🚨 FIX 1: ENCENDER EL MOTOR DE AUDIO ANTES DE MANDARLO A OSU! 🚨
@@ -241,21 +223,14 @@ window.prepareAndPlaySong = async function(k) {
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
 
-        // [NUEVO] AUTO-FETCHER DE LETRAS EN TIEMPO REAL CON LIMPIEZA DE PARÉNTESIS
         if (window.cfg.subtitles && !window.curSongData.lyrics && window.curSongData.title) {
             try {
-                // Regex mágico: Elimina cualquier cosa entre () o []
                 let cleanTitle = window.curSongData.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
-                console.log("Buscando subtítulos automáticos para:", cleanTitle);
-                
                 const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
                 const data = await res.json();
                 const bestMatch = data.find(song => song.syncedLyrics);
                 
-                if (bestMatch && bestMatch.syncedLyrics) {
-                    console.log("¡Letras automáticas encontradas!");
-                    window.curSongData.lyrics = bestMatch.syncedLyrics;
-                }
+                if (bestMatch && bestMatch.syncedLyrics) window.curSongData.lyrics = bestMatch.syncedLyrics;
             } catch(e) { console.warn("No se encontraron letras automáticas."); }
         }
 
@@ -281,7 +256,6 @@ window.prepareAndPlaySong = async function(k) {
              playSongInternal(songObj);
              if(loader) loader.style.display = 'none';
         }
-
     } catch (e) {
         console.error(e);
         if(loader) loader.style.display = 'none';
@@ -291,7 +265,6 @@ window.prepareAndPlaySong = async function(k) {
 
 window.playSongInternal = function(s) {
     if(!s) return;
-    // Iniciar controles táctiles basados en la cantidad de teclas (ej. 4)
     initMobileTouchControls(window.keys || 4);
     window.st.act = true; window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
@@ -314,7 +287,6 @@ window.playSongInternal = function(s) {
     const uiToClose = ['modal-res', 'modal-pause', 'modal-lobbies', 'modal-lobby-room', 'modal-song-selector', 'modal-diff', 'loading-overlay'];
     uiToClose.forEach(id => { const m = document.getElementById(id); if(m) m.style.display = 'none'; });
 
-    // === INYECTAR SUBTÍTULOS Y FONDO SI NO EXISTEN ===
     if(!document.getElementById('game-bg-container')) {
         const bgCont = document.createElement('div');
         bgCont.id = "game-bg-container";
@@ -330,7 +302,6 @@ window.playSongInternal = function(s) {
     const bgC = document.getElementById('game-bg-container');
     const subC = document.getElementById('subtitles-container');
     
-    // Activar Imagen de Fondo (Con o sin efectos)
     if (window.cfg.bgEffects || window.cfg.subtitles) {
         bgC.style.display = 'block';
         document.getElementById('game-bg-img').style.backgroundImage = window.curSongData.imageURL ? `url(${window.curSongData.imageURL})` : 'none';
@@ -338,7 +309,6 @@ window.playSongInternal = function(s) {
         bgC.style.display = 'none';
     }
 
-    // Parsear Subtítulos
     if (window.cfg.subtitles) {
         window.st.parsedLyrics = [];
         window.st.currentLyricIdx = 0;
@@ -397,9 +367,25 @@ function loop() {
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
-    
+    // === ACTUALIZACIÓN DE BARRA Y RELOJ ===
+    if (window.st.songDuration > 0 && songTime > 0) {
+        let currentSec = songTime / 1000;
+        let totalSec = window.st.songDuration;
+        if (currentSec > totalSec) currentSec = totalSec;
 
-    // Lógica de Subtítulos
+        const pct = Math.min(100, (currentSec / totalSec) * 100);
+        const bar = document.getElementById('top-progress-fill');
+        if(bar) bar.style.width = pct + "%";
+
+        let curM = Math.floor(currentSec / 60);
+        let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
+        let totM = Math.floor(totalSec / 60);
+        let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
+        
+        const timeText = document.getElementById('top-progress-time');
+        if (timeText) timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
+    }
+
     if (window.cfg.subtitles && window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
         let idx = window.st.currentLyricIdx;
         if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
@@ -420,31 +406,11 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
-    // 1. FASE DE SPAWN
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
         
-        i// === ACTUALIZACIÓN DE BARRA Y RELOJ ===
-    if (window.st.songDuration > 0 && songTime > 0) {
-        let currentSec = songTime / 1000;
-        let totalSec = window.st.songDuration;
-        if (currentSec > totalSec) currentSec = totalSec;
-
-        // 1. Llenar la barra de color
-        const pct = Math.min(100, (currentSec / totalSec) * 100);
-        const bar = document.getElementById('top-progress-fill');
-        if(bar) bar.style.width = pct + "%";
-
-        // 2. Actualizar el reloj (Ej: 1:05 / 3:20)
-        let curM = Math.floor(currentSec / 60);
-        let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
-        let totM = Math.floor(totalSec / 60);
-        let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
-        
-        const timeText = document.getElementById('top-progress-time');
-        if (timeText) timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
-    }f (n.t - now < 1500) { 
+        if (n.t - now < 1500) { 
             if (n.t - now > -200) { 
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
@@ -480,7 +446,6 @@ function loop() {
         } else break; 
     }
 
-    // 2. FASE DE PROCESAMIENTO Y DESTRUCCIÓN 
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         
@@ -605,7 +570,6 @@ function showJudge(text, color, diffMs) {
 // ==========================================
 // 6. EVENTOS DE TECLADO Y EVALUACIÓN
 // ==========================================
-
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
     if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
@@ -652,13 +616,11 @@ function hit(l, p) {
                 if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; 
             }
 
-            // [NUEVO] EFECTOS ALEATORIOS DE CÁMARA EN SICK Y GOOD
             if(window.cfg.bgEffects && (text === "SICK!!" || text === "GOOD")) {
                 const bg = document.getElementById('game-bg-img');
                 if(bg) {
                     bg.classList.remove('bg-bump-1', 'bg-bump-2', 'bg-bump-3');
-                    void bg.offsetWidth; // Forzar reinicio de animación
-                    // Escoger un movimiento al azar (1 a 3)
+                    void bg.offsetWidth; 
                     const randomBump = 'bg-bump-' + (Math.floor(Math.random() * 3) + 1);
                     bg.classList.add(randomBump);
                     setTimeout(() => bg.classList.remove(randomBump), 120);
@@ -701,7 +663,6 @@ function miss(n) {
 // ==========================================
 // 7. HUD Y FINALIZACIÓN
 // ==========================================
-
 function updHUD() {
     const scEl = document.getElementById('g-score');
     if(scEl) scEl.innerText = window.st.sc.toLocaleString();
@@ -736,8 +697,8 @@ function end(died) {
     window.st.act = false;
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
-    let touchZones = document.getElementById('mobile-touch-zones'); // <--- BUSCAMOS
-    if(touchZones) touchZones.style.display = 'none';               // <--- APAGAMOS AL MORIR/GANAR
+    let touchZones = document.getElementById('mobile-touch-zones'); 
+    if(touchZones) touchZones.style.display = 'none';               
     
     if(window.isMultiplayer) {
         if(typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc, true);
@@ -857,33 +818,26 @@ function initReceptors(k) {
 
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
-// [NUEVO] CREADOR DINÁMICO DEL MENÚ DE PAUSA
-// ==========================================
-// FIX: MENÚ DE PAUSA A PRUEBA DE BALAS
-// ==========================================
-
 window.togglePause = function() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     
     let modal = document.getElementById('modal-pause');
-    let touchZones = document.getElementById('mobile-touch-zones'); // <--- BUSCAMOS LAS ZONAS
+    let touchZones = document.getElementById('mobile-touch-zones'); 
 
     if(window.st.paused) {
-        if(touchZones) touchZones.style.display = 'none'; // <--- APAGAMOS LAS ZONAS AL PAUSAR
+        if(touchZones) touchZones.style.display = 'none'; 
         
         window.st.pauseTime = performance.now();
         if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
         
         if(modal) {
-            // FORZAMOS VISIBILIDAD EXTREMA PARA EVITAR BUGS DE CSS
             modal.style.setProperty('display', 'flex', 'important');
             modal.style.setProperty('z-index', '999999', 'important');
             modal.style.setProperty('opacity', '1', 'important');
             
             const panel = modal.querySelector('.modal-panel');
             if(panel) {
-                // Sacamos la accuracy actual de forma segura
                 const accEl = document.getElementById('g-acc');
                 const currentAcc = accEl ? accEl.innerText : "100%";
 
@@ -909,7 +863,6 @@ window.resumeGame = function() {
         modal.style.setProperty('display', 'none', 'important');
     }
     
-    // <--- VOLVEMOS A ENCENDER LAS ZONAS TÁCTILES (SOLO EN CELULAR)
     let touchZones = document.getElementById('mobile-touch-zones');
     if(touchZones && window.innerWidth <= 800) touchZones.style.display = 'flex'; 
 
@@ -934,33 +887,25 @@ window.toMenu = function() {
     document.getElementById('game-layer').style.display = 'none';
     document.getElementById('menu-container').classList.remove('hidden');
     
-    // Ocultar modales
     const resM = document.getElementById('modal-res');
     if(resM) resM.style.display = 'none';
     
     const pauseM = document.getElementById('modal-pause');
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 };
-// === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS ===
+
 // === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS (V-FINAL) ===
 window.initMobileTouchControls = function(keyCount) {
-    // 1. ARRANCAMOS LAS CINTAS VIEJAS (Esto arregla el bug de 4K a 6K)
     let oldContainer = document.getElementById('mobile-touch-zones');
-    if (oldContainer) {
-        oldContainer.remove(); 
-    }
+    if (oldContainer) oldContainer.remove(); 
 
-    // 2. Si estás en computadora, no hacemos nada y cancelamos
     if (window.innerWidth > 800 && !('ontouchstart' in window)) return;
 
-    // 3. PONEMOS UN CONTENEDOR NUEVO Y LIMPIO
     const touchContainer = document.createElement('div');
     touchContainer.id = 'mobile-touch-zones';
-    // El z-index 800 es para que no tape tu botón de pausa ni otros menús
     touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 800; display: flex; flex-direction: row; pointer-events: auto;';
     document.body.appendChild(touchContainer); 
 
-    // 4. PREGUNTAMOS QUÉ LETRAS SE VAN A USAR (D, F, J, K o S, D, F, J, K, L)
     let currentKeys = [];
     if (window.cfg && window.cfg.modes && window.cfg.modes[keyCount]) {
         for(let i = 0; i < keyCount; i++) currentKeys.push(window.cfg.modes[keyCount][i].k);
@@ -968,7 +913,6 @@ window.initMobileTouchControls = function(keyCount) {
         currentKeys = keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k'];
     }
 
-    // 5. CORTAMOS LA PANTALLA EN LOS PEDAZOS NECESARIOS Y LES DAMOS VIDA
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
         zone.style.flex = '1';
@@ -977,21 +921,18 @@ window.initMobileTouchControls = function(keyCount) {
         
         const targetKey = currentKeys[i].toLowerCase();
 
-        // Cuando tu dedo TOCA la pantalla
         zone.addEventListener('touchstart', (e) => {
             e.preventDefault(); 
-            zone.style.background = 'rgba(255,255,255,0.1)'; // Brilla un poquito para que sepas que tocaste
+            zone.style.background = 'rgba(255,255,255,0.1)'; 
             if(typeof window.onKd === 'function') window.onKd({ key: targetKey, preventDefault: ()=>{} });
         }, { passive: false });
 
-        // Cuando tu dedo SUELTA la pantalla
         zone.addEventListener('touchend', (e) => {
             e.preventDefault();
             zone.style.background = 'transparent';
             if(typeof window.onKu === 'function') window.onKu({ key: targetKey, preventDefault: ()=>{} });
         }, { passive: false });
 
-        // Por si deslizas el dedo fuera de la zona
         zone.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             zone.style.background = 'transparent';
@@ -1001,4 +942,3 @@ window.initMobileTouchControls = function(keyCount) {
         touchContainer.appendChild(zone);
     }
 };
-
