@@ -129,6 +129,7 @@ window.toggleProfileSettings = function(show) {
 // ==========================================
 // MOSTRAR EL PERFIL (Cerradura de Privacidad)
 // ==========================================
+// === js/script/profile.js - PERFIL CORREGIDO ===
 window.showUserProfile = async function(targetName) {
     if (!window.db) return notify("Error de conexión", "error");
     
@@ -138,28 +139,25 @@ window.showUserProfile = async function(targetName) {
     document.getElementById('login-view').style.display = 'none';
     document.getElementById('profile-view').style.display = 'block';
     
-    setText('p-name', "Cargando...");
-    setText('p-global-rank', "#--");
+    document.getElementById('p-name').innerText = "Cargando...";
+    document.getElementById('p-global-rank').innerText = "#--";
     
     const profilePanel = document.querySelector('#modal-profile .modal-panel');
     if(profilePanel) profilePanel.className = 'modal-panel'; 
-    
     const badge = document.getElementById('p-top-badge');
     if(badge) badge.style.display = 'none';
 
     const isMe = (window.user && targetName === window.user.name);
     
-    // --- RESET SEGURO DEL AVATAR ---
     const avBig = document.getElementById('p-av-big');
     if(avBig) { 
         avBig.style.backgroundImage = "none"; 
-        setText('p-av-letter', "G"); // Ya no borra el input, solo cambia la letra
+        document.getElementById('p-av-letter').innerText = "G";
         avBig.style.border = "4px solid #333"; 
         avBig.style.boxShadow = "none"; 
         avBig.style.animation = "none"; 
     }
 
-    // --- CERRADURAS DE SEGURIDAD (BOTONES Y CAMBIAR FOTO) ---
     document.getElementById('p-owner-actions').style.display = isMe ? 'flex' : 'none';
     document.getElementById('p-visitor-actions').style.display = isMe ? 'none' : 'flex';
     
@@ -175,93 +173,38 @@ window.showUserProfile = async function(targetName) {
         if(avInput) avInput.disabled = false;
     } else {
         if(avBig) avBig.style.cursor = 'default';
-        if(avOverlay) avOverlay.style.display = 'none'; // Foxy ya no tendrá el botón CAMBIAR
-        if(avInput) avInput.disabled = true; // Input desactivado para visitantes
+        if(avOverlay) avOverlay.style.display = 'none'; 
+        if(avInput) avInput.disabled = true; 
     }
 
     try {
         const doc = await window.db.collection('users').doc(targetName).get();
-        if (!doc.exists) { setText('p-name', "Usuario no encontrado"); return; }
+        if (!doc.exists) { document.getElementById('p-name').innerText = "Usuario no encontrado"; return; }
         const d = doc.data();
         
-        setText('p-name', targetName);
-        // LÓGICA DE TAGS (Predefinidos, Custom y Especiales Top)
-        const tagEl = document.getElementById('p-user-tag');
-        if (tagEl) {
-            tagEl.style.display = 'none'; // Ocultar por defecto
-            tagEl.className = 'player-tag'; // Resetear clases
-            tagEl.style.background = ''; tagEl.style.color = ''; // Reset custom CSS
-            
-            // 1. Prioridad: ¿Es Top Global? (Se lo asignamos temporalmente, esto sobrescribe los comprados)
-            let isTop = false;
-            // Evaluamos el Top en la promesa de abajo, pero aquí cargamos su Tag normal:
-            
-            if (d.equipped && d.equipped.tag) {
-                tagEl.style.display = 'inline-block';
-                
-                if (d.equipped.tag === 'tag_custom' && d.customTagData) {
-                    // Es un Tag Customizado
-                    tagEl.classList.add('tag-custom');
-                    tagEl.innerText = d.customTagData.text || "CUSTOM";
-                    tagEl.style.background = d.customTagData.bg || "#ff66aa";
-                    tagEl.style.color = d.customTagData.color || "#ffffff";
-                } else {
-                    // Es un Tag comprado de la tienda
-                    const sItem = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS.find(x => x.id === d.equipped.tag) : null;
-                    if (sItem) {
-                        tagEl.classList.add(sItem.css);
-                        tagEl.innerText = sItem.name;
-                    } else {
-                        tagEl.style.display = 'none';
-                    }
-                }
-            }
-        }
-        setText('p-lvl-txt', "LVL " + (d.lvl || 1));
-        setText('p-score', (d.score || 0).toLocaleString());
-        setText('p-plays', (d.plays || 0).toLocaleString());
-        setText('p-pp-display', (d.pp || 0).toLocaleString() + " PP");
-        setText('p-sp-display', (d.sp || 0).toLocaleString());
+        document.getElementById('p-name').innerText = targetName;
+        document.getElementById('p-lvl-txt').innerText = "LVL " + (d.lvl || 1);
+        document.getElementById('p-score').innerText = (d.score || 0).toLocaleString();
+        document.getElementById('p-plays').innerText = (d.plays || 0).toLocaleString();
+        document.getElementById('p-pp-display').innerText = (d.pp || 0).toLocaleString() + " PP";
+        document.getElementById('p-sp-display').innerText = (d.sp || 0).toLocaleString();
         
-        // Lógica real de Online/Offline con la regla de latidos (Heartbeat)
-let isOnlineText = "⚪ Offline";
-let bgStatus = "rgba(0,0,0,0.5)"; // Fondo gris por defecto
+        let isOnlineText = "⚪ Offline"; let bgStatus = "rgba(0,0,0,0.5)";
+        if (d.lastActive && (Date.now() - d.lastActive <= 25000)) { isOnlineText = "🟢 Conectado"; bgStatus = "rgba(0, 255, 0, 0.15)"; } 
+        else if (d.online === true) { isOnlineText = "🟢 Conectado"; bgStatus = "rgba(0, 255, 0, 0.15)"; }
 
-if (d.lastActive) {
-    const timeSinceLastSignal = Date.now() - d.lastActive;
-    // Si la última señal fue hace menos de 25 segundos (15s de latido + 10s de margen por lag de internet)
-    if (timeSinceLastSignal <= 25000) {
-        isOnlineText = "🟢 Conectado";
-        bgStatus = "rgba(0, 255, 0, 0.15)"; // Fondo verdecito brillante
-    }
-} else if (d.online === true) { 
-    // Respaldo por si usabas un booleano en lugar de tiempo
-    isOnlineText = "🟢 Conectado";
-    bgStatus = "rgba(0, 255, 0, 0.15)";
-}
-
-const statusEl = document.getElementById('p-online-status');
-if (statusEl) {
-    statusEl.innerText = isOnlineText;
-    statusEl.style.background = bgStatus;
-    if(isOnlineText.includes('Conectado')) {
-        statusEl.style.border = "1px solid var(--good)";
-        statusEl.style.color = "var(--good)";
-    } else {
-        statusEl.style.border = "1px solid #444";
-        statusEl.style.color = "#aaa";
-    }
-}
-        setText('p-custom-status', d.customStatus || "");
-        setText('p-bio', d.bio || "Este usuario no ha escrito una biografía.");
-
-        // Cargar Avatar sin destruir la estructura
-        if(d.avatarData && avBig) { 
-            avBig.style.backgroundImage = `url(${d.avatarData})`; 
-            setText('p-av-letter', ""); 
-        } else {
-            setText('p-av-letter', targetName.charAt(0).toUpperCase());
+        const statusEl = document.getElementById('p-online-status');
+        if (statusEl) {
+            statusEl.innerText = isOnlineText; statusEl.style.background = bgStatus;
+            if(isOnlineText.includes('Conectado')) { statusEl.style.border = "1px solid var(--good)"; statusEl.style.color = "var(--good)"; } 
+            else { statusEl.style.border = "1px solid #444"; statusEl.style.color = "#aaa"; }
         }
+        
+        document.getElementById('p-custom-status').innerText = d.customStatus || "";
+        document.getElementById('p-bio').innerText = d.bio || "Este usuario no ha escrito una biografía.";
+
+        if(d.avatarData && avBig) { avBig.style.backgroundImage = `url(${d.avatarData})`; document.getElementById('p-av-letter').innerText = ""; } 
+        else { document.getElementById('p-av-letter').innerText = targetName.charAt(0).toUpperCase(); }
 
         const headerBg = document.getElementById('p-header-bg');
         if(headerBg) {
@@ -269,9 +212,7 @@ if (statusEl) {
             headerBg.style.backgroundImage = `linear-gradient(to bottom, transparent, #0a0a0a), ${bannerUrl}`;
         }
 
-        // Privacidad de Skins
-        let skinName = "Oculto", uiName = "Oculto";
-        let equippedUI = 'default';
+        let skinName = "Oculto", uiName = "Oculto"; let equippedUI = 'default';
         if (!d.hideItems || isMe) { 
             skinName = "Default"; uiName = "Ninguno";
             if (d.equipped && typeof SHOP_ITEMS !== 'undefined') {
@@ -280,56 +221,89 @@ if (statusEl) {
             }
             equippedUI = d.equipped ? d.equipped.ui : 'default';
         }
-        setText('p-equipped-skin', skinName);
-        setText('p-equipped-ui', uiName);
+        document.getElementById('p-equipped-skin').innerText = skinName;
+        document.getElementById('p-equipped-ui').innerText = uiName;
 
-        if (!isMe) {
-            const btnAdd = document.getElementById('btn-add-friend');
-            const friendsList = window.user.friends || [];
-            if (btnAdd) {
-                if (friendsList.includes(targetName)) {
-                    btnAdd.innerText = "❌ ELIMINAR AMIGO"; btnAdd.style.background = "#FF3333"; btnAdd.style.color = "white";
-                    btnAdd.onclick = () => { window.removeFriend(targetName); window.closeModal('profile'); };
+        // --- SISTEMA DE TAGS (ARREGLADO) ---
+        // 1. Tag de Clan (Creamos o actualizamos un span separado para no borrar el otro)
+        let clanSpan = document.getElementById('p-clan-tag');
+        if(!clanSpan) {
+            clanSpan = document.createElement('span');
+            clanSpan.id = 'p-clan-tag'; clanSpan.className = 'clan-tag';
+            document.getElementById('p-name-container').prepend(clanSpan);
+        }
+        if (d.clan && d.clan.tag) {
+            clanSpan.style.display = 'inline-block';
+            clanSpan.style.setProperty('--c', d.clan.color);
+            clanSpan.innerText = `[${d.clan.tag}]`;
+        } else { clanSpan.style.display = 'none'; }
+
+        // 2. Tag de la Tienda (Pro Player, Custom, etc)
+        const tagEl = document.getElementById('p-user-tag');
+        if (tagEl) {
+            tagEl.style.display = 'none'; tagEl.className = 'player-tag'; tagEl.style.background = ''; tagEl.style.color = ''; 
+            if (d.equipped && d.equipped.tag) {
+                tagEl.style.display = 'inline-block';
+                if (d.equipped.tag === 'tag_custom' && d.customTagData) {
+                    tagEl.classList.add('tag-custom'); tagEl.innerText = d.customTagData.text || "CUSTOM";
+                    tagEl.style.background = d.customTagData.bg || "#ff66aa"; tagEl.style.color = d.customTagData.color || "#ffffff";
                 } else {
-                    btnAdd.innerText = "➕ AGREGAR AMIGO"; btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black";
-                    btnAdd.onclick = () => { window.sendFriendRequestTarget(targetName); };
+                    const sItem = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS.find(x => x.id === d.equipped.tag) : null;
+                    if (sItem) { tagEl.classList.add(sItem.css); tagEl.innerText = sItem.name; }
                 }
             }
         }
-// --- MOSTRAR CLAN AL LADO DEL NOMBRE ---
-        let clanHTML = "";
-        if (d.clan && d.clan.tag) {
-            clanHTML = `<span class="clan-tag" style="--c:${d.clan.color}; font-size:1.2rem; margin-right:15px; margin-bottom:10px;">[${d.clan.tag}]</span>`;
+
+        // --- BOTONES DE INTERACCIÓN ---
+        if (!isMe) {
+            const btnAdd = document.getElementById('btn-add-friend');
+            const btnChat = document.getElementById('btn-chat-user');
+            const btnChal = document.getElementById('btn-challenge-user');
+            const friendsList = window.user.friends || [];
+            
+            if (btnAdd) {
+                if (friendsList.includes(targetName)) {
+                    btnAdd.innerText = "❌ ELIMINAR AMIGO"; btnAdd.style.background = "#FF3333"; btnAdd.style.color = "white";
+                    btnAdd.onclick = () => { if(typeof window.removeFriend === 'function') window.removeFriend(targetName); window.closeModal('profile'); };
+                } else {
+                    btnAdd.innerText = "➕ AGREGAR AMIGO"; btnAdd.style.background = "var(--good)"; btnAdd.style.color = "black";
+                    btnAdd.onclick = () => { 
+                        if(typeof window.sendFriendRequestTarget === 'function') window.sendFriendRequestTarget(targetName);
+                        else notify("Asegúrate de tener sociales.js cargado", "error");
+                    };
+                }
+            }
+            if(btnChat) btnChat.onclick = () => { window.closeModal('profile'); if(typeof window.openFloatingChat === 'function') window.openFloatingChat(targetName); };
+            if(btnChal) btnChal.onclick = () => { window.closeModal('profile'); if(typeof window.challengeUser === 'function') window.challengeUser(targetName); else notify("¡Sistema PvP muy pronto!", "info"); };
         }
-        
-        // Reconstruimos el contenedor del nombre para incluir el Clan
-        const nameContainer = document.getElementById('p-name').parentElement;
-        nameContainer.innerHTML = `
-            ${clanHTML}
-            <h2 id="p-name" style="margin:0; font-size:3.5rem; font-weight:900; text-shadow:0 4px 15px rgba(0,0,0,0.8); color:white; line-height: 1; display:inline-block; vertical-align:middle;">${targetName}</h2>
-            <span id="p-user-tag" class="player-tag" style="display:none; vertical-align:middle;">TAG</span>
-        `;
+
+        // Ranking
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
             let rankPos = 0; let index = 1;
             snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
-            
             if (rankPos > 0) {
-                setText('p-global-rank', "#" + rankPos);
+                document.getElementById('p-global-rank').innerText = "#" + rankPos;
                 if (rankPos <= 3 && profilePanel) {
                     profilePanel.classList.add(`epic-top-${rankPos}`);
                     if (badge) {
-                        if (rankPos === 1) badge.innerHTML = `👑 #1`;
-                        else if (rankPos === 2) badge.innerHTML = `#2`;
-                        else if (rankPos === 3) badge.innerHTML = `#3`;
+                        if (rankPos === 1) badge.innerHTML = `👑 #1`; else if (rankPos === 2) badge.innerHTML = `#2`; else if (rankPos === 3) badge.innerHTML = `#3`;
                         badge.style.display = 'block';
                     }
                 }
-            } else { setText('p-global-rank', "#100+"); }
-
+            } else { document.getElementById('p-global-rank').innerText = "#100+"; }
             applyUIFrameVisuals(equippedUI, rankPos);
         }).catch(e => console.log("Ranking no disponible", e));
 
     } catch(e) { console.error("Error cargando perfil:", e); }
+};
+
+// Función de respaldo por si falta en sociales.js
+window.sendFriendRequestTarget = async function(target) {
+    if(!window.user || !window.db) return;
+    try {
+        await window.db.collection('users').doc(target).collection('requests').doc(window.user.name).set({ from: window.user.name, time: Date.now() });
+        notify("Solicitud de amistad enviada a " + target, "success");
+    } catch(e) { notify("Error enviando solicitud", "error"); }
 };
 
 // ==========================================
