@@ -1095,3 +1095,59 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 /* Cajas de Estadísticas */
 .res-stats-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:25px; }
 .res-stat-box { background:#111; padding:15px; border-radius:8px; border:1px solid #333; font-weight:bold; }
+
+/* === DISEÑO DE TARJETAS DE CANCIONES (ULTRA-PREMIUM) === */
+.song-card {
+    background: #0f0f13 !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+    position: relative;
+    height: 180px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+/* Efecto de degradado suave para legibilidad del texto */
+.song-info {
+    z-index: 2;
+    background: linear-gradient(0deg, 
+        rgba(7, 7, 10, 1) 0%, 
+        rgba(7, 7, 10, 0.8) 40%, 
+        transparent 100%) !important;
+    padding: 20px 15px 15px 15px !important;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+}
+
+/* Brillo dinámico en hover */
+.song-card:hover {
+    border-color: var(--blue) !important;
+    transform: translateY(-8px) scale(1.02) !important;
+    box-shadow: 0 15px 40px rgba(0, 229, 255, 0.2) !important;
+}
+
+/* Estilo para las insignias (Badges) */
+.diff-badge {
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
+    font-size: 0.75rem !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    backdrop-filter: blur(4px);
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid transparent;
+}
+
+/* Ajuste especial para tarjetas de Osu! */
+.osu-card-style:hover {
+    border-color: #ff66aa !important;
+    box-shadow: 0 15px 45px rgba(255, 102, 170, 0.3) !important;
+}
