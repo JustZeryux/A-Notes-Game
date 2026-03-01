@@ -1130,3 +1130,30 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     0%, 100% { filter: drop-shadow(0 0 5px currentColor); }
     50% { filter: drop-shadow(0 0 15px currentColor); }
 }
+
+/* =========================================
+   ANIMACIONES Y GLOW PARA EL BROWSER
+========================================= */
+@keyframes cardArrival {
+    0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.song-card {
+    animation: cardArrival 0.4s ease-out forwards;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+/* El brillo de las estrellas */
+.star-glow {
+    text-shadow: 0 0 12px currentColor, 0 0 20px currentColor;
+    font-weight: 900;
+}
+
+/* Ajuste del contenedor para que no se amontonen */
+#song-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
