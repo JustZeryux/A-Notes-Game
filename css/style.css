@@ -970,3 +970,45 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     margin-bottom: 10px;
 }
 .clan-upgrade button { padding: 5px 10px; font-size: 0.8rem; }
+
+/* =========================================
+   PARCHE DE UI: Z-INDEX, ANIMACIONES Y SCROLLS
+========================================= */
+/* 1. Modales siempre por encima de la barra superior */
+.modal-overlay { z-index: 99999 !important; }
+
+/* 2. Ocultar la barra de scroll fea del menú lateral pero permitir scrollear */
+.sidebar { overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; }
+.sidebar::-webkit-scrollbar { display: none; }
+
+/* 3. Animación de la Campana de Notificaciones */
+@keyframes ringBell {
+    0%, 100% { transform: rotate(0deg); }
+    10%, 30%, 50% { transform: rotate(15deg); }
+    20%, 40% { transform: rotate(-15deg); }
+    60% { transform: rotate(0deg); }
+}
+#notif-bell { 
+    animation: ringBell 5s infinite; 
+    transform-origin: top center; 
+    display: inline-block; 
+    transition: transform 0.2s;
+}
+#notif-bell:hover { transform: scale(1.2); }
+
+/* 4. Reparar el Modal del Perfil (Permitir Scroll interno sin desbordar) */
+#modal-profile .modal-panel { 
+    max-height: 90vh !important; 
+    overflow-y: auto !important; 
+    overflow-x: hidden; 
+    padding-bottom: 20px; 
+}
+#modal-profile .modal-panel::-webkit-scrollbar { width: 8px; }
+#modal-profile .modal-panel::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
+
+/* 5. Asegurar que la Foto de Perfil no sea cuadrada */
+#p-av-big { border-radius: 20px !important; overflow: hidden; }
+
+/* 6. Animación suave para botones */
+.action, .filter-btn, .nav-btn, .clan-box { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.action:active { transform: scale(0.95); }
