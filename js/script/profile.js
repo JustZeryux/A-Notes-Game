@@ -265,7 +265,19 @@ if (statusEl) {
                 }
             }
         }
-
+// --- MOSTRAR CLAN AL LADO DEL NOMBRE ---
+        let clanHTML = "";
+        if (d.clan && d.clan.tag) {
+            clanHTML = `<span class="clan-tag" style="--c:${d.clan.color}; font-size:1.2rem; margin-right:15px; margin-bottom:10px;">[${d.clan.tag}]</span>`;
+        }
+        
+        // Reconstruimos el contenedor del nombre para incluir el Clan
+        const nameContainer = document.getElementById('p-name').parentElement;
+        nameContainer.innerHTML = `
+            ${clanHTML}
+            <h2 id="p-name" style="margin:0; font-size:3.5rem; font-weight:900; text-shadow:0 4px 15px rgba(0,0,0,0.8); color:white; line-height: 1; display:inline-block; vertical-align:middle;">${targetName}</h2>
+            <span id="p-user-tag" class="player-tag" style="display:none; vertical-align:middle;">TAG</span>
+        `;
         window.db.collection("users").orderBy("pp", "desc").get().then(snap => {
             let rankPos = 0; let index = 1;
             snap.forEach(uDoc => { if(uDoc.id === targetName) rankPos = index; index++; });
