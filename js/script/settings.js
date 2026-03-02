@@ -1,13 +1,23 @@
 /* === js/script/settings.js - MEGA CONFIGURADOR PRO === */
 
 // 1. CARGA DE CONFIGURACIÓN MAESTRA
-window.loadSettings = function() {
+wwindow.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
+    
+    // FIX: Evitamos que el juego crashee si window.defaultCfg no existe aún
+    let fallbackCfg = window.defaultCfg || {
+        subtitles: true, showFps: true, spd: 2, down: true, den: 5, bgDim: 50, showSplash: true,
+        vol: 0.5, hvol: 0.5, missVol: 0.5, off: 0,
+        stdAR: 9, stdCS: 4, stdK1: 'z', stdK2: 'x',
+        tkDonL: 'f', tkDonR: 'j', tkKatsuL: 'd', tkKatsuR: 'k',
+        ctSpeed: 5, ctLeft: 'ArrowLeft', ctRight: 'ArrowRight', ctDash: 'Shift'
+    };
+
     if (saved) {
-        try { window.cfg = Object.assign({}, window.defaultCfg, JSON.parse(saved)); } 
-        catch(e) { window.cfg = JSON.parse(JSON.stringify(window.defaultCfg)); }
+        try { window.cfg = Object.assign({}, fallbackCfg, JSON.parse(saved)); } 
+        catch(e) { window.cfg = JSON.parse(JSON.stringify(fallbackCfg)); }
     } else {
-        window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
+        window.cfg = JSON.parse(JSON.stringify(fallbackCfg));
     }
     
     // Asegurar estructura de modos por si es primera vez
@@ -20,7 +30,7 @@ window.loadSettings = function() {
         }
     });
 
-    // Cargar en el UI
+    // Cargar en el UI de forma segura
     const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
     const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = window.cfg[prop]; };
     const setTxt = (id, prop) => { const el = document.getElementById(id); if(el) el.innerText = String(window.cfg[prop]).toUpperCase().replace('ARROW',''); };
@@ -42,15 +52,11 @@ window.loadSettings = function() {
     if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
     setVal('cfg-off', 'off');
 
-    // Standard
+    // Standard, Taiko, Catch
     setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS');
     setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
-
-    // Taiko
     setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR');
     setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
-
-    // Catch
     setVal('cfg-ct-spd', 'ctSpeed');
     setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
 };
