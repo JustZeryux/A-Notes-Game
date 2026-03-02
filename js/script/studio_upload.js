@@ -51,10 +51,25 @@ window.openStudioDashboard = async function() {
                 </div>
             `;
             
-            card.querySelector('.btn-edit').onclick = () => {
-                window.closeModal('studio');
-                if(typeof openEditor === 'function') openEditor(song, 4); 
-                else alert("Error: editor.js no conectado");
+card.querySelector('.btn-edit').onclick = () => {
+                // Crear un mini-modal de selección de modo al vuelo
+                const modeHtml = `
+                    <div id="ed-mode-selector" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
+                        <div style="background:#111; padding:40px; border-radius:20px; border:2px solid #00ffff; text-align:center; width:600px; box-shadow:0 0 50px rgba(0,255,255,0.2);">
+                            <h2 style="color:white; font-size:2rem; font-weight:900; margin-top:0;">¿QUÉ VAS A MAPEAR?</h2>
+                            <div style="color:#aaa; margin-bottom:30px;">Selecciona el modo de juego para crear su versión.</div>
+                            
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:30px;">
+                                <button class="action" style="background:transparent; border:2px solid #ff66aa; color:#ff66aa;" onclick="launchStudio('${song.id}', 'mania', 4)">🎹 MANIA 4K</button>
+                                <button class="action" style="background:transparent; border:2px solid #12FA05; color:#12FA05;" onclick="launchStudio('${song.id}', 'mania', 7)">🎹 MANIA 7K</button>
+                                <button class="action" style="background:transparent; border:2px solid #f95555; color:#f95555;" onclick="launchStudio('${song.id}', 'taiko', 2)">🥁 TAIKO</button>
+                                <button class="action" style="background:transparent; border:2px solid #44b9ff; color:#44b9ff;" onclick="launchStudio('${song.id}', 'catch', 4)">🍎 CATCH</button>
+                            </div>
+                            <button class="action secondary" onclick="document.getElementById('ed-mode-selector').remove()">CANCELAR</button>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modeHtml);
             };
             
             card.querySelector('.btn-del').onclick = async () => {
@@ -67,6 +82,18 @@ window.openStudioDashboard = async function() {
             grid.appendChild(card);
         });
     } catch(e) { loader.innerText = "Error DB"; loader.style.color = "var(--miss)"; }
+};
+
+window.launchStudio = function(songId, mode, keys) {
+    document.getElementById('ed-mode-selector').remove();
+    window.closeModal('studio');
+    
+    // Obtenemos los datos frescos de la canción (por si ya tiene notas)
+    const songData = window.unifiedSongs.find(s => s.id === songId)?.raw || window.curSongData;
+    
+    if(typeof window.openEditor === 'function') {
+        window.openEditor(songData, keys, mode);
+    }
 };
 
 window.tempUploadData = { audioURL: null, imageURL: null };
