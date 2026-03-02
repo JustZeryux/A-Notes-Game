@@ -1151,3 +1151,109 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     border-color: #ff66aa !important;
     box-shadow: 0 15px 45px rgba(255, 102, 170, 0.3) !important;
 }
+
+/* =========================================
+   REWORK DEL MENÚ LATERAL (SIDEBAR PRO)
+========================================= */
+#sidebar {
+    padding: 20px 15px; /* Más espacio interior */
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* Espaciado uniforme entre botones */
+}
+
+/* Estilo base para los botones del menú */
+.sidebar-btn, .menu-item {
+    background: transparent !important; /* Quitamos el azul feo */
+    border: none !important;
+    color: #ccc;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.17, 0.89, 0.32, 1.28);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Efecto Hover: Desplazamiento y resplandor lateral */
+.sidebar-btn:hover, .menu-item:hover {
+    color: white;
+    transform: translateX(10px); /* Se mueve a la derecha suavemente */
+    background: linear-gradient(90deg, rgba(255, 102, 170, 0.15), transparent) !important;
+    text-shadow: 0 0 10px rgba(255, 102, 170, 0.5);
+}
+
+/* El borde de luz que aparece a la izquierda al hacer hover */
+.sidebar-btn::before, .menu-item::before {
+    content: ''; position: absolute; left: 0; top: 0;
+    width: 4px; height: 100%;
+    background: var(--accent, #ff66aa);
+    transform: scaleY(0); transition: 0.3s;
+    border-radius: 4px;
+}
+.sidebar-btn:hover::before, .menu-item:hover::before {
+    transform: scaleY(1);
+    box-shadow: 0 0 15px var(--accent, #ff66aa);
+}
+
+/* Estado Activo */
+.sidebar-btn.active, .menu-item.active {
+    color: white;
+    background: linear-gradient(90deg, rgba(0, 255, 255, 0.2), transparent) !important;
+}
+.sidebar-btn.active::before, .menu-item.active::before {
+    transform: scaleY(1);
+    background: #00ffff;
+    box-shadow: 0 0 15px #00ffff;
+}
+
+/* =========================================
+   MEGA-PANEL DE AJUSTES
+========================================= */
+.settings-grid {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    height: 600px;
+    background: rgba(10, 10, 15, 0.95);
+    border-radius: 15px;
+    border: 1px solid #333;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+}
+
+.settings-tabs {
+    background: #0a0a0a; border-right: 1px solid #222;
+    display: flex; flex-direction: column; padding: 20px 10px; gap: 5px;
+}
+
+.set-tab-btn {
+    background: none; border: none; color: #888; text-align: left;
+    padding: 15px 20px; font-size: 1.1rem; font-weight: 900;
+    border-radius: 10px; cursor: pointer; transition: 0.2s;
+}
+
+.set-tab-btn:hover { background: #111; color: white; }
+.set-tab-btn.active { background: #ff66aa22; color: #ff66aa; border-left: 4px solid #ff66aa; }
+
+.settings-content { padding: 30px; overflow-y: auto; }
+.set-section { display: none; animation: fadeIn 0.3s forwards; }
+.set-section.active { display: block; }
+
+.set-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #111; padding: 15px 20px; border-radius: 10px;
+    margin-bottom: 10px; border: 1px solid #222; transition: 0.2s;
+}
+.set-row:hover { border-color: #444; background: #151515; }
+.set-label { font-size: 1.1rem; font-weight: bold; color: white; }
+.set-sub { font-size: 0.8rem; color: #888; font-weight: normal; margin-top: 5px; }
+
+/* Controles de Input Modernos */
+.set-input { background: #000; border: 1px solid #333; color: white; padding: 10px; border-radius: 8px; font-weight: bold; outline: none; transition: 0.2s; }
+.set-input:focus { border-color: #00ffff; box-shadow: 0 0 10px rgba(0,255,255,0.3); }
