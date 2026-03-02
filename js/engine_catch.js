@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE CATCH V-PRO (ANTI-CRASH + SKINS + LYRICS + MOBILE UI) 🍎
+   ENGINE CATCH V-PRO (ANTI-CRASH + PROGRESS BAR + FLOATING JUDGES) 🍎
    ========================================================================== */
 
 window.startCatchEngine = async function(songObj) {
@@ -8,6 +8,9 @@ window.startCatchEngine = async function(songObj) {
     if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO FRUTAS..."; }
 
     try {
+        // Aseguramos el audio maestro
+        if(typeof unlockAudio === 'function') unlockAudio();
+
         let res = await fetch(`https://api.nerinyan.moe/d/${songObj.id}`);
         const oszBuffer = await res.arrayBuffer();
         const zip = await JSZip.loadAsync(oszBuffer);
@@ -60,8 +63,7 @@ function runCatchGame(audioBuffer, map, songObj) {
 
     let canvas = document.getElementById('catch-canvas'); 
     if (!canvas) {
-        canvas = document.createElement('canvas'); 
-        canvas.id = 'catch-canvas';
+        canvas = document.createElement('canvas'); canvas.id = 'catch-canvas';
         canvas.style.cssText = 'position:fixed; top:0; left:0; z-index:8000; touch-action:none;';
         document.body.appendChild(canvas);
     }
@@ -70,22 +72,22 @@ function runCatchGame(audioBuffer, map, songObj) {
 
     let ui = document.getElementById('catch-ui');
     if (ui) ui.remove(); 
-    ui = document.createElement('div');
-    ui.id = 'catch-ui'; ui.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; z-index:9000; pointer-events:none;";
+    ui = document.createElement('div'); ui.id = 'catch-ui';
+    ui.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; z-index:9000; pointer-events:none; overflow:hidden;";
     
     const avUrl = (window.user && window.user.avatarData) ? window.user.avatarData : 'icon.png';
     const uName = window.user ? window.user.name : 'Guest';
     const uLvl = window.user ? window.user.lvl : 1;
 
     ui.innerHTML = `
-        <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; backdrop-filter:blur(8px);">
+        <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(0,255,255,0.3); z-index:9500; backdrop-filter:blur(8px);">
             <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white;"></div>
             <div style="display:flex; flex-direction:column; justify-content:center; padding-right:10px;">
                 <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; letter-spacing:1px; line-height:1;">${uName}</div>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
                     <div style="color:var(--gold); font-weight:900; font-size:0.7rem;">LVL ${uLvl}</div>
                     <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333;">
-                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s;"></div>
+                        <div id="ct-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s;"></div>
                     </div>
                 </div>
             </div>
@@ -96,25 +98,46 @@ function runCatchGame(audioBuffer, map, songObj) {
             <div id="hud-fc" style="color:cyan; font-size:1.2rem; font-weight:bold; margin-top:5px;">PFC</div>
         </div>
         <div id="ct-combo" style="position:absolute; bottom:30px; left:30px; color:white; font-size:6rem; font-weight:900; text-shadow:0 0 30px #00ffff;">0x</div>
+        
+        <div id="ct-judgement-container" style="position:absolute; top:0; left:0; width:100%; height:100%;"></div>
+
         <div id="subtitles-container" style="position:absolute; bottom:25%; left:0; width:100%; text-align:center; display:none;">
             <div id="subtitles-text" style="display:inline-block; background:rgba(0,0,0,0.7); padding:10px 20px; border-radius:10px; color:white; font-size:2rem; font-weight:bold; border:2px solid var(--blue); text-shadow:0 0 10px var(--blue);"></div>
         </div>
         <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s; box-shadow: inset 0 0 150px 50px rgba(249,57,63,0.8);"></div>
         
-        <div id="ct-mobile-controls" style="position:absolute; bottom:20px; right:20px; display:none; pointer-events:auto; gap:10px; z-index:9100;">
-            <button id="btn-left" style="width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; font-size:2rem; border:2px solid white;">◀</button>
-            <button id="btn-dash" style="width:70px; height:70px; border-radius:50%; background:rgba(255,0,85,0.4); color:white; font-size:1rem; border:2px solid #ff0055; font-weight:bold;">DASH</button>
-            <button id="btn-right" style="width:70px; height:70px; border-radius:50%; background:rgba(255,255,255,0.2); color:white; font-size:2rem; border:2px solid white;">▶</button>
+        <div style="position:fixed; top:0; left:0; width:100%; height:6px; background:#111; z-index:9999;">
+            <div id="ct-progress-fill" style="height:100%; width:0%; background:var(--accent); transition:0.1s;"></div>
+        </div>
+
+        <div id="ct-mobile-controls" style="position:absolute; bottom:20px; right:20px; display:none; pointer-events:auto; gap:15px; z-index:9100; touch-action:none;">
+            <button id="btn-left" style="width:75px; height:75px; border-radius:50%; background:rgba(0,255,255,0.2); color:white; font-size:2rem; border:2px solid #00ffff; box-shadow:0 0 15px rgba(0,255,255,0.3);">◀</button>
+            <button id="btn-dash" style="width:75px; height:75px; border-radius:50%; background:rgba(255,0,85,0.4); color:white; font-size:1.1rem; border:2px solid #ff0055; font-weight:900; box-shadow:0 0 15px rgba(255,0,85,0.4);">DASH</button>
+            <button id="btn-right" style="width:75px; height:75px; border-radius:50%; background:rgba(0,255,255,0.2); color:white; font-size:2rem; border:2px solid #00ffff; box-shadow:0 0 15px rgba(0,255,255,0.3);">▶</button>
         </div>
     `;
     document.body.appendChild(ui);
 
     if('ontouchstart' in window) document.getElementById('ct-mobile-controls').style.display = 'flex';
 
+    // Funciones Locales Anti-Crash de Audio
+    function playCtHit() {
+        if(window.hitBuf && window.st.ctx) {
+            try { const s=window.st.ctx.createBufferSource(); s.buffer=window.hitBuf; const g=window.st.ctx.createGain(); g.gain.value=window.cfg?.hvol||0.5; s.connect(g); g.connect(window.st.ctx.destination); s.start(0); } catch(e){}
+        }
+    }
+    function playCtMiss() {
+        if(window.missBuf && window.st.ctx) {
+            try { const s=window.st.ctx.createBufferSource(); s.buffer=window.missBuf; const g=window.st.ctx.createGain(); g.gain.value=window.cfg?.missVol||0.5; s.connect(g); g.connect(window.st.ctx.destination); s.start(0); } catch(e){}
+        }
+    }
+
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
     window.st.stats = { s:0, g:0, b:0, m:0 }; 
     window.st.fcStatus = "PFC";
     window.st.trueMaxScore = map.length * 300;
+    window.st.songDuration = audioBuffer.duration;
+
     let catcherX = 256; let speed = 10;
     let keys = { left: false, right: false, shift: false };
     let isRunning = true;
@@ -145,8 +168,8 @@ function runCatchGame(audioBuffer, map, songObj) {
     if(window.st.src) try { window.st.src.stop(); } catch(e){}
     window.st.src = window.st.ctx.createBufferSource();
     window.st.src.buffer = audioBuffer; 
-    const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
-    window.st.src.connect(g); g.connect(window.st.ctx.destination);
+    const mainGain = window.st.ctx.createGain(); mainGain.gain.value = window.cfg?.vol || 0.5;
+    window.st.src.connect(mainGain); mainGain.connect(window.st.ctx.destination);
     
     window.st.t0 = window.st.ctx.currentTime;
     window.st.src.start(window.st.t0 + 3);
@@ -157,12 +180,31 @@ function runCatchGame(audioBuffer, map, songObj) {
         for(let i=0; i<8; i++) particles.push({ x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1 });
     }
 
+    // Sistema de Juez Flotante
+    function showCtJudgeFloat(text, color, x) {
+        if(!window.cfg?.judgeVis) return;
+        const container = document.createElement('div');
+        container.style.position = 'absolute'; container.style.left = x + 'px'; container.style.top = '65%';
+        container.style.transform = 'translate(-50%, -50%)'; container.style.zIndex = '500'; container.style.pointerEvents = 'none';
+        
+        container.innerHTML = `<div style="color:${color}; font-size:2.5rem; font-weight:900; text-shadow:0 0 15px ${color}; animation:judgePop 0.4s ease-out forwards;">${text}</div>`;
+        document.getElementById('ct-judgement-container').appendChild(container);
+        setTimeout(() => container.remove(), 500);
+    }
+
     function loop() {
         if(!isRunning || !window.st.act) return;
         if(window.st.paused) { window.st.animId = requestAnimationFrame(loop); return; }
 
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         let songTime = now - 3000;
+
+        // Barra de Progreso
+        if (window.st.songDuration > 0 && songTime > 0) {
+            const pct = Math.min(100, (songTime / 1000 / window.st.songDuration) * 100);
+            const bar = document.getElementById('ct-progress-fill');
+            if(bar) bar.style.width = pct + "%";
+        }
 
         if (window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
             let idx = window.st.currentLyricIdx;
@@ -181,10 +223,8 @@ function runCatchGame(audioBuffer, map, songObj) {
             window.st.nextNote++;
         }
 
-        ctx.fillStyle = '#0a0a0a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.globalAlpha = (window.cfg && window.cfg.bgEffects === false) ? 0.05 : 0.25;
+        ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = (window.cfg?.bgEffects === false) ? 0.05 : 0.25;
         if(bgImg.complete) ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
         ctx.globalAlpha = 1.0;
 
@@ -208,42 +248,48 @@ function runCatchGame(audioBuffer, map, songObj) {
 
         let baseColor = activeSkin && activeSkin.fixed ? activeSkin.color : '#00e5ff';
         ctx.fillStyle = keys.shift ? '#ff0055' : baseColor;
+        ctx.shadowBlur = 15; ctx.shadowColor = ctx.fillStyle;
         ctx.fillRect(screenCatcherX - (catcherWidth*scale/2), catcherY, catcherWidth*scale, 15);
+        ctx.shadowBlur = 0;
 
         for(let i=particles.length-1; i>=0; i--) {
             let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
             ctx.beginPath(); ctx.arc(p.x, p.y, 6*p.life, 0, Math.PI*2);
-            ctx.fillStyle = '#ffcc00'; ctx.globalAlpha = p.life; ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.globalAlpha = p.life; ctx.fill();
             if(p.life <= 0) particles.splice(i,1);
         }
         ctx.globalAlpha = 1.0;
 
         const dropTime = 1000; 
+        
+        // Loop invertido seguro para Splice
         for(let i = window.st.spawned.length - 1; i >= 0; i--) {
             const f = window.st.spawned[i];
+            if(f.caught || f.missed) continue;
+
             const timeDiff = f.t - now;
+            const x = (canvas.width / 2) + (f.x - 256) * scale;
+            const y = ((dropTime - timeDiff) / dropTime) * catcherY;
 
             if (timeDiff < -100) {
                 f.missed = true; window.st.cmb = 0; window.st.stats.m++; window.st.hp -= 10; window.st.fcStatus = "CLEAR";
-                try { if(typeof window.playMiss === 'function') window.playMiss(); } catch(e){}
+                playCtMiss(); showCtJudgeFloat("MISS", "#F9393F", x);
                 window.st.spawned.splice(i, 1);
                 updateHUD(); checkDeath();
                 continue;
             }
 
-            const x = (canvas.width / 2) + (f.x - 256) * scale;
-            const y = ((dropTime - timeDiff) / dropTime) * catcherY;
-
             ctx.beginPath(); ctx.arc(x, y, 20 * scale, 0, Math.PI * 2);
             ctx.fillStyle = activeSkin && activeSkin.fixed ? activeSkin.color : '#ff44aa'; ctx.fill();
             ctx.strokeStyle = 'white'; ctx.lineWidth = 3; ctx.stroke();
 
+            // Lógica de colisión robusta
             if(y >= catcherY - 20 && y <= catcherY + 10) {
                 if(Math.abs(x - screenCatcherX) < (catcherWidth * scale / 1.2)) {
                     f.caught = true; window.st.sc += 300; window.st.cmb++; window.st.stats.s++;
                     window.st.hp = Math.min(100, window.st.hp + 2);
-                    try { if(typeof window.playHit === 'function') window.playHit(); } catch(e){}
-                    spawnExplosion(x, catcherY); updateHUD();
+                    playCtHit(); spawnExplosion(x, catcherY); showCtJudgeFloat("CATCH!", "#00ffff", screenCatcherX);
+                    updateHUD();
                     window.st.spawned.splice(i, 1);
                 }
             }
@@ -255,10 +301,11 @@ function runCatchGame(audioBuffer, map, songObj) {
     function checkDeath() { if(window.st.hp <= 0 && isRunning) { window.st.hp = 0; endEngine(true); } }
 
     function updateHUD() {
-        if(!isRunning) return; // BLINDAJE CONTRA DOM LEAK
+        if(!isRunning) return; 
         try {
             document.getElementById('ct-score').innerText = window.st.sc.toLocaleString();
             document.getElementById('ct-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
+            
             const total = window.st.stats.s + window.st.stats.m;
             const acc = total > 0 ? ((window.st.stats.s / total) * 100).toFixed(2) : "100.00";
             document.getElementById('ct-acc').innerText = acc + "%";
@@ -266,7 +313,7 @@ function runCatchGame(audioBuffer, map, songObj) {
             const fcEl = document.getElementById('hud-fc');
             if(fcEl) { fcEl.innerText = window.st.fcStatus; fcEl.style.color = (window.st.fcStatus==="PFC"?"cyan":(window.st.fcStatus==="GFC"?"gold":(window.st.fcStatus==="FC"?"lime":"red"))); }
 
-            const hpBar = document.getElementById('engine-hp-fill');
+            const hpBar = document.getElementById('ct-hp-fill');
             if (hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
             
             const vign = document.getElementById('near-death-vignette');
@@ -282,10 +329,17 @@ function runCatchGame(audioBuffer, map, songObj) {
         if(e.key === "Shift") keys.shift = down;
     };
     
-    const btnL = document.getElementById('btn-left'); const btnR = document.getElementById('btn-right'); const btnD = document.getElementById('btn-dash');
-    if(btnL) { btnL.ontouchstart = (e) => { e.preventDefault(); keys.left = true; }; btnL.ontouchend = (e) => { e.preventDefault(); keys.left = false; }; }
-    if(btnR) { btnR.ontouchstart = (e) => { e.preventDefault(); keys.right = true; }; btnR.ontouchend = (e) => { e.preventDefault(); keys.right = false; }; }
-    if(btnD) { btnD.ontouchstart = (e) => { e.preventDefault(); keys.shift = true; }; btnD.ontouchend = (e) => { e.preventDefault(); keys.shift = false; }; }
+    // Controles táctiles seguros
+    function bindMobileBtn(id, keyProp) {
+        const btn = document.getElementById(id);
+        if(!btn) return;
+        btn.ontouchstart = (e) => { e.preventDefault(); keys[keyProp] = true; btn.style.transform = 'scale(0.9)'; };
+        btn.ontouchend = (e) => { e.preventDefault(); keys[keyProp] = false; btn.style.transform = 'scale(1)'; };
+        btn.ontouchcancel = (e) => { e.preventDefault(); keys[keyProp] = false; btn.style.transform = 'scale(1)'; };
+    }
+    bindMobileBtn('btn-left', 'left');
+    bindMobileBtn('btn-right', 'right');
+    bindMobileBtn('btn-dash', 'shift');
 
     window.st.ctResizeHandler = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     window.st.ctResizeHandler();
@@ -336,7 +390,7 @@ function runCatchGame(audioBuffer, map, songObj) {
     };
 
     function endEngine(died) {
-        if(!isRunning) return; // FIX DE SEGURIDAD DEFINITIVO
+        if(!isRunning) return;
         isRunning = false; window.st.act = false;
         cancelAnimationFrame(window.st.animId);
         try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
