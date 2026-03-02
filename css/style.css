@@ -1257,3 +1257,54 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
 /* Controles de Input Modernos */
 .set-input { background: #000; border: 1px solid #333; color: white; padding: 10px; border-radius: 8px; font-weight: bold; outline: none; transition: 0.2s; }
 .set-input:focus { border-color: #00ffff; box-shadow: 0 0 10px rgba(0,255,255,0.3); }
+
+
+/* =========================================
+   SIDEBAR Y UI DEL CREATOR STUDIO PRO
+========================================= */
+#ed-grid {
+    position: relative;
+    background: repeating-linear-gradient(
+        0deg,
+        #000,
+        #000 19px,
+        #111 20px
+    );
+    box-shadow: 0 0 50px rgba(0,0,0,0.5);
+}
+
+.ed-lane {
+    position: absolute;
+    top: 0;
+    width: 80px;
+    height: 100%;
+    border-right: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.01);
+}
+
+.ed-note {
+    position: absolute;
+    height: 10px;
+    border-radius: 4px;
+    box-shadow: 0 0 15px currentColor;
+    border: 1px solid white;
+    z-index: 10;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.ed-note:hover {
+    transform: scale(1.1);
+    filter: brightness(1.5);
+}
+
+#ed-playhead {
+    pointer-events: none;
+    transition: none;
+}
+
+/* Efecto de cristal para la barra lateral */
+#editor-layer > div:first-child {
+    backdrop-filter: blur(10px);
+    background: rgba(10,10,15,0.8) !important;
+}
