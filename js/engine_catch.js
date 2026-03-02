@@ -252,11 +252,25 @@ function runCatchGame(audioBuffer, map, songObj) {
         ctx.fillRect(screenCatcherX - (catcherWidth*scale/2), catcherY, catcherWidth*scale, 15);
         ctx.shadowBlur = 0;
 
+// --- FIX ANTI-CRASH: EXPLOSION DE FRUTAS ---
         for(let i=particles.length-1; i>=0; i--) {
-            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.05;
-            ctx.beginPath(); ctx.arc(p.x, p.y, 6*p.life, 0, Math.PI*2);
-            ctx.fillStyle = '#ffffff'; ctx.globalAlpha = p.life; ctx.fill();
-            if(p.life <= 0) particles.splice(i,1);
+            let p = particles[i]; 
+            p.x += p.vx; 
+            p.y += p.vy; 
+            p.life -= 0.05;
+            
+            // 🚨 SEGURIDAD: Eliminar antes de dibujar si su vida es negativa
+            if(p.life <= 0) {
+                particles.splice(i,1);
+                continue;
+            }
+            
+            ctx.beginPath(); 
+            // 🚨 DOBLE SEGURIDAD: Radio siempre positivo
+            ctx.arc(p.x, p.y, Math.max(0.1, 6 * p.life), 0, Math.PI*2);
+            ctx.fillStyle = '#ffffff'; 
+            ctx.globalAlpha = p.life; 
+            ctx.fill();
         }
         ctx.globalAlpha = 1.0;
 
