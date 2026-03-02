@@ -254,11 +254,25 @@ function runTaikoEngine(audioBuffer, map, songObj) {
         ctx.beginPath(); ctx.arc(receptorX, laneY, 30 * drumScale, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(255, 0, 85, ${0.2 + innerDrumFlash})`; ctx.fill(); 
 
+       // --- FIX ANTI-CRASH: PARTICULAS TAIKO ---
         for(let i=particles.length-1; i>=0; i--) {
-            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.08;
-            ctx.beginPath(); ctx.arc(p.x, p.y, 6*p.life, 0, Math.PI*2);
-            ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life); ctx.fill();
-            if(p.life <= 0) particles.splice(i,1);
+            let p = particles[i]; 
+            p.x += p.vx; 
+            p.y += p.vy; 
+            p.life -= 0.08;
+            
+            // 🚨 SEGURIDAD: Si la vida es 0 o menos, lo eliminamos ANTES de intentar dibujarlo
+            if(p.life <= 0) {
+                particles.splice(i,1);
+                continue; 
+            }
+            
+            ctx.beginPath(); 
+            // 🚨 DOBLE SEGURIDAD: Math.max garantiza que el radio NUNCA sea negativo
+            ctx.arc(p.x, p.y, Math.max(0.1, 6 * p.life), 0, Math.PI*2);
+            ctx.fillStyle = p.color; 
+            ctx.globalAlpha = p.life; 
+            ctx.fill();
         }
         ctx.globalAlpha = 1.0;
 
