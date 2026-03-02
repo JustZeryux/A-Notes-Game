@@ -165,6 +165,10 @@ window.renderUnifiedGrid = function() {
         let sourceBadge = song.isOsu 
             ? `<div class="diff-badge" style="margin-left:auto; border-color: #ff66aa; color: #ff66aa;">${mIcon} ${song.originalMode.toUpperCase()}</div>` 
             : `<div class="diff-badge" style="margin-left:auto; border-color: var(--blue); color: var(--blue);">☁️ COMMUNITY</div>`;
+        // NUEVO BADGE DE MECÁNICAS
+        let mechBadge = (song.raw && song.raw.mechanics && song.raw.mechanics.length > 0) 
+            ? `<div class="diff-badge" style="border-color:#00ffff; color:#00ffff; font-weight:900;">⚙️ GIMMICK</div>` 
+            : ``;
 
         card.innerHTML = `
             <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; transition: 0.5s; filter: brightness(0.6);"></div>
