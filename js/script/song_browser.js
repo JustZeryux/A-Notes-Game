@@ -124,6 +124,12 @@ window.renderUnifiedGrid = function() {
 
     let filtered = baseList.filter(song => {
         if (window.currentFilters.type === 'recent') return true; 
+        
+        // NUEVO FILTRO: Si se buscan mecánicas, revisamos el array 'mechanics' de la BD
+        if (window.currentFilters.type === 'mechanics') {
+            return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
+        }
+
         if (window.currentFilters.type === 'osu_mania' && (!song.isOsu || song.originalMode !== 'mania')) return false;
         if (window.currentFilters.type === 'osu_standard' && (!song.isOsu || song.originalMode !== 'standard')) return false;
         if (window.currentFilters.type === 'osu_taiko' && (!song.isOsu || song.originalMode !== 'taiko')) return false;
