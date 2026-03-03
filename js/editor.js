@@ -111,21 +111,33 @@ function initEditorGrid() {
 
     const startAction = (e) => {
         if(e.type === 'mousedown' && e.button !== 0) return; 
-        // e.preventDefault(); // Comentado para permitir scroll si tocas fuera
         
         const pos = getPointerPos(e);
         if(pos.l < 0 || pos.l >= window.edK) return;
 
-        // Borrar si existe
-        const existingIdx = window.edMap.findIndex(n => Math.abs(n.t - pos.t) < (window.edSnap) && n.l === pos.l);
+        // FIX BORRADO DE HOLD NOTES: Busca si el clic cae DENTRO del cuerpo de la nota
+        const existingIdx = window.edMap.findIndex(n => {
+            if (n.l !== pos.l) return false;
+            let endT = n.t + (n.dur || 0); // Considera el inicio y el fin
+            return pos.t >= (n.t - window.edSnap) && pos.t <= (endT + window.edSnap);
+        });
+
         if(existingIdx !== -1) {
             window.edMap.splice(existingIdx, 1);
             drawEditorGrid();
             return;
         }
         
-        // Crear nueva nota
-        let finalType = window.edBrush;
+        // Crear nueva nota respetando el pincel seleccionado
+        let finalType = window.edBrush || 'tap';
+        window.edDragNote = { 
+            t: pos.t, l: pos.l, 
+            type: finalType, h: false, dur: 0, 
+            customData: window.edActiveCustomFX || null 
+        };
+        window.edMap.push(window.edDragNote);
+        drawEditorGrid();
+    };
         let isHoldable = (finalType === 'tap' || finalType === 'mine' || finalType === 'dodge');
         
         window.edDragNote = { 
