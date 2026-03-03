@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V9 (FIX APERTURA) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V10 (METODO TAIKO + PREVIEW SVG) === */
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
@@ -68,7 +68,6 @@ window.loadSettings = function() {
     if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
 };
 
-// 🚨 AQUÍ ESTÁN LAS FUNCIONES QUE FALTABAN PARA ABRIR Y CERRAR 🚨
 window.openSettingsPanel = function() {
     window.loadSettings();
     let modal = document.getElementById('modal-settings');
@@ -118,7 +117,6 @@ window.saveSettings = function() {
 
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
     if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
-    
     window.closeSettingsPanel();
 };
 
@@ -147,142 +145,119 @@ window.renderLaneConfig = function(k) {
         for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: def[i]||' ', c: '#00ffff' });
     }
 
-    cont.innerHTML = ''; 
-    
+    let html = '';
     window.cfg.modes[k].forEach((lane, i) => {
-        let keyText = lane.k === ' ' ? 'SPC' : String(lane.k).toUpperCase();
+        let keyText = lane.k === ' ' || lane.k === 'Space' ? 'SPC' : String(lane.k).toUpperCase().replace('ARROW', '');
         
-        const card = document.createElement('div');
-        card.style.cssText = "text-align:center; background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; border:1px solid #444; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display:flex; flex-direction:column; align-items:center;";
-        
-        const label = document.createElement('div');
-        label.style.cssText = "color:#aaa; font-size:0.8rem; font-weight:bold; margin-bottom:10px;";
-        label.innerText = `LANE ${i+1}`;
-        card.appendChild(label);
-        
-        const btn = document.createElement('button');
-        btn.id = `kb-btn-${k}-${i}`;
-        btn.className = "kb-btn";
-        btn.style.cssText = `width:60px; height:60px; background:#111; border:3px solid ${lane.c}; color:white; font-size:1.5rem; font-weight:900; border-radius:10px; cursor:pointer; transition:0.2s; display:flex; justify-content:center; align-items:center;`;
-        btn.innerText = keyText;
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.startKeyCapture(k, i);
-        });
-        card.appendChild(btn);
-        
-        const colorLabel = document.createElement('div');
-        colorLabel.style.cssText = "margin-top:10px; color:#666; font-size:0.7rem;";
-        colorLabel.innerText = "COLOR";
-        card.appendChild(colorLabel);
-        
-        const colorInp = document.createElement('input');
-        colorInp.type = 'color';
-        colorInp.value = lane.c;
-        colorInp.style.cssText = "display:block; margin:5px auto 0; width:35px; height:35px; border:none; background:none; cursor:pointer;";
-        colorInp.addEventListener('input', (e) => {
-            window.updateLaneColor(k, i, e.target.value);
-        });
-        card.appendChild(colorInp);
-        
-        cont.appendChild(card);
+        // CÓDIGO HTML DE CADA BOTÓN (IGUAL A TAIKO)
+        html += `
+        <div style="text-align:center; background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; border:1px solid #444; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display:flex; flex-direction:column; align-items:center;">
+            <div style="color:#aaa; font-size:0.8rem; font-weight:bold; margin-bottom:10px;">LANE ${i+1}</div>
+            
+            <button id="kb-btn-${k}-${i}" 
+                    class="set-input" 
+                    onclick="window.captureManiaKey(${k}, ${i})"
+                    style="width:60px; height:60px; background:#111; border:3px solid ${lane.c}; color:white; font-size:1.5rem; font-weight:900; border-radius:10px; cursor:pointer; transition:0.2s; display:flex; justify-content:center; align-items:center;">
+                ${keyText}
+            </button>
+            
+            <div style="margin-top:10px; color:#666; font-size:0.7rem;">COLOR</div>
+            <input type="color" value="${lane.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" style="display:block; margin:5px auto 0; width:35px; height:35px; border:none; background:none; cursor:pointer;">
+        </div>`;
     });
-
+    
+    cont.innerHTML = html;
     window.updatePreview(k);
 };
 
-window.startKeyCapture = function(k, laneIdx) {
+// 🚨 SISTEMA IDENTICO AL DE TAIKO PERO PARA MANIA 🚨
+window.captureManiaKey = function(k, laneIdx) {
     const btn = document.getElementById(`kb-btn-${k}-${laneIdx}`);
-    if (!btn || btn.dataset.waiting === "true") return;
+    if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; }
     
-    document.querySelectorAll('.kb-btn').forEach(b => {
-        if(b.dataset.waiting === "true") {
-            b.dataset.waiting = "false";
-            b.innerText = b.dataset.origKey;
-            b.style.background = "#111";
-        }
-    });
+    const overlay = document.createElement('div');
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(5px);";
+    overlay.innerHTML = `
+        <div style="color:#ff66aa; font-size:4rem; font-weight:900; text-shadow:0 0 20px #ff66aa;">NUEVA TECLA</div>
+        <div style="color:white; font-size:1.5rem; margin-top:10px;">Presiona la tecla para el carril ${laneIdx + 1}</div>
+        <div style="color:#888; margin-top:20px; font-weight:bold;">Presiona [ESC] para cancelar</div>
+    `;
+    document.body.appendChild(overlay);
 
-    btn.dataset.origKey = btn.innerText;
-    btn.dataset.waiting = "true";
-    btn.innerText = "...";
-    btn.style.background = "#F9393F";
-    btn.blur(); 
-
-    const capture = (e) => {
+    const handler = (e) => {
         e.preventDefault(); e.stopPropagation();
-        
-        let key = e.key;
-        if(e.code === "Space") key = " ";
+        let key = e.key; if(e.code === "Space") key = "Space";
         
         if (key !== "Escape") {
             window.cfg.modes[k][laneIdx].k = key;
         }
         
-        document.removeEventListener('keydown', capture, true);
-        window.renderLaneConfig(k); 
+        overlay.remove();
+        document.removeEventListener('keydown', handler, true);
+        window.renderLaneConfig(k); // Refresca los botones
     };
-
-    setTimeout(() => {
-        document.addEventListener('keydown', capture, true);
-    }, 150);
+    
+    // Retraso para que el clic del mouse no asigne la tecla accidentalmente
+    setTimeout(() => { document.addEventListener('keydown', handler, true); }, 150);
 };
 
+// (El de Taiko original se queda intacto para que siga funcionando)
 window.captureSingleKey = function(btnId, cfgProp) {
     const btn = document.getElementById(btnId);
-    if(!btn || btn.dataset.waiting === "true") return;
+    if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; }
     
-    btn.dataset.origKey = btn.innerText;
-    btn.dataset.waiting = "true";
-    btn.innerText = "...";
-    btn.style.background = "#F9393F";
-    btn.blur();
+    const overlay = document.createElement('div');
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(5px);";
+    overlay.innerHTML = `<div style="color:#ff66aa; font-size:4rem; font-weight:900;">ASIGNAR TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div><div style="color:#888; margin-top:20px; font-weight:bold;">Presiona [ESC] para cancelar</div>`;
+    document.body.appendChild(overlay);
 
-    const capture = (e) => {
+    const handler = (e) => {
         e.preventDefault(); e.stopPropagation();
-        let key = e.key; 
-        if(e.code === "Space") key = "Space";
+        let key = e.key; if(e.code === "Space") key = "Space";
         
         if (key !== "Escape") {
             window.cfg[cfgProp] = key;
             btn.innerText = key.toUpperCase().replace('ARROW','');
-        } else {
-            btn.innerText = btn.dataset.origKey;
         }
         
-        btn.dataset.waiting = "false";
         btn.style.background = "transparent";
-        document.removeEventListener('keydown', capture, true);
+        overlay.remove();
+        document.removeEventListener('keydown', handler, true);
     };
 
-    setTimeout(() => document.addEventListener('keydown', capture, true), 150);
+    setTimeout(() => document.addEventListener('keydown', handler, true), 150);
 };
 
+// 🌟 VISTA PREVIA RESTAURADA CON SVG (Como estaba originalmente) 🌟
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box) return;
     
-    box.innerHTML = '';
+    let html = '';
     for(let i=0; i<k; i++) {
         let color = window.cfg.modes[k][i].c || '#00ffff';
+        let shapeData = "M50,10 A40,40 0 1,1 49.9,10"; // Círculo base
         
-        const lane = document.createElement('div');
-        lane.style.cssText = "flex:1; height:100%; border-left:1px dashed #333; display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);";
-        
-        const note = document.createElement('div');
-        note.style.cssText = `width:80%; max-width:60px; height:20px; background:${color}; border-radius:8px; box-shadow: 0 0 20px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border:2px solid white;`;
-        
-        lane.appendChild(note);
-        box.appendChild(lane);
+        let skinId = document.getElementById('cfg-note-skin') ? document.getElementById('cfg-note-skin').value : 'default';
+        if (skinId !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+            let skin = SHOP_ITEMS.find(item => item.id === skinId);
+            if (skin && skin.shape && typeof SKIN_PATHS !== 'undefined') shapeData = SKIN_PATHS[skin.shape];
+            if (skin && skin.fixed) color = skin.color;
+        }
+
+        html += `
+        <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:10px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
+            <svg viewBox="0 0 100 100" style="width:60%; filter:drop-shadow(0 0 8px ${color});">
+                <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="3"/>
+            </svg>
+        </div>`;
     }
+    box.innerHTML = html;
 };
 
 window.updateLaneColor = function(k, i, color) {
     window.cfg.modes[k][i].c = color;
     window.updatePreview(k);
-    
-    const btn = document.getElementById(`kb-btn-${k}-${i}`);
-    if(btn) btn.style.borderColor = color;
 };
 
 window.populateSkinDropdowns = function() {
