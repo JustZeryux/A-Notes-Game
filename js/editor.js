@@ -1,5 +1,5 @@
 /* ==========================================================
-   CREATOR STUDIO PRO V5 - FULL UNIFIED EDITOR (FIXED SYNTAX)
+   CREATOR STUDIO PRO V5 - VISUAL MECHANICS & ICONS
    ========================================================== */
 
 window.edMap = [];
@@ -13,6 +13,7 @@ window.edSnap = 50;
 window.edDragNote = null; 
 window.edMechanics = []; 
 window.edBrush = 'tap'; // Pincel por defecto
+window.edActiveCustomFX = null;
 
 window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     if(!songData || !songData.id) return window.notify("Error: Canción inválida para editar", "error");
@@ -40,7 +41,7 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     initEditorGrid();
     drawEditorGrid();
     
-    window.notify("Studio Móvil Listo. Toca para poner notas.", "success");
+    window.notify("Studio Listo. Selecciona tu pincel en las herramientas.", "success");
 };
 
 function injectProTools() {
@@ -62,25 +63,23 @@ function injectProTools() {
 
             <div style="background:#222; padding:10px; border-radius:8px;">
                 <div style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Pincel Actual</div>
-                <select class="set-input" style="background:#000; color:#00ffff; border-color:#00ffff;" onchange="window.edBrush = this.value">
+                <select class="set-input" style="background:#000; color:#00ffff; border-color:#00ffff; font-size:0.9rem;" onchange="window.edBrush = this.value">
                     <option value="tap">🟦 Nota Normal</option>
                     <option value="mine">💣 Mina (Daño)</option>
                     <option value="dodge">🛑 Dodge (Esquivar)</option>
                     <option value="fx_flash">🔦 FX: Flashlight</option>
-                    <option value="fx_shake">💥 FX: Shake</option>
                     <option value="custom_fx">✨ FX Custom</option>
                 </select>
             </div>
 
             <button class="action" style="background:#ff66aa; color:black; padding:10px;" onclick="openAutoMapModal()">🤖 AUTO-MAPEO IA</button>
-            <button class="action" style="background:#00ffff; color:black; padding:10px;" onclick="openCustomMechanicCreator()">⚙️ CREADOR FX CUSTOM</button>
-            <button class="action" style="background:#444; color:white; padding:10px;" onclick="testMap()">▶️ PROBAR</button>
+            <button class="action" style="background:#00ffff; color:black; padding:10px;" onclick="openCustomMechanicCreator()">⚙️ CREAR FX CUSTOM</button>
+            <button class="action" style="background:#444; color:white; padding:10px;" onclick="testMap()">▶️ PROBAR MAPA</button>
         </div>
     `;
     sidebar.insertAdjacentHTML('beforeend', html);
 }
 
-// === GRID CON SOPORTE TÁCTIL (MÓVIL) ===
 function initEditorGrid() {
     const grid = document.getElementById('ed-grid');
     grid.style.width = (window.edK * 80) + 'px'; 
@@ -112,7 +111,7 @@ function initEditorGrid() {
         const pos = getPointerPos(e);
         if(pos.l < 0 || pos.l >= window.edK) return;
 
-        // FIX BORRADO DE HOLD NOTES: Busca si el clic cae DENTRO del cuerpo de la nota
+        // Borrado preciso de Hold Notes y notas normales
         const existingIdx = window.edMap.findIndex(n => {
             if (n.l !== pos.l) return false;
             let endT = n.t + (n.dur || 0); 
@@ -125,7 +124,7 @@ function initEditorGrid() {
             return;
         }
         
-        // Crear nueva nota respetando el pincel seleccionado
+        // Crear nota respetando el pincel
         let finalType = window.edBrush || 'tap';
         window.edDragNote = { 
             t: pos.t, l: pos.l, 
@@ -141,7 +140,6 @@ function initEditorGrid() {
         e.preventDefault(); 
         
         const pos = getPointerPos(e);
-        // Solo permite estirar notas normales, minas o dodges
         let isHoldable = (window.edDragNote.type === 'tap' || window.edDragNote.type === 'mine' || window.edDragNote.type === 'dodge' || window.edDragNote.type === 'hold');
         
         if (isHoldable && pos.t > window.edDragNote.t + 50) {
@@ -164,15 +162,11 @@ function initEditorGrid() {
         }
     };
 
-    grid.onmousedown = startAction;
-    grid.onmousemove = moveAction;
-    window.onmouseup = endAction;
-
-    grid.ontouchstart = startAction;
-    grid.ontouchmove = moveAction;
-    window.ontouchend = endAction;
+    grid.onmousedown = startAction; grid.onmousemove = moveAction; window.onmouseup = endAction;
+    grid.ontouchstart = startAction; grid.ontouchmove = moveAction; window.ontouchend = endAction;
 }
 
+// === EL DIBUJADOR DE NOTAS CON ICONOS VISUALES ===
 window.drawEditorGrid = function() {
     const grid = document.getElementById('ed-grid');
     const zoom = document.getElementById('ed-zoom').value;
@@ -190,12 +184,19 @@ window.drawEditorGrid = function() {
         note.style.width = '70px';
         
         let color = getLaneColor(n.l, window.edMode);
+        let iconHTML = '';
         
-        if(n.type === 'mine') color = '#F9393F'; 
-        else if(n.type === 'dodge') color = '#00ffff'; 
-        else if(n.type === 'fx_flash' || n.type === 'custom_fx') color = '#FFD700'; 
+        // ASIGNAR COLORES E ICONOS A LAS MECÁNICAS
+        if(n.type === 'mine') { color = '#F9393F'; iconHTML = '💣'; }
+        else if(n.type === 'dodge') { color = '#00ffff'; iconHTML = '🛑'; }
+        else if(n.type === 'fx_flash') { color = '#FFD700'; iconHTML = '🔦'; }
+        else if(n.type === 'custom_fx') { color = '#FFD700'; iconHTML = '✨'; }
 
         note.style.background = color;
+        note.style.display = 'flex';
+        note.style.justifyContent = 'center';
+        note.style.alignItems = 'center';
+        note.innerHTML = `<span style="pointer-events:none;">${iconHTML}</span>`;
 
         if(n.h && n.dur > 0) {
             note.style.height = (n.dur * (zoom / 100)) + 'px';
@@ -206,10 +207,14 @@ window.drawEditorGrid = function() {
             
             note.style.transform = 'translateY(0)'; 
             note.style.transformOrigin = 'top center';
+            note.style.alignItems = 'flex-start'; // El icono se queda arriba
+            note.style.paddingTop = '5px';
+            note.style.fontSize = '1.5rem';
         } else {
             note.style.height = '20px';
             note.style.borderRadius = window.edMode === 'taiko' ? '50%' : '5px';
             note.style.transform = 'translateY(-50%)'; 
+            note.style.fontSize = '0.9rem';
         }
         grid.appendChild(note);
     });
@@ -221,6 +226,62 @@ function getLaneColor(l, mode) {
     const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700', '#F9393F', '#a200ff'];
     return colors[l % colors.length];
 }
+
+// === CREADOR DE MECÁNICAS ===
+window.openCustomMechanicCreator = function() {
+    const html = `
+        <div id="mech-creator-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px);">
+            <div style="background:#0a0a0a; padding:30px; border-radius:15px; border:2px solid #00ffff; width:500px; box-shadow: 0 0 30px rgba(0,255,255,0.2);">
+                <h2 style="color:#00ffff; margin-top:0;">🛠️ CREADOR DE MECÁNICAS</h2>
+                <p style="color:#888; font-size:0.9rem;">Crea un efecto visual complejo que se activará cuando la línea de tiempo llegue a la nota.</p>
+                
+                <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px;">
+                    <div>
+                        <label style="color:white; font-size:0.8rem;">Nombre de tu Mecánica</label>
+                        <input type="text" id="cm-name" class="log-inp" placeholder="Ej: Mundo Invertido">
+                    </div>
+                    
+                    <div>
+                        <label style="color:white; font-size:0.8rem;">Filtro CSS (El motor de renderizado)</label>
+                        <select id="cm-filter" class="log-inp" style="background:#111;">
+                            <option value="invert(1)">Invertir Colores</option>
+                            <option value="hue-rotate(90deg)">Glitch de Color (Hue)</option>
+                            <option value="blur(5px)">Visión Borrosa (Blur)</option>
+                            <option value="grayscale(1)">Blanco y Negro</option>
+                            <option value="contrast(3)">Alto Contraste Tóxico</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="color:white; font-size:0.8rem;">Duración (en Milisegundos)</label>
+                        <input type="number" id="cm-dur" class="log-inp" value="2000" min="100" max="10000">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="action" onclick="saveCustomMechanic()">💾 GUARDAR COMO PINCEL</button>
+                    <button class="action secondary" onclick="document.getElementById('mech-creator-modal').remove()">CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+};
+
+window.saveCustomMechanic = function() {
+    const name = document.getElementById('cm-name').value || "Custom FX";
+    const filter = document.getElementById('cm-filter').value;
+    const dur = parseInt(document.getElementById('cm-dur').value);
+
+    window.edActiveCustomFX = { name, filter, dur };
+    
+    const brushSelect = document.querySelector('#pro-tools-container select:last-of-type');
+    if(brushSelect) brushSelect.value = 'custom_fx';
+    window.edBrush = 'custom_fx';
+
+    window.notify(`Mecánica "${name}" lista. Clic en la pista para ponerla.`, "success");
+    document.getElementById('mech-creator-modal').remove();
+};
 
 window.openAutoMapModal = function() {
     const html = `
@@ -354,61 +415,3 @@ setInterval(() => {
         if(!window.edAudio.paused) document.getElementById('ed-scroll-area').scrollTop = pos - 200;
     }
 }, 16);
-
-// === CREADOR DE MECÁNICAS ===
-window.edActiveCustomFX = null;
-
-window.openCustomMechanicCreator = function() {
-    const html = `
-        <div id="mech-creator-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px);">
-            <div style="background:#0a0a0a; padding:30px; border-radius:15px; border:2px solid #00ffff; width:500px; box-shadow: 0 0 30px rgba(0,255,255,0.2);">
-                <h2 style="color:#00ffff; margin-top:0;">🛠️ CREADOR DE MECÁNICAS</h2>
-                <p style="color:#888; font-size:0.9rem;">Crea un efecto visual complejo que se activará cuando la línea de tiempo llegue a la nota.</p>
-                
-                <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px;">
-                    <div>
-                        <label style="color:white; font-size:0.8rem;">Nombre de tu Mecánica</label>
-                        <input type="text" id="cm-name" class="log-inp" placeholder="Ej: Mundo Invertido">
-                    </div>
-                    
-                    <div>
-                        <label style="color:white; font-size:0.8rem;">Filtro CSS (El motor de renderizado)</label>
-                        <select id="cm-filter" class="log-inp" style="background:#111;">
-                            <option value="invert(1)">Invertir Colores</option>
-                            <option value="hue-rotate(90deg)">Glitch de Color (Hue)</option>
-                            <option value="blur(5px)">Visión Borrosa (Blur)</option>
-                            <option value="grayscale(1)">Blanco y Negro</option>
-                            <option value="contrast(3)">Alto Contraste Tóxico</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label style="color:white; font-size:0.8rem;">Duración (en Milisegundos)</label>
-                        <input type="number" id="cm-dur" class="log-inp" value="2000" min="100" max="10000">
-                    </div>
-                </div>
-
-                <div style="display:flex; gap:10px;">
-                    <button class="action" onclick="saveCustomMechanic()">💾 GUARDAR COMO PINCEL</button>
-                    <button class="action secondary" onclick="document.getElementById('mech-creator-modal').remove()">CANCELAR</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', html);
-};
-
-window.saveCustomMechanic = function() {
-    const name = document.getElementById('cm-name').value || "Custom FX";
-    const filter = document.getElementById('cm-filter').value;
-    const dur = parseInt(document.getElementById('cm-dur').value);
-
-    window.edActiveCustomFX = { name, filter, dur };
-    
-    const brushSelect = document.querySelector('#pro-tools-container select:last-of-type');
-    if(brushSelect) brushSelect.value = 'custom_fx';
-    window.edBrush = 'custom_fx';
-
-    window.notify(`Mecánica "${name}" lista. Clic en la pista para ponerla.`, "success");
-    document.getElementById('mech-creator-modal').remove();
-};
