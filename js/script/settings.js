@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V8 (ANTI-BUGS) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V9 (FIX APERTURA) === */
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
@@ -28,7 +28,7 @@ window.loadSettings = function() {
         if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
             window.cfg.modes[k] = [];
             const defKeys = ['a','s','d','f','g','h','j','k','l',';'];
-            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
+            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff' });
         }
     }
 
@@ -68,6 +68,27 @@ window.loadSettings = function() {
     if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
 };
 
+// 🚨 AQUÍ ESTÁN LAS FUNCIONES QUE FALTABAN PARA ABRIR Y CERRAR 🚨
+window.openSettingsPanel = function() {
+    window.loadSettings();
+    let modal = document.getElementById('modal-settings');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '9999999';
+    } else if (typeof openModal === 'function') {
+        openModal('settings');
+    }
+};
+
+window.closeSettingsPanel = function() {
+    let modal = document.getElementById('modal-settings');
+    if (modal) {
+        modal.style.display = 'none';
+    } else if (typeof closeModal === 'function') {
+        closeModal('settings');
+    }
+};
+
 window.saveSettings = function() {
     const getVal = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : 0; };
     const getStr = (id) => { const el = document.getElementById(id); return el ? el.value : 'default'; };
@@ -97,8 +118,8 @@ window.saveSettings = function() {
 
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
     if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
-    if (typeof window.closeSettingsPanel === 'function') window.closeSettingsPanel();
-    else if (typeof window.closeModal === 'function') window.closeModal('settings');
+    
+    window.closeSettingsPanel();
 };
 
 window.switchSetTab = function(tabId) {
@@ -115,7 +136,6 @@ window.switchSetTab = function(tabId) {
     }
 };
 
-// 🚨 SISTEMA DE RENDERIZADO DOM (A prueba de fallos, sin HTML Strings) 🚨
 window.renderLaneConfig = function(k) {
     k = parseInt(k);
     const cont = document.getElementById('lanes-container');
@@ -127,22 +147,19 @@ window.renderLaneConfig = function(k) {
         for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: def[i]||' ', c: '#00ffff' });
     }
 
-    cont.innerHTML = ''; // Limpiamos contenedor
+    cont.innerHTML = ''; 
     
     window.cfg.modes[k].forEach((lane, i) => {
         let keyText = lane.k === ' ' ? 'SPC' : String(lane.k).toUpperCase();
         
-        // Creamos la tarjeta
         const card = document.createElement('div');
         card.style.cssText = "text-align:center; background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; border:1px solid #444; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display:flex; flex-direction:column; align-items:center;";
         
-        // Título del carril
         const label = document.createElement('div');
         label.style.cssText = "color:#aaa; font-size:0.8rem; font-weight:bold; margin-bottom:10px;";
         label.innerText = `LANE ${i+1}`;
         card.appendChild(label);
         
-        // Botón de captura (Se inyecta evento directo)
         const btn = document.createElement('button');
         btn.id = `kb-btn-${k}-${i}`;
         btn.className = "kb-btn";
@@ -154,13 +171,11 @@ window.renderLaneConfig = function(k) {
         });
         card.appendChild(btn);
         
-        // Etiqueta color
         const colorLabel = document.createElement('div');
         colorLabel.style.cssText = "margin-top:10px; color:#666; font-size:0.7rem;";
         colorLabel.innerText = "COLOR";
         card.appendChild(colorLabel);
         
-        // Input de color (Se inyecta evento directo)
         const colorInp = document.createElement('input');
         colorInp.type = 'color';
         colorInp.value = lane.c;
@@ -176,12 +191,10 @@ window.renderLaneConfig = function(k) {
     window.updatePreview(k);
 };
 
-// 🎮 CAPTURA DE TECLA SEGURA 🎮
 window.startKeyCapture = function(k, laneIdx) {
     const btn = document.getElementById(`kb-btn-${k}-${laneIdx}`);
     if (!btn || btn.dataset.waiting === "true") return;
     
-    // Restaurar otros
     document.querySelectorAll('.kb-btn').forEach(b => {
         if(b.dataset.waiting === "true") {
             b.dataset.waiting = "false";
@@ -245,7 +258,6 @@ window.captureSingleKey = function(btnId, cfgProp) {
     setTimeout(() => document.addEventListener('keydown', capture, true), 150);
 };
 
-// 🌟 VISTA PREVIA RENDERIZADA EN CSS PURO (Garantizado que no queda en negro) 🌟
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box) return;
@@ -269,7 +281,6 @@ window.updateLaneColor = function(k, i, color) {
     window.cfg.modes[k][i].c = color;
     window.updatePreview(k);
     
-    // Refrescar color del borde del botón sin recargar todo
     const btn = document.getElementById(`kb-btn-${k}-${i}`);
     if(btn) btn.style.borderColor = color;
 };
