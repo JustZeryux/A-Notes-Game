@@ -1,7 +1,20 @@
-/* === AUDIO & ENGINE (ULTRA PERFORMANCE + AUTO-LYRICS + FX CAMERA V18) === */
+/* === AUDIO & ENGINE (ULTRA PERFORMANCE + FX MECHANICS + EDITOR SYNC V20) === */
 
 let elTrack = null;
-let gameLoopId; // Variable global para detener el loop y evitar lag
+let gameLoopId; 
+
+window.isTestingMap = false; // Flag para saber si venimos del editor
+
+// Interceptar testMap del editor para saber que estamos en modo prueba
+setTimeout(() => {
+    if (typeof window.testMap === 'function') {
+        const originalTestMap = window.testMap;
+        window.testMap = function() {
+            window.isTestingMap = true;
+            originalTestMap();
+        };
+    }
+}, 1000);
 
 // ==========================================
 // 1. SISTEMA DE AUDIO
@@ -62,24 +75,9 @@ function getSmartLane(last, k, busyLanes, time) {
 }
 
 function genMap(buf, k) {
-    // --- FIX: LEER CHART MANUAL O USAR AUTO-MAP ---
-        let map = [];
-        let rawData = window.curSongData.raw || window.curSongData;
-        let mapKey = `notes_mania_${k}k`; // Por defecto asume mania
-
-        if (rawData[mapKey] && rawData[mapKey].length > 0) {
-            // 1. Si existe un chart para este modo/keys, úsalo!
-            map = JSON.parse(JSON.stringify(rawData[mapKey])); 
-        } else if (rawData.notes && rawData.notes.length > 0) {
-            // 2. Compatibilidad con mapas viejos
-            map = JSON.parse(JSON.stringify(rawData.notes));
-        } else {
-            // 3. Si está vacía, SOLO entonces usa el Auto-Mapeo por densidad
-            map = genMap(buffer, k); 
-        }
-        // ----------------------------------------------
-
-        const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
+    const rawData = buf.getChannelData(0);
+    const data = normalizeAudio(new Float32Array(rawData)); 
+    const map = [];
     const sampleRate = buf.sampleRate;
     
     const START_OFFSET = 3000; 
@@ -177,14 +175,6 @@ function genMap(buf, k) {
                         if (l2 !== -1 && l2 !== lane) {
                             map.push({ t: timeMs, l: l2, type: 'tap', len: 0, h: false });
                             laneFreeTimes[l2] = timeMs + 25;
-
-                            if (density >= 12 && intensity > 1.8 && k >= 6 && Math.random() < 0.4) {
-                                let l3 = getSmartLane(l2, k, laneFreeTimes, timeMs);
-                                if(l3 !== -1 && l3 !== lane && l3 !== l2) {
-                                    map.push({ t: timeMs, l: l3, type: 'tap', len: 0, h: false });
-                                    laneFreeTimes[l3] = timeMs + 25;
-                                }
-                            }
                         }
                     }
                 }
@@ -220,10 +210,8 @@ window.prepareAndPlaySong = async function(k) {
     if(window.currentLobbyId) window.isMultiplayer = true;
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
-    // === INTERCEPTOR DE OSU! ===
     if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
         if(typeof unlockAudio === 'function') unlockAudio();
-        
         let realId = String(window.curSongData.id).replace('osu_', '');
         if(typeof downloadAndPlayOsu === 'function') {
             downloadAndPlayOsu(realId, window.curSongData.title, window.curSongData.imageURL, k);
@@ -237,25 +225,21 @@ window.prepareAndPlaySong = async function(k) {
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
 
-        // 1. Letras Automáticas
         if (window.cfg.subtitles && !window.curSongData.lyrics && window.curSongData.title) {
             try {
                 let cleanTitle = window.curSongData.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
                 const res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`);
                 const data = await res.json();
                 const bestMatch = data.find(song => song.syncedLyrics);
-                
                 if (bestMatch && bestMatch.syncedLyrics) window.curSongData.lyrics = bestMatch.syncedLyrics;
-            } catch(e) { console.warn("No se encontraron letras automáticas."); }
+            } catch(e) {}
         }
 
-        // 2. Cargar el Audio (AQUÍ ES DONDE SE DEFINE EL BUFFER QUE TE DABA ERROR)
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
-        if (songInRam) { 
-            buffer = songInRam.buf; 
-        } else {
+        if (songInRam) { buffer = songInRam.buf; } 
+        else {
             const response = await fetch(window.curSongData.audioURL || window.curSongData.url); 
             const arrayBuffer = await response.arrayBuffer();
             buffer = await window.st.ctx.decodeAudioData(arrayBuffer);
@@ -263,21 +247,22 @@ window.prepareAndPlaySong = async function(k) {
             window.ramSongs.push({ id: window.curSongData.id, buf: buffer });
         }
 
-        // 3. --- FIX: LEER CHART MANUAL (STUDIO) O USAR AUTO-MAP ---
         let map = [];
         let rawData = window.curSongData.raw || window.curSongData;
-        let mapKey = `notes_mania_${k}k`; // Por defecto asume mania
+        let mapKey = `notes_mania_${k}k`; 
 
         if (rawData[mapKey] && rawData[mapKey].length > 0) {
-            // Usa tu mapa de Creator Studio
             map = JSON.parse(JSON.stringify(rawData[mapKey])); 
         } else if (rawData.notes && rawData.notes.length > 0) {
-            // Compatibilidad con mapas viejos
             map = JSON.parse(JSON.stringify(rawData.notes));
         } else {
-            // Solo si NO hay mapa, usa el Auto-Mapeo por densidad (buffer)
             map = genMap(buffer, k); 
         }
+
+        // 🚨 EL FIX MAESTRO PARA NOTAS DOBLES 🚨
+        // Las notas del editor se guardan desordenadas según las pusiste.
+        // El motor necesita que estén cronológicas para que no dejen de aparecer.
+        map.sort((a, b) => a.t - b.t);
 
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         window.preparedSong = songObj; 
@@ -294,6 +279,7 @@ window.prepareAndPlaySong = async function(k) {
         alert("Error carga: " + e.message);
     }
 };
+
 window.playSongInternal = function(s) {
     if(!s) return;
     initMobileTouchControls(window.keys || 4);
@@ -315,9 +301,8 @@ window.playSongInternal = function(s) {
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
     
-    // === INTEGRACIÓN DEL AVATAR CAPSULA (HUD) ===
     const oldIg = document.getElementById('ig-profile');
-    if (oldIg) oldIg.style.display = 'none'; // Ocultamos el antiguo
+    if (oldIg) oldIg.style.display = 'none'; 
 
     let capsuleUI = document.getElementById('capsule-ui');
     if(!capsuleUI) {
@@ -423,10 +408,7 @@ window.playSongInternal = function(s) {
 }
 
 // ==========================================
-// 4. EL LOOP ULTRA-OPTIMIZADO (GPU ACCELERATED)
-// ==========================================
-// ==========================================
-// 4. EL LOOP ULTRA-OPTIMIZADO (GPU ACCELERATED)
+// 4. EL LOOP ULTRA-OPTIMIZADO 
 // ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) {
@@ -434,11 +416,9 @@ function loop() {
         return;
     }
     
-    // AQUÍ SE CALCULA EL TIEMPO
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
-    // === ACTUALIZACIÓN DE BARRA Y RELOJ ===
     if (window.st.songDuration > 0 && songTime > 0) {
         let currentSec = songTime / 1000;
         let totalSec = window.st.songDuration;
@@ -469,37 +449,24 @@ function loop() {
         }
     }
 
-    // --- LECTOR DE MECÁNICAS EN TIEMPO REAL (AHORA SÍ, DEBAJO DE 'now') ---
+    // LECTOR DE MECÁNICAS (Sin afectar DOM visual inútil)
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
-        
-        // Si la nota pasa la línea de tiempo y es un FX que no se ha activado
         if (!n.fxTriggered && n.t <= now) {
-            
-            // Efecto Flashlight
             if (n.type === 'fx_flash') {
                 document.getElementById('game-layer').style.background = 'white';
                 setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150);
             }
-            
-            // Efecto Custom del usuario
             if (n.type === 'custom_fx' && n.customData) {
                 const track = document.getElementById('track');
                 const oldFilter = track.style.filter;
                 track.style.filter = n.customData.filter;
                 track.style.transition = 'filter 0.2s';
-                
-                // Apagar efecto tras la duración elegida
-                setTimeout(() => {
-                    track.style.filter = oldFilter;
-                }, n.customData.dur);
+                setTimeout(() => { track.style.filter = oldFilter; }, n.customData.dur);
             }
-
-            // Marcar como ejecutado para no repetirlo cada frame
             n.fxTriggered = true; 
         }
     }
-    // ----------------------------------------------------------------------
 
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
@@ -509,11 +476,15 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
-    // === GENERACIÓN DE NOTAS VISUALES ===
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
         
+        // Bloquear renderizado de mecánicas invisibles puras para no buggear la pista
+        if (n.type === 'fx_flash' || n.type === 'custom_fx') {
+            n.s = true; window.st.spawned.push(n); continue;
+        }
+
         if (n.t - now < 1500) { 
             if (n.t - now > -200) { 
                 const el = document.createElement('div');
@@ -531,8 +502,8 @@ function loop() {
                     if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
                     if (activeSkin.fixed) color = activeSkin.color;
                 }
-                
-                // Cambiar el color si es una mina o dodge para que se distinga en partida
+
+                // Ajustes visuales de mecánicas
                 if(n.type === 'mine') color = '#F9393F';
                 if(n.type === 'dodge') color = '#00ffff';
 
@@ -554,18 +525,15 @@ function loop() {
         } else break; 
     }
 
-    // === MOVIMIENTO DE NOTAS ===
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
-        
-        // Evitamos que las mecánicas puramente visuales cuenten como "MISS"
+
+        // Limpiar FX puros para que no generen MISS 
         if ((n.type === 'fx_flash' || n.type === 'custom_fx') && n.t < now - 100) {
-            if(n.el) { n.el.remove(); n.el = null; }
-            window.st.spawned.splice(i, 1);
-            continue;
+            window.st.spawned.splice(i, 1); continue;
         }
 
-        if (n.h && n.type === 'tap') {
+        if (n.h && (n.type === 'tap' || n.type === 'mine' || n.type === 'dodge')) {
             if(n.el) { n.el.remove(); n.el = null; }
             window.st.spawned.splice(i, 1);
             continue;
@@ -574,11 +542,26 @@ function loop() {
         const timeDiff = n.t - now + (window.cfg.off || 0);
 
         if (!n.h && timeDiff < -160) {
-            miss(n); 
-            n.h = true; 
-            if(n.el) { n.el.remove(); n.el = null; }
-            window.st.spawned.splice(i, 1); 
-            continue;
+            if (n.type === 'mine') {
+                // Pasó sin tocarse = BIEN
+                n.h = true;
+                if(n.el) { n.el.remove(); n.el = null; }
+                window.st.spawned.splice(i, 1);
+                continue;
+            } else if (n.type === 'dodge') {
+                // Esquivada = BIEN
+                n.h = true; window.st.sc += 100;
+                showJudge("DODGED", "#00ffff", 0);
+                if(n.el) { n.el.remove(); n.el = null; }
+                window.st.spawned.splice(i, 1);
+                continue;
+            } else {
+                miss(n); 
+                n.h = true; 
+                if(n.el) { n.el.remove(); n.el = null; }
+                window.st.spawned.splice(i, 1); 
+                continue;
+            }
         }
 
         if (n.el) {
@@ -618,11 +601,11 @@ function loop() {
 // ==========================================
 // 5. VISUALS & JUEZ
 // ==========================================
-function createSplash(l) {
-    if(!window.cfg.showSplash) return;
+function createSplash(l, isBad = false) {
+    if(!window.cfg.showSplash && !isBad) return;
     const r = document.getElementById(`rec-${l}`);
     if(!r) return;
-    const color = r.style.getPropertyValue('--col') || window.cfg.modes[window.keys][l].c;
+    const color = isBad ? "#F9393F" : (r.style.getPropertyValue('--col') || window.cfg.modes[window.keys][l].c);
     const s = document.createElement('div');
     s.className = 'splash-oppa'; 
     s.style.setProperty('--c', color);
@@ -661,13 +644,14 @@ function showJudge(text, color, diffMs) {
     if(!document.getElementById('style-judge')) {
         const st = document.createElement('style');
         st.id = 'style-judge';
-        st.innerHTML = `@keyframes judgePop { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }`;
+        st.innerHTML = `@keyframes judgePop { 0% { transform: scale(0.8); opacity: 0; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+                        @keyframes cameraShake { 0% {transform: translate(0)} 25% {transform: translate(-10px, 10px)} 50% {transform: translate(10px, -10px)} 75% {transform: translate(-10px, -10px)} 100% {transform: translate(0)} }`;
         document.head.appendChild(st);
     }
     
     container.appendChild(j);
 
-    if (text !== "MISS" && typeof diffMs === 'number' && window.cfg.showMs) {
+    if (text !== "MISS" && text !== "OUCH!" && text !== "FAIL" && typeof diffMs === 'number' && window.cfg.showMs) {
         const msDiv = document.createElement('div');
         const sign = diffMs > 0 ? "+" : "";
         msDiv.innerText = `${sign}${Math.round(diffMs)}ms`;
@@ -684,7 +668,7 @@ function showJudge(text, color, diffMs) {
 }
 
 // ==========================================
-// 6. EVENTOS DE TECLADO Y EVALUACIÓN
+// 6. EVENTOS Y COLISIONES DE MECÁNICAS
 // ==========================================
 window.onKd = function(e) {
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
@@ -720,16 +704,22 @@ function hit(l, p) {
             window.st.hitCount++;
 
             let score=50, text="BAD", color="yellow";
-            if(absDiff < 45){ 
-                text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); 
-            }
-            else if(absDiff < 90){ 
-                text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); 
-                if(window.st.fcStatus === "PFC") window.st.fcStatus = "GFC";
-            }
-            else { 
-                window.st.stats.b++; window.st.hp-=2; 
-                if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; 
+
+            if (n.type === 'mine') {
+                text = "OUCH!"; color = "#F9393F"; score = -200; window.st.hp -= 15;
+                window.st.cmb = 0; window.st.fcStatus = "CLEAR";
+                createSplash(l, true);
+                document.getElementById('game-layer').style.animation = 'cameraShake 0.3s';
+                setTimeout(()=>document.getElementById('game-layer').style.animation = '', 300);
+            } else if (n.type === 'dodge') {
+                text = "FAIL"; color = "#F9393F"; score = -100; window.st.hp -= 10;
+                window.st.cmb = 0; window.st.fcStatus = "CLEAR";
+                createSplash(l, true);
+            } else {
+                if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
+                else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); if(window.st.fcStatus === "PFC") window.st.fcStatus = "GFC"; }
+                else { window.st.stats.b++; window.st.hp-=2; if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; }
+                window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             }
 
             if(window.cfg.bgEffects && (text === "SICK!!" || text === "GOOD")) {
@@ -744,14 +734,11 @@ function hit(l, p) {
             }
 
             window.st.sc += score; 
-            window.st.cmb++; 
-            if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
-            window.st.hp = Math.min(100, window.st.hp+2);
+            if(n.type !== 'mine' && n.type !== 'dodge') window.st.hp = Math.min(100, window.st.hp+2);
             
             showJudge(text, color, diff); 
             playHit(); 
             updHUD();
-            
             n.h = true; 
         }
     } else {
@@ -762,13 +749,8 @@ function hit(l, p) {
 
 function miss(n) {
     showJudge("MISS", "#F9393F");
-    window.st.stats.m++; 
-    window.st.cmb = 0; 
-    window.st.hp -= 10; 
-    window.st.fcStatus = "CLEAR"; 
-
-    playMiss(); 
-    updHUD();
+    window.st.stats.m++; window.st.cmb = 0; window.st.hp -= 10; window.st.fcStatus = "CLEAR"; 
+    playMiss(); updHUD();
     
     if (window.st.hp <= 0) {
         window.st.hp = 0;
@@ -777,16 +759,15 @@ function miss(n) {
 }
 
 // ==========================================
-// 7. HUD Y FINALIZACIÓN
+// 7. HUD Y RETORNO AL EDITOR
 // ==========================================
 function updHUD() {
     const scEl = document.getElementById('g-score'); if(scEl) scEl.innerText = window.st.sc.toLocaleString();
     const cEl = document.getElementById('g-combo'); if(cEl) { if(window.st.cmb > 0) { cEl.innerText = window.st.cmb; cEl.style.opacity=1; } else cEl.style.opacity=0; }
     
     const hBar = document.getElementById('health-fill');
-    if(hBar) hBar.style.height = window.st.hp + "%"; // Mantiene barra vertical original
+    if(hBar) hBar.style.height = window.st.hp + "%"; 
 
-    // NUEVA LÓGICA DE BARRA HP DEL AVATAR (CAPSULA)
     const hpCapsule = document.getElementById('engine-hp-fill');
     if(hpCapsule) {
         hpCapsule.style.width = Math.max(0, window.st.hp) + "%";
@@ -805,31 +786,32 @@ function updHUD() {
     const hMiss = document.getElementById('h-miss'); if(hMiss) hMiss.innerText = window.st.stats.m;
     if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
 
-    // SISTEMA DE ALERTA DE MUERTE INMINENTE (Pulsating Danger Vignette)
     let vign = document.getElementById('near-death-vignette');
     if(!vign) { 
         vign = document.createElement('div'); vign.id = 'near-death-vignette';
         document.getElementById('game-layer').insertBefore(vign, document.getElementById('top-progress-bar'));
     }
-
-    if (window.st.hp < 20) { // Si la salud está por debajo de 20
-        vign.classList.add('danger-active'); // Empieza a palpitar en rojo
-    } else {
-        vign.classList.remove('danger-active'); // Se quita si te recuperas
-    }
+    if (window.st.hp < 20) vign.classList.add('danger-active'); else vign.classList.remove('danger-active');
 }
 
 function end(died) {
     window.st.act = false; 
-    cancelAnimationFrame(gameLoopId); // PREVIENE MEMORY LEAKS
+    cancelAnimationFrame(gameLoopId); 
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
-    // Apagar la viñeta de peligro al terminar
     let vign = document.getElementById('near-death-vignette');
     if(vign) vign.classList.remove('danger-active');
 
     let touchZones = document.getElementById('mobile-touch-zones'); if(touchZones) touchZones.style.display = 'none';               
-    if(window.isMultiplayer) { /* Lógica multi */ return; }
+    if(window.isMultiplayer) return; 
+
+    // 🚨 RETORNO DIRECTO AL EDITOR SI PERDISTE TESTEANDO 🚨
+    if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
+        document.getElementById('game-layer').style.display = 'none';
+        window.isTestingMap = false; 
+        window.openEditor(window.curSongData, window.keys, window.curSongData.originalMode || 'mania');
+        return;
+    }
 
     document.getElementById('game-layer').style.display = 'none';
     const modal = document.getElementById('modal-res');
@@ -881,6 +863,7 @@ function end(died) {
         }
     }
 }
+
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
@@ -933,7 +916,6 @@ window.togglePause = function() {
     window.st.paused = !window.st.paused;
     let modal = document.getElementById('modal-pause');
     
-    // Apagar la viñeta de peligro al pausar
     let vign = document.getElementById('near-death-vignette');
     if(vign) vign.classList.remove('danger-active');
 
@@ -974,9 +956,7 @@ window.togglePause = function() {
 
 window.resumeGame = function() {
     const modal = document.getElementById('modal-pause');
-    if(modal) {
-        modal.style.setProperty('display', 'none', 'important');
-    }
+    if(modal) modal.style.setProperty('display', 'none', 'important');
     
     let touchZones = document.getElementById('mobile-touch-zones');
     if(touchZones && window.innerWidth <= 800) touchZones.style.display = 'flex'; 
@@ -997,27 +977,30 @@ window.toMenu = function() {
     }
     if(window.st.ctx) window.st.ctx.suspend();
     window.st.act = false; window.st.paused = false;
-    cancelAnimationFrame(gameLoopId); // PREVIENE MEMORY LEAKS
+    cancelAnimationFrame(gameLoopId); 
     
     document.getElementById('game-layer').style.display = 'none';
-    document.getElementById('menu-container').classList.remove('hidden');
     
     const resM = document.getElementById('modal-res');
     if(resM) resM.style.display = 'none';
-    
     const pauseM = document.getElementById('modal-pause');
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
+
+    // 🚨 RETORNO DIRECTO AL EDITOR SI SALIMOS DEL MENÚ DE PAUSA 🚨
+    if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
+        window.isTestingMap = false; // Reiniciamos el flag
+        window.openEditor(window.curSongData, window.keys, window.curSongData.originalMode || 'mania');
+    } else {
+        document.getElementById('menu-container').classList.remove('hidden');
+    }
 };
 
-// === SISTEMA MULTI-TOUCH A PRUEBA DE BUGS (V-FINAL) ===
-// === js/game.js - SISTEMA SWIPE FLUIDO PARA MÓVILES ===
 window.initMobileTouchControls = function(keyCount) {
     let oldContainer = document.getElementById('mobile-touch-zones'); if (oldContainer) oldContainer.remove(); 
     if (window.innerWidth > 800 && !('ontouchstart' in window)) return;
 
     const touchContainer = document.createElement('div');
     touchContainer.id = 'mobile-touch-zones';
-    // touch-action: none es vital para que el navegador no intente hacer scroll al deslizar
     touchContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 800; display: flex; flex-direction: row; touch-action: none; pointer-events: auto;';
     document.body.appendChild(touchContainer); 
 
@@ -1028,7 +1011,6 @@ window.initMobileTouchControls = function(keyCount) {
         currentKeys = keyCount === 6 ? ['s','d','f','j','k','l'] : ['d','f','j','k'];
     }
 
-    // Dibujar carriles visuales
     for (let i = 0; i < keyCount; i++) {
         const zone = document.createElement('div');
         zone.style.flex = '1'; zone.style.height = '100%';
@@ -1036,9 +1018,8 @@ window.initMobileTouchControls = function(keyCount) {
         touchContainer.appendChild(zone);
     }
 
-    let activeTouches = {}; // Rastrea en qué carril está cada dedo
+    let activeTouches = {}; 
 
-    // Cálculo matemático ultra-rápido para saber en qué carril está el dedo
     function getLane(x) {
         return Math.max(0, Math.min(Math.floor((x / window.innerWidth) * keyCount), keyCount - 1));
     }
@@ -1049,14 +1030,11 @@ window.initMobileTouchControls = function(keyCount) {
             let t = e.changedTouches[i];
             let newLane = getLane(t.clientX);
             
-            // Si el dedo cambió de carril, soltamos la tecla vieja
             if(activeTouches[t.identifier] !== undefined && activeTouches[t.identifier] !== newLane) {
                 let oldLane = activeTouches[t.identifier];
                 if(typeof window.onKu === 'function') window.onKu({ key: currentKeys[oldLane], preventDefault: ()=>{} });
                 if(touchContainer.children[oldLane]) touchContainer.children[oldLane].style.background = 'transparent';
             }
-            
-            // Y presionamos la tecla nueva
             if(activeTouches[t.identifier] !== newLane) {
                 activeTouches[t.identifier] = newLane;
                 touchContainer.children[newLane].style.background = 'rgba(255,255,255,0.1)';
@@ -1078,7 +1056,6 @@ window.initMobileTouchControls = function(keyCount) {
         }
     }
 
-    // Escuchar el deslizamiento sin interrupciones
     touchContainer.addEventListener('touchstart', handleTouchMove, { passive: false });
     touchContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
     touchContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
