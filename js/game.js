@@ -220,10 +220,8 @@ window.prepareAndPlaySong = async function(k) {
     if(window.currentLobbyId) window.isMultiplayer = true;
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
-    // === FIX: INTERCEPTOR DE OSU! CORREGIDO ===
+    // === INTERCEPTOR DE OSU! ===
     if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
-        
-        // 🚨 FIX 1: ENCENDER EL MOTOR DE AUDIO ANTES DE MANDARLO A OSU! 🚨
         if(typeof unlockAudio === 'function') unlockAudio();
         
         let realId = String(window.curSongData.id).replace('osu_', '');
@@ -239,6 +237,7 @@ window.prepareAndPlaySong = async function(k) {
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
 
+        // 1. Letras Automáticas
         if (window.cfg.subtitles && !window.curSongData.lyrics && window.curSongData.title) {
             try {
                 let cleanTitle = window.curSongData.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
@@ -250,11 +249,13 @@ window.prepareAndPlaySong = async function(k) {
             } catch(e) { console.warn("No se encontraron letras automáticas."); }
         }
 
+        // 2. Cargar el Audio (AQUÍ ES DONDE SE DEFINE EL BUFFER QUE TE DABA ERROR)
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
         
-        if (songInRam) { buffer = songInRam.buf; } 
-        else {
+        if (songInRam) { 
+            buffer = songInRam.buf; 
+        } else {
             const response = await fetch(window.curSongData.audioURL || window.curSongData.url); 
             const arrayBuffer = await response.arrayBuffer();
             buffer = await window.st.ctx.decodeAudioData(arrayBuffer);
@@ -262,7 +263,22 @@ window.prepareAndPlaySong = async function(k) {
             window.ramSongs.push({ id: window.curSongData.id, buf: buffer });
         }
 
-        const map = genMap(buffer, k); 
+        // 3. --- FIX: LEER CHART MANUAL (STUDIO) O USAR AUTO-MAP ---
+        let map = [];
+        let rawData = window.curSongData.raw || window.curSongData;
+        let mapKey = `notes_mania_${k}k`; // Por defecto asume mania
+
+        if (rawData[mapKey] && rawData[mapKey].length > 0) {
+            // Usa tu mapa de Creator Studio
+            map = JSON.parse(JSON.stringify(rawData[mapKey])); 
+        } else if (rawData.notes && rawData.notes.length > 0) {
+            // Compatibilidad con mapas viejos
+            map = JSON.parse(JSON.stringify(rawData.notes));
+        } else {
+            // Solo si NO hay mapa, usa el Auto-Mapeo por densidad (buffer)
+            map = genMap(buffer, k); 
+        }
+
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         window.preparedSong = songObj; 
 
@@ -278,7 +294,6 @@ window.prepareAndPlaySong = async function(k) {
         alert("Error carga: " + e.message);
     }
 };
-
 window.playSongInternal = function(s) {
     if(!s) return;
     initMobileTouchControls(window.keys || 4);
