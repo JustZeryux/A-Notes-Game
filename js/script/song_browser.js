@@ -1,4 +1,4 @@
-/* === SONGS_BROWSER.JS - Motor Maestro (Versión Completa Restaurada) 💎 === */
+/* === SONGS_BROWSER.JS - Motor Maestro (Corregido y Ordenado) 💎 === */
 
 window.currentFilters = { type: 'all', key: 'all' };
 window.unifiedSongs = [];
@@ -66,7 +66,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         } catch(e) { console.warn("Error en la Base de Datos"); }
     }
 
-    // Lógica de Búsqueda en Osu! (Standard, Taiko, Catch y Mania)
+    // Lógica de Búsqueda en Osu!
     try {
         let safeQuery = window.lastQuery;
         if (safeQuery === "") {
@@ -81,7 +81,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         const pageB = window.currentOsuPage + 1; 
         window.currentOsuPage += 2;
         
-        // Sin el filtro &m=3 para traer todos los modos
         const [res1, res2] = await Promise.all([
             fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&p=${pageA}`),
             fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}&p=${pageB}`)
@@ -122,28 +121,10 @@ window.renderUnifiedGrid = function() {
     
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
-
-
-    if (filtered.length === 0) { 
-        grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones. 🌸</div>`; 
-        return; 
-    }
-
-    filtered.forEach(song => {
-        const card = document.createElement('div'); 
-        card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
-        
-        // --- LÓGICA DE ESTRELLAS ⭐ ---
-        let stars = parseFloat(song.starRating || 0).toFixed(1);
-        if(!song.isOsu) stars = ((song.raw?.notes?.length || 0) / 250 + 1.2).toFixed(1);
-        
-        let starCol = stars >= 6 ? '#ff0055' : (stars >= 4 ? '#FFD700' : '#00ffcc');
-        
-        // --- LÓGICA DE BADGES ---
-        let mIcon = song.orlet filtered = baseList.filter(song => {
+    // --- FILTRADO CORRECTO ---
+    let filtered = baseList.filter(song => {
         if (window.currentFilters.type === 'recent') return true; 
         
-        // FILTRO CHARTED: Solo canciones comunitarias que tienen un array de notas (ya sea en "notes" o en un modo específico)
         if (window.currentFilters.type === 'charted') {
             if (song.isOsu) return false;
             const hasNotes = song.raw && (
@@ -154,7 +135,6 @@ window.renderUnifiedGrid = function() {
         }
 
         if (window.currentFilters.type === 'mechanics') return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
-        
         if (window.currentFilters.type === 'osu_mania' && (!song.isOsu || song.originalMode !== 'mania')) return false;
         if (window.currentFilters.type === 'osu_standard' && (!song.isOsu || song.originalMode !== 'standard')) return false;
         if (window.currentFilters.type === 'osu_taiko' && (!song.isOsu || song.originalMode !== 'taiko')) return false;
@@ -166,7 +146,21 @@ window.renderUnifiedGrid = function() {
         }
         return true;
     });
-        iginalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🎹'));
+
+    if (filtered.length === 0) { 
+        grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones. 🌸</div>`; 
+        return; 
+    }
+
+    filtered.forEach(song => {
+        const card = document.createElement('div'); 
+        card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
+        
+        let stars = parseFloat(song.starRating || 0).toFixed(1);
+        if(!song.isOsu) stars = ((song.raw?.notes?.length || 0) / 250 + 1.2).toFixed(1);
+        let starCol = stars >= 6 ? '#ff0055' : (stars >= 4 ? '#FFD700' : '#00ffcc');
+        
+        let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🎹'));
         let maniaKeys = (song.originalMode === 'mania' || !song.isOsu) 
             ? song.keysAvailable.map(k => `<div class="diff-badge" style="border: 1px solid var(--blue); color: var(--blue);">${k}K</div>`).join('') 
             : "";
@@ -174,10 +168,6 @@ window.renderUnifiedGrid = function() {
         let sourceBadge = song.isOsu 
             ? `<div class="diff-badge" style="margin-left:auto; border-color: #ff66aa; color: #ff66aa;">${mIcon} ${song.originalMode.toUpperCase()}</div>` 
             : `<div class="diff-badge" style="margin-left:auto; border-color: var(--blue); color: var(--blue);">☁️ COMMUNITY</div>`;
-        // NUEVO BADGE DE MECÁNICAS
-        let mechBadge = (song.raw && song.raw.mechanics && song.raw.mechanics.length > 0) 
-            ? `<div class="diff-badge" style="border-color:#00ffff; color:#00ffff; font-weight:900;">⚙️ GIMMICK</div>` 
-            : ``;
 
         card.innerHTML = `
             <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; transition: 0.5s; filter: brightness(0.6);"></div>
@@ -192,7 +182,6 @@ window.renderUnifiedGrid = function() {
                 </div>
             </div>`;
         
-        // Hover effects manejados por CSS, pero añadimos el zoom de fondo por JS
         const bg = card.querySelector('.song-bg');
         card.onmouseenter = () => { bg.style.transform = 'scale(1.1)'; bg.style.filter = 'brightness(0.9)'; };
         card.onmouseleave = () => { bg.style.transform = 'scale(1)'; bg.style.filter = 'brightness(0.6)'; };
@@ -201,7 +190,6 @@ window.renderUnifiedGrid = function() {
         grid.appendChild(card);
     });
 
-    // Botón Cargar Más (Estilizado)
     if (window.currentFilters.type !== 'recent') {
         const loadMoreContainer = document.createElement('div'); 
         loadMoreContainer.style.gridColumn = "1 / -1"; 
