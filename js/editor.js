@@ -1,5 +1,5 @@
 /* ==========================================================
-   CREATOR STUDIO PRO V4 - MOBILE SUPPORT & BPM MODAL
+   CREATOR STUDIO PRO V5 - FULL UNIFIED EDITOR (FIXED SYNTAX)
    ========================================================== */
 
 window.edMap = [];
@@ -12,13 +12,14 @@ window.edAudio = null;
 window.edSnap = 50; 
 window.edDragNote = null; 
 window.edMechanics = []; 
+window.edBrush = 'tap'; // Pincel por defecto
 
 window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     if(!songData || !songData.id) return window.notify("Error: Canción inválida para editar", "error");
     
     window.edK = keys;
     window.edMode = mode;
-    window.curSongData = songData; // Refuerzo de seguridad
+    window.curSongData = songData; 
     
     window.edMechanics = songData.mechanics || [];
     const mapKey = `notes_${mode}_${keys}k`; 
@@ -41,8 +42,6 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     
     window.notify("Studio Móvil Listo. Toca para poner notas.", "success");
 };
-
-window.edBrush = 'tap'; // Pincel por defecto
 
 function injectProTools() {
     if(document.getElementById('pro-tools-container')) return;
@@ -87,7 +86,6 @@ function initEditorGrid() {
     grid.style.width = (window.edK * 80) + 'px'; 
     grid.innerHTML = '';
     
-    // Crear carriles
     for(let i=0; i<window.edK; i++) {
         const lane = document.createElement('div');
         lane.className = 'ed-lane';
@@ -96,7 +94,6 @@ function initEditorGrid() {
         grid.appendChild(lane);
     }
 
-    // --- MANEJO UNIFICADO DE PUNTERO (Mouse + Touch) ---
     const getPointerPos = (e) => {
         const rect = grid.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -118,7 +115,7 @@ function initEditorGrid() {
         // FIX BORRADO DE HOLD NOTES: Busca si el clic cae DENTRO del cuerpo de la nota
         const existingIdx = window.edMap.findIndex(n => {
             if (n.l !== pos.l) return false;
-            let endT = n.t + (n.dur || 0); // Considera el inicio y el fin
+            let endT = n.t + (n.dur || 0); 
             return pos.t >= (n.t - window.edSnap) && pos.t <= (endT + window.edSnap);
         });
 
@@ -138,28 +135,18 @@ function initEditorGrid() {
         window.edMap.push(window.edDragNote);
         drawEditorGrid();
     };
-        let isHoldable = (finalType === 'tap' || finalType === 'mine' || finalType === 'dodge');
-        
-        window.edDragNote = { 
-            t: pos.t, 
-            l: pos.l, 
-            type: finalType, 
-            h: false, 
-            dur: 0,
-            customData: window.edActiveCustomFX || null // Por si usan una mecánica propia
-        };
-        window.edMap.push(window.edDragNote);
-        drawEditorGrid();
-    };
 
     const moveAction = (e) => {
         if(!window.edDragNote || window.edMode !== 'mania') return; 
-        e.preventDefault(); // Evitar scroll mientras arrastras nota
+        e.preventDefault(); 
         
         const pos = getPointerPos(e);
-        if (pos.t > window.edDragNote.t + 50) {
+        // Solo permite estirar notas normales, minas o dodges
+        let isHoldable = (window.edDragNote.type === 'tap' || window.edDragNote.type === 'mine' || window.edDragNote.type === 'dodge' || window.edDragNote.type === 'hold');
+        
+        if (isHoldable && pos.t > window.edDragNote.t + 50) {
             window.edDragNote.h = true;
-            window.edDragNote.type = 'hold';
+            window.edDragNote.type = 'hold'; 
             window.edDragNote.dur = pos.t - window.edDragNote.t;
             drawEditorGrid();
         }
@@ -168,19 +155,19 @@ function initEditorGrid() {
     const endAction = () => {
         if(window.edDragNote) {
             if(window.edDragNote.h && window.edDragNote.dur < 50) {
-                window.edDragNote.h = false; window.edDragNote.type = 'tap'; window.edDragNote.dur = 0;
+                window.edDragNote.h = false; 
+                window.edDragNote.type = window.edBrush === 'tap' ? 'tap' : window.edBrush; 
+                window.edDragNote.dur = 0;
             }
             window.edDragNote = null;
             drawEditorGrid();
         }
     };
 
-    // Listeners Mouse
     grid.onmousedown = startAction;
     grid.onmousemove = moveAction;
     window.onmouseup = endAction;
 
-    // Listeners Touch (Móvil)
     grid.ontouchstart = startAction;
     grid.ontouchmove = moveAction;
     window.ontouchend = endAction;
@@ -204,26 +191,22 @@ window.drawEditorGrid = function() {
         
         let color = getLaneColor(n.l, window.edMode);
         
-        // Colores según el tipo de mecánica
-        if(n.type === 'mine') color = '#F9393F'; // Minas rojas
-        else if(n.type === 'dodge') color = '#00ffff'; // Dodge azul cyan
-        else if(n.type === 'fx_flash' || n.type === 'custom_fx') color = '#FFD700'; // FX dorados
+        if(n.type === 'mine') color = '#F9393F'; 
+        else if(n.type === 'dodge') color = '#00ffff'; 
+        else if(n.type === 'fx_flash' || n.type === 'custom_fx') color = '#FFD700'; 
 
         note.style.background = color;
 
         if(n.h && n.dur > 0) {
-            // NOTAS LARGAS
             note.style.height = (n.dur * (zoom / 100)) + 'px';
             note.style.border = `2px solid ${color}`;
             note.style.background = `linear-gradient(to bottom, ${color} 80%, transparent 100%)`;
             note.style.opacity = '0.8';
             note.style.borderRadius = '5px';
             
-            // FIX DE CRECIMIENTO: Forzamos a que crezca hacia abajo
             note.style.transform = 'translateY(0)'; 
             note.style.transformOrigin = 'top center';
         } else {
-            // NOTAS CORTAS NORMALES
             note.style.height = '20px';
             note.style.borderRadius = window.edMode === 'taiko' ? '50%' : '5px';
             note.style.transform = 'translateY(-50%)'; 
@@ -232,7 +215,13 @@ window.drawEditorGrid = function() {
     });
 };
 
-// === NUEVO MODAL PARA AUTO-MAPEO ===
+function getLaneColor(l, mode) {
+    if(mode === 'taiko') return l === 0 ? '#f95555' : '#44b9ff'; 
+    if(mode === 'catch') return '#12FA05'; 
+    const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700', '#F9393F', '#a200ff'];
+    return colors[l % colors.length];
+}
+
 window.openAutoMapModal = function() {
     const html = `
         <div id="automap-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; align-items:center; justify-content:center;">
@@ -274,7 +263,6 @@ window.runAutoMap = async function() {
         const sampleRate = audioBuffer.sampleRate;
         let peaks = []; 
         
-        // Algoritmo de detección de picos
         for (let i = 0; i < channelData.length; i += sampleRate / 10) { 
             let maxVol = 0;
             for (let j = 0; j < sampleRate / 10 && (i + j) < channelData.length; j++) {
@@ -307,37 +295,6 @@ window.runAutoMap = async function() {
     }
 };
 
-// === MECÁNICAS ===
-window.openMechanicsMenu = function() {
-    const html = `
-        <div id="mech-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999999; display:flex; align-items:center; justify-content:center;">
-            <div style="background:#111; padding:30px; border-radius:15px; border:1px solid var(--accent); width:300px;">
-                <h3 style="color:white; margin-top:0;">⚙️ MECÁNICAS</h3>
-                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-                    <label style="color:#12FA05;"><input type="checkbox" id="mech-mines" ${window.edMechanics.includes('mines')?'checked':''}> 💣 Minas</label>
-                    <label style="color:#00ffff;"><input type="checkbox" id="mech-sv" ${window.edMechanics.includes('sv_changes')?'checked':''}> 🎢 SV Changes</label>
-                    <label style="color:#ff66aa;"><input type="checkbox" id="mech-flash" ${window.edMechanics.includes('flashlight')?'checked':''}> 🔦 Flashlight</label>
-                    <label style="color:#FFD700;"><input type="checkbox" id="mech-poison" ${window.edMechanics.includes('poison')?'checked':''}> ☠️ Veneno</label>
-                </div>
-                <button class="action" onclick="saveMechanics()">APLICAR</button>
-                <button class="action secondary" style="margin-top:10px;" onclick="document.getElementById('mech-modal').remove()">CERRAR</button>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', html);
-};
-
-window.saveMechanics = function() {
-    window.edMechanics = [];
-    if(document.getElementById('mech-mines').checked) window.edMechanics.push('mines');
-    if(document.getElementById('mech-sv').checked) window.edMechanics.push('sv_changes');
-    if(document.getElementById('mech-flash').checked) window.edMechanics.push('flashlight');
-    if(document.getElementById('mech-poison').checked) window.edMechanics.push('poison');
-    document.getElementById('mech-modal').remove();
-    window.notify("Mecánicas aplicadas", "success");
-};
-
-// === GUARDADO Y TEST ===
 window.calculateStarRating = function(notes, durationMs) {
     if(!notes || notes.length === 0) return 0;
     const durationSecs = durationMs / 1000;
@@ -360,7 +317,6 @@ window.saveEditorMap = async function() {
     const calculatedStars = window.calculateStarRating(window.edMap, durationMs);
     updateData[`stars_${window.edMode}_${window.edK}k`] = calculatedStars;
     
-    // Compatibilidad Legacy
     if(window.edMode === 'mania' && window.edK === 4) {
         updateData.notes = window.edMap;
         updateData.starRating = calculatedStars; 
@@ -392,71 +348,14 @@ setInterval(() => {
     if(!window.isEditing || !window.edAudio) return;
     const zoom = document.getElementById('ed-zoom').value;
     const playhead = document.getElementById('ed-playhead');
-    const pos = (window.edAudio.currentTime * 1000) * (zoom / 100);
-    playhead.style.top = pos + 'px';
-    if(!window.edAudio.paused) document.getElementById('ed-scroll-area').scrollTop = pos - 200;
+    if(playhead && window.edAudio) {
+        const pos = (window.edAudio.currentTime * 1000) * (zoom / 100);
+        playhead.style.top = pos + 'px';
+        if(!window.edAudio.paused) document.getElementById('ed-scroll-area').scrollTop = pos - 200;
+    }
 }, 16);
 
-window.openCustomMechanicCreator = function() {
-    const html = `
-        <div id="mech-creator-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px);">
-            <div style="background:#0a0a0a; padding:30px; border-radius:15px; border:2px solid #00ffff; width:500px; box-shadow: 0 0 30px rgba(0,255,255,0.2);">
-                <h2 style="color:#00ffff; margin-top:0;">🛠️ CREADOR DE MECÁNICAS</h2>
-                <p style="color:#888; font-size:0.9rem;">Crea un efecto visual complejo que se activará cuando la línea de tiempo llegue a la nota.</p>
-                
-                <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px;">
-                    <div>
-                        <label style="color:white; font-size:0.8rem;">Nombre de tu Mecánica</label>
-                        <input type="text" id="cm-name" class="log-inp" placeholder="Ej: Mundo Invertido">
-                    </div>
-                    
-                    <div>
-                        <label style="color:white; font-size:0.8rem;">Filtro CSS (El motor de renderizado)</label>
-                        <select id="cm-filter" class="log-inp" style="background:#111;">
-                            <option value="invert(1)">Invertir Colores</option>
-                            <option value="hue-rotate(90deg)">Glitch de Color (Hue)</option>
-                            <option value="blur(5px)">Visión Borrosa (Blur)</option>
-                            <option value="grayscale(1)">Blanco y Negro</option>
-                            <option value="contrast(3)">Alto Contraste Tóxico</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label style="color:white; font-size:0.8rem;">Duración (en Milisegundos)</label>
-                        <input type="number" id="cm-dur" class="log-inp" value="2000" min="100" max="10000">
-                    </div>
-                </div>
-
-                <div style="display:flex; gap:10px;">
-                    <button class="action" onclick="saveCustomMechanic()">💾 GUARDAR COMO PINCEL</button>
-                    <button class="action secondary" onclick="document.getElementById('mech-creator-modal').remove()">CANCELAR</button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', html);
-};
-
-window.edActiveCustomFX = null;
-
-window.saveCustomMechanic = function() {
-    const name = document.getElementById('cm-name').value || "Custom FX";
-    const filter = document.getElementById('cm-filter').value;
-    const dur = parseInt(document.getElementById('cm-dur').value);
-
-    // Creamos el payload de la mecánica
-    window.edActiveCustomFX = { name, filter, dur };
-    
-    // Forzamos el pincel a "custom_fx"
-    const brushSelect = document.querySelector('#pro-tools-container select');
-    brushSelect.value = 'custom_fx';
-    window.edBrush = 'custom_fx';
-
-    window.notify(`Mecánica "${name}" lista en tu pincel. Haz clic en la pista para colocarla.`, "success");
-    document.getElementById('mech-creator-modal').remove();
-};
-
-// === CREADOR DE MECÁNICAS (PEGAR AL FINAL DE editor.js) ===
+// === CREADOR DE MECÁNICAS ===
 window.edActiveCustomFX = null;
 
 window.openCustomMechanicCreator = function() {
@@ -504,10 +403,8 @@ window.saveCustomMechanic = function() {
     const filter = document.getElementById('cm-filter').value;
     const dur = parseInt(document.getElementById('cm-dur').value);
 
-    // Creamos el payload de la mecánica
     window.edActiveCustomFX = { name, filter, dur };
     
-    // Forzamos el pincel a "custom_fx"
     const brushSelect = document.querySelector('#pro-tools-container select:last-of-type');
     if(brushSelect) brushSelect.value = 'custom_fx';
     window.edBrush = 'custom_fx';
