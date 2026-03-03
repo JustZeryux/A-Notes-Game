@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO) === */
 
 window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
 
@@ -148,9 +148,10 @@ window.renderLaneConfig = function(k) {
         
         let shapeSvg = window.getShapeSvg(lane.s, lane.c);
 
+        // 🚨 FIX MAESTRO: Enviamos "this" en el onclick para que nunca más se pierda el botón 🚨
         html += `
         <div class="l-col" style="display:flex; flex-direction:column; align-items:center; gap:15px; margin: 0 5px;">
-            <div class="key-bind" id="btn-bind-${k}-${i}" onclick="window.remapKey(${k}, ${i})" 
+            <div class="key-bind" onclick="window.remapKey(this, ${k}, ${i})" 
                  style="width:70px; height:70px; border:3px solid ${lane.c}; border-radius:15px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.8rem; cursor:pointer; background:#111; color:white; transition:0.2s; box-shadow: 0 0 15px rgba(0,0,0,0.5);">
                 ${keyText}
             </div>
@@ -183,16 +184,16 @@ window.updateLaneColor = function(k, laneIdx, newColor) {
     window.renderLaneConfig(k); 
 };
 
-window.remapKey = function(k, laneIdx) {
-    const btn = document.getElementById(`btn-bind-${k}-${laneIdx}`);
-    if(!btn || btn.dataset.waiting === "true") return;
+// 🚨 NUEVO REMAPKEY: Usa el botón directo ("btnElement"), ya no depende de IDs defectuosos
+window.remapKey = function(btnElement, k, laneIdx) {
+    if(!btnElement || btnElement.dataset.waiting === "true") return;
     
-    btn.dataset.origKey = btn.innerText;
-    btn.dataset.waiting = "true";
-    btn.innerText = "...";
-    btn.style.background = "#F9393F"; 
-    btn.style.borderColor = "white";
-    btn.blur();
+    btnElement.dataset.origKey = btnElement.innerText;
+    btnElement.dataset.waiting = "true";
+    btnElement.innerText = "...";
+    btnElement.style.background = "#F9393F"; 
+    btnElement.style.borderColor = "white";
+    btnElement.blur();
 
     const overlay = document.createElement('div');
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
@@ -204,7 +205,7 @@ window.remapKey = function(k, laneIdx) {
         let key = e.key; if(e.code === "Space") key = " ";
         if (key !== "Escape") window.cfg.modes[k][laneIdx].k = key;
         
-        btn.dataset.waiting = "false";
+        btnElement.dataset.waiting = "false";
         overlay.remove();
         document.removeEventListener('keydown', capture, true);
         window.renderLaneConfig(k); 
@@ -257,7 +258,7 @@ window.updatePreview = function(k) {
         
         html += `
         <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
-            <div style="width:60px; height:60px; transform: translateY(0);">${shapeSvg}</div>
+            <div style="width:50px; height:50px; transform: translateY(0);">${shapeSvg}</div>
         </div>`;
     }
     box.innerHTML = html;
