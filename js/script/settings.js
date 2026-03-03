@@ -137,7 +137,10 @@ window.renderLaneConfig = function(k) {
     
     if(!window.cfg.modes[k]) {
         window.cfg.modes[k] = [];
-        const defKeys = ['a','s','d','f','g','h','j','k','l',';'];
+// Si es 4K usa DFJK, si es 6K usa SDFJKL, de lo contrario la fila normal
+const defKeys = (k === 4) ? ['d','f','j','k'] : 
+                (k === 6) ? ['s','d','f','j','k','l'] : 
+                ['a','s','d','f','g','h','j','k','l',';'];       
         for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
     }
 
@@ -202,8 +205,17 @@ window.remapKey = function(btnElement, k, laneIdx) {
 
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
-        let key = e.key; if(e.code === "Space") key = " ";
-        if (key !== "Escape") window.cfg.modes[k][laneIdx].k = key;
+        
+        let key = e.key;
+        // Normalizar mayúsculas/minúsculas para evitar bugs en el gameplay
+        if (key.length === 1) key = key.toLowerCase(); 
+        
+        // Estandarizar la barra espaciadora
+        if(e.code === "Space") key = " "; 
+
+        if (key !== "Escape") {
+            window.cfg.modes[k][laneIdx].k = key;
+        }
         
         btnElement.dataset.waiting = "false";
         overlay.remove();
