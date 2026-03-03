@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V5 (UX COMPLETO) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V6 (KEYBINDS & PREVIEW FIX) === */
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
@@ -35,30 +35,34 @@ window.loadSettings = function() {
 
     const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
     const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
-    const setTxt = (id, prop) => { const el = document.getElementById(id); if(el) el.innerText = String(window.cfg[prop]||'').toUpperCase().replace('ARROW',''); };
+    const setTxt = (id, prop) => { 
+        const el = document.getElementById(id); 
+        if(el) {
+            let txt = String(window.cfg[prop]||'').toUpperCase().replace('ARROW', '');
+            if(txt === ' ' || txt === 'SPACE') txt = 'SPC';
+            el.innerText = txt; 
+        }
+    };
 
-    // CARGAR GENERAL Y UX
     setChk('cfg-perf-mode', 'perfMode');
     setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
     setVal('cfg-ui-skin', 'uiSkin');
     
-    // CARGAR MANIA
     setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
     setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); setVal('cfg-hit-pos', 'hitPos');
     setVal('cfg-note-skin', 'noteSkin'); 
 
-    // CARGAR STANDARD
     setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS'); setChk('cfg-std-trail', 'stdTrail');
     setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
 
-    // CARGAR TAIKO Y CATCH
     setVal('cfg-tk-spd', 'tkSpeed');
     setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR'); setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
+    
     setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS');
     setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
 
-    // CARGAR VISUALES Y AUDIO
     setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
+    
     if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
     if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.5) * 100;
     if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
@@ -138,7 +142,7 @@ window.renderLaneConfig = function(k) {
         html += `
         <div style="display:flex; flex-direction:column; align-items:center; gap:5px; background:rgba(255,255,255,0.02); padding:10px; border-radius:10px; border:1px solid #333;">
             <div style="color:#aaa; font-size:0.7rem; font-weight:bold;">T${i+1}</div>
-            <button id="kb-btn-${k}-${i}" onclick="window.waitForKey(${k}, ${i})" style="width:45px; height:45px; border-radius:8px; background:#111; color:white; border:2px solid ${l.c}; font-weight:900; font-size:1rem; cursor:pointer; transition:0.2s;">${displayKey}</button>
+            <button id="kb-btn-${k}-${i}" onclick="window.waitForKey(${k}, ${i})" style="width:45px; height:45px; border-radius:8px; background:#111; color:white; border:2px solid ${l.c}; font-weight:900; font-size:1rem; cursor:pointer; transition:0.2s; box-shadow: 0 0 10px rgba(0,0,0,0.5);">${displayKey}</button>
             <input type="color" value="${l.c}" onchange="window.updateLaneProp(${k}, ${i}, 'c', this.value)" style="width:30px; height:30px; border:none; background:none; cursor:pointer; padding:0; margin-top:5px;">
         </div>`;
     }
@@ -151,75 +155,56 @@ window.updateLaneProp = function(k, lane, prop, val) {
     window.renderLaneConfig(k); 
 };
 
+// 🌟 SISTEMA DE PREVIEW REHECHO (Garantizado que funciona con CSS)
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box || !window.cfg || !window.cfg.modes[k]) return;
     
     let html = '';
     for(let i=0; i<k; i++) {
-        let conf = window.cfg.modes[k][i];
-        let color = conf.c;
-        let shapeData = "M50,10 A40,40 0 1,1 49.9,10"; 
-
-        let skinId = document.getElementById('cfg-note-skin') ? document.getElementById('cfg-note-skin').value : 'default';
-        if (skinId !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-            let skin = SHOP_ITEMS.find(item => item.id === skinId);
-            if (skin) {
-                if (skin.shape && typeof SKIN_PATHS !== 'undefined') shapeData = SKIN_PATHS[skin.shape];
-                if (skin.fixed) color = skin.color;
-            }
-        }
-
+        let color = window.cfg.modes[k][i].c || "#00ffff";
+        
+        // Creamos notas puramente con CSS brillante para que nunca fallen
         html += `
-        <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); background:linear-gradient(to top, rgba(255,255,255,0.05), transparent); display:flex; justify-content:center; align-items:flex-end;">
-            <svg viewBox="0 0 100 100" style="width:60%; filter:drop-shadow(0 0 8px ${color}); margin-bottom:10px;">
-                <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="3"/>
-            </svg>
+        <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); background:linear-gradient(to top, rgba(255,255,255,0.08), transparent); display:flex; justify-content:center; align-items:flex-end; padding-bottom: 10px;">
+            <div style="width: 80%; max-width: 50px; height: 25px; background: ${color}; border-radius: 12px; box-shadow: 0 0 20px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border: 2px solid white;"></div>
         </div>`;
     }
     box.innerHTML = html;
 };
 
-window.populateSkinDropdowns = function() {
-    const ns = document.getElementById('cfg-note-skin');
-    const ui = document.getElementById('cfg-ui-skin');
-    if(!ns || !ui || !window.user || !window.user.inventory || typeof SHOP_ITEMS === 'undefined') return;
-
-    window.user.inventory.forEach(itemId => {
-        let item = SHOP_ITEMS.find(i => i.id === itemId);
-        if(item) {
-            if(item.type === 'skin' && !ns.querySelector(`option[value="${item.id}"]`)) {
-                ns.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-            }
-            if(item.type === 'ui' && !ui.querySelector(`option[value="${item.id}"]`)) {
-                ui.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-            }
-        }
-    });
-    
-    ns.value = window.cfg.noteSkin || 'default';
-    ui.value = window.cfg.uiSkin || 'default';
-};
-
+// 🎮 NUEVO SISTEMA DE CAPTURA DE TECLAS (ANTI-BUGS)
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
     if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; btn.style.borderColor = "white"; }
     
     const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(5px);";
-    overlay.innerHTML = `<div style="color:#00ffff; font-size:4rem; font-weight:900;">CAPTURA DE TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Presiona tu nueva tecla para el Carril ${lane+1} (${k}K)</div>`;
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(10px);";
+    overlay.innerHTML = `
+        <div style="color:#00ffff; font-size:4rem; font-weight:900; text-shadow: 0 0 20px #00ffff;">NUEVA TECLA</div>
+        <div style="color:white; font-size:1.5rem; margin-top:10px;">Presiona la tecla para el Carril ${lane+1} (${k}K)</div>
+        <div style="color:#888; margin-top:20px; font-weight:bold;">Presiona [ESC] para cancelar</div>
+    `;
     document.body.appendChild(overlay);
 
-    const handler = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        let key = e.key.toLowerCase(); if(e.code === "Space") key = " ";
-        
-        window.cfg.modes[k][lane].k = key;
-        overlay.remove();
-        window.renderLaneConfig(k);
-        window.removeEventListener('keydown', handler, true);
-    };
-    window.addEventListener('keydown', handler, true);
+    // Retraso de 100ms para evitar que el click capture la tecla Espacio o Enter por accidente
+    setTimeout(() => {
+        const handler = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            
+            let key = e.key;
+            if(e.code === "Space") key = " ";
+            
+            if (key !== "Escape") {
+                window.cfg.modes[k][lane].k = key;
+            }
+            
+            overlay.remove();
+            document.removeEventListener('keydown', handler, true);
+            window.renderLaneConfig(k);
+        };
+        document.addEventListener('keydown', handler, true);
+    }, 100);
 };
 
 window.captureSingleKey = function(btnId, cfgProp) {
@@ -227,22 +212,32 @@ window.captureSingleKey = function(btnId, cfgProp) {
     if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; }
     
     const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(5px);";
-    overlay.innerHTML = `<div style="color:#ff66aa; font-size:4rem; font-weight:900;">NUEVA TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier botón...</div>`;
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(10px);";
+    overlay.innerHTML = `
+        <div style="color:#ff66aa; font-size:4rem; font-weight:900; text-shadow: 0 0 20px #ff66aa;">ASIGNAR TECLA</div>
+        <div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div>
+        <div style="color:#888; margin-top:20px; font-weight:bold;">Presiona [ESC] para cancelar</div>
+    `;
     document.body.appendChild(overlay);
 
-    const handler = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        let key = e.key; if(e.code === "Space") key = "Space";
-        
-        window.cfg[cfgProp] = key;
-        btn.innerText = key.toUpperCase().replace('ARROW','');
-        btn.style.background = "transparent";
-        
-        overlay.remove();
-        window.removeEventListener('keydown', handler, true);
-    };
-    window.addEventListener('keydown', handler, true);
+    setTimeout(() => {
+        const handler = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            
+            let key = e.key; 
+            if(e.code === "Space") key = "Space";
+            
+            if (key !== "Escape") {
+                window.cfg[cfgProp] = key;
+                btn.innerText = key.toUpperCase().replace('ARROW','');
+            }
+            
+            btn.style.background = "#111"; // Regresa a su color original
+            overlay.remove();
+            document.removeEventListener('keydown', handler, true);
+        };
+        document.addEventListener('keydown', handler, true);
+    }, 100);
 };
 
 if(typeof window.loadSettings === 'function') window.loadSettings();
