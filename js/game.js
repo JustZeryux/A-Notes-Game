@@ -415,6 +415,37 @@ function loop() {
         gameLoopId = requestAnimationFrame(loop);
         return;
     }
+
+    // --- LECTOR DE MECÁNICAS EN TIEMPO REAL ---
+    for (let i = 0; i < window.st.notes.length; i++) {
+        const n = window.st.notes[i];
+        
+        // Si la nota pasa la línea de tiempo y es un FX que no se ha activado
+        if (!n.fxTriggered && n.t <= now) {
+            
+            // Efecto Flashlight
+            if (n.type === 'fx_flash') {
+                document.getElementById('game-layer').style.background = 'white';
+                setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150);
+            }
+            
+            // Efecto Custom del usuario
+            if (n.type === 'custom_fx' && n.customData) {
+                const track = document.getElementById('track');
+                const oldFilter = track.style.filter;
+                track.style.filter = n.customData.filter;
+                track.style.transition = 'filter 0.2s';
+                
+                // Apagar efecto tras la duración elegida
+                setTimeout(() => {
+                    track.style.filter = oldFilter;
+                }, n.customData.dur);
+            }
+
+            // Marcar como ejecutado para no repetirlo cada frame
+            n.fxTriggered = true; 
+        }
+    }
     
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
