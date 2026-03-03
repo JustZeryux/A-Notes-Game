@@ -1,7 +1,7 @@
 /* === js/script/settings.js - MEGA CONFIGURADOR PRO === */
 
 // 1. CARGA DE CONFIGURACIÓN MAESTRA
-wwindow.loadSettings = function() {
+window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
     // FIX: Evitamos que el juego crashee si window.defaultCfg no existe aún
