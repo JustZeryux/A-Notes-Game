@@ -21,6 +21,9 @@ window.loadSettings = function() {
         window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
     }
     
+    // 🚨 EL FIX ANTI-CRASHEO: Si venías de una versión vieja, creamos el objeto modes para que no explote
+    if (!window.cfg.modes) window.cfg.modes = {};
+
     // Generar mapeos desde 1K hasta 10K
     for(let k = 1; k <= 10; k++) {
         if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
@@ -56,7 +59,28 @@ window.loadSettings = function() {
     if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
     setVal('cfg-off', 'off'); setVal('cfg-hitsound', 'hitSound');
     
-    populateSkinDropdowns();
+    if(typeof populateSkinDropdowns === 'function') populateSkinDropdowns();
+};
+
+// 🚨 FORZAR APERTURA DEL PANEL: Esta función se asegura de abrir el HTML
+window.openSettingsPanel = function() {
+    window.loadSettings();
+    let modal = document.getElementById('modal-settings');
+    if (modal) {
+        modal.style.display = 'flex'; // Fuerza a que se muestre en pantalla
+    } else if (typeof openModal === 'function') {
+        openModal('settings');
+    }
+};
+
+// 🚨 FORZAR CIERRE DEL PANEL
+window.closeSettingsPanel = function() {
+    let modal = document.getElementById('modal-settings');
+    if (modal) {
+        modal.style.display = 'none';
+    } else if (typeof closeModal === 'function') {
+        closeModal('settings');
+    }
 };
 
 window.saveSettings = function() {
@@ -85,7 +109,7 @@ window.saveSettings = function() {
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
     if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
     
-    // FIX: Se eliminó window.closeSettingsPanel(), el botón del HTML ahora hace el cierre correctamente.
+    window.closeSettingsPanel();
 };
 
 window.switchSetTab = function(tabId) {
@@ -124,10 +148,9 @@ window.renderLaneConfig = function(k) {
 
 window.updateLaneProp = function(k, lane, prop, val) {
     window.cfg.modes[k][lane][prop] = val;
-    window.renderLaneConfig(k); // Refresca los bordes de los botones
+    window.renderLaneConfig(k); 
 };
 
-// 🚨 VISTA PREVIA MASIVA QUE DIBUJA TODA LA PISTA 🚨
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box || !window.cfg || !window.cfg.modes[k]) return;
@@ -157,7 +180,6 @@ window.updatePreview = function(k) {
     box.innerHTML = html;
 };
 
-// Poblar los desplegables de Skins si tienes items comprados
 function populateSkinDropdowns() {
     const ns = document.getElementById('cfg-note-skin');
     const ui = document.getElementById('cfg-ui-skin');
@@ -223,5 +245,4 @@ window.captureSingleKey = function(btnId, cfgProp) {
     window.addEventListener('keydown', handler, true);
 };
 
-// Cargar ajustes al inicio
 if(typeof window.loadSettings === 'function') window.loadSettings();
