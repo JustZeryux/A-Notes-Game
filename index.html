@@ -207,16 +207,142 @@
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     </div>
 
-    <div id="modal-settings" class="modal-overlay" style="z-index: 999999;">
-        <div class="modal-panel" style="width: 900px; max-width: 95vw; padding: 0; background: transparent; border: none; box-shadow: none;">
+    <div id="modal-settings" class="modal-overlay" style="display:none;">
+    <div class="settings-panel">
+        <div class="settings-header">
+            <h2 style="margin:0; font-weight:900; font-size:2rem; color:white;">CONFIGURACIÓN</h2>
+            <button class="action secondary" style="width:auto; padding:10px 20px;" onclick="window.saveSettings()">GUARDAR Y SALIR</button>
+        </div>
+        <div class="settings-layout">
+            <div class="settings-sidebar">
+                <button class="set-tab-btn active" onclick="switchSetTab('set-gen')">GENERAL</button>
+                <button class="set-tab-btn" onclick="switchSetTab('set-mania')">MANIA (TECLAS)</button>
+                <button class="set-tab-btn" onclick="switchSetTab('set-std')">STANDARD</button>
+                <button class="set-tab-btn" onclick="switchSetTab('set-taiko')">TAIKO</button>
+                <button class="set-tab-btn" onclick="switchSetTab('set-catch')">CATCH</button>
+            </div>
             
-            <div style="background: linear-gradient(90deg, var(--accent), #111); padding: 15px 25px; border-radius: 15px 15px 0 0; display: flex; justify-content: space-between; align-items: center;">
-                <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:white; text-shadow:0 0 10px black;">⚙️ CONFIGURACIÓN GLOBAL</h2>
-                <div style="display:flex; gap:10px;">
-                    <button class="action" onclick="saveSettings(); window.closeModal('settings');" style="padding: 10px 20px; font-size:1rem; box-shadow: 0 0 10px rgba(0,0,0,0.5);">GUARDAR Y APLICAR</button>
-                    <button onclick="window.closeModal('settings')" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
+            <div class="settings-content">
+                <div id="set-gen" class="set-section active">
+                    <div class="set-row">
+                        <div>
+                            <div class="set-label">Volumen Maestro</div>
+                            <div class="set-sub">Música y efectos globales</div>
+                        </div>
+                        <input type="range" id="cfg-vol" min="0" max="100" value="50">
+                    </div>
+                    <div class="set-row">
+                        <div>
+                            <div class="set-label">Volumen Hitsounds</div>
+                            <div class="set-sub">Sonido al acertar notas</div>
+                        </div>
+                        <input type="range" id="cfg-hvol" min="0" max="100" value="50">
+                    </div>
+                    <div class="set-row">
+                        <div>
+                            <div class="set-label">Offset de Audio (ms)</div>
+                            <div class="set-sub">Ajustar si el audio va desfasado</div>
+                        </div>
+                        <input type="number" id="cfg-off" class="num-input" value="0">
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Mostrar FPS</div>
+                        <input type="checkbox" id="cfg-show-fps" class="toggle-switch">
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Dim del Fondo (%)</div>
+                        <input type="range" id="cfg-dim" min="0" max="100" value="50">
+                    </div>
+                </div>
+
+                <div id="set-mania" class="set-section">
+                    <div class="set-row">
+                        <div>
+                            <div class="set-label">Velocidad de Scroll (Scroll Speed)</div>
+                            <div class="set-sub">Qué tan rápido caen las notas</div>
+                        </div>
+                        <input type="number" id="cfg-spd" class="num-input" value="25" step="1">
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Scroll Hacia Abajo (Downscroll)</div>
+                        <input type="checkbox" id="cfg-down" checked>
+                    </div>
+                    
+                    <div class="lane-cfg-box" style="margin-top:20px;">
+                        <h3 style="color:var(--blue); margin-top:0;">CONFIGURAR TECLAS Y COLORES</h3>
+                        <div style="margin-bottom:15px;">
+                            <label>Cantidad de Teclas:</label>
+                            <select id="kb-mode-select" class="num-input" onchange="renderLaneConfig(parseInt(this.value))">
+                                <option value="4">4 Keys</option>
+                                <option value="5">5 Keys</option>
+                                <option value="6">6 Keys</option>
+                                <option value="7">7 Keys</option>
+                            </select>
+                        </div>
+                        <div id="lanes-container" class="lanes-view"></div>
+                    </div>
+                </div>
+
+                <div id="set-std" class="set-section">
+                    <div class="set-row">
+                        <div class="set-label">Approach Rate (AR)</div>
+                        <input type="number" id="cfg-std-ar" class="num-input" value="9">
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Circle Size (CS)</div>
+                        <input type="number" id="cfg-std-cs" class="num-input" value="4">
+                    </div>
+                </div>
+
+                <div id="set-taiko" class="set-section">
+                    <div class="set-row">
+                        <div class="set-label">Tecla Don (Centro - Izq)</div>
+                        <button id="cfg-tk-dl" class="key-bind" onclick="captureSingleKey('cfg-tk-dl', 'tkDonL')">F</button>
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Tecla Don (Centro - Der)</div>
+                        <button id="cfg-tk-dr" class="key-bind" onclick="captureSingleKey('cfg-tk-dr', 'tkDonR')">J</button>
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Tecla Katsu (Borde - Izq)</div>
+                        <button id="cfg-tk-kl" class="key-bind" onclick="captureSingleKey('cfg-tk-kl', 'tkKatsuL')">D</button>
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Tecla Katsu (Borde - Der)</div>
+                        <button id="cfg-tk-kr" class="key-bind" onclick="captureSingleKey('cfg-tk-kr', 'tkKatsuR')">K</button>
+                    </div>
+                </div>
+
+                <div id="set-catch" class="set-section">
+                    <div class="set-row">
+                        <div class="set-label">Velocidad del Catcher</div>
+                        <input type="number" id="cfg-ct-spd" class="num-input" value="10">
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Mover Izquierda</div>
+                        <button id="cfg-ct-l" class="key-bind" onclick="captureSingleKey('cfg-ct-l', 'ctLeft')">←</button>
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Mover Derecha</div>
+                        <button id="cfg-ct-r" class="key-bind" onclick="captureSingleKey('cfg-ct-r', 'ctRight')">→</button>
+                    </div>
+                    <div class="set-row">
+                        <div class="set-label">Dash (Correr)</div>
+                        <button id="cfg-ct-d" class="key-bind" onclick="captureSingleKey('cfg-ct-d', 'ctDash')">SHIFT</button>
+                    </div>
                 </div>
             </div>
+
+            <div class="settings-preview">
+                <div class="preview-title">VISTA PREVIA</div>
+                <div id="live-skin-preview" class="preview-box"></div>
+                <p style="color:#666; text-align:center; font-size:0.8rem; margin-top:20px;">
+                    Los cambios de skin y colores se reflejan aquí en tiempo real.
+                </p>
+            </div>
+        </div>
+    </div>
+    </div>
 
             <div class="settings-grid">
                 <div class="settings-tabs">
