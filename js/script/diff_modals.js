@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODAL.JS - Menú de Dificultades con Botón Largo
+   DIFF_MODAL.JS - Menú de Dificultades Reparado (Anti-Bugs de ID)
    ========================================================== */
 
 window.openUnifiedDiffModal = function(song) {
@@ -16,12 +16,17 @@ window.openUnifiedDiffModal = function(song) {
     grid.style.padding = '5px';
     
     let safeMode = song.originalMode || 'mania';
+    
+    // FIX VITAL: Limpiamos el ID para evitar el Error 400 Bad Request en la API de Osu
+    let cleanId = String(song.id).replace('osu_', '');
+    let engineSong = Object.assign({}, song);
+    engineSong.id = cleanId;
 
     // --- LOGICA BOTON LARGO PARA STANDARD / TAIKO / CATCH ---
     if (song.isOsu && safeMode !== 'mania') {
         let btn = document.createElement('div');
         btn.className = 'diff-card';
-        btn.style.gridColumn = "1 / -1"; // ESTO LO HACE LARGO
+        btn.style.gridColumn = "1 / -1";
         
         let icon = safeMode === 'standard' ? "🎯" : (safeMode === 'taiko' ? "🥁" : "🍎");
         let color = safeMode === 'standard' ? "#ff44b9" : (safeMode === 'taiko' ? "#f95555" : "#44b9ff");
@@ -45,9 +50,10 @@ window.openUnifiedDiffModal = function(song) {
 
         btn.onclick = () => {
             window.closeModal('diff');
-            if(safeMode === 'standard' && typeof startNewEngine === 'function') startNewEngine(song);
-            else if(safeMode === 'taiko' && typeof startTaikoEngine === 'function') startTaikoEngine(song);
-            else if(safeMode === 'catch' && typeof startCatchEngine === 'function') startCatchEngine(song);
+            // Enviamos engineSong (que tiene el ID limpio) para evitar el JSZip error
+            if(safeMode === 'standard' && typeof startNewEngine === 'function') startNewEngine(engineSong);
+            else if(safeMode === 'taiko' && typeof startTaikoEngine === 'function') startTaikoEngine(engineSong);
+            else if(safeMode === 'catch' && typeof startCatchEngine === 'function') startCatchEngine(engineSong);
         };
         grid.appendChild(btn);
     } 
@@ -65,17 +71,25 @@ window.openUnifiedDiffModal = function(song) {
             let btn = document.createElement('div');
             btn.className = 'diff-card';
             
-            if (song.keysAvailable.includes(k)) {
+            if (song.keysAvailable && song.keysAvailable.includes(k)) {
                 btn.style.borderColor = c; btn.style.color = c;
                 btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">${k}K</div><div class="diff-label">${l}</div>`;
                 btn.onclick = () => {
                     window.closeModal('diff');
-                    window.asegurarModo(k); 
+                    if(typeof window.asegurarModo === 'function') window.asegurarModo(k); 
                     if(typeof window.saveToRecents === 'function') window.saveToRecents(song);
+                    
                     if(song.isOsu) {
-                        downloadAndPlayOsu(song.id, song.title, song.imageURL, k);
+                        // Enviamos el cleanId aquí también por seguridad
+                        downloadAndPlayOsu(cleanId, song.title, song.imageURL, k);
                     } else {
-                        window.curSongData = song.raw; window.startGame(k);
+                        // FIX: Arreglo del bucle infinito "PREPARANDO PISTA..." para la comunidad
+                        window.curSongData = song.raw || song; 
+                        if (typeof window.prepareAndPlaySong === 'function') {
+                            window.prepareAndPlaySong(k);
+                        } else if (typeof window.startGame === 'function') {
+                            window.startGame(k);
+                        }
                     }
                 };
             } else {
@@ -91,8 +105,15 @@ window.openUnifiedDiffModal = function(song) {
         editBtn.className = 'diff-card'; editBtn.style.gridColumn = "1 / -1";
         editBtn.style.borderColor = "#ff66aa"; editBtn.style.color = "#ff66aa"; editBtn.style.marginTop = "10px"; editBtn.style.minHeight = "80px";
         editBtn.innerHTML = `<div class="diff-bg-icon">✏️</div><div class="diff-num" style="font-size:1.5rem; font-weight:900;">✏️ EDITOR STUDIO</div><div class="diff-label">Crea y edita tu propio mapa</div>`;
-        editBtn.onclick = () => { window.closeModal('diff'); if(typeof openEditor === 'function') openEditor(song.raw, 4); };
+        editBtn.onclick = () => { window.closeModal('diff'); if(typeof openEditor === 'function') openEditor(song.raw || song, 4); };
         grid.appendChild(editBtn);
     }
-    window.openModal('diff');
+    
+    // Mostramos el modal usando la lógica global de tu HTML
+    if (typeof window.openModal === 'function') {
+        window.openModal('diff');
+    } else {
+        const modal = document.getElementById('modal-diff');
+        if(modal) modal.style.display = 'flex';
+    }
 };
