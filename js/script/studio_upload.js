@@ -50,7 +50,7 @@ window.openStudioDashboard = async function() {
                     <button class="action btn-del" style="flex:1; padding:5px; font-size:0.8rem; border-color:#F9393F; color:#F9393F; background:transparent; width:auto; margin:0;">🗑️ BORRAR</button>
                 </div>
             `;
-            
+            window.curSongData = song;
 // DENTRO de openStudioDashboard...
             card.querySelector('.btn-edit').onclick = () => {
                 const modeHtml = `
