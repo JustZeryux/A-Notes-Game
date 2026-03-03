@@ -272,4 +272,94 @@ window.populateSkinDropdowns = function() {
     ui.value = window.cfg.uiSkin || 'default';
 };
 
+window.renderLaneConfig = function(k) {
+    k = parseInt(k);
+    const cont = document.getElementById('lanes-container');
+    if(!cont) return;
+    
+    if(!window.cfg.modes[k]) {
+        window.cfg.modes[k] = [];
+        const def = ['a','s','d','f','g','h','j','k','l',';'];
+        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: def[i]||' ', c: '#00ffff' });
+    }
+
+    let html = '';
+    window.cfg.modes[k].forEach((lane, i) => {
+        let keyText = lane.k === ' ' ? 'SPC' : lane.k.toUpperCase();
+        html += `
+        <div style="text-align:center; background:rgba(255,255,255,0.05); padding:20px; border-radius:15px; border:1px solid #444; box-shadow: 0 10px 20px rgba(0,0,0,0.5);">
+            <div style="color:#aaa; font-size:1rem; font-weight:bold; margin-bottom:15px;">LANE ${i+1}</div>
+            
+            <button id="kb-btn-${k}-${i}" 
+                    onclick="window.startKeyCapture(${k}, ${i})"
+                    style="width:70px; height:70px; background:#111; border:4px solid ${lane.c}; color:white; font-size:1.5rem; font-weight:900; border-radius:12px; cursor:pointer; transition: 0.2s;">
+                ${keyText}
+            </button>
+            
+            <div style="margin-top:15px; color:#666; font-size:0.8rem;">COLOR</div>
+            <input type="color" value="${lane.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" style="display:block; margin:5px auto 0; width:40px; height:40px; border:none; background:none; cursor:pointer;">
+        </div>`;
+    });
+    cont.innerHTML = html;
+    window.updatePreview(k);
+};
+
+// CAPTURA SEGURA: Evita que el clic del mouse o el espacio se registren por accidente
+window.startKeyCapture = function(k, laneIdx) {
+    const btn = document.getElementById(`kb-btn-${k}-${laneIdx}`);
+    if (!btn) return;
+    
+    btn.innerText = "...";
+    btn.style.background = "#F9393F"; 
+    btn.style.borderColor = "white";
+    btn.blur(); // Quitar el foco del botón
+
+    const capture = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        let key = e.key;
+        if(e.code === "Space") key = " ";
+        
+        if(key === "Escape") { 
+            end(); // Cancela si presionas ESC
+            return; 
+        }
+
+        window.cfg.modes[k][laneIdx].k = key;
+        end();
+    };
+
+    const end = () => {
+        document.removeEventListener('keydown', capture, true);
+        window.renderLaneConfig(k); // Refresca la vista
+    };
+
+    // Esperamos 150ms antes de escuchar para evitar que el mismo click dispare la tecla
+    setTimeout(() => {
+        document.addEventListener('keydown', capture, true);
+    }, 150);
+};
+
+// VISTA PREVIA ESPECTACULAR EN CSS
+window.updatePreview = function(k) {
+    const box = document.getElementById('live-skin-preview');
+    if(!box) return;
+    
+    let html = '';
+    for(let i=0; i<k; i++) {
+        let color = window.cfg.modes[k][i].c;
+        html += `
+        <div style="flex:1; height:100%; border-left:1px dashed #333; display:flex; justify-content:center; align-items:flex-end; padding-bottom:10px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
+            <div style="width:80%; max-width:60px; height:25px; background:${color}; border-radius:8px; box-shadow: 0 0 25px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border:2px solid white;"></div>
+        </div>`;
+    }
+    box.innerHTML = html;
+};
+
+window.updateLaneColor = function(k, i, color) {
+    window.cfg.modes[k][i].c = color;
+    window.updatePreview(k);
+};
+
 window.loadSettings();
