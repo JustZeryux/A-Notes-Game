@@ -1,10 +1,10 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO (REPARADO) === */
 
 // 1. CARGA DE CONFIGURACIÓN MAESTRA
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
-    // FIX: Evitamos que el juego crashee si window.defaultCfg no existe aún
+    // Configuración por defecto
     let fallbackCfg = window.defaultCfg || {
         subtitles: true, showFps: true, spd: 2, down: true, den: 5, bgDim: 50, showSplash: true,
         vol: 0.5, hvol: 0.5, missVol: 0.5, off: 0,
@@ -20,7 +20,7 @@ window.loadSettings = function() {
         window.cfg = JSON.parse(JSON.stringify(fallbackCfg));
     }
     
-    // Asegurar estructura de modos por si es primera vez
+    // Asegurar estructura de modos
     if(!window.cfg.modes) window.cfg.modes = {};
     [4,5,6,7,8,9,10].forEach(k => {
         if(!window.cfg.modes[k]) {
@@ -30,45 +30,46 @@ window.loadSettings = function() {
         }
     });
 
-    // Cargar en el UI de forma segura
+    // Cargar valores en los inputs del HTML (Si el panel está creado)
     const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
     const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = window.cfg[prop]; };
-    const setTxt = (id, prop) => { const el = document.getElementById(id); if(el) el.innerText = String(window.cfg[prop]).toUpperCase().replace('ARROW',''); };
-
-    // UX / General
+    
     setChk('cfg-subtitles', 'subtitles');
     setChk('cfg-show-fps', 'showFps');
-    
-    // Mania
     setVal('cfg-spd', 'spd');
     setChk('cfg-down', 'down');
     setVal('cfg-den', 'den');
-
-    // Visuales y Audio
+    
     if(document.getElementById('cfg-dim')) document.getElementById('cfg-dim').value = window.cfg.bgDim || 50;
     setChk('cfg-splash', 'showSplash');
+    
     if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
     if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.5) * 100;
-    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
     setVal('cfg-off', 'off');
-
-    // Standard, Taiko, Catch
-    setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS');
-    setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
-    setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR');
-    setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
-    setVal('cfg-ct-spd', 'ctSpeed');
-    setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
 };
 
-// 2. GUARDADO AL SALIR
+// 2. FUNCIÓN PARA ABRIR EL PANEL (¡ESTA FALTABA!)
+window.openSettings = function() {
+    window.loadSettings(); // Recargar datos frescos
+    
+    const modal = document.getElementById('modal-settings');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Renderizar la vista previa de teclas (por defecto 4K)
+        if(typeof window.renderLaneConfig === 'function') window.renderLaneConfig(4);
+    } else {
+        console.error("Error: No se encontró el modal con ID 'modal-settings'");
+        if(typeof window.notify === 'function') window.notify("Error: Panel de ajustes no encontrado en HTML", "error");
+    }
+};
+
+// 3. GUARDAR AL SALIR
 window.saveSettings = function() {
     const getVal = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : 0; };
     const getChk = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
 
     window.cfg.subtitles = getChk('cfg-subtitles');
     window.cfg.showFps = getChk('cfg-show-fps');
-    
     window.cfg.spd = getVal('cfg-spd');
     window.cfg.down = getChk('cfg-down');
     window.cfg.den = getVal('cfg-den');
@@ -85,27 +86,34 @@ window.saveSettings = function() {
     window.cfg.ctSpeed = getVal('cfg-ct-spd');
 
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
-    window.notify("Ajustes guardados correctamente.", "success");
-    if(typeof updatePreview === 'function') updatePreview();
+    
+    if(typeof window.notify === 'function') window.notify("Ajustes guardados", "success");
+    const modal = document.getElementById('modal-settings');
+    if(modal) modal.style.display = 'none';
+    
+    if(typeof window.updatePreview === 'function') window.updatePreview(4);
+    if(typeof window.applyCfg === 'function') window.applyCfg();
 };
 
-// 3. PESTAÑAS DEL PANEL
+// 4. PESTAÑAS DEL PANEL
 window.switchSetTab = function(tabId) {
     document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.set-section').forEach(s => s.classList.remove('active'));
     
-    event.currentTarget.classList.add('active');
-    document.getElementById(tabId).classList.add('active');
+    if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    const tab = document.getElementById(tabId);
+    if(tab) tab.classList.add('active');
     
-    if(tabId === 'set-mania') window.renderLaneConfig(4); // Renderiza 4K por defecto al abrir
+    if(tabId === 'set-mania') window.renderLaneConfig(4);
 };
 
-// 4. EDITOR DE TECLAS MANIA Y VISTA PREVIA REAL
+// 5. EDITOR DE TECLAS
 window.renderLaneConfig = function(k) {
     const cont = document.getElementById('lanes-container');
     if(!cont) return;
     
-    document.getElementById('kb-mode-select').value = k;
+    const sel = document.getElementById('kb-mode-select');
+    if(sel) sel.value = k;
     
     let html = '';
     for(let i=0; i<k; i++) {
@@ -126,7 +134,7 @@ window.renderLaneConfig = function(k) {
         </div>`;
     }
     cont.innerHTML = html;
-    window.updatePreview(k); // Actualiza el cuadro de preview
+    window.updatePreview(k);
 };
 
 window.updateLaneProp = function(k, lane, prop, val) {
@@ -134,19 +142,15 @@ window.updateLaneProp = function(k, lane, prop, val) {
     window.updatePreview(k);
 };
 
-// 🚨 FIX: LA VISTA PREVIA AHORA REFLEJA TU SKIN O COLORES ELEGIDOS 🚨
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box || !window.cfg || !window.cfg.modes[k]) return;
     
-    // Tomamos el color y forma del carril 0 como ejemplo para el preview
     let conf = window.cfg.modes[k][0];
     let color = conf.c;
-    
-    // Si tienes PATHS definidos en globals, lo usa. Si no, dibuja un círculo por defecto
     let shapeData = (typeof PATHS !== 'undefined' && PATHS[conf.s]) ? PATHS[conf.s] : "M50,10 A40,40 0 1,1 49.9,10"; 
 
-    // Revisar si hay Skin equipada (Prioridad Absoluta)
+    // Revisar si hay Skin equipada
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         let activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
         if (activeSkin) {
@@ -164,7 +168,6 @@ window.updatePreview = function(k) {
     box.style.boxShadow = `0 0 20px ${color}33 inset`;
 };
 
-// 5. CAPTURA GLOBAL DE TECLAS (Súper seguro)
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
     if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; btn.style.borderColor = "white"; }
@@ -186,26 +189,5 @@ window.waitForKey = function(k, lane) {
     window.addEventListener('keydown', handler, true);
 };
 
-// Captura simple para Standard, Taiko y Catch
-window.captureSingleKey = function(btnId, cfgProp) {
-    const btn = document.getElementById(btnId);
-    if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; }
-    
-    const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; justify-content:center; align-items:center; color:#ff66aa; font-size:3rem; font-weight:900; backdrop-filter:blur(5px);";
-    overlay.innerHTML = `<div>ASIGNANDO NUEVA TECLA</div>`;
-    document.body.appendChild(overlay);
-
-    const handler = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        let key = e.key; if(e.code === "Space") key = "Space";
-        
-        window.cfg[cfgProp] = key;
-        btn.innerText = key.toUpperCase().replace('ARROW','');
-        btn.style.background = "#000";
-        
-        overlay.remove();
-        window.removeEventListener('keydown', handler, true);
-    };
-    window.addEventListener('keydown', handler, true);
-};
+// Cargar configuración al iniciar
+window.loadSettings();
