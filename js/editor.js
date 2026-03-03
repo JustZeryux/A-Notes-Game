@@ -194,37 +194,7 @@ function getLaneColor(l, mode) {
     return colors[l % colors.length];
 }
 
-// ==========================================
-// AUTO-MAPEO ALGORÍTMICO (BETA)
-// ==========================================
-window.autoFillMap = function() {
-    if(!confirm("¿Rellenar mapa automáticamente? Esto borrará tus notas actuales.")) return;
-    
-    window.edMap = [];
-    const duration = (window.edAudio.duration || 120) * 1000;
-    const bpm = prompt("Introduce el BPM de la canción (Ej: 120):", "120");
-    if(!bpm || isNaN(bpm)) return window.notify("BPM inválido", "error");
-    
-    const interval = (60000 / parseInt(bpm)); // ms por beat
-    
-    for(let t = 0; t < duration; t += interval) {
-        if(Math.random() > 0.3) { // 70% de probabilidad de nota en el beat
-            const lane = Math.floor(Math.random() * window.edK);
-            
-            // 15% de probabilidad de Hold Note en Mania
-            let isHold = (window.edMode === 'mania' && Math.random() > 0.85);
-            window.edMap.push({
-                t: Math.round(t),
-                l: lane,
-                type: isHold ? 'hold' : 'tap',
-                h: isHold,
-                dur: isHold ? interval : 0
-            });
-        }
-    }
-    drawEditorGrid();
-    window.notify("¡Auto-mapeo completado!", "success");
-};
+
 
 // ==========================================
 // CUSTOM MECHANICS MODAL
@@ -236,7 +206,97 @@ window.openMechanicsMenu = function() {
                 <h3 style="color:white; margin-top:0;">⚙️ MECÁNICAS DEL MAPA</h3>
                 <p style="color:#aaa; font-size:0.9rem;">Selecciona las mecánicas locas que tendrá este mapa. Los jugadores podrán filtrar por ellas.</p>
                 
-                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                <div style=// ==========================================
+// AUTO-MAPEO INTELIGENTE (BEAT DETECTION IA)
+// ==========================================
+window.autoFillMap = async function() {
+    if(!confirm("¿La IA analizará el audio para colocar las notas. Esto borrará tu mapa actual. ¿Continuar?")) return;
+    
+    const btn = event.currentTarget;
+    const oldText = btn.innerText;
+    btn.innerText = "⏳ ANALIZANDO ONDAS DE AUDIO...";
+    btn.style.pointerEvents = "none";
+    
+    window.edMap = [];
+    
+    try {
+        // 1. Descargar y decodificar el MP3
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const response = await fetch(window.curSongData.audioURL || window.curSongData.url);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        
+        // 2. Analizar picos de volumen (Kicks y Snares)
+        const channelData = audioBuffer.getChannelData(0);
+        const sampleRate = audioBuffer.sampleRate;
+        
+        let peaks = [];
+        const threshold = 0.85; // Sensibilidad del detector (0.0 a 1.0)
+        
+        for (let i = 0; i < channelData.length; i += sampleRate / 10) { // Chequeo cada 100ms
+            let maxVol = 0;
+            // Buscar el pico máximo en este bloque de 100ms
+            for (let j = 0; j < sampleRate / 10 && (i + j) < channelData.length; j++) {
+                if (Math.abs(channelData[i + j]) > maxVol) maxVol = Math.abs(channelData[i + j]);
+            }
+            
+            if (maxVol > threshold) {
+                let timeMs = (i / sampleRate) * 1000;
+                // Evitar notas demasiado juntas (min 150ms de separación)
+                if (peaks.length === 0 || timeMs - peaks[peaks.length - 1] > 150) {
+                    peaks.push(timeMs);
+                }
+            }
+        }
+
+        // 3. Traducir Picos a Notas según el Modo
+        peaks.forEach(time => {
+            let note = { t: Math.round(time), type: 'tap', h: false, dur: 0 };
+            
+            if (window.edMode === 'standard') {
+                note.x = Math.floor(Math.random() * 400) + 50; // Random X entre 50 y 450
+                note.y = Math.floor(Math.random() * 300) + 50; // Random Y
+            } else {
+                note.l = Math.floor(Math.random() * window.edK); // Carril random
+                
+                // 15% de probabilidad de ser Hold Note en Mania
+                if (window.edMode === 'mania' && Math.random() > 0.85) {
+                    note.type = 'hold'; note.h = true; note.dur = 200; // Hold de 200ms
+                }
+            }
+            window.edMap.push(note);
+        });
+
+        drawEditorGrid();
+        window.notify(`¡IA completada! Se generaron ${peaks.length} notas al ritmo.`, "success");
+        
+    } catch (e) {
+        console.error(e);
+        window.notify("Error analizando el audio. Intenta mapear manualmente.", "error");
+    } finally {
+        btn.innerText = oldText;
+        btn.style.pointerEvents = "auto";
+    }
+};
+
+// ==========================================
+// CALCULADORA DE DIFICULTAD ESTELAR (IA)
+// ==========================================
+window.calculateStarRating = function(notes, durationMs) {
+    if(!notes || notes.length === 0) return 0;
+    const durationSecs = durationMs / 1000;
+    const notesPerSecond = notes.length / durationSecs;
+    
+    // Algoritmo: NPS * multiplicador base
+    let stars = notesPerSecond * 0.8;
+    
+    // Si hay muchos Holds, sube la dificultad un poco
+    const holds = notes.filter(n => n.h).length;
+    stars += (holds / notes.length) * 1.5;
+    
+    // Limitar entre 1 y 10 estrellas
+    return Math.max(1, Math.min(10, stars)).toFixed(1);
+};"display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
                     <label style="color:#12FA05;"><input type="checkbox" id="mech-mines" ${window.edMechanics.includes('mines')?'checked':''}> 💣 Minas (Pulsarlas resta vida)</label>
                     <label style="color:#00ffff;"><input type="checkbox" id="mech-sv" ${window.edMechanics.includes('sv_changes')?'checked':''}> 🎢 Velocidad Variable (SV Changes)</label>
                     <label style="color:#ff66aa;"><input type="checkbox" id="mech-flash" ${window.edMechanics.includes('flashlight')?'checked':''}> 🔦 Flashlight (Visión reducida)</label>
