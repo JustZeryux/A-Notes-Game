@@ -1,121 +1,117 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO (REPARADO) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V3 === */
 
-// 1. CARGA DE CONFIGURACIÓN MAESTRA
+// 1. CARGA DE DATOS Y VALORES POR DEFECTO
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
-    // Configuración por defecto
-    let fallbackCfg = window.defaultCfg || {
-        subtitles: true, showFps: true, spd: 2, down: true, den: 5, bgDim: 50, showSplash: true,
+    window.defaultCfg = {
+        subtitles: true, showFps: true, spd: 2.5, down: true, den: 5, fov: 0, noteOp: 100,
+        bgDim: 50, showSplash: true, showMs: true, hideUI: false,
         vol: 0.5, hvol: 0.5, missVol: 0.5, off: 0,
         stdAR: 9, stdCS: 4, stdK1: 'z', stdK2: 'x',
         tkDonL: 'f', tkDonR: 'j', tkKatsuL: 'd', tkKatsuR: 'k',
-        ctSpeed: 5, ctLeft: 'ArrowLeft', ctRight: 'ArrowRight', ctDash: 'Shift'
+        ctSpeed: 10, ctLeft: 'ArrowLeft', ctRight: 'ArrowRight', ctDash: 'Shift',
+        modes: {}
     };
 
     if (saved) {
-        try { window.cfg = Object.assign({}, fallbackCfg, JSON.parse(saved)); } 
-        catch(e) { window.cfg = JSON.parse(JSON.stringify(fallbackCfg)); }
+        try { window.cfg = Object.assign({}, window.defaultCfg, JSON.parse(saved)); } 
+        catch(e) { window.cfg = JSON.parse(JSON.stringify(window.defaultCfg)); }
     } else {
-        window.cfg = JSON.parse(JSON.stringify(fallbackCfg));
+        window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
     }
     
-    // Asegurar estructura de modos
-    if(!window.cfg.modes) window.cfg.modes = {};
+    // Crear estructuras de modos si no existen
     [4,5,6,7,8,9,10].forEach(k => {
-        if(!window.cfg.modes[k]) {
+        if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
             window.cfg.modes[k] = [];
             const defKeys = ['a','s','d','f','g','h','j','k','l',';'];
             for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
         }
     });
 
-    // Cargar valores en los inputs del HTML (Si el panel está creado)
-    const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
-    const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = window.cfg[prop]; };
-    
-    setChk('cfg-subtitles', 'subtitles');
-    setChk('cfg-show-fps', 'showFps');
-    setVal('cfg-spd', 'spd');
-    setChk('cfg-down', 'down');
-    setVal('cfg-den', 'den');
-    
-    if(document.getElementById('cfg-dim')) document.getElementById('cfg-dim').value = window.cfg.bgDim || 50;
-    setChk('cfg-splash', 'showSplash');
+    const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop] !== undefined ? window.cfg[prop] : ''; };
+    const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
+    const setTxt = (id, prop) => { const el = document.getElementById(id); if(el) el.innerText = String(window.cfg[prop]||'').toUpperCase().replace('ARROW',''); };
+
+    // Setear HTML
+    setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
+    setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
+    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp');
+    setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS');
+    setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
+    setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR'); setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
+    setVal('cfg-ct-spd', 'ctSpeed'); setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
+    setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
     
     if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
     if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.5) * 100;
+    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
     setVal('cfg-off', 'off');
 };
 
-// 2. FUNCIÓN PARA ABRIR EL PANEL (¡ESTA FALTABA!)
-window.openSettings = function() {
-    window.loadSettings(); // Recargar datos frescos
-    
+// 2. FUNCIÓN SEGURA PARA ABRIR Y CERRAR EL PANEL
+window.openSettingsPanel = function() {
+    window.loadSettings();
     const modal = document.getElementById('modal-settings');
-    if (modal) {
+    if(modal) {
         modal.style.display = 'flex';
-        // Renderizar la vista previa de teclas (por defecto 4K)
-        if(typeof window.renderLaneConfig === 'function') window.renderLaneConfig(4);
-    } else {
-        console.error("Error: No se encontró el modal con ID 'modal-settings'");
-        if(typeof window.notify === 'function') window.notify("Error: Panel de ajustes no encontrado en HTML", "error");
+        window.renderLaneConfig(4); // Cargar modo 4K por defecto al abrir
     }
 };
 
-// 3. GUARDAR AL SALIR
+window.closeSettingsPanel = function() {
+    const modal = document.getElementById('modal-settings');
+    if(modal) modal.style.display = 'none';
+};
+
+// 3. GUARDADO MAESTRO
 window.saveSettings = function() {
     const getVal = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : 0; };
     const getChk = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
 
-    window.cfg.subtitles = getChk('cfg-subtitles');
-    window.cfg.showFps = getChk('cfg-show-fps');
-    window.cfg.spd = getVal('cfg-spd');
-    window.cfg.down = getChk('cfg-down');
-    window.cfg.den = getVal('cfg-den');
-
-    let dimEl = document.getElementById('cfg-dim'); if(dimEl) window.cfg.bgDim = parseFloat(dimEl.value);
-    window.cfg.showSplash = getChk('cfg-splash');
+    window.cfg.showFps = getChk('cfg-show-fps'); window.cfg.subtitles = getChk('cfg-subtitles');
+    window.cfg.spd = getVal('cfg-spd'); window.cfg.down = getChk('cfg-down'); 
+    window.cfg.den = getVal('cfg-den'); window.cfg.fov = getVal('cfg-fov'); window.cfg.noteOp = getVal('cfg-noteop');
+    
+    window.cfg.stdAR = getVal('cfg-std-ar'); window.cfg.stdCS = getVal('cfg-std-cs');
+    window.cfg.ctSpeed = getVal('cfg-ct-spd');
+    
+    window.cfg.bgDim = getVal('cfg-dim'); window.cfg.showSplash = getChk('cfg-splash'); 
+    window.cfg.showMs = getChk('cfg-show-ms'); window.cfg.hideUI = getChk('cfg-hide-ui');
     
     let volEl = document.getElementById('cfg-vol'); if(volEl) window.cfg.vol = parseFloat(volEl.value) / 100;
     let hvolEl = document.getElementById('cfg-hvol'); if(hvolEl) window.cfg.hvol = parseFloat(hvolEl.value) / 100;
     let mvolEl = document.getElementById('cfg-mvol'); if(mvolEl) window.cfg.missVol = parseFloat(mvolEl.value) / 100;
     window.cfg.off = getVal('cfg-off');
 
-    window.cfg.stdAR = getVal('cfg-std-ar'); window.cfg.stdCS = getVal('cfg-std-cs');
-    window.cfg.ctSpeed = getVal('cfg-ct-spd');
-
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
+    window.notify("Configuración maestra guardada.", "success");
+    window.closeSettingsPanel();
     
-    if(typeof window.notify === 'function') window.notify("Ajustes guardados", "success");
-    const modal = document.getElementById('modal-settings');
-    if(modal) modal.style.display = 'none';
-    
-    if(typeof window.updatePreview === 'function') window.updatePreview(4);
-    if(typeof window.applyCfg === 'function') window.applyCfg();
+    if(typeof window.applyCfg === 'function') window.applyCfg(); // Refrescar juego si está en curso
 };
 
-// 4. PESTAÑAS DEL PANEL
+// 4. CONTROL DE PESTAÑAS (TABS)
 window.switchSetTab = function(tabId) {
     document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.set-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.set-section').forEach(s => s.style.display = 'none');
     
     if(event && event.currentTarget) event.currentTarget.classList.add('active');
     const tab = document.getElementById(tabId);
-    if(tab) tab.classList.add('active');
+    if(tab) tab.style.display = 'block';
     
-    if(tabId === 'set-mania') window.renderLaneConfig(4);
+    if(tabId === 'set-mania') window.renderLaneConfig(parseInt(document.getElementById('kb-mode-select').value || 4));
 };
 
-// 5. EDITOR DE TECLAS
+// 5. EDITOR DE TECLAS MANIA Y VISTA PREVIA
 window.renderLaneConfig = function(k) {
     const cont = document.getElementById('lanes-container');
     if(!cont) return;
     
-    const sel = document.getElementById('kb-mode-select');
-    if(sel) sel.value = k;
-    
+    document.getElementById('kb-mode-select').value = k;
     let html = '';
+    
     for(let i=0; i<k; i++) {
         let l = window.cfg.modes[k][i];
         let displayKey = String(l.k).toUpperCase().replace('KEY', '').replace('ARROW', '');
@@ -150,7 +146,7 @@ window.updatePreview = function(k) {
     let color = conf.c;
     let shapeData = (typeof PATHS !== 'undefined' && PATHS[conf.s]) ? PATHS[conf.s] : "M50,10 A40,40 0 1,1 49.9,10"; 
 
-    // Revisar si hay Skin equipada
+    // Revisar si hay Skin equipada (Prioridad de Tienda)
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         let activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
         if (activeSkin) {
@@ -159,15 +155,12 @@ window.updatePreview = function(k) {
         }
     }
 
-    box.innerHTML = `
-        <svg viewBox="0 0 100 100" style="width:70%; height:70%; filter:drop-shadow(0 0 15px ${color});">
-            <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="3"/>
-        </svg>
-    `;
+    box.innerHTML = `<svg viewBox="0 0 100 100" style="width:70%; height:70%; filter:drop-shadow(0 0 15px ${color});"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="3"/></svg>`;
     box.style.borderColor = color;
     box.style.boxShadow = `0 0 20px ${color}33 inset`;
 };
 
+// 6. ASIGNACIÓN SEGURA DE TECLAS
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
     if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; btn.style.borderColor = "white"; }
@@ -189,5 +182,27 @@ window.waitForKey = function(k, lane) {
     window.addEventListener('keydown', handler, true);
 };
 
-// Cargar configuración al iniciar
+window.captureSingleKey = function(btnId, cfgProp) {
+    const btn = document.getElementById(btnId);
+    if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; }
+    
+    const overlay = document.createElement('div');
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; justify-content:center; align-items:center; color:#ff66aa; font-size:3rem; font-weight:900; backdrop-filter:blur(5px);";
+    overlay.innerHTML = `<div>ASIGNANDO NUEVA TECLA</div>`;
+    document.body.appendChild(overlay);
+
+    const handler = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        let key = e.key; if(e.code === "Space") key = "Space";
+        
+        window.cfg[cfgProp] = key;
+        btn.innerText = key.toUpperCase().replace('ARROW','');
+        btn.style.background = "transparent";
+        
+        overlay.remove();
+        window.removeEventListener('keydown', handler, true);
+    };
+    window.addEventListener('keydown', handler, true);
+};
+
 window.loadSettings();
