@@ -1,29 +1,8 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V7 (INLINE KEYBINDS) === */
-// 🚨 FORZAR APERTURA
-window.openSettingsPanel = function() {
-    if(typeof window.loadSettings === 'function') window.loadSettings();
-    let modal = document.getElementById('modal-settings');
-    if (modal) { 
-        modal.style.display = 'flex'; 
-        modal.style.zIndex = '9999999'; // Lo pone por encima de todo
-    } else if (typeof openModal === 'function') { 
-        openModal('settings'); 
-    }
-};
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V8 (ANTI-BUGS) === */
 
-// 🚨 FORZAR CIERRE
-window.closeSettingsPanel = function() {
-    let modal = document.getElementById('modal-settings');
-    if (modal) { 
-        modal.style.display = 'none'; 
-    } else if (typeof closeModal === 'function') { 
-        closeModal('settings'); 
-    }
-};
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
-    // VALORES PREDETERMINADOS MEJORADOS
     window.defaultCfg = {
         perfMode: false, subtitles: true, showFps: true, 
         spd: 25, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85, noteSize: 100,
@@ -64,18 +43,15 @@ window.loadSettings = function() {
         }
     };
 
-    // GENERAL
     setChk('cfg-perf-mode', 'perfMode');
     setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
     setVal('cfg-ui-skin', 'uiSkin');
     
-    // MANIA
     setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
     setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); 
     setVal('cfg-hit-pos', 'hitPos'); setVal('cfg-note-size', 'noteSize');
     setVal('cfg-note-skin', 'noteSkin'); 
 
-    // STANDARD / TAIKO / CATCH
     setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS'); setChk('cfg-std-trail', 'stdTrail');
     setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
     setVal('cfg-tk-spd', 'tkSpeed');
@@ -83,7 +59,6 @@ window.loadSettings = function() {
     setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS');
     setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
 
-    // VISUALS & AUDIO
     setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
     if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
     if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.8) * 100;
@@ -122,6 +97,8 @@ window.saveSettings = function() {
 
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
     if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
+    if (typeof window.closeSettingsPanel === 'function') window.closeSettingsPanel();
+    else if (typeof window.closeModal === 'function') window.closeModal('settings');
 };
 
 window.switchSetTab = function(tabId) {
@@ -132,93 +109,109 @@ window.switchSetTab = function(tabId) {
     const tab = document.getElementById(tabId);
     if(tab) tab.style.display = 'block';
     
-    if(tabId === 'set-mania') window.renderLaneConfig(parseInt(document.getElementById('kb-mode-select').value || 4));
+    if(tabId === 'set-mania') {
+        const select = document.getElementById('kb-mode-select');
+        window.renderLaneConfig(parseInt(select ? select.value : 4));
+    }
 };
 
+// 🚨 SISTEMA DE RENDERIZADO DOM (A prueba de fallos, sin HTML Strings) 🚨
 window.renderLaneConfig = function(k) {
+    k = parseInt(k);
     const cont = document.getElementById('lanes-container');
     if(!cont) return;
     
-    document.getElementById('kb-mode-select').value = k;
-    let html = '';
-    
-    for(let i=0; i<k; i++) {
-        let l = window.cfg.modes[k][i];
-        let displayKey = String(l.k).toUpperCase().replace('KEY', '').replace('ARROW', '');
-        if (displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
-        
-        html += `
-        <div style="display:flex; flex-direction:column; align-items:center; gap:5px; background:rgba(255,255,255,0.02); padding:15px 10px; border-radius:10px; border:1px solid #333; min-width:60px;">
-            <div style="color:#aaa; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">LANE ${i+1}</div>
-            <button id="kb-btn-${k}-${i}" class="kb-btn" onclick="window.waitForKey(${k}, ${i})" style="width:50px; height:50px; border-radius:10px; background:#1a1a1a; color:white; border:3px solid ${l.c}; font-weight:900; font-size:1.2rem; cursor:pointer; transition:0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">${displayKey}</button>
-            <div style="margin-top:10px; font-size:0.7rem; color:#888;">COLOR</div>
-            <input type="color" value="${l.c}" onchange="window.updateLaneProp(${k}, ${i}, 'c', this.value)" style="width:35px; height:35px; border:none; background:none; cursor:pointer; padding:0;">
-        </div>`;
+    if(!window.cfg.modes[k]) {
+        window.cfg.modes[k] = [];
+        const def = ['a','s','d','f','g','h','j','k','l',';'];
+        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: def[i]||' ', c: '#00ffff' });
     }
-    cont.innerHTML = html;
+
+    cont.innerHTML = ''; // Limpiamos contenedor
+    
+    window.cfg.modes[k].forEach((lane, i) => {
+        let keyText = lane.k === ' ' ? 'SPC' : String(lane.k).toUpperCase();
+        
+        // Creamos la tarjeta
+        const card = document.createElement('div');
+        card.style.cssText = "text-align:center; background:rgba(255,255,255,0.05); padding:15px; border-radius:12px; border:1px solid #444; box-shadow: 0 5px 15px rgba(0,0,0,0.5); display:flex; flex-direction:column; align-items:center;";
+        
+        // Título del carril
+        const label = document.createElement('div');
+        label.style.cssText = "color:#aaa; font-size:0.8rem; font-weight:bold; margin-bottom:10px;";
+        label.innerText = `LANE ${i+1}`;
+        card.appendChild(label);
+        
+        // Botón de captura (Se inyecta evento directo)
+        const btn = document.createElement('button');
+        btn.id = `kb-btn-${k}-${i}`;
+        btn.className = "kb-btn";
+        btn.style.cssText = `width:60px; height:60px; background:#111; border:3px solid ${lane.c}; color:white; font-size:1.5rem; font-weight:900; border-radius:10px; cursor:pointer; transition:0.2s; display:flex; justify-content:center; align-items:center;`;
+        btn.innerText = keyText;
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.startKeyCapture(k, i);
+        });
+        card.appendChild(btn);
+        
+        // Etiqueta color
+        const colorLabel = document.createElement('div');
+        colorLabel.style.cssText = "margin-top:10px; color:#666; font-size:0.7rem;";
+        colorLabel.innerText = "COLOR";
+        card.appendChild(colorLabel);
+        
+        // Input de color (Se inyecta evento directo)
+        const colorInp = document.createElement('input');
+        colorInp.type = 'color';
+        colorInp.value = lane.c;
+        colorInp.style.cssText = "display:block; margin:5px auto 0; width:35px; height:35px; border:none; background:none; cursor:pointer;";
+        colorInp.addEventListener('input', (e) => {
+            window.updateLaneColor(k, i, e.target.value);
+        });
+        card.appendChild(colorInp);
+        
+        cont.appendChild(card);
+    });
+
     window.updatePreview(k);
 };
 
-window.updateLaneProp = function(k, lane, prop, val) {
-    window.cfg.modes[k][lane][prop] = val;
-    window.renderLaneConfig(k); 
-};
-
-window.updatePreview = function(k) {
-    const box = document.getElementById('live-skin-preview');
-    if(!box || !window.cfg || !window.cfg.modes[k]) return;
+// 🎮 CAPTURA DE TECLA SEGURA 🎮
+window.startKeyCapture = function(k, laneIdx) {
+    const btn = document.getElementById(`kb-btn-${k}-${laneIdx}`);
+    if (!btn || btn.dataset.waiting === "true") return;
     
-    let html = '';
-    for(let i=0; i<k; i++) {
-        let color = window.cfg.modes[k][i].c || "#00ffff";
-        html += `
-        <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); background:linear-gradient(to top, rgba(255,255,255,0.08), transparent); display:flex; justify-content:center; align-items:flex-end; padding-bottom: 10px;">
-            <div style="width: 80%; max-width: 50px; height: 25px; background: ${color}; border-radius: 12px; box-shadow: 0 0 20px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border: 2px solid white;"></div>
-        </div>`;
-    }
-    box.innerHTML = html;
-};
-
-// 🎮 NUEVO SISTEMA DE CAPTURA INLINE (SEGURO Y SIN BUGS)
-window.waitForKey = function(k, lane) {
-    const btn = document.getElementById(`kb-btn-${k}-${lane}`);
-    if(!btn || btn.dataset.waiting === "true") return;
-
-    // Restaurar otros botones por si el usuario hizo clic en otro sin terminar
+    // Restaurar otros
     document.querySelectorAll('.kb-btn').forEach(b => {
         if(b.dataset.waiting === "true") {
             b.dataset.waiting = "false";
             b.innerText = b.dataset.origKey;
-            b.style.borderColor = b.dataset.origColor;
-            b.style.background = "#1a1a1a";
+            b.style.background = "#111";
         }
     });
 
     btn.dataset.origKey = btn.innerText;
-    btn.dataset.origColor = btn.style.borderColor;
     btn.dataset.waiting = "true";
     btn.innerText = "...";
-    btn.style.background = "#F9393F"; 
-    btn.style.borderColor = "white";
-    btn.blur();
+    btn.style.background = "#F9393F";
+    btn.blur(); 
 
-    const handler = (e) => {
+    const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
         
         let key = e.key;
         if(e.code === "Space") key = " ";
         
         if (key !== "Escape") {
-            window.cfg.modes[k][lane].k = key;
+            window.cfg.modes[k][laneIdx].k = key;
         }
         
-        document.removeEventListener('keydown', handler, true);
+        document.removeEventListener('keydown', capture, true);
         window.renderLaneConfig(k); 
     };
 
-    // Retraso de 150ms para evitar falsos clics (espacio o enter rebotando)
     setTimeout(() => {
-        document.addEventListener('keydown', handler, true);
+        document.addEventListener('keydown', capture, true);
     }, 150);
 };
 
@@ -232,9 +225,8 @@ window.captureSingleKey = function(btnId, cfgProp) {
     btn.style.background = "#F9393F";
     btn.blur();
 
-    const handler = (e) => {
+    const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
-        
         let key = e.key; 
         if(e.code === "Space") key = "Space";
         
@@ -247,12 +239,39 @@ window.captureSingleKey = function(btnId, cfgProp) {
         
         btn.dataset.waiting = "false";
         btn.style.background = "transparent";
-        document.removeEventListener('keydown', handler, true);
+        document.removeEventListener('keydown', capture, true);
     };
 
-    setTimeout(() => {
-        document.addEventListener('keydown', handler, true);
-    }, 150);
+    setTimeout(() => document.addEventListener('keydown', capture, true), 150);
+};
+
+// 🌟 VISTA PREVIA RENDERIZADA EN CSS PURO (Garantizado que no queda en negro) 🌟
+window.updatePreview = function(k) {
+    const box = document.getElementById('live-skin-preview');
+    if(!box) return;
+    
+    box.innerHTML = '';
+    for(let i=0; i<k; i++) {
+        let color = window.cfg.modes[k][i].c || '#00ffff';
+        
+        const lane = document.createElement('div');
+        lane.style.cssText = "flex:1; height:100%; border-left:1px dashed #333; display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);";
+        
+        const note = document.createElement('div');
+        note.style.cssText = `width:80%; max-width:60px; height:20px; background:${color}; border-radius:8px; box-shadow: 0 0 20px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border:2px solid white;`;
+        
+        lane.appendChild(note);
+        box.appendChild(lane);
+    }
+};
+
+window.updateLaneColor = function(k, i, color) {
+    window.cfg.modes[k][i].c = color;
+    window.updatePreview(k);
+    
+    // Refrescar color del borde del botón sin recargar todo
+    const btn = document.getElementById(`kb-btn-${k}-${i}`);
+    if(btn) btn.style.borderColor = color;
 };
 
 window.populateSkinDropdowns = function() {
@@ -270,96 +289,6 @@ window.populateSkinDropdowns = function() {
     
     ns.value = window.cfg.noteSkin || 'default';
     ui.value = window.cfg.uiSkin || 'default';
-};
-
-window.renderLaneConfig = function(k) {
-    k = parseInt(k);
-    const cont = document.getElementById('lanes-container');
-    if(!cont) return;
-    
-    if(!window.cfg.modes[k]) {
-        window.cfg.modes[k] = [];
-        const def = ['a','s','d','f','g','h','j','k','l',';'];
-        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: def[i]||' ', c: '#00ffff' });
-    }
-
-    let html = '';
-    window.cfg.modes[k].forEach((lane, i) => {
-        let keyText = lane.k === ' ' ? 'SPC' : lane.k.toUpperCase();
-        html += `
-        <div style="text-align:center; background:rgba(255,255,255,0.05); padding:20px; border-radius:15px; border:1px solid #444; box-shadow: 0 10px 20px rgba(0,0,0,0.5);">
-            <div style="color:#aaa; font-size:1rem; font-weight:bold; margin-bottom:15px;">LANE ${i+1}</div>
-            
-            <button id="kb-btn-${k}-${i}" 
-                    onclick="window.startKeyCapture(${k}, ${i})"
-                    style="width:70px; height:70px; background:#111; border:4px solid ${lane.c}; color:white; font-size:1.5rem; font-weight:900; border-radius:12px; cursor:pointer; transition: 0.2s;">
-                ${keyText}
-            </button>
-            
-            <div style="margin-top:15px; color:#666; font-size:0.8rem;">COLOR</div>
-            <input type="color" value="${lane.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" style="display:block; margin:5px auto 0; width:40px; height:40px; border:none; background:none; cursor:pointer;">
-        </div>`;
-    });
-    cont.innerHTML = html;
-    window.updatePreview(k);
-};
-
-// CAPTURA SEGURA: Evita que el clic del mouse o el espacio se registren por accidente
-window.startKeyCapture = function(k, laneIdx) {
-    const btn = document.getElementById(`kb-btn-${k}-${laneIdx}`);
-    if (!btn) return;
-    
-    btn.innerText = "...";
-    btn.style.background = "#F9393F"; 
-    btn.style.borderColor = "white";
-    btn.blur(); // Quitar el foco del botón
-
-    const capture = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        let key = e.key;
-        if(e.code === "Space") key = " ";
-        
-        if(key === "Escape") { 
-            end(); // Cancela si presionas ESC
-            return; 
-        }
-
-        window.cfg.modes[k][laneIdx].k = key;
-        end();
-    };
-
-    const end = () => {
-        document.removeEventListener('keydown', capture, true);
-        window.renderLaneConfig(k); // Refresca la vista
-    };
-
-    // Esperamos 150ms antes de escuchar para evitar que el mismo click dispare la tecla
-    setTimeout(() => {
-        document.addEventListener('keydown', capture, true);
-    }, 150);
-};
-
-// VISTA PREVIA ESPECTACULAR EN CSS
-window.updatePreview = function(k) {
-    const box = document.getElementById('live-skin-preview');
-    if(!box) return;
-    
-    let html = '';
-    for(let i=0; i<k; i++) {
-        let color = window.cfg.modes[k][i].c;
-        html += `
-        <div style="flex:1; height:100%; border-left:1px dashed #333; display:flex; justify-content:center; align-items:flex-end; padding-bottom:10px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
-            <div style="width:80%; max-width:60px; height:25px; background:${color}; border-radius:8px; box-shadow: 0 0 25px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border:2px solid white;"></div>
-        </div>`;
-    }
-    box.innerHTML = html;
-};
-
-window.updateLaneColor = function(k, i, color) {
-    window.cfg.modes[k][i].c = color;
-    window.updatePreview(k);
 };
 
 window.loadSettings();
