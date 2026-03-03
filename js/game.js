@@ -425,43 +425,16 @@ window.playSongInternal = function(s) {
 // ==========================================
 // 4. EL LOOP ULTRA-OPTIMIZADO (GPU ACCELERATED)
 // ==========================================
+// ==========================================
+// 4. EL LOOP ULTRA-OPTIMIZADO (GPU ACCELERATED)
+// ==========================================
 function loop() {
     if (!window.st.act || window.st.paused) {
         gameLoopId = requestAnimationFrame(loop);
         return;
     }
-
-    // --- LECTOR DE MECÁNICAS EN TIEMPO REAL ---
-    for (let i = 0; i < window.st.notes.length; i++) {
-        const n = window.st.notes[i];
-        
-        // Si la nota pasa la línea de tiempo y es un FX que no se ha activado
-        if (!n.fxTriggered && n.t <= now) {
-            
-            // Efecto Flashlight
-            if (n.type === 'fx_flash') {
-                document.getElementById('game-layer').style.background = 'white';
-                setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150);
-            }
-            
-            // Efecto Custom del usuario
-            if (n.type === 'custom_fx' && n.customData) {
-                const track = document.getElementById('track');
-                const oldFilter = track.style.filter;
-                track.style.filter = n.customData.filter;
-                track.style.transition = 'filter 0.2s';
-                
-                // Apagar efecto tras la duración elegida
-                setTimeout(() => {
-                    track.style.filter = oldFilter;
-                }, n.customData.dur);
-            }
-
-            // Marcar como ejecutado para no repetirlo cada frame
-            n.fxTriggered = true; 
-        }
-    }
     
+    // AQUÍ SE CALCULA EL TIEMPO
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
@@ -496,6 +469,38 @@ function loop() {
         }
     }
 
+    // --- LECTOR DE MECÁNICAS EN TIEMPO REAL (AHORA SÍ, DEBAJO DE 'now') ---
+    for (let i = 0; i < window.st.notes.length; i++) {
+        const n = window.st.notes[i];
+        
+        // Si la nota pasa la línea de tiempo y es un FX que no se ha activado
+        if (!n.fxTriggered && n.t <= now) {
+            
+            // Efecto Flashlight
+            if (n.type === 'fx_flash') {
+                document.getElementById('game-layer').style.background = 'white';
+                setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150);
+            }
+            
+            // Efecto Custom del usuario
+            if (n.type === 'custom_fx' && n.customData) {
+                const track = document.getElementById('track');
+                const oldFilter = track.style.filter;
+                track.style.filter = n.customData.filter;
+                track.style.transition = 'filter 0.2s';
+                
+                // Apagar efecto tras la duración elegida
+                setTimeout(() => {
+                    track.style.filter = oldFilter;
+                }, n.customData.dur);
+            }
+
+            // Marcar como ejecutado para no repetirlo cada frame
+            n.fxTriggered = true; 
+        }
+    }
+    // ----------------------------------------------------------------------
+
     const w = 100 / window.keys;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
@@ -504,6 +509,7 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
+    // === GENERACIÓN DE NOTAS VISUALES ===
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
@@ -525,6 +531,10 @@ function loop() {
                     if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
                     if (activeSkin.fixed) color = activeSkin.color;
                 }
+                
+                // Cambiar el color si es una mina o dodge para que se distinga en partida
+                if(n.type === 'mine') color = '#F9393F';
+                if(n.type === 'dodge') color = '#00ffff';
 
                 let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})">
                     <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>
@@ -544,9 +554,17 @@ function loop() {
         } else break; 
     }
 
+    // === MOVIMIENTO DE NOTAS ===
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         
+        // Evitamos que las mecánicas puramente visuales cuenten como "MISS"
+        if ((n.type === 'fx_flash' || n.type === 'custom_fx') && n.t < now - 100) {
+            if(n.el) { n.el.remove(); n.el = null; }
+            window.st.spawned.splice(i, 1);
+            continue;
+        }
+
         if (n.h && n.type === 'tap') {
             if(n.el) { n.el.remove(); n.el = null; }
             window.st.spawned.splice(i, 1);
@@ -567,7 +585,7 @@ function loop() {
             const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
             let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
             
-            if (n.type === 'tap' || (n.type === 'hold' && !n.h)) {
+            if (n.type !== 'hold' || (n.type === 'hold' && !n.h)) {
                  n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`;
             }
 
