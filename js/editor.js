@@ -42,6 +42,8 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     window.notify("Studio Móvil Listo. Toca para poner notas.", "success");
 };
 
+window.edBrush = 'tap'; // Pincel por defecto
+
 function injectProTools() {
     if(document.getElementById('pro-tools-container')) return;
     const sidebar = document.querySelector('#editor-layer > div:nth-child(2) > div:nth-child(1)');
@@ -49,6 +51,7 @@ function injectProTools() {
     const html = `
         <div id="pro-tools-container" style="display:flex; flex-direction:column; gap:15px; margin-top:20px; border-top:1px solid #333; padding-top:20px;">
             <div style="color:var(--gold); font-weight:bold;">⚡ HERRAMIENTAS</div>
+            
             <div>
                 <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;">Imán (Snap)</div>
                 <select class="set-input" onchange="window.edSnap = parseInt(this.value)">
@@ -57,8 +60,21 @@ function injectProTools() {
                     <option value="100">Lento (100ms)</option>
                 </select>
             </div>
+
+            <div style="background:#222; padding:10px; border-radius:8px;">
+                <div style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Pincel Actual</div>
+                <select class="set-input" style="background:#000; color:#00ffff; border-color:#00ffff;" onchange="window.edBrush = this.value">
+                    <option value="tap">🟦 Nota Normal</option>
+                    <option value="mine">💣 Mina (Daño)</option>
+                    <option value="dodge">🛑 Dodge (Esquivar)</option>
+                    <option value="fx_flash">🔦 FX: Flashlight</option>
+                    <option value="fx_shake">💥 FX: Shake</option>
+                    <option value="custom_fx">✨ FX Custom</option>
+                </select>
+            </div>
+
             <button class="action" style="background:#ff66aa; color:black; padding:10px;" onclick="openAutoMapModal()">🤖 AUTO-MAPEO IA</button>
-            <button class="action" style="background:#00ffff; color:black; padding:10px;" onclick="openMechanicsMenu()">⚙️ MECÁNICAS</button>
+            <button class="action" style="background:#00ffff; color:black; padding:10px;" onclick="openCustomMechanicCreator()">⚙️ CREADOR FX CUSTOM</button>
             <button class="action" style="background:#444; color:white; padding:10px;" onclick="testMap()">▶️ PROBAR</button>
         </div>
     `;
@@ -109,7 +125,17 @@ function initEditorGrid() {
         }
         
         // Crear nueva nota
-        window.edDragNote = { t: pos.t, l: pos.l, type: 'tap', h: false, dur: 0 };
+        let finalType = window.edBrush;
+        let isHoldable = (finalType === 'tap' || finalType === 'mine' || finalType === 'dodge');
+        
+        window.edDragNote = { 
+            t: pos.t, 
+            l: pos.l, 
+            type: finalType, 
+            h: false, 
+            dur: 0,
+            customData: window.edActiveCustomFX || null // Por si usan una mecánica propia
+        };
         window.edMap.push(window.edDragNote);
         drawEditorGrid();
     };
