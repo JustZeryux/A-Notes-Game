@@ -62,9 +62,24 @@ function getSmartLane(last, k, busyLanes, time) {
 }
 
 function genMap(buf, k) {
-    const rawData = buf.getChannelData(0);
-    const data = normalizeAudio(new Float32Array(rawData)); 
-    const map = [];
+    // --- FIX: LEER CHART MANUAL O USAR AUTO-MAP ---
+        let map = [];
+        let rawData = window.curSongData.raw || window.curSongData;
+        let mapKey = `notes_mania_${k}k`; // Por defecto asume mania
+
+        if (rawData[mapKey] && rawData[mapKey].length > 0) {
+            // 1. Si existe un chart para este modo/keys, úsalo!
+            map = JSON.parse(JSON.stringify(rawData[mapKey])); 
+        } else if (rawData.notes && rawData.notes.length > 0) {
+            // 2. Compatibilidad con mapas viejos
+            map = JSON.parse(JSON.stringify(rawData.notes));
+        } else {
+            // 3. Si está vacía, SOLO entonces usa el Auto-Mapeo por densidad
+            map = genMap(buffer, k); 
+        }
+        // ----------------------------------------------
+
+        const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
     const sampleRate = buf.sampleRate;
     
     const START_OFFSET = 3000; 
