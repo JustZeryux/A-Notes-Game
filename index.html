@@ -1,286 +1,382 @@
-><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>A Notes Game - Community Rhythm Project</title>
-    <meta name="description" content="Juego de ritmo comunitario. Juega, crea, compite y sube de rango.">
+    <title>A Notes Game</title>
+    <meta name="title" content="A Notes Game">
+    <meta name="description" content="El mejor juego de ritmo en tu navegador. Juega mapas creados por la comunidad, personaliza tus teclas, sube de nivel y compite en el ranking global online.">
+    <meta name="theme-color" content="#ff66aa">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://a-notes-game.pages.dev/">
+    <meta property="og:title" content="A Notes Game - Juego de Ritmo">
+    <meta property="og:description" content="Compite online, sube tus propias canciones y conviértete en el mejor jugador.">
+    <meta property="og:image" content="https://a-notes-game.pages.dev/icon.png">
+    <meta property="og:site_name" content="A Notes Game">
+    
+    <link rel="icon" type="image/png" href="icon.png">
     
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
     <link rel="stylesheet" href="css/style.css">
-
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; user-select: none; -webkit-tap-highlight-color: transparent; }
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .modal-neon-box, .settings-panel { background: #111; border: 1px solid #333; padding: 20px; border-radius: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); position: relative; display: flex; flex-direction: column; }
-        
-        /* Ajustes específicos del Panel de Configuración */
-        .settings-panel { width: 900px; height: 600px; padding: 0; overflow: hidden; background: #0f0f0f; }
-        .settings-header { padding: 20px; background: #151515; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
-        .settings-layout { display: flex; flex: 1; overflow: hidden; }
-        .settings-sidebar { width: 220px; background: #111; border-right: 1px solid #333; display: flex; flex-direction: column; }
-        .settings-content { flex: 1; padding: 30px; overflow-y: auto; background: #050505; }
-        
-        .set-tab-btn { padding: 15px 20px; text-align: left; background: none; border: none; color: #888; cursor: pointer; border-left: 4px solid transparent; font-weight: bold; transition: 0.2s; }
-        .set-tab-btn:hover { background: #1a1a1a; color: white; }
-        .set-tab-btn.active { background: #1a1a1a; color: #00ffff; border-left-color: #00ffff; }
-        
-        .set-section { display: none; animation: fadeIn 0.3s ease; }
-        .set-section.active { display: block; }
-        .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #222; }
-        .set-label { font-size: 1.1rem; color: #eee; }
-        .set-sub { font-size: 0.8rem; color: #666; display: block; }
-        
-        /* Inputs y Botones */
-        .cw-input, .num-input { background: #111; border: 1px solid #333; color: white; padding: 8px; border-radius: 5px; }
-        .action { background: #00ffff; color: black; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 5px; transition: 0.2s; }
-        .action:hover { transform: scale(1.05); box-shadow: 0 0 15px #00ffff; }
-        .action.secondary { background: #333; color: white; }
-        .action.secondary:hover { background: #444; box-shadow: none; }
-        
-        /* Animaciones */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
 </head>
 <body>
 
-    <div id="loading-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-        <div class="loader-spinner" style="width:60px; height:60px; border:6px solid #222; border-top-color:#ff0055; border-radius:50%; animation:spin 1s infinite linear;"></div>
-        <div id="loading-text" style="margin-top:20px; color:#ff0055; font-weight:900; letter-spacing:2px; font-size:1.2rem;">INICIALIZANDO SISTEMAS...</div>
+    <div id="maintenance-screen">
+        <div class="maint-icon">⚙️</div>
+        <div class="maint-title">MANTENIMIENTO</div>
+        <div class="maint-desc">El servidor está siendo actualizado por Zeryux. Se están añadiendo cosas épicas. Vuelve pronto.</div>
     </div>
-
-    <div id="notification-area" style="position:fixed; bottom:20px; right:20px; z-index:10000; display:flex; flex-direction:column; gap:10px; pointer-events:none;"></div>
     
-    <div id="chat-overlay-container" style="position:fixed; bottom:0; right:300px; display:flex; gap:10px; z-index:5000; align-items:flex-end;"></div>
-
-    <div id="global-announcement" style="position:fixed; top:-150px; left:0; width:100%; background:linear-gradient(90deg, #ff0055, #ff44b9); z-index:11000; padding:15px; text-align:center; transition:top 0.5s ease; box-shadow:0 5px 20px rgba(0,0,0,0.5);">
-        <div id="ga-title" style="font-size:1.5rem; font-weight:900; color:white; text-transform:uppercase;">AVISO IMPORTANTE</div>
-        <div id="ga-msg" style="color:white; font-size:1.1rem; margin-top:5px;">Mensaje del sistema...</div>
+    <div id="global-announcement">
+        <div style="color:#ffaa00; font-size:0.8rem; letter-spacing:2px; margin-bottom:5px;">📢 MENSAJE DEL ADMINISTRADOR</div>
+        <div id="ga-title" style="font-size:1.5rem; font-weight:900; margin-bottom:5px;">TÍTULO</div>
+        <div id="ga-msg" style="font-size:1rem; color:#f0f0f0;">Mensaje...</div>
     </div>
 
-    <div id="notif-panel" style="position:fixed; top:0; right:-350px; width:350px; height:100%; background:#111; border-left:1px solid #333; z-index:2000; transition:right 0.3s ease; display:flex; flex-direction:column;">
-        <div class="notif-header" style="padding:20px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center; background:#1a1a1a;">
-            <span style="color:white; font-weight:bold; font-size:1.1rem;">🔔 NOTIFICACIONES</span>
-            <button style="background:none; border:none; color:#ff66aa; cursor:pointer; font-size:0.9rem;" onclick="if(typeof clearAllNotifs==='function')clearAllNotifs()">Limpiar Todo</button>
-        </div>
-        <div id="notif-list-content" style="flex:1; overflow-y:auto; padding:10px;">
-            <div style="text-align:center; color:#666; padding:30px;">No tienes notificaciones nuevas.</div>
-        </div>
+    <div id="notification-area"></div>
+    <div id="chat-overlay-container"></div>
+    
+    <div id="loading-overlay" style="display:none;">
+        <div class="loader"></div>
+        <div id="loading-text">Cargando...</div>
     </div>
 
-    <nav id="top-nav" style="position:fixed; top:0; left:0; width:100%; height:70px; background:rgba(0,0,0,0.95); border-bottom:1px solid #333; display:flex; align-items:center; justify-content:space-between; padding:0 30px; z-index:1000;">
-        <div class="nav-left" style="display:flex; gap:20px; align-items:center;">
-            <div class="nav-logo" style="font-family:'Segoe UI', sans-serif; font-weight:900; font-size:1.8rem; color:#ff0055; margin-right:20px; text-shadow:0 0 10px rgba(255,0,85,0.5); cursor:pointer;" onclick="window.location.reload()">A-NOTES</div>
-            
-            <button class="nav-btn" onclick="openModal('lobbies')" style="background:none; border:none; color:#ccc; font-weight:bold; cursor:pointer; transition:0.2s;">🌐 MULTIJUGADOR</button>
-            <button class="nav-btn" onclick="openModal('rank')" style="background:none; border:none; color:#ccc; font-weight:bold; cursor:pointer; transition:0.2s;">🏆 RANKING</button>
-            <button class="nav-btn" onclick="openClansModal()" style="background:none; border:none; color:#ccc; font-weight:bold; cursor:pointer; transition:0.2s;">🛡️ CLANES</button>
-            <button class="nav-btn" onclick="openShop()" style="background:none; border:none; color:#ccc; font-weight:bold; cursor:pointer; transition:0.2s;">🛒 TIENDA</button>
-        </div>
-
-        <div class="nav-right" style="display:flex; gap:20px; align-items:center;">
-            <div id="user-panel" onclick="openModal('auth')" style="display:flex; align-items:center; gap:12px; cursor:pointer; background:#1a1a1a; padding:8px 20px; border-radius:30px; border:1px solid #333; transition:0.2s;">
-                <div id="user-avatar" style="width:35px; height:35px; background:#333; border-radius:50%; background-size:cover; border:2px solid #555;"></div>
-                <div id="user-name" style="font-weight:bold; font-size:1rem;">Invitado</div>
+    <div id="editor-layer" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a0a; z-index:9000; color:white; flex-direction:column;">
+        <div style="height: 60px; background: #111; border-bottom: 2px solid var(--accent); display: flex; justify-content: space-between; align-items: center; padding: 0 20px;">
+            <div style="display:flex; gap:15px; align-items:center;">
+                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeEditor()">SALIR</button>
+                <div id="ed-title" style="font-weight:bold; font-size:1.2rem;">Editor Mode</div>
             </div>
-
-            <button id="nav-notif" class="icon-btn" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">
-                🔔
-                <span id="notif-badge" style="display:none; position:absolute; top:-2px; right:-2px; background:#ff0055; color:white; font-size:0.7rem; padding:2px 6px; border-radius:10px;">0</span>
-            </button>
-            <button id="nav-admin" class="icon-btn" style="display:none; color:#ff0055; background:none; border:none; font-size:1.5rem; cursor:pointer;" onclick="openAdminPanel()">🔧</button>
+            <audio id="ed-audio" controls style="height: 40px; outline:none;"></audio>
+            <button class="action btn-acc" style="width:auto; padding:5px 20px;" onclick="saveEditorMap()">💾 GUARDAR MAPA</button>
         </div>
-    </nav>
-
-    <div id="main-menu" style="position:fixed; top:0; left:0; width:100%; height:100%; background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:100;">
-        <div class="menu-center" style="text-align:center; animation:fadeIn 1s ease;">
-            <h1 class="game-title" style="font-size:5rem; margin-bottom:10px; color:white; font-weight:900; text-shadow:0 0 30px #ff0055; letter-spacing:-2px;">A NOTES GAME</h1>
-            <p style="color:#888; margin-bottom:50px; font-size:1.2rem; letter-spacing:5px;">RHYTHM COMMUNITY PROJECT</p>
-            
-            <div class="menu-buttons" style="display:flex; flex-direction:column; gap:20px; width:350px; margin:0 auto;">
-                <button class="menu-btn play-btn" onclick="window.openSongBrowser()" style="padding:25px; font-size:1.8rem; background:#ff0055; color:white; border:none; font-weight:900; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%); cursor:pointer; transition:0.3s; text-transform:uppercase;">▶ Jugar Ahora</button>
-                <button class="menu-btn secondary" onclick="window.openStudioDashboard()" style="padding:20px; background:#111; color:white; border:1px solid #333; font-weight:bold; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%); cursor:pointer; transition:0.3s; font-size:1.2rem;">✏️ Editor de Mapas</button>
-                <button class="menu-btn secondary" onclick="window.openSettings()" style="padding:20px; background:#111; color:white; border:1px solid #333; font-weight:bold; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%); cursor:pointer; transition:0.3s; font-size:1.2rem;">⚙️ Configuración</button>
-            </div>
-            
-            <div style="margin-top:50px; color:#444; font-size:0.9rem;">
-                v4.5.0 - Build: Community Edition
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-songs" class="modal-overlay">
-        <div class="browser-container" style="width:95%; height:90%; background:#0a0a0a; border:1px solid #333; display:flex; flex-direction:column; border-radius:10px; overflow:hidden;">
-            <div class="browser-header" style="padding:20px; border-bottom:1px solid #333; background:#111; display:flex; gap:15px; align-items:center;">
-                <div class="browser-tabs" style="display:flex; gap:10px; flex:1; overflow-x:auto;">
-                    <button class="filter-btn active" data-type="all" onclick="setFilter('type','all')" style="padding:10px 20px; background:#222; border:none; color:white; cursor:pointer; font-weight:bold; border-radius:5px;">TODO</button>
-                    <button class="filter-btn" data-type="recent" onclick="setFilter('type','recent')" style="padding:10px 20px; background:#222; border:none; color:white; cursor:pointer; font-weight:bold; border-radius:5px;">RECIENTES</button>
-                    <button class="filter-btn" data-type="charted" onclick="setFilter('type','charted')" style="padding:10px 20px; background:#222; border:none; color:#12FA05; cursor:pointer; font-weight:bold; border-radius:5px;">📝 CHARTED</button>
-                    <button class="filter-btn" data-type="osu_mania" onclick="setFilter('type','osu_mania')" style="padding:10px 20px; background:#222; border:none; color:#ff66aa; cursor:pointer; font-weight:bold; border-radius:5px;">🎹 MANIA</button>
-                    <button class="filter-btn" data-type="osu_taiko" onclick="setFilter('type','osu_taiko')" style="padding:10px 20px; background:#222; border:none; color:#f95555; cursor:pointer; font-weight:bold; border-radius:5px;">🥁 TAIKO</button>
-                    <button class="filter-btn" data-type="osu_catch" onclick="setFilter('type','osu_catch')" style="padding:10px 20px; background:#222; border:none; color:#44b9ff; cursor:pointer; font-weight:bold; border-radius:5px;">🍎 CATCH</button>
+        <div style="flex:1; display:flex; overflow:hidden;">
+            <div style="width:250px; background:#111; border-right:1px solid #333; padding:20px; display:flex; flex-direction:column; gap:20px;">
+                <div style="color:var(--gold); font-weight:bold;">🛠️ HERRAMIENTAS</div>
+                <div>
+                    <div style="margin-bottom:5px; font-size:0.9rem;">ZOOM (Línea de tiempo)</div>
+                    <input type="range" id="ed-zoom" min="10" max="100" value="30" style="width:100%;" oninput="drawEditorGrid()">
                 </div>
-                <input type="text" id="song-search" placeholder="🔍 Buscar canción, artista, anime..." onkeyup="debounceSearch(this.value)" style="padding:12px; background:#000; border:1px solid #333; color:white; width:350px; border-radius:5px;">
-                <button class="action secondary" onclick="closeModal('songs')">SALIR</button>
-            </div>
-            
-            <div id="song-grid" class="song-grid" style="padding:20px; overflow-y:auto; flex:1; display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap:20px;">
+                <div style="background:#222; padding:10px; border-radius:8px; font-size:0.8rem; color:#aaa;">
+                    <b>Controles:</b><br>
+                    - Clic en la pista: Poner Nota<br>
+                    - Clic en nota: Borrar Nota<br>
+                    - Barra Espaciadora: Play/Pausa
                 </div>
+                <button class="action secondary" onclick="clearEditorMap()" style="border-color:#F9393F; color:#F9393F; margin-top:auto;">🗑️ BORRAR TODO</button>
+            </div>
+            <div id="ed-scroll-area" style="flex:1; background:#1a1a1a; overflow-y:scroll; position:relative; display:flex; justify-content:center;">
+                <div id="ed-grid" style="position:relative; width:400px; background:#000; border-left:2px solid #444; border-right:2px solid #444; cursor:crosshair;"></div>
+                <div id="ed-playhead" style="position:absolute; width:400px; height:2px; background:red; z-index:100; pointer-events:none; top:0; box-shadow: 0 0 10px red;"></div>
+            </div>
         </div>
     </div>
-
-    <div id="modal-diff" class="modal-overlay">
-        <div class="diff-modal-box" style="background:#151515; padding:30px; border-radius:20px; width:600px; text-align:center; border:2px solid #ff0055; box-shadow:0 0 50px rgba(255,0,85,0.2);">
-            <div id="diff-song-cover" style="width:100%; height:180px; background-color:#333; background-size:cover; background-position:center; margin-bottom:20px; border-radius:10px; border:1px solid #333;"></div>
-            <h2 id="diff-song-title" style="margin:0 0 20px 0; font-size:2rem; text-shadow:0 0 10px rgba(255,255,255,0.3);">Titulo Canción</h2>
-            
-            <div class="diff-grid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:15px; margin-bottom:30px; max-height:300px; overflow-y:auto; padding:10px;">
-                </div>
-            
-            <button class="action secondary full-width" onclick="closeModal('diff')" style="width:100%; padding:15px; font-size:1.1rem;">CANCELAR</button>
-        </div>
+    
+    <div id="bg-layer">
+        <video id="bg-video" loop muted playsinline style="display:none;"></video>
+        <img id="bg-image">
     </div>
 
-    <div id="modal-settings" class="modal-overlay">
-        <div class="settings-panel">
-            <div class="settings-header">
-                <h2 style="margin:0; font-weight:900; font-size:2rem; color:white; letter-spacing:1px;">CONFIGURACIÓN</h2>
-                <button class="action secondary" style="width:auto; padding:10px 25px;" onclick="window.saveSettings()">GUARDAR Y CERRAR</button>
+    <div id="menu-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">
+                <img src="icon.png" alt="A Notes Game Logo" style="width: 50px; height: 50px; border-radius: 50%; box-shadow: 0 0 20px var(--accent); flex-shrink: 0; margin-right: 15px;">
+                A Notes Game
             </div>
             
-            <div class="settings-layout">
-                <div class="settings-sidebar">
-                    <button class="set-tab-btn active" id="tab-gen" onclick="switchSetTab('set-gen')">GENERAL</button>
-                    <button class="set-tab-btn" id="tab-mania" onclick="switchSetTab('set-mania')">MANIA / TECLAS</button>
-                    <button class="set-tab-btn" id="tab-std" onclick="switchSetTab('set-std')">STANDARD</button>
-                    <button class="set-tab-btn" id="tab-taiko" onclick="switchSetTab('set-taiko')">TAIKO</button>
-                    <button class="set-tab-btn" id="tab-catch" onclick="switchSetTab('set-catch')">CATCH</button>
+            <div class="user-card" onclick="openModal('profile')" onmouseenter="if(typeof playHover==='function') playHover()">
+                <div class="u-avatar" id="m-av">G</div>
+                <div class="u-info">
+                    <div id="m-name">Guest</div>
+                    <div id="m-rank">LVL 1</div>
                 </div>
+            </div>
+            
+            <button class="sidebar-btn" id="nav-osu" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openOsuBrowser()"><span style="color:#ff66aa;">🌸 OSU! DIRECT</span></button>
+            <button class="sidebar-btn active" id="nav-songs" onmouseenter="if(typeof playHover==='function') playHover()" onclick="changeSection('songs')">🎵 CANCIONES GLOBALES</button>
+            <button class="sidebar-btn" id="nav-multi" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLobbyBrowser()">⚔️ SALAS ONLINE</button>
+            <button class="sidebar-btn" id="nav-shop" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openShop()">🛒 TIENDA</button>
+            
+            <button class="sidebar-btn" id="nav-settings" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openSettingsPanel()">⚙️ AJUSTES</button>
+            
+            <button class="sidebar-btn" id="nav-rank" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
+            <button class="sidebar-btn" id="nav-friends" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openFriends()">👥 AMIGOS</button>
+            <button class="sidebar-btn" id="nav-clans" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openClansModal()">🛡️ CLANES</button>
+
+            <button class="sidebar-btn" onclick="openStudioDashboard()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
+                ✏️ CREATOR STUDIO
+            </button>            
+            <button class="sidebar-btn" id="imp-btn" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openCustomUploadModal()"><span id="imp-txt">☁️ SUBIR CANCIÓN</span></button>
+            <button class="sidebar-btn" onclick="openModal('news')">📰 NOVEDADES</button>
+            
+            <button class="sidebar-btn" id="nav-admin" style="display:none; color: #ff003c;" onclick="openAdminPanel()">🚨 ADMIN PANEL</button>
+        </aside>
+
+        <main class="content-area">
+            <div class="top-bar" style="flex-direction:column; align-items:stretch; gap:15px; height:auto; padding-bottom:15px;">
                 
+                <div style="display:flex; gap:10px; width:100%; align-items:center;">
+                    <input type="text" id="main-search-inp" class="search-inp" style="flex:1;" placeholder="Buscar en la Nube y en Osu! Mania..." oninput="debounceSearch(this.value)">
+                    
+                    <div id="notif-bell" onclick="openNotifPanel()" style="position:relative; cursor:pointer; font-size:1.8rem; margin:0 15px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));">
+                        🔔<span id="notif-badge" style="display:none; position:absolute; top:-5px; right:-10px; background:#F9393F; color:white; border-radius:10px; padding:2px 6px; font-size:0.7rem; font-weight:900; border:2px solid #0a0a0a;">0</span>
+                    </div>
+
+                    <div style="display:flex; gap:20px; align-items:center;">
+                         <div style="font-weight:900; color:var(--gold);">SP: <span id="h-sp" style="color:white; font-size:1.5rem;">0</span></div>
+                         <div style="font-weight:900; color:#aaa;">PP: <span id="h-pp" style="color:white; font-size:1.5rem;">0</span></div>
+                    </div>
+                </div>
+
+                <div id="filter-bar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <button class="filter-btn active" data-type="type" data-val="all" onclick="setFilter('type', 'all')">TODO</button>
+                    <button class="filter-btn" data-type="type" data-val="com" onclick="setFilter('type', 'com')">☁️ COMUNIDAD</button>
+                    <button class="filter-btn" data-type="type" data-val="recent" onclick="setFilter('type', 'recent')" style="color:var(--gold); border-color:var(--gold);">🕒 RECIENTES</button>
+                    
+                    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
+                    
+                    <button class="filter-btn" data-type="type" data-val="osu_mania" onclick="setFilter('type', 'osu_mania')" style="color:#ff66aa; border-color:#ff66aa;">🌸 MANIA</button>
+                    <button class="filter-btn" data-type="type" data-val="mechanics" onclick="setFilter('type', 'mechanics')" style="color:#00ffff; border-color:#00ffff; font-weight:900;">⚙️ CUSTOM MECHANICS</button>
+                    <button class="filter-btn" data-type="type" data-val="charted" onclick="setFilter('type', 'charted')" style="color:#12FA05; border-color:#12FA05;">✏️ MAPAS CHARTED</button>
+                    <button class="filter-btn" data-type="type" data-val="osu_standard" onclick="setFilter('type', 'osu_standard')" style="color:#ff44b9; border-color:#ff44b9;">🎯 STANDARD</button>
+                    <button class="filter-btn" data-type="type" data-val="osu_taiko" onclick="setFilter('type', 'osu_taiko')" style="color:#f95555; border-color:#f95555;">🥁 TAIKO</button>
+                    <button class="filter-btn" data-type="type" data-val="osu_catch" onclick="setFilter('type', 'osu_catch')" style="color:#44b9ff; border-color:#44b9ff;">🍎 CATCH</button>
+                    
+                    <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
+                    
+                    <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
+                    <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
+                    <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
+                    <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
+                    <button class="filter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
+                    <button class="filter-btn" data-type="key" data-val="8" onclick="setFilter('key', '8')">8K</button>
+                    <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
+                    <button class="filter-btn" data-type="key" data-val="10" onclick="setFilter('key', '10')">10K</button>
+                </div>
+            </div>
+            <div class="song-grid" id="song-grid"></div>
+        </main>
+    </div>
+
+    <div id="game-layer" style="display:none;">
+        <div id="mobile-touch-zones" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 900; flex-direction: row;"></div>
+        <div id="top-progress-bar">
+            <div id="top-progress-fill"></div>
+            <div id="top-progress-time">0:00 / 0:00</div>
+        </div>
+        
+        <div id="mobile-pause-btn" onclick="togglePause()">⏸</div>
+        <div id="vs-hud">
+            <div id="multi-players-container"></div>
+        </div>
+
+        <div id="ig-profile">
+            <div id="ig-av"></div>
+            <div id="ig-name" style="color:white;">User</div>
+        </div>
+
+        <div id="combo-container">
+            <div class="combo-label">COMBO</div>
+            <div id="g-combo" class="combo-val">0</div>
+            <div id="hud-fc" class="hud-fc">GFC</div>
+            <div id="hud-mean" class="hud-mean">0.00ms</div>
+        </div>
+
+        <div id="track"></div>
+
+        <div id="hud">
+            <div class="stats-col">
+                <div style="color:var(--sick)" class="stat-item">SICK <span id="h-sick">0</span></div>
+                <div style="color:var(--good)" class="stat-item">GOOD <span id="h-good">0</span></div>
+                <div style="color:var(--bad)" class="stat-item">BAD <span id="h-bad">0</span></div>
+                <div style="color:var(--miss)" class="stat-item">MISS <span id="h-miss">0</span></div>
+                
+                <div class="acc-block">
+                    <div class="acc-label">ACCURACY</div>
+                    <div class="acc-val" id="g-acc">100%</div>
+                </div>
+
+                <div class="score-label">SCORE</div>
+                <div class="score-val" id="g-score">0</div>
+            </div>
+            <div class="health-bar"><div class="health-fill" id="health-fill"></div></div>
+        </div>
+        
+        <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
+    </div>
+
+    <div id="modal-settings" class="modal-overlay" style="display: none; z-index: 999999; backdrop-filter: blur(10px);">
+        <div class="modal-panel" style="width: 1000px; max-width: 95vw; padding: 0; background: rgba(10,10,15,0.95); border: 1px solid #333; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
+            
+            <div style="background: linear-gradient(90deg, var(--accent), #0a0a0a); padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent);">
+                <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:white; text-shadow:0 0 10px black;">⚙️ CONFIGURACIÓN MAESTRA</h2>
+                <div style="display:flex; gap:10px;">
+                    <button class="action btn-acc" onclick="saveSettings()" style="width:auto; padding: 10px 25px; box-shadow: 0 0 15px rgba(0,0,0,0.5);">GUARDAR Y APLICAR</button>
+                    <button onclick="closeSettingsPanel()" style="background:rgba(0,0,0,0.5); border:1px solid #555; border-radius:8px; color:white; font-size:1.2rem; cursor:pointer; padding:5px 15px; transition:0.2s;">✖ CERRAR</button>
+                </div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-tabs">
+                    <button class="set-tab-btn active" onclick="switchSetTab('set-ux')">🌐 GENERAL / UX</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-mania')">🌸 OSU! MANIA</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-std')">🎯 OSU! STANDARD</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-taiko')">🥁 OSU! TAIKO</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-catch')">🍎 OSU! CATCH</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-vis')">🎨 VISUALES</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-audio')">🔊 AUDIO</button>
+                </div>
+
                 <div class="settings-content">
                     
-                    <div id="set-gen" class="set-section active">
-                        <h3 style="color:#00ffff; border-bottom:1px solid #333; padding-bottom:10px; margin-top:0;">AUDIO Y VIDEO</h3>
-                        
+                    <div id="set-ux" class="set-section active">
+                        <h3 style="color:#00ffff; margin-top:0;">Experiencia de Usuario</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Volumen Maestro</div><span class="set-sub">Música y efectos globales</span></div>
-                            <input type="range" id="cfg-vol" min="0" max="100" value="50" style="width:150px;">
+                            <div><div class="set-label">Mostrar FPS y Ping</div><div class="set-sub">Ver rendimiento en la esquina superior.</div></div>
+                            <input type="checkbox" id="cfg-show-fps" style="width:25px; height:25px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Volumen Hitsounds</div><span class="set-sub">Sonido al acertar notas</span></div>
-                            <input type="range" id="cfg-hvol" min="0" max="100" value="50" style="width:150px;">
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label">Offset de Audio (ms)</div><span class="set-sub">Ajustar si el audio va desfasado (+/-)</span></div>
-                            <input type="number" id="cfg-off" class="num-input" value="0">
-                        </div>
-                        
-                        <h3 style="color:#00ffff; border-bottom:1px solid #333; padding-bottom:10px; margin-top:30px;">VISUALES</h3>
-                        <div class="set-row">
-                            <div class="set-label">Mostrar FPS</div>
-                            <input type="checkbox" id="cfg-show-fps" style="transform:scale(1.5);">
-                        </div>
-                        <div class="set-row">
-                            <div class="set-label">Mostrar Subtítulos (Lyrics)</div>
-                            <input type="checkbox" id="cfg-subtitles" style="transform:scale(1.5);">
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label">Oscuridad del Fondo (%)</div><span class="set-sub">Dim Background</span></div>
-                            <input type="range" id="cfg-dim" min="0" max="100" value="50" style="width:150px;">
+                            <div><div class="set-label">Letras de Canciones (Lyrics)</div><div class="set-sub">Descarga y muestra subtítulos automáticos.</div></div>
+                            <input type="checkbox" id="cfg-subtitles" style="width:25px; height:25px;">
                         </div>
                     </div>
 
-                    <div id="set-mania" class="set-section">
-                        <h3 style="color:#ff66aa; margin-top:0;">GAMEPLAY MANIA</h3>
+                    <div id="set-mania" class="set-section" style="display:none;">
+                        <h3 style="color:#ff66aa; margin-top:0;">Ajustes de Mania</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Velocidad de Scroll (Speed)</div><span class="set-sub">Qué tan rápido caen las notas (1-40)</span></div>
-                            <input type="number" id="cfg-spd" class="num-input" value="25">
+                            <div><div class="set-label">Velocidad (Scroll Speed)</div><div class="set-sub">Multiplicador de caída de las notas.</div></div>
+                            <input type="number" id="cfg-spd" step="0.1" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div class="set-label">Scroll Hacia Abajo (Downscroll)</div>
-                            <input type="checkbox" id="cfg-down" checked style="transform:scale(1.5);">
+                            <div><div class="set-label">Dirección (Downscroll)</div><div class="set-sub">Las notas caen de arriba hacia abajo.</div></div>
+                            <input type="checkbox" id="cfg-down" style="width:25px; height:25px;">
                         </div>
-
-                        <div class="lane-cfg-box" style="margin-top:30px; background:#000; padding:20px; border-radius:10px; border:1px solid #333;">
-                            <h3 style="color:#00ffff; margin-top:0; border-bottom:1px solid #333; padding-bottom:10px;">CONFIGURAR TECLAS Y COLORES</h3>
-                            
-                            <div style="margin-bottom:20px; display:flex; align-items:center; gap:10px;">
-                                <label style="color:#aaa;">Modo:</label>
-                                <select id="kb-mode-select" class="num-input" onchange="renderLaneConfig(parseInt(this.value))">
-                                    <option value="4">4 Keys</option>
-                                    <option value="5">5 Keys</option>
-                                    <option value="6">6 Keys</option>
-                                    <option value="7">7 Keys</option>
-                                    <option value="8">8 Keys</option>
-                                    <option value="9">9 Keys</option>
+                        <div class="set-row">
+                            <div><div class="set-label">Inclinación de Pista (FOV 3D)</div><div class="set-sub">Grados de inclinación para dar efecto de profundidad (0 a 60).</div></div>
+                            <input type="number" id="cfg-fov" min="0" max="60" class="set-input" style="width:80px; margin:0;">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Opacidad Notas Largas (%)</div><div class="set-sub">Transparencia del cuerpo de las Hold Notes.</div></div>
+                            <input type="number" id="cfg-noteop" min="10" max="100" class="set-input" style="width:80px; margin:0;">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Densidad de Auto-Mapeo</div><div class="set-sub">Cantidad de notas generadas para audios custom (1-10).</div></div>
+                            <input type="number" id="cfg-den" min="1" max="10" class="set-input" style="width:80px; margin:0;">
+                        </div>
+                        
+                        <div style="margin-top:20px; background:#000; padding:20px; border-radius:15px; border:1px solid #333;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                                <h4 style="color:#00ffff; margin:0;">TECLAS Y VISTA PREVIA</h4>
+                                <select id="kb-mode-select" class="set-input" style="width:120px; margin:0;" onchange="window.renderLaneConfig(parseInt(this.value))">
+                                    <option value="4">4K</option><option value="5">5K</option><option value="6">6K</option><option value="7">7K</option><option value="8">8K</option><option value="9">9K</option>
                                 </select>
                             </div>
+                            <div id="lanes-container" style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;"></div>
                             
-                            <div id="lanes-container" class="lanes-view" style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                                </div>
-                        </div>
-
-                        <div style="margin-top:30px; text-align:center;">
-                            <div style="color:#888; margin-bottom:10px;">VISTA PREVIA DE NOTA</div>
-                            <div id="live-skin-preview" style="width:100px; height:100px; border:2px solid #333; margin:0 auto; background:#111; display:flex; align-items:center; justify-content:center; border-radius:10px;"></div>
+                            <div id="live-skin-preview" style="width:120px; height:120px; background:#111; border:2px dashed #444; border-radius:20px; margin:0 auto; display:flex; align-items:center; justify-content:center;"></div>
                         </div>
                     </div>
 
-                    <div id="set-std" class="set-section">
-                        <h3 style="color:#ff44b9; margin-top:0;">OSU! STANDARD</h3>
+                    <div id="set-std" class="set-section" style="display:none;">
+                        <h3 style="color:#ff44b9; margin-top:0;">Ajustes de Standard</h3>
                         <div class="set-row">
-                            <div class="set-label">Approach Rate (AR)</div>
-                            <input type="number" id="cfg-std-ar" class="num-input" value="9">
+                            <div><div class="set-label">Approach Rate (AR)</div><div class="set-sub">Velocidad del anillo (1-10)</div></div>
+                            <input type="number" id="cfg-std-ar" min="1" max="10" step="0.1" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div class="set-label">Circle Size (CS)</div>
-                            <input type="number" id="cfg-std-cs" class="num-input" value="4">
-                        </div>
-                    </div>
-
-                    <div id="set-taiko" class="set-section">
-                        <h3 style="color:#f95555; margin-top:0;">TAIKO DRUM</h3>
-                        <div class="set-row">
-                            <div><div class="set-label">Tecla DON (Centro - Izq)</div><span class="set-sub">Golpe Rojo</span></div>
-                            <button id="cfg-tk-dl" class="action secondary" onclick="captureSingleKey('cfg-tk-dl','tkDonL')">F</button>
+                            <div><div class="set-label">Circle Size (CS)</div><div class="set-sub">Tamaño de los círculos (1-10)</div></div>
+                            <input type="number" id="cfg-std-cs" min="1" max="10" step="0.1" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Tecla DON (Centro - Der)</div><span class="set-sub">Golpe Rojo</span></div>
-                            <button id="cfg-tk-dr" class="action secondary" onclick="captureSingleKey('cfg-tk-dr','tkDonR')">J</button>
+                            <div><div class="set-label">Tecla Izquierda (Click 1)</div></div>
+                            <button id="cfg-std-k1" class="set-input" onclick="captureSingleKey('cfg-std-k1', 'stdK1')" style="width:80px; cursor:pointer;">Z</button>
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Tecla KATSU (Borde - Izq)</div><span class="set-sub">Golpe Azul</span></div>
-                            <button id="cfg-tk-kl" class="action secondary" onclick="captureSingleKey('cfg-tk-kl','tkKatsuL')">D</button>
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label">Tecla KATSU (Borde - Der)</div><span class="set-sub">Golpe Azul</span></div>
-                            <button id="cfg-tk-kr" class="action secondary" onclick="captureSingleKey('cfg-tk-kr','tkKatsuR')">K</button>
+                            <div><div class="set-label">Tecla Derecha (Click 2)</div></div>
+                            <button id="cfg-std-k2" class="set-input" onclick="captureSingleKey('cfg-std-k2', 'stdK2')" style="width:80px; cursor:pointer;">X</button>
                         </div>
                     </div>
 
-                    <div id="set-catch" class="set-section">
-                        <h3 style="color:#44b9ff; margin-top:0;">CATCH THE BEAT</h3>
+                    <div id="set-taiko" class="set-section" style="display:none;">
+                        <h3 style="color:#f95555; margin-top:0;">Ajustes de Taiko</h3>
                         <div class="set-row">
-                            <div class="set-label">Sensibilidad / Velocidad</div>
-                            <input type="number" id="cfg-ct-spd" class="num-input" value="10">
+                            <div><div class="set-label">Don (Centro / Rojo)</div><div class="set-sub">Teclas interiores</div></div>
+                            <div style="display:flex; gap:10px;">
+                                <button id="cfg-tk-dl" class="set-input" onclick="captureSingleKey('cfg-tk-dl', 'tkDonL')" style="width:60px; cursor:pointer;">F</button>
+                                <button id="cfg-tk-dr" class="set-input" onclick="captureSingleKey('cfg-tk-dr', 'tkDonR')" style="width:60px; cursor:pointer;">J</button>
+                            </div>
                         </div>
                         <div class="set-row">
-                            <div class="set-label">Mover Izquierda</div>
-                            <button id="cfg-ct-l" class="action secondary" onclick="captureSingleKey('cfg-ct-l','ctLeft')">←</button>
+                            <div><div class="set-label">Katsu (Aro / Azul)</div><div class="set-sub">Teclas exteriores</div></div>
+                            <div style="display:flex; gap:10px;">
+                                <button id="cfg-tk-kl" class="set-input" onclick="captureSingleKey('cfg-tk-kl', 'tkKatsuL')" style="width:60px; cursor:pointer;">D</button>
+                                <button id="cfg-tk-kr" class="set-input" onclick="captureSingleKey('cfg-tk-kr', 'tkKatsuR')" style="width:60px; cursor:pointer;">K</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="set-catch" class="set-section" style="display:none;">
+                        <h3 style="color:#44b9ff; margin-top:0;">Ajustes de Catch</h3>
+                        <div class="set-row">
+                            <div><div class="set-label">Velocidad del Plato</div></div>
+                            <input type="number" id="cfg-ct-spd" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div class="set-label">Mover Derecha</div>
-                            <button id="cfg-ct-r" class="action secondary" onclick="captureSingleKey('cfg-ct-r','ctRight')">→</button>
+                            <div><div class="set-label">Mover Izquierda</div></div>
+                            <button id="cfg-ct-l" class="set-input" onclick="captureSingleKey('cfg-ct-l', 'ctLeft')" style="width:100px;">LArrow</button>
                         </div>
                         <div class="set-row">
-                            <div class="set-label">Dash (Correr)</div>
-                            <button id="cfg-ct-d" class="action secondary" onclick="captureSingleKey('cfg-ct-d','ctDash')">SHIFT</button>
+                            <div><div class="set-label">Mover Derecha</div></div>
+                            <button id="cfg-ct-r" class="set-input" onclick="captureSingleKey('cfg-ct-r', 'ctRight')" style="width:100px;">RArrow</button>
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Turbo (Dash)</div></div>
+                            <button id="cfg-ct-d" class="set-input" onclick="captureSingleKey('cfg-ct-d', 'ctDash')" style="width:100px;">Shift</button>
+                        </div>
+                    </div>
+
+                    <div id="set-vis" class="set-section" style="display:none;">
+                        <h3 style="color:#12FA05; margin-top:0;">Ajustes Visuales</h3>
+                        <div class="set-row">
+                            <div><div class="set-label">Fondo de Juego (Dim)</div><div class="set-sub">Opacidad de la imagen de fondo (0 a 100).</div></div>
+                            <input type="range" id="cfg-dim" min="0" max="100" class="set-input">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Efectos de Destello (Splash)</div><div class="set-sub">Iluminación de la pista al acertar notas.</div></div>
+                            <input type="checkbox" id="cfg-splash" style="width:25px; height:25px;">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Mostrar Precisión (MS)</div><div class="set-sub">Muestra los milisegundos de error flotando.</div></div>
+                            <input type="checkbox" id="cfg-show-ms" style="width:25px; height:25px;">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Ocultar Interfaz (HUD)</div><div class="set-sub">Juega sin ver puntuación o combo (Inmersivo).</div></div>
+                            <input type="checkbox" id="cfg-hide-ui" style="width:25px; height:25px;">
+                        </div>
+                    </div>
+
+                    <div id="set-audio" class="set-section" style="display:none;">
+                        <h3 style="color:#FFD700; margin-top:0;">Audio y Sincronización</h3>
+                        <div class="set-row">
+                            <div><div class="set-label">Volumen Maestro (Música)</div></div>
+                            <input type="range" id="cfg-vol" min="0" max="100" class="set-input">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Volumen de Acierto (Hit)</div></div>
+                            <input type="range" id="cfg-hvol" min="0" max="100" class="set-input">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Volumen de Fallo (Miss)</div></div>
+                            <input type="range" id="cfg-mvol" min="0" max="100" class="set-input">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Desfase Global (Offset MS)</div><div class="set-sub">Si notas que el audio va adelantado/atrasado.</div></div>
+                            <input type="number" id="cfg-off" class="set-input" style="width:100px; margin:0;">
                         </div>
                     </div>
 
@@ -288,314 +384,525 @@
             </div>
         </div>
     </div>
-
-    <div id="modal-profile" class="modal-overlay">
-        <div class="modal-neon-box" style="width:750px; min-height:500px;">
-            <div class="profile-header" style="display:flex; gap:25px; align-items:center; border-bottom:1px solid #333; padding-bottom:25px;">
-                <div id="p-av-big" style="width:120px; height:120px; background:#222; border-radius:20px; background-size:cover; box-shadow:0 0 20px rgba(0,0,0,0.5);"></div>
-                <div class="profile-info" style="flex:1;">
-                    <h2 id="p-name" style="margin:0; font-size:2.5rem; color:white; text-shadow:0 0 10px rgba(255,255,255,0.2);">Cargando...</h2>
-                    <div id="p-rank" style="color:#00ffff; font-size:1.2rem; margin-top:5px; font-weight:bold;">#--- Global</div>
-                    <div class="profile-stats" style="margin-top:15px; display:flex; gap:20px; color:#aaa;">
-                        <div style="background:#111; padding:5px 15px; border-radius:10px; border:1px solid #333;">PP: <span id="p-pp" style="color:white; font-weight:bold;">0</span></div>
-                        <div style="background:#111; padding:5px 15px; border-radius:10px; border:1px solid #333;">Nivel: <span id="p-lvl" style="color:white; font-weight:bold;">1</span></div>
-                    </div>
+    <div id="modal-diff" class="modal-overlay">
+        <div class="modal-panel" style="width: 950px; max-width: 95vw; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.05); display: flex; gap: 40px; align-items: stretch;">
+            
+            <div style="flex: 0 0 320px; display: flex; flex-direction: column; text-align: center;">
+                <div style="position: relative; margin-bottom: 25px;">
+                    <div id="diff-song-cover" style="width: 100%; aspect-ratio: 1; border-radius: 20px; background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 15px 35px rgba(0,0,0,0.6); position: relative; z-index: 2;"></div>
+                    <div id="diff-song-glow" style="position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%); background: var(--accent); filter: blur(50px); opacity: 0.3; z-index: 1; border-radius: 50%; pointer-events: none;"></div>
                 </div>
-            </div>
-            
-            <div id="p-bio" class="profile-bio" style="margin:25px 0; color:#888; font-style:italic; padding:15px; background:rgba(255,255,255,0.05); border-radius:10px;">Sin biografía...</div>
-            
-            <h3 style="margin-top:20px; color:#ff66aa;">Últimas Jugadas</h3>
-            <div id="p-history" class="profile-history-list" style="max-height:250px; overflow-y:auto; border:1px solid #333; border-radius:10px; padding:10px; background:#000;">
+                
+                <div id="diff-song-title" style="font-size: 1.8rem; font-weight: 900; color: white; text-shadow: 0 4px 10px rgba(0,0,0,0.5); line-height: 1.2; margin-bottom: 8px;">...</div>
+                <div style="color: var(--accent); font-size: 0.85rem; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; margin-bottom: auto; padding-bottom: 20px;">Preparando Partida</div>
+                
+                <div class="ranked-toggle" style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
+                    <input type="checkbox" id="chk-ranked" style="accent-color: var(--gold); transform: scale(1.3); cursor: pointer;">
+                    <label for="chk-ranked" style="margin-left: 12px; color: var(--gold); font-weight: 900; letter-spacing: 1px; cursor: pointer;">RANKED MODE</label>
                 </div>
 
-            <div class="modal-buttons-row" style="margin-top:auto; padding-top:20px; display:flex; gap:15px; justify-content:flex-end;">
-                <button class="action secondary" onclick="closeModal('profile')">CERRAR</button>
-                <button class="action" id="btn-logout" onclick="window.logout()" style="background:#F9393F; color:white;">CERRAR SESIÓN</button>
+                <button class="action secondary" style="width: 100%; border-radius: 12px; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;" onclick="closeModal('diff')">⬅ VOLVER</button>
             </div>
+
+            <div style="flex: 1; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
+                    <h2 style="margin: 0; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: 1px;">SELECCIONA MODO</h2>
+                </div>
+
+                <div class="diff-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto; padding-right: 10px; align-content: flex-start;"></div>
+                
+                <div id="create-lobby-opts" style="display:none; margin-top: auto; padding-top: 20px;">
+                    <button class="action" style="width: 100%; border-radius: 12px; padding: 15px; background: linear-gradient(90deg, var(--blue), #00ffff); color: black;" onclick="confirmCreateLobby()">🌐 CREAR SALA ONLINE</button>
+                </div>
+            </div>
+
         </div>
     </div>
 
-    <div id="modal-auth" class="modal-overlay">
-        <div class="modal-neon-box" style="width:400px; text-align:center; padding:40px;">
-            <h2 style="margin-top:0; color:#ff0055; font-size:2rem;">BIENVENIDO</h2>
-            <p style="color:#888; margin-bottom:30px;">Inicia sesión para guardar tu progreso.</p>
-            
-            <button class="google-btn" onclick="loginWithGoogle()" style="width:100%; padding:12px; background:white; color:black; border:none; border-radius:5px; cursor:pointer; font-weight:bold; margin-bottom:20px; display:flex; align-items:center; justify-content:center; gap:10px;">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" width="20"> Iniciar con Google
-            </button>
-            
-            <div class="separator" style="color:#444; margin:15px 0; font-size:0.9rem;">— O USA TU CORREO —</div>
-            
-            <input type="email" id="login-email" class="auth-input" placeholder="Correo electrónico" style="width:100%; padding:12px; margin-bottom:10px; background:#111; border:1px solid #333; color:white; border-radius:5px;">
-            <input type="password" id="login-pass" class="auth-input" placeholder="Contraseña" style="width:100%; padding:12px; margin-bottom:25px; background:#111; border:1px solid #333; color:white; border-radius:5px;">
-            
-            <div class="modal-buttons-row" style="display:flex; gap:10px; margin-bottom:20px;">
-                <button class="action" onclick="emailLogin()" style="flex:1;">ENTRAR</button>
-                <button class="action secondary" onclick="emailRegister()" style="flex:1;">REGISTRARSE</button>
-            </div>
-            
-            <button class="text-btn" onclick="closeModal('auth')" style="background:none; border:none; color:#666; cursor:pointer; text-decoration:underline;">Continuar como Invitado</button>
+    <div id="modal-finish-reg" class="modal-overlay" style="z-index: 6000;">
+        <div class="modal-panel login-box">
+            <div class="m-title">CASI LISTO</div>
+            <input type="text" id="reg-google-user" class="log-inp" placeholder="Nombre de Usuario">
+            <button class="action" onclick="finishGoogleRegistration()">CREAR CUENTA</button>
         </div>
     </div>
 
-    <div id="modal-studio" class="modal-overlay">
-        <div class="modal-neon-box" style="width:850px; height:650px; display:flex; flex-direction:column;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:15px;">
-                <div>
-                    <h2 style="margin:0; color:white;">STUDIO PRO</h2>
-                    <span style="color:#666; font-size:0.9rem;">Crea, edita y comparte tus mapas</span>
-                </div>
-                <button class="action" onclick="window.openModal('upload')" style="background:#12FA05; color:black;">+ NUEVO MAPA</button>
-            </div>
-            
-            <div id="studio-loading" style="display:none; text-align:center; padding:50px; color:#aaa;">Cargando tus mapas...</div>
-            
-            <div id="studio-grid" class="studio-grid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:20px; padding-right:10px;">
-                </div>
-            
-            <div style="margin-top:auto; text-align:right; padding-top:20px; border-top:1px solid #333;">
-                <button class="action secondary" onclick="closeModal('studio')">VOLVER AL MENÚ</button>
-            </div>
+    <div id="modal-song-selector" class="modal-overlay">
+        <div class="modal-panel" style="width:800px; height:80vh;">
+            <div class="m-title">ELIGE CANCIÓN</div>
+            <input type="text" class="search-inp" style="width:100%;" placeholder="Buscar..." oninput="renderLobbySongList(this.value)">
+            <div class="song-grid" id="lobby-song-grid" style="padding:10px;"></div>
+            <button class="action secondary" onclick="closeModal('song-selector')">CANCELAR</button>
         </div>
     </div>
 
     <div id="modal-upload" class="modal-overlay">
-        <div class="modal-neon-box" style="width:450px;">
-            <h3 style="margin-top:0; color:#00ffff;">SUBIR NUEVO AUDIO</h3>
-            <p style="color:#888; font-size:0.9rem; margin-bottom:20px;">Sube un archivo MP3 para comenzar a mapear.</p>
-            
-            <label style="display:block; margin-bottom:5px; color:#ccc;">Título de la Canción</label>
-            <input type="text" id="up-title" class="cw-input" placeholder="Ej: Freedom Dive" style="width:100%; margin-bottom:15px;">
-            
-            <label style="display:block; margin-bottom:5px; color:#ccc;">Artista</label>
-            <input type="text" id="up-artist" class="cw-input" placeholder="Ej: xi" style="width:100%; margin-bottom:15px;">
-            
-            <div style="margin:20px 0; padding:15px; background:#1a1a1a; border-radius:5px; border:1px dashed #444;">
-                <label style="display:block; margin-bottom:10px; color:white;">Archivo de Audio (MP3/OGG)</label>
-                <input type="file" id="up-file" accept="audio/*" style="color:#888;">
+        <div class="modal-panel settings-panel" style="max-width: 900px; height: auto; display: flex; flex-direction: column;">
+            <div class="settings-header">
+                <div class="m-title" style="margin:0; border:none; text-align:left; color: white;">☁️ STUDIO: SUBIR CANCIÓN</div>
+                <button class="action secondary" style="width:auto; padding:10px 20px;" onclick="closeModal('upload')">X</button>
             </div>
-            
-            <button id="btn-upload-submit" class="action" onclick="submitSongUpload()" style="width:100%; margin-bottom:10px;">SUBIR Y MAPEAR</button>
-            <button class="action secondary" onclick="closeModal('upload')" style="width:100%;">CANCELAR</button>
+
+            <div class="settings-content" style="display:flex; gap: 30px; padding: 30px;">
+                <div style="flex:1; display:flex; flex-direction:column; gap:20px;">
+                    <div>
+                        <div style="color:var(--accent); font-weight:900; margin-bottom:5px;">TÍTULO</div>
+                        <input type="text" id="up-title" class="log-inp" placeholder="Ej: Alan Walker - Faded" style="margin:0;">
+                    </div>
+
+                    <div style="background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
+                        <div style="color:var(--blue); font-weight:900; margin-bottom:10px;">🎧 ARCHIVO MP3</div>
+                        <div style="display:flex; gap:10px; margin-bottom:15px;">
+                            <button class="action" id="btn-up-audio" onclick="triggerAudioUpload()" style="flex:1; font-size: 0.9rem;">SUBIR MP3</button>
+                        </div>
+                        <div id="lbl-up-audio" style="margin-top:15px; font-weight: bold; color:#666; text-align:center;">Ningún archivo seleccionado</div>
+                    </div>
+
+                    <input type="hidden" id="up-url" value="">
+                    <input type="hidden" id="up-lyrics" value="">
+                </div> 
+                <div style="width: 250px; display:flex; flex-direction:column; gap:10px;">
+                    <div style="color:var(--gold); font-weight:900;">🖼️ PORTADA (Opcional)</div>
+                    <div id="up-cover-preview" style="width:100%; aspect-ratio: 1; background:#0a0a0a; border:2px dashed #444; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer; background-size:cover; background-position:center;" onclick="triggerCoverUpload()">
+                        <span style="font-size:3rem;">📷</span><span style="color:#888; font-weight:bold;">Subir Imagen</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-header" style="border-top:1px solid #222; border-bottom:none; justify-content:flex-end; background: #080808; padding: 20px 30px;">
+                <button class="action btn-acc" id="btn-publish-song" style="width:auto; padding:15px 40px;" onclick="submitSongToFirebase()">PUBLICAR CANCIÓN</button>
+            </div>
         </div>
     </div>
 
     <div id="modal-lobbies" class="modal-overlay">
-        <div class="modal-neon-content" style="width:850px; height:650px; background:#111; padding:25px; border-radius:20px; border:1px solid #333; display:flex; flex-direction:column;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h2 style="margin:0; color:white;">SALAS MULTIJUGADOR</h2>
-                <div id="lobby-filters-bar" style="display:flex; gap:10px;">
-                    <button class="action active" onclick="window.setLobbyFilter('all', this)">🌐 TODAS</button>
-                    <button class="action secondary" onclick="window.setLobbyFilter('waiting', this)">⏳ ESPERANDO</button>
-                    <button class="action secondary" onclick="window.setLobbyFilter('playing', this)">▶️ JUGANDO</button>
-                </div>
+        <div class="modal-panel" style="width:800px;">
+            <div class="m-title">SALAS ONLINE</div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                 <button class="btn-small btn-add" onclick="openSongSelectorForLobby()">CREAR SALA</button>
+                 <button class="btn-small btn-chat" onclick="refreshLobbies()">ACTUALIZAR</button>
             </div>
-
-            <input type="text" id="lobby-search-inp" placeholder="🔍 Buscar sala..." class="cw-input" style="width:100%; margin-bottom:20px; padding:12px;">
-
-            <div id="lobby-list" class="lobby-grid" style="flex:1; overflow-y:auto; border:1px solid #222; background:#050505; border-radius:10px; padding:15px; display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:15px;">
-                </div>
-            
-            <div class="modal-buttons-row" style="margin-top:20px; display:flex; gap:15px; justify-content:flex-end;">
-                <button class="action" onclick="createLobby()" style="background:#00ffff; color:black;">+ CREAR SALA</button>
-                <button class="action secondary" onclick="closeModal('lobbies')">VOLVER</button>
-            </div>
+            <div id="lobby-list"></div>
+            <button class="action secondary" onclick="closeModal('lobbies')">CERRAR</button>
         </div>
     </div>
 
-    <div id="modal-host" class="modal-overlay">
-        <div class="modal-neon-box" style="width:850px; height:600px; display:flex; flex-direction:column;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:1px solid #333; padding-bottom:15px;">
-                <h2 id="host-title" style="margin:0; font-family:monospace; color:#00ffff;">SALA #XXXX</h2>
-                <button class="btn-small" onclick="copyLobbyCode()" style="background:#222; border:1px solid #444; color:white; padding:5px 10px; cursor:pointer;">COPIAR CÓDIGO</button>
-            </div>
-            
-            <div class="host-layout" style="display:flex; gap:25px; flex:1;">
-                <div class="host-players" style="flex:1; background:#050505; border:1px solid #333; border-radius:10px; padding:15px; display:flex; flex-direction:column;">
-                    <h3 style="margin-top:0; color:#aaa; border-bottom:1px solid #222; padding-bottom:10px;">JUGADORES</h3>
-                    <div id="host-player-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:5px;"></div>
-                </div>
-                
-                <div class="host-song" style="flex:1; background:#050505; border:1px solid #333; border-radius:10px; padding:15px; display:flex; flex-direction:column;">
-                    <h3 style="margin-top:0; color:#aaa; border-bottom:1px solid #222; padding-bottom:10px;">CANCIÓN</h3>
-                    <div id="host-song-card" class="song-card-mini" onclick="window.openSongBrowserForLobby()" style="flex:1; display:flex; align-items:center; justify-content:center; background:#111; border:1px dashed #444; cursor:pointer; border-radius:10px; transition:0.2s;">
-                        <div style="text-align:center;">
-                            <div style="font-size:3rem; margin-bottom:10px;">🎵</div>
-                            <div>CLICK PARA ELEGIR</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="modal-buttons-row" style="margin-top:20px; display:flex; gap:15px; justify-content:flex-end;">
-                <button id="btn-host-start" class="action" onclick="startLobbyGame()" disabled style="background:#333; cursor:not-allowed; width:200px;">ESPERANDO...</button>
-                <button class="action secondary" onclick="leaveLobby()">SALIR DE SALA</button>
-            </div>
+   <div id="modal-host" class="modal-overlay">
+        <div class="modal-panel" style="width:700px; text-align:center;">
+            <div class="m-title" id="room-host-name">SALA</div>
+            <div style="margin-bottom:20px;" id="room-song">...</div>
+            <div id="room-players" style="display:flex; gap:20px; justify-content:center;"></div>
+            <button class="action btn-acc" id="btn-ready" onclick="toggleReady()">LISTO</button>
+            <button class="action secondary" onclick="leaveLobby()">SALIR</button>
         </div>
     </div>
 
     <div id="modal-shop" class="modal-overlay">
-        <div class="modal-neon-content" style="width:850px; height:650px; background:#111; padding:30px; border-radius:20px; display:flex; flex-direction:column; border:1px solid #333;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <div>
-                    <h2 style="margin:0; color:white;">TIENDA DE ITEMS</h2>
-                    <span style="color:#666;">Compra skins y marcos para tu perfil</span>
-                </div>
-                <div class="shop-balance" style="color:#FFD700; font-size:1.8rem; font-weight:bold; text-shadow:0 0 10px rgba(255,215,0,0.3);">💰 <span id="shop-sp">0</span> SP</div>
-            </div>
-            
-            <div id="shop-items" class="shop-grid" style="flex:1; overflow-y:auto; display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:20px; padding:10px;">
-                </div>
-            
-            <button class="action secondary" onclick="closeModal('shop')" style="margin-top:20px; align-self:flex-end;">CERRAR TIENDA</button>
-        </div>
-    </div>
-
-    <div id="modal-clans" class="modal-overlay">
-        <div class="modal-neon-box" style="width:750px; min-height:550px;">
-            <div id="clan-none-view">
-                <h2 style="color:#ff0055;">CLANES</h2>
-                <p style="color:#aaa;">Únete a un clan para competir en guerras de territorio o crea el tuyo.</p>
-                
-                <h3 style="margin-top:30px; border-bottom:1px solid #333; padding-bottom:10px;">Clanes Populares</h3>
-                <div id="c-popular-list" style="margin-bottom:30px;"></div>
-                
-                <div style="background:#1a1a1a; padding:20px; border-radius:10px; border:1px solid #333;">
-                    <h3 style="margin-top:0;">Crear Nuevo Clan (Costo: 50,000 SP)</h3>
-                    <div style="display:flex; gap:10px;">
-                        <input id="c-new-name" class="cw-input" placeholder="Nombre del Clan" style="flex:2;">
-                        <input id="c-new-tag" class="cw-input" placeholder="TAG (Max 4)" maxlength="4" style="flex:1; text-transform:uppercase;">
-                        <input type="color" id="c-new-color" value="#ff0055" style="height:40px; width:50px; border:none; background:none;">
-                    </div>
-                    <button class="action" onclick="createClan()" style="margin-top:15px;">FUNDAR CLAN</button>
-                </div>
-            </div>
-            
-            <div id="clan-dash-view" style="display:none; height:100%;">
-                </div>
-            
-            <button class="action secondary" style="margin-top:auto;" onclick="closeModal('clans')">CERRAR</button>
+        <div class="modal-panel" style="width:800px;">
+            <div class="m-title">TIENDA</div>
+            <div style="text-align:center; margin-bottom:20px;">SP: <span id="shop-sp">0</span></div>
+            <div class="shop-grid" id="shop-items"></div>
+            <button class="action secondary" onclick="closeModal('shop')">CERRAR</button>
         </div>
     </div>
     
-    <div id="modal-rank" class="modal-overlay">
-        <div class="modal-neon-content" style="width:650px; height:750px; background:#111; padding:25px; border-radius:15px; display:flex; flex-direction:column;">
-            <h2 style="color:#00ffff; text-align:center; margin-bottom:20px;">🏆 TOP JUGADORES</h2>
-            
-            <div class="rank-header-row" style="display:flex; padding:10px; background:#1a1a1a; font-weight:bold; color:#888; border-radius:5px;">
-                <span style="width:50px;">#</span>
-                <span style="flex:1;">JUGADOR</span>
-                <span style="width:100px; text-align:right;">PP</span>
+    <div id="modal-osu" class="modal-overlay">
+        <div class="modal-panel" style="width:900px; height:85vh; display:flex; flex-direction:column;">
+            <div class="m-title" style="color:#ff66aa; border-bottomColor:#ff66aa;">🌸 OSU! DIRECT</div>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <input type="text" id="osu-search-inp" class="log-inp" style="flex:1; margin:0;" placeholder="Buscar canción, artista o anime..." onkeydown="if(event.key==='Enter') searchOsu()">
+                <button class="action" style="width:auto; padding:0 30px; background:#ff66aa; color:black;" onclick="searchOsu()">BUSCAR</button>
             </div>
+            <div id="osu-status" style="text-align:center; color:#888; margin-bottom:10px; font-weight:bold;">Busca cualquier mapa de Osu!</div>
+            <div id="osu-results" class="song-grid" style="flex:1; overflow-y:auto; padding:10px; border:1px solid #333; border-radius:10px;"></div>
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('osu')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-news" class="modal-overlay">
+        <div class="modal-panel" style="width:600px;">
+            <div class="m-title">NOVEDADES ULTRA</div>
+            <div class="patch-text">
+                <ul>
+                    <li><b>UI REMASTER:</b> Nuevo selector de modo, menú de ajustes y HUD.</li>
+                    <li><b>HOLD NOTES:</b> Lógica de notas largas mejorada.</li>
+                    <li><b>INDICADORES:</b> Mean MS y Full Combo status en vivo.</li>
+                </ul>
+            </div>
+            <button class="action secondary" onclick="closeModal('news')">CERRAR</button>
+        </div>
+    </div>
+
+    <div id="modal-studio" class="modal-overlay">
+        <div class="modal-panel" style="width:900px; height:85vh; display:flex; flex-direction:column;">
+            <div class="m-title" style="color:#00ffff; border-bottomColor:#00ffff;">✏️ MIS CREACIONES</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <div style="color:#aaa;">Aquí están todas las canciones que has subido a la Nube. ¡Añádeles notas!</div>
+                <button class="action" style="width:auto; padding:5px 20px;" onclick="closeModal('studio'); openModal('upload')">☁️ SUBIR NUEVA CANCIÓN</button>
+            </div>
+            <div id="studio-loading" style="text-align:center; color:var(--gold); padding:20px; font-weight:bold;">Buscando tus canciones en la Nube... ⏳</div>
+            <div id="studio-grid" class="song-grid" style="flex:1; overflow-y:auto; padding:10px; border:1px solid #333; border-radius:10px;"></div>
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('studio')">CERRAR STUDIO</button>
+        </div>
+    </div>
+
+    <div id="modal-profile" class="modal-overlay">
+        <div class="modal-panel" style="width: 95%; max-width: 800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
             
-            <div id="rank-list" class="rank-list" style="flex:1; overflow-y:auto; margin-top:10px;">
+            <div id="login-view" style="padding: 40px; text-align:center;">
+                <div class="m-title" style="color:var(--accent); border-color:var(--accent);">INICIAR SESIÓN</div>
+                <button class="btn-google" onclick="loginGoogle()" style="margin-bottom:20px;">ENTRAR CON GOOGLE</button>
+                <input type="text" id="l-user" class="log-inp" placeholder="Usuario Local (Opcional)">
+                <input type="password" id="l-pass" class="log-inp" placeholder="Contraseña Local">
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="action" onclick="login()" style="flex:1;">ENTRAR</button>
+                    <button class="action secondary" onclick="register()" style="flex:1;">REGISTRAR</button>
                 </div>
-            
-            <button class="action secondary" onclick="closeModal('rank')" style="margin-top:20px;">CERRAR</button>
+                <button class="action secondary" style="margin-top:20px; width:100%;" onclick="closeModal('profile')">CERRAR</button>
+            </div>
+
+            <div id="profile-view" style="display:none;">
+                <div id="p-header-bg" style="height:220px; background:linear-gradient(to bottom, transparent, #0a0a0a), url('icon.png') center/cover; position:relative; transition: all 0.4s ease;">
+                    <button class="action secondary" style="position:absolute; right:15px; top:15px; width:auto; padding:5px 15px; background: rgba(0,0,0,0.6); z-index: 10; border:1px solid #555;" onclick="closeModal('profile')">CERRAR X</button>
+                    <label id="btn-edit-banner" style="display:none; position:absolute; bottom:15px; right:15px; background:rgba(0,0,0,0.8); color:white; padding:8px 20px; border-radius:10px; cursor:pointer; font-weight:bold; border:1px solid var(--accent); z-index: 10; transition: 0.2s; box-shadow: 0 0 10px rgba(255,102,170,0.3);">
+                        ✏️ Cambiar Banner
+                        <input type="file" accept="image/*" style="display:none" onchange="uploadBanner(this)">
+                    </label>
+                </div>
+                
+                <div style="padding: 0 5% 40px 5%; position:relative; top:-60px;">
+                    
+                    <div class="profile-header-flex" style="display:flex; align-items:flex-end; gap:35px;">
+                        
+                        <div style="position:relative; z-index:10;">
+                            <label class="prof-av-big" id="p-av-big" style="width:140px; height:140px; border-radius:20px; border:4px solid var(--accent); background-color:#111; background-size:cover; background-position:center; position:relative; display:block; cursor:pointer; overflow:hidden;">
+                                <span id="p-av-letter" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:4rem; font-weight:900; color:#555; z-index:1;"></span>
+                                <div id="p-av-overlay" style="display:none; position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.7); color:white; text-align:center; padding:5px 0; font-size:0.8rem; font-weight:bold; z-index:2; text-transform:uppercase;">CAMBIAR</div>
+                                <input type="file" accept="image/*" style="display:none" onchange="uploadAvatar(this)" id="avatar-upload-input">
+                            </label>
+                            <div id="p-top-badge" style="display:none; position:absolute; bottom:-12px; right:-18px; font-size:1.5rem; font-weight:900; z-index:15; padding: 3px 12px; transform: rotate(-8deg);">
+                                👑 #1
+                            </div>
+                        </div>
+                        
+                        <div style="flex:1; padding-bottom: 10px;">
+                            <div id="p-name-container" style="display:flex; align-items:center;">
+                                <h2 id="p-name" style="margin:0; font-size:3.5rem; font-weight:900; text-shadow:0 4px 15px rgba(0,0,0,0.8); color:white; line-height: 1;">User</h2>
+                                <span id="p-user-tag" class="player-tag" style="display:none;">TAG</span>
+                            </div>
+
+                            <div style="display:flex; gap:15px; align-items:center; margin-top:5px;">
+                                <div id="p-lvl-txt" style="color:var(--gold); font-weight:900; font-size:1.2rem; letter-spacing: 2px;">LVL 1</div>
+                                <div id="p-online-status" style="font-size: 13px; font-weight:bold; background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:10px; border: 1px solid #444;">⚪ Offline</div>
+                            </div>
+                            <div id="p-custom-status" style="color: var(--accent); font-style: italic; font-size: 14px; margin-top: 5px;"></div>
+                        </div>
+
+                        <div style="text-align:right; padding-bottom: 10px;">
+                            <div style="font-size:0.9rem; color:#888; font-weight:bold; letter-spacing: 1px;">GLOBAL</div>
+                            <div id="p-global-rank" style="font-size:2.5rem; font-weight:900; color:white; text-shadow: 0 0 15px rgba(255,255,255,0.3);">#--</div>
+                        </div>
+                    </div>
+
+                    <div id="p-bio" style="font-size: 14px; color: #ddd; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 3px solid var(--accent); line-height:1.5;"></div>
+
+                    <div id="profile-main-stats">
+                        <div class="xp-container" style="margin-top:20px; height:18px; background:#1a1a1a; border-radius:10px; border: 1px solid #333; overflow:hidden;">
+                            <div class="xp-fill" id="p-xp-bar" style="height:100%; background:linear-gradient(90deg, #ff66aa, #00ffff); width:0%; transition: width 0.5s;"></div>
+                        </div>
+
+                        <div class="profile-stats-grid" style="display:grid; grid-template-columns:repeat(4, 1fr); gap:15px; margin-top:25px;">
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">PERFORMANCE</div>
+                                <div id="p-pp-display" style="color:var(--accent); font-size:1.8rem; font-weight:900;">0 <span style="font-size:1rem;">PP</span></div>
+                            </div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">TOTAL SCORE</div>
+                                <div id="p-score" style="color:white; font-size:1.8rem; font-weight:900;">0</div>
+                            </div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">PARTIDAS</div>
+                                <div id="p-plays" style="color:var(--blue); font-size:1.8rem; font-weight:900;">0</div>
+                            </div>
+                            <div style="background:linear-gradient(145deg, #1a1a1a, #111); padding:20px 10px; border-radius:12px; text-align:center; border:1px solid #222;">
+                                <div style="color:#aaa; font-size:0.75rem; font-weight:bold; margin-bottom:5px;">SP AHORRADO</div>
+                                <div id="p-sp-display" style="color:var(--gold); font-size:1.8rem; font-weight:900;">0</div>
+                            </div>
+                        </div>
+
+                        <div class="profile-equip-flex" style="margin-top:20px; display:flex; gap:15px;">
+                            <div style="flex:1; background:#111; padding:15px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:2rem;">🎨</div>
+                                <div><div style="color:#888; font-size:0.75rem;">SKIN DE NOTAS</div><div id="p-equipped-skin" style="font-weight:900; color:#00ffff;">Default</div></div>
+                            </div>
+                            <div style="flex:1; background:#111; padding:15px; border-radius:12px; border:1px solid #333; display:flex; align-items:center; gap:15px;">
+                                <div style="font-size:2rem;">🖼️</div>
+                                <div><div style="color:#888; font-size:0.75rem;">MARCO EQUIPADO</div><div id="p-equipped-ui" style="font-weight:900; color:#ff66aa;">Ninguno</div></div>
+                            </div>
+                        </div>
+                        
+                        <div id="p-owner-actions" style="display:none; gap:15px; margin-top:25px;">
+                            <button class="action secondary" style="flex:1;" onclick="toggleProfileSettings(true)">⚙️ AJUSTES Y PRIVACIDAD</button>
+                        </div>
+
+                        <div id="p-visitor-actions" style="display:none; gap:15px; margin-top:25px;">
+                            <button class="action" style="flex:1; background:var(--good); color:black;" id="btn-add-friend">➕ AGREGAR AMIGO</button>
+                            <button class="action" style="flex:1; background:var(--blue); color:white;" id="btn-chat-user">💬 CHATEAR</button>
+                            <button class="action" style="flex:1; background:var(--gold); color:black;" id="btn-challenge-user">⚔️ DESAFIAR</button>
+                        </div>
+                    </div>
+
+                    <div id="profile-account-settings" style="display:none; margin-top:20px; background:#111; padding:20px; border-radius:12px; border:1px solid #333;">
+                        <h3 style="color:var(--accent); margin-top:0;">⚙️ PRIVACIDAD Y ESTADO</h3>
+                        <input type="text" id="inp-custom-status" class="log-inp" placeholder="Escribe un estado (Ej: Jugando Osu!)">
+                        <textarea id="inp-bio" class="log-inp" placeholder="Escribe tu biografía aquí..." style="height:80px; resize:none;"></textarea>
+                        
+                        <div class="ranked-toggle" style="margin-bottom:20px;">
+                            <input type="checkbox" id="chk-hide-items">
+                            <label for="chk-hide-items" style="margin-left:10px; color:white;">Ocultar mis Ítems a los demás</label>
+                        </div>
+
+                        <div id="custom-tag-creator" style="display:none; background:rgba(255,102,170,0.1); border: 1px solid var(--accent); padding:15px; border-radius:10px; margin-bottom:20px;">
+                            <div style="color:var(--accent); font-weight:bold; margin-bottom:10px;">🎟️ CREADOR DE TAG CUSTOM</div>
+                            <input type="text" id="inp-tag-text" class="log-inp" placeholder="Texto del Tag (Max 12 letras)" maxlength="12">
+                            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:0.8rem; color:#aaa;">Color Fondo</label>
+                                    <input type="color" id="inp-tag-bg" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:0.8rem; color:#aaa;">Color Letra</label>
+                                    <input type="color" id="inp-tag-color" style="width:100%; height:40px; border:none; background:none; cursor:pointer;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:20px;">
+                            <label style="color:#888; font-weight:bold; font-size:0.9rem;">Equipar Tag de mi Inventario</label>
+                            <select id="sel-equip-tag" class="log-inp" style="background:#222; color:white; border:1px solid #444;" onchange="if(typeof checkCustomTag==='function')checkCustomTag()">
+                                <option value="none">Ninguno</option>
+                            </select>
+                        </div>
+                        
+                        <button class="action secondary" style="width:100%; margin-bottom:10px;" onclick="saveProfilePrivacy()">GUARDAR CAMBIOS</button>
+                        
+                        <div id="acc-mgmt-area" style="padding-top:20px; border-top:1px solid #333; margin-top:20px;">
+                            <button class="action secondary" style="width:100%; border-color:#F9393F; color:#F9393F;" onclick="logout()">CERRAR SESIÓN</button>
+                        </div>
+
+                        <button class="action" style="width:100%; background:#444; color:white; margin-top:15px;" onclick="toggleProfileSettings(false)">⬅ VOLVER</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="modal-admin" class="modal-overlay">
-        <div class="modal-neon-box" style="width:500px;">
-            <h2 style="color:red; border-bottom:1px solid red; padding-bottom:10px;">PANEL DE ADMINISTRADOR</h2>
-            
-            <div style="margin:20px 0;">
-                <h3>Estado del Servidor</h3>
-                <div id="admin-maint-status" style="font-weight:bold; margin-bottom:10px;">VERIFICANDO...</div>
-                <button class="action" onclick="toggleMaintenance()" style="background:red; color:white;">TOGGLE MANTENIMIENTO</button>
+        <div class="modal-panel admin-panel-container" style="width: 800px; padding:0; background:#0a0a0a; overflow:hidden;">
+            <div class="admin-header">
+                <h2 style="margin:0; font-size:2rem; font-weight:900; color:white; text-shadow:0 0 10px white;">💻 GOD MODE: PANEL DE CONTROL</h2>
             </div>
             
-            <div style="margin:20px 0; border-top:1px solid #333; padding-top:20px;">
-                <h3>Anuncio Global</h3>
-                <input id="adm-ann-title" class="cw-input" placeholder="Título" style="width:100%; margin-bottom:10px;">
-                <input id="adm-ann-msg" class="cw-input" placeholder="Mensaje" style="width:100%; margin-bottom:10px;">
-                <button class="action" onclick="sendGlobalAnnounce()">ENVIAR AVISO</button>
-            </div>
-            
-            <button class="action secondary" onclick="closeModal('admin')">CERRAR</button>
-        </div>
-    </div>
-
-    <div id="editor-layer" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#111; z-index:200; flex-direction:column;">
-        <div style="height:50px; background:#000; border-bottom:1px solid #333; display:flex; align-items:center; justify-content:space-between; padding:0 20px;">
-            <div id="ed-title" style="font-weight:bold; color:white;">EDITANDO: Sin Título</div>
-            <div style="display:flex; gap:10px;">
-                <button class="action" onclick="window.testMap()" style="padding:5px 15px; font-size:0.8rem;">▶ PROBAR</button>
-                <button class="action" onclick="window.saveEditorMap()" style="padding:5px 15px; font-size:0.8rem; background:#12FA05; color:black;">💾 GUARDAR</button>
-                <button class="action secondary" onclick="window.closeEditor()" style="padding:5px 15px; font-size:0.8rem;">❌ SALIR</button>
-            </div>
-        </div>
-
-        <div style="flex:1; display:flex; overflow:hidden;">
-            <div id="ed-scroll-area" style="flex:1; overflow-y:scroll; position:relative; background:#050505; display:flex; justify-content:center;">
-                <div id="ed-grid" style="position:relative; width:320px; background:repeating-linear-gradient(0deg, #000, #000 19px, #111 20px); box-shadow:0 0 50px rgba(0,0,0,0.5);">
-                    </div>
-                <div id="ed-playhead" style="position:absolute; width:100%; height:2px; background:red; top:0; z-index:10; pointer-events:none;"></div>
-            </div>
-
-            <div class="ed-sidebar" style="width:300px; background:#151515; border-left:1px solid #333; padding:20px; display:flex; flex-direction:column; overflow-y:auto;">
-                <h3 style="color:#ccc; margin-top:0;">HERRAMIENTAS</h3>
+            <div style="padding: 20px; max-height: 70vh; overflow-y:auto;">
                 
-                <div style="margin-bottom:20px;">
-                    <label style="color:#888; font-size:0.9rem;">Zoom Vertical</label>
-                    <input type="range" id="ed-zoom" min="10" max="200" value="100" oninput="drawEditorGrid()" style="width:100%;">
+                <div class="admin-section">
+                    <h3 style="color:#ff003c; margin-top:0;">⚙️ ESTADO DEL SERVIDOR</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>Bloquea el acceso a todos los jugadores excepto a ti.</div>
+                        <div style="font-size:1.2rem; font-weight:bold;">ESTADO: <span id="admin-maint-status" style="color:#12FA05;">APAGADO</span></div>
+                    </div>
+                    <button class="action" style="width:100%; margin-top:15px; background:#ff003c; color:white; border:none;" onclick="toggleMaintenance()">ENCENDER / APAGAR MANTENIMIENTO</button>
                 </div>
 
+                <div class="admin-section">
+                    <h3 style="color:#00ffff; margin-top:0;">📢 ENVIAR ANUNCIO GLOBAL EN VIVO</h3>
+                    <p style="color:#888; font-size:0.8rem; margin:0 0 10px 0;">Saldrá en la pantalla de todos los que estén jugando ahora mismo.</p>
+                    <input type="text" id="admin-ann-title" class="log-inp" placeholder="Título (Ej: ¡NUEVA ACTUALIZACIÓN!)">
+                    <textarea id="admin-ann-msg" class="log-inp" placeholder="Mensaje para todos los jugadores..." style="height:60px; resize:none;"></textarea>
+                    <button class="action btn-acc" style="width:100%; margin-top:10px;" onclick="sendGlobalAnnouncement()">ENVIAR ANUNCIO</button>
                 </div>
+
+                <div class="admin-section" style="border-color:var(--gold);">
+                    <h3 style="color:var(--gold); margin-top:0;">💰 GESTIÓN DE JUGADORES (SP / BAN)</h3>
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <input type="text" id="admin-target-user" class="log-inp" style="flex:1; margin:0;" placeholder="Nombre del Jugador">
+                        <input type="number" id="admin-target-sp" class="log-inp" style="width:150px; margin:0;" placeholder="Cant. SP">
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="action" style="flex:1; background:var(--gold); color:black;" onclick="adminGiveSP()">REGALAR SP</button>
+                        <button class="action" style="flex:1; background:#8a0021; color:white;" onclick="adminWipeUser()">BORRAR CUENTA (BAN)</button>
+                    </div>
+                </div>
+
+            </div>
+            <div style="padding:15px; background:#111; text-align:center; border-top:1px solid #333;">
+                <button class="action secondary" onclick="closeModal('admin')">CERRAR PANEL</button>
+            </div>
         </div>
-        
-        <audio id="ed-audio"></audio>
     </div>
 
-    <div id="game-ui" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:50;">
-        <div id="game-hud-top" style="position:absolute; top:20px; width:100%; display:flex; justify-content:space-between; padding:0 50px; font-size:2.5rem; font-weight:900; z-index:60; pointer-events:none; font-family:'Courier New', monospace;">
-            <div id="score-txt" style="color:white; text-shadow:0 0 15px #ff0055;">000000</div>
-            <div id="acc-txt" style="color:#00ffff; text-shadow:0 0 15px #00ffff;">100.00%</div>
-        </div>
-        
-        <div id="combo-container" style="position:absolute; top:40%; left:50%; transform:translate(-50%, -50%); text-align:center; z-index:55; opacity:0.6; pointer-events:none;">
-            <div id="combo-num" style="font-size:6rem; font-weight:900; color:white;">0</div>
-            <div id="combo-lbl" style="font-size:1.5rem; color:#ff0055; letter-spacing:5px;">COMBO</div>
-        </div>
-        
-        <div id="health-bar-container" style="position:absolute; top:0; left:0; width:12px; height:100%; background:#222; z-index:60; border-right:1px solid #444;">
-            <div id="health-bar" style="width:100%; height:50%; background:linear-gradient(to top, #12FA05, #00ffff); position:absolute; bottom:0; transition: height 0.1s linear; box-shadow:0 0 10px #12FA05;"></div>
-        </div>
-        
-        <canvas id="game-canvas" style="display:block; width:100%; height:100%;"></canvas>
+    <div id="modal-clans" class="modal-overlay">
+        <div class="modal-panel" style="width: 850px; max-width: 95%; max-height: 85vh; overflow-y: auto;">
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--gold); padding-bottom:15px; margin-bottom:20px;">
+                <h2 style="margin:0; font-size:2rem; font-weight:900; color:var(--gold);">🛡️ CUARTEL DE CLANES</h2>
+                <button class="action secondary" onclick="closeModal('clans')">CERRAR</button>
+            </div>
 
-        <button id="mobile-back-btn" onclick="window.toMenu()" style="position:absolute; top:10px; left:20px; z-index:100; padding:8px 15px; background:rgba(255,0,0,0.3); border:1px solid red; color:white; border-radius:5px; cursor:pointer; opacity:0.5; transition:0.2s;">SALIR</button>
-    </div>
+            <div id="clan-none-view" style="display:none; text-align:center;">
+                <div style="color:#aaa; font-size:1.2rem; margin-bottom:30px;">Únete a un clan o forja tu propia leyenda.</div>
+                
+                <div class="clan-grid">
+                    <div class="clan-box" style="--c: var(--gold);">
+                        <h3 style="color:var(--gold); margin-top:0;">👑 CREAR CLAN</h3>
+                        <p style="color:#888; font-size:0.9rem;">Costo: <span style="color:var(--gold); font-weight:bold;">50,000 SP</span></p>
+                        
+                        <input type="text" id="c-new-name" class="log-inp" placeholder="Nombre (Ej: Osu Masters)">
+                        <input type="text" id="c-new-tag" class="log-inp" placeholder="Tag [Max 4 Letras] (Ej: OSU)" maxlength="4" style="text-transform:uppercase;">
+                        
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                            <label style="color:#aaa; font-size:0.9rem;">Color del Tag:</label>
+                            <input type="color" id="c-new-color" value="#ff66aa" style="border:none; background:none; cursor:pointer; height:40px; width:100%;">
+                        </div>
+                        <button class="action" style="width:100%; background:var(--gold); color:black;" onclick="createClan()">FUNDAR CLAN</button>
+                    </div>
 
-    <div id="results-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:150; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
-        <div class="results-content" style="text-align:center; animation:fadeIn 0.5s ease;">
-            <h1 id="res-title" style="font-size:4rem; color:#ff0055; text-shadow:0 0 30px #ff0055; margin-bottom:10px; font-weight:900;">CLEARED</h1>
-            
-            <div id="res-rank" style="font-size:10rem; color:#00ffff; font-weight:900; text-shadow:0 0 50px #00ffff; line-height:1;">S</div>
-            
-            <div id="res-score" style="font-size:3rem; color:white; margin:20px 0; font-family:monospace;">1,000,000</div>
-            
-            <div style="display:flex; justify-content:center; gap:30px; margin-bottom:40px;">
-                <div style="text-align:center;">
-                    <div style="font-size:1.5rem; color:#12FA05;">PERFECT</div>
-                    <div id="res-perf" style="font-size:1.5rem; color:white; font-weight:bold;">0</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:1.5rem; color:#00ffff;">GOOD</div>
-                    <div id="res-good" style="font-size:1.5rem; color:white; font-weight:bold;">0</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:1.5rem; color:#F9393F;">MISS</div>
-                    <div id="res-miss" style="font-size:1.5rem; color:white; font-weight:bold;">0</div>
+                    <div class="clan-box" style="--c: var(--blue);">
+                        <h3 style="color:var(--blue); margin-top:0;">🤝 UNIRSE A UN CLAN</h3>
+                        <p style="color:#888; font-size:0.9rem;">Ingresa el Tag del clan al que quieres unirte.</p>
+                        <input type="text" id="c-join-tag" class="log-inp" placeholder="Ej: OSU" maxlength="4" style="text-transform:uppercase; margin-bottom:20px;">
+                        <button class="action" style="width:100%; background:var(--blue);" onclick="joinClan()">BUSCAR Y UNIRSE</button>
+                        
+                        <div id="top-clans-list" style="margin-top:20px; text-align:left; max-height:150px; overflow-y:auto;">
+                            <div style="font-size:0.8rem; color:#666; margin-bottom:5px; font-weight:bold;">CLANES DESTACADOS</div>
+                            <div id="c-popular-list">Buscando...</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <button class="action" onclick="window.toMenu()" style="padding:15px 50px; font-size:1.5rem; border-radius:30px;">VOLVER AL MENÚ</button>
+
+            <div id="clan-dash-view" style="display:none;">
+                <div style="display:flex; align-items:center; gap:15px; margin-bottom: 20px;">
+                    <span id="c-dash-tag" class="clan-tag" style="font-size:1.5rem; padding:5px 15px;">[TAG]</span>
+                    <div>
+                        <h2 id="c-dash-name" style="margin:0; font-size:2.5rem; color:white;">Nombre del Clan</h2>
+                        <div style="color:var(--gold); font-weight:bold;">Nivel <span id="c-dash-lvl">1</span> • Miembros: <span id="c-dash-members">1</span>/10</div>
+                    </div>
+                </div>
+
+                <div class="clan-grid">
+                    <div class="clan-box" style="--c: #12FA05;">
+                        <h3 style="margin-top:0; color:#12FA05;">💰 BANCO DEL CLAN</h3>
+                        <div style="font-size:2rem; font-weight:900; color:var(--gold);"><span id="c-dash-sp">0</span> SP</div>
+                        <div style="display:flex; gap:10px; margin-top:15px;">
+                            <input type="number" id="c-donate-amount" class="log-inp" placeholder="Cant. SP" style="margin:0; flex:1;">
+                            <button class="action" style="width:auto; padding:0 20px; background:#12FA05; color:black;" onclick="donateToClan()">DONAR</button>
+                        </div>
+
+                        <h3 style="margin-top:25px; color:#aaa; font-size:1rem;">👥 MIEMBROS</h3>
+                        <div id="c-dash-members-list" style="background:#0a0a0a; border:1px solid #333; padding:10px; border-radius:8px; max-height:150px; overflow-y:auto; font-size:0.9rem;"></div>
+                    </div>
+
+                    <div class="clan-box" style="--c: var(--accent);">
+                        <h3 style="margin-top:0; color:var(--accent);">⭐ MEJORAS GLOBALES</h3>
+                        <p style="font-size:0.8rem; color:#888;">El líder puede comprar mejoras usando el SP del banco para todos los miembros.</p>
+                        
+                        <div class="clan-upgrade">
+                            <div>
+                                <div style="font-weight:bold; color:var(--blue);">+10% Experiencia</div>
+                                <div style="font-size:0.8rem; color:#aaa;">Costo: 100,000 SP</div>
+                            </div>
+                            <button id="btn-upg-xp" class="action" style="background:var(--blue);" onclick="buyClanUpgrade('xp')">COMPRAR</button>
+                        </div>
+
+                        <div class="clan-upgrade">
+                            <div>
+                                <div style="font-weight:bold; color:var(--gold);">+5% SP en Partidas</div>
+                                <div style="font-size:0.8rem; color:#aaa;">Costo: 250,000 SP</div>
+                            </div>
+                            <button id="btn-upg-sp" class="action" style="background:var(--gold); color:black;" onclick="buyClanUpgrade('sp')">COMPRAR</button>
+                        </div>
+                        
+                        <button class="action secondary" style="width:100%; margin-top:30px; border-color:#F9393F; color:#F9393F;" onclick="leaveClan()">SALIR DEL CLAN</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script src="js/script/globals.js"></script>
+    <div id="modal-rank" class="modal-overlay">
+        <div class="modal-panel" style="width:700px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
+            <div style="padding:20px 30px; background:#111; border-bottom:2px solid var(--accent); display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; color:white; font-weight:900; font-size:1.8rem;">🏆 RANKING GLOBAL</h2>
+                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeModal('rank')">CERRAR</button>
+            </div>
+            <div id="rank-list" style="padding:20px; max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+    </div>
+
+    <div id="modal-friends" class="modal-overlay">
+        <div class="modal-panel" style="width:650px; padding:0; background:#0a0a0a; border-radius:15px; overflow:hidden;">
+            <div style="padding:20px 30px; background:#111; border-bottom:2px solid #00ffff; display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0; color:white; font-weight:900; font-size:1.8rem;">👥 AMIGOS</h2>
+                <button class="action secondary" style="width:auto; padding:5px 15px;" onclick="closeModal('friends')">CERRAR</button>
+            </div>
+            <div style="padding:20px;">
+                <div style="display:flex; gap:10px; margin-bottom:20px;">
+                    <input type="text" id="friend-inp" class="log-inp" style="margin:0; flex:1;" placeholder="Usuario a buscar...">
+                    <button class="action" style="width:auto; background:#00ffff; color:black; padding:0 30px;" onclick="sendFriendRequest()">AGREGAR</button>
+                </div>
+                
+                <div style="color:var(--accent); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">SOLICITUDES PENDIENTES</div>
+                <div id="req-list" style="margin-bottom:20px;"></div>
+                
+                <div style="color:var(--good); font-weight:bold; margin-bottom:10px; font-size:0.9rem;">TU LISTA DE AMIGOS</div>
+                <div id="friend-list" style="display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-pause" class="modal-overlay">
+        <div class="modal-panel login-box">
+            <div class="m-title">PAUSA</div>
+            <div style="font-size:3rem; font-weight:900; color:var(--blue);">ACC: <span id="p-acc">100%</span></div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:1.5rem; margin-bottom:30px;">
+                <div style="color:var(--sick)">SICK: <span id="p-sick">0</span></div>
+                <div style="color:var(--good)">GOOD: <span id="p-good">0</span></div>
+                <div style="color:var(--bad)">BAD: <span id="p-bad">0</span></div>
+                <div style="color:var(--miss)">MISS: <span id="p-miss">0</span></div>
+            </div>
+            <button class="action" onclick="resumeGame()">CONTINUAR</button>
+            <button class="action secondary" onclick="toMenu()">SALIR</button>
+        </div>
+    </div>
+
+    <div id="modal-res" class="modal-overlay">
+        <div class="modal-panel login-box" style="width:600px;">
+            <div class="m-title">RESULTADOS</div>
+            <div class="res-rank" id="res-rank">S</div>
+            <div id="winner-msg" style="display:none;">¡GANASTE!</div>
+            <div style="font-size:4rem; font-weight:900;" id="res-score">0</div>
+            <div style="color:#aaa; font-size:1.5rem;">ACC: <span id="res-acc" style="color:white;">100%</span></div>
+            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; margin-top:15px;">+0 PP</div>
+            <div style="display:flex; justify-content:space-around; margin-top:15px;">
+                <div style="color:var(--blue);">+<span id="res-xp">0</span> XP</div>
+                <div style="color:var(--gold);">+<span id="res-sp">0</span> SP</div>
+            </div>
+            <button class="action" onclick="toMenu()">VOLVER</button>
+        </div>
+    </div>
+
+    <div id="notif-panel" style="display:none; position:absolute; top:80px; right:50px; width:350px; background:#111; border:2px solid #333; border-radius:10px; z-index:99999; box-shadow:0 10px 30px rgba(0,0,0,0.8); overflow:hidden;">
+        <div style="background:#0a0a0a; padding:15px; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; color:white;">Notificaciones</h3>
+            <button style="background:none; border:none; color:#888; cursor:pointer;" onclick="if(typeof clearAllNotifs==='function')clearAllNotifs()">Limpiar Todo</button>
+        </div>
+        <div id="notif-list-content" style="max-height:400px; overflow-y:auto; padding:10px;">
+            <div style="text-align:center; color:#666; padding:20px;">No tienes notificaciones nuevas.</div>
+        </div>
+    </div>
+
+    <script src="js/globals.js"></script>
     <script src="js/script/core.js"></script>
     <script src="js/script/modals.js"></script>
 
@@ -612,15 +919,16 @@
     <script src="js/script/multiplayer.js"></script>
     <script src="js/script/studio_upload.js"></script>
     <script src="js/script/shop_audio.js"></script>
+
     <script src="js/script/clans.js"></script>
     <script src="js/script/admin.js"></script>
-    
-    <script src="js/script/editor.js"></script>
-    <script src="js/engines/engine_mania.js"></script>
-    <script src="js/engines/engine_taiko.js"></script>
-    <script src="js/engines/engine_catch.js"></script>
-    
-    <script src="js/main.js"></script>
 
+    <script src="js/game.js"></script>
+    <script src="js/osu.js"></script>
+    <script src="js/engine_standard.js"></script>
+    <script src="js/engine_taiko.js"></script>
+    <script src="js/engine_catch.js"></script>
+    <script src="js/editor.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
