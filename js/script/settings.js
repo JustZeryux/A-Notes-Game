@@ -1,10 +1,12 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V4 (1K a 10K) REPARADO === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V5 (UX COMPLETO) === */
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
+    // VARIABLES POR DEFECTO ACTUALIZADAS
     window.defaultCfg = {
-        subtitles: true, showFps: true, spd: 2.5, down: true, den: 5, fov: 0, noteOp: 100,
+        perfMode: false, subtitles: true, showFps: true, 
+        spd: 2.5, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85,
         bgDim: 50, showSplash: true, showMs: true, hideUI: false,
         vol: 0.5, hvol: 0.5, missVol: 0.5, off: 0, hitSound: 'default',
         stdAR: 9, stdCS: 4, stdK1: 'z', stdK2: 'x', stdTrail: true,
@@ -21,10 +23,8 @@ window.loadSettings = function() {
         window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
     }
     
-    // 🚨 EL FIX ANTI-CRASHEO: Si venías de una versión vieja, creamos el objeto modes para que no explote
     if (!window.cfg.modes) window.cfg.modes = {};
 
-    // Generar mapeos desde 1K hasta 10K
     for(let k = 1; k <= 10; k++) {
         if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
             window.cfg.modes[k] = [];
@@ -37,23 +37,28 @@ window.loadSettings = function() {
     const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
     const setTxt = (id, prop) => { const el = document.getElementById(id); if(el) el.innerText = String(window.cfg[prop]||'').toUpperCase().replace('ARROW',''); };
 
+    // CARGAR GENERAL Y UX
+    setChk('cfg-perf-mode', 'perfMode');
     setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
+    setVal('cfg-ui-skin', 'uiSkin');
     
+    // CARGAR MANIA
     setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
-    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp');
-    setVal('cfg-note-skin', 'noteSkin'); setVal('cfg-ui-skin', 'uiSkin');
+    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); setVal('cfg-hit-pos', 'hitPos');
+    setVal('cfg-note-skin', 'noteSkin'); 
 
+    // CARGAR STANDARD
     setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS'); setChk('cfg-std-trail', 'stdTrail');
     setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
 
+    // CARGAR TAIKO Y CATCH
     setVal('cfg-tk-spd', 'tkSpeed');
     setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR'); setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
-
     setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS');
     setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
 
+    // CARGAR VISUALES Y AUDIO
     setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
-    
     if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
     if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.5) * 100;
     if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
@@ -62,25 +67,17 @@ window.loadSettings = function() {
     if(typeof populateSkinDropdowns === 'function') populateSkinDropdowns();
 };
 
-// 🚨 FORZAR APERTURA DEL PANEL: Esta función se asegura de abrir el HTML
 window.openSettingsPanel = function() {
     window.loadSettings();
     let modal = document.getElementById('modal-settings');
-    if (modal) {
-        modal.style.display = 'flex'; // Fuerza a que se muestre en pantalla
-    } else if (typeof openModal === 'function') {
-        openModal('settings');
-    }
+    if (modal) { modal.style.display = 'flex'; } 
+    else if (typeof openModal === 'function') { openModal('settings'); }
 };
 
-// 🚨 FORZAR CIERRE DEL PANEL
 window.closeSettingsPanel = function() {
     let modal = document.getElementById('modal-settings');
-    if (modal) {
-        modal.style.display = 'none';
-    } else if (typeof closeModal === 'function') {
-        closeModal('settings');
-    }
+    if (modal) { modal.style.display = 'none'; } 
+    else if (typeof closeModal === 'function') { closeModal('settings'); }
 };
 
 window.saveSettings = function() {
@@ -88,11 +85,14 @@ window.saveSettings = function() {
     const getStr = (id) => { const el = document.getElementById(id); return el ? el.value : 'default'; };
     const getChk = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
 
+    window.cfg.perfMode = getChk('cfg-perf-mode');
     window.cfg.showFps = getChk('cfg-show-fps'); window.cfg.subtitles = getChk('cfg-subtitles');
+    window.cfg.uiSkin = getStr('cfg-ui-skin');
     
     window.cfg.spd = getVal('cfg-spd'); window.cfg.down = getChk('cfg-down'); 
-    window.cfg.den = getVal('cfg-den'); window.cfg.fov = getVal('cfg-fov'); window.cfg.noteOp = getVal('cfg-noteop');
-    window.cfg.noteSkin = getStr('cfg-note-skin'); window.cfg.uiSkin = getStr('cfg-ui-skin');
+    window.cfg.den = getVal('cfg-den'); window.cfg.fov = getVal('cfg-fov'); 
+    window.cfg.noteOp = getVal('cfg-noteop'); window.cfg.hitPos = getVal('cfg-hit-pos');
+    window.cfg.noteSkin = getStr('cfg-note-skin');
     
     window.cfg.stdAR = getVal('cfg-std-ar'); window.cfg.stdCS = getVal('cfg-std-cs'); window.cfg.stdTrail = getChk('cfg-std-trail');
     window.cfg.tkSpeed = getVal('cfg-tk-spd');
@@ -120,7 +120,7 @@ window.switchSetTab = function(tabId) {
     const tab = document.getElementById(tabId);
     if(tab) tab.style.display = 'block';
     
-    if(tabId === 'set-controls') window.renderLaneConfig(parseInt(document.getElementById('kb-mode-select').value || 4));
+    if(tabId === 'set-mania') window.renderLaneConfig(parseInt(document.getElementById('kb-mode-select').value || 4));
 };
 
 window.renderLaneConfig = function(k) {
@@ -161,7 +161,7 @@ window.updatePreview = function(k) {
         let color = conf.c;
         let shapeData = "M50,10 A40,40 0 1,1 49.9,10"; 
 
-        let skinId = window.cfg.noteSkin || 'default';
+        let skinId = document.getElementById('cfg-note-skin') ? document.getElementById('cfg-note-skin').value : 'default';
         if (skinId !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
             let skin = SHOP_ITEMS.find(item => item.id === skinId);
             if (skin) {
@@ -180,7 +180,7 @@ window.updatePreview = function(k) {
     box.innerHTML = html;
 };
 
-function populateSkinDropdowns() {
+window.populateSkinDropdowns = function() {
     const ns = document.getElementById('cfg-note-skin');
     const ui = document.getElementById('cfg-ui-skin');
     if(!ns || !ui || !window.user || !window.user.inventory || typeof SHOP_ITEMS === 'undefined') return;
@@ -199,7 +199,7 @@ function populateSkinDropdowns() {
     
     ns.value = window.cfg.noteSkin || 'default';
     ui.value = window.cfg.uiSkin || 'default';
-}
+};
 
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
