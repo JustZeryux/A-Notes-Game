@@ -1,14 +1,14 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V6 (KEYBINDS & PREVIEW FIX) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V7 (INLINE KEYBINDS) === */
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
-    // VARIABLES POR DEFECTO ACTUALIZADAS
+    // VALORES PREDETERMINADOS MEJORADOS
     window.defaultCfg = {
         perfMode: false, subtitles: true, showFps: true, 
-        spd: 2.5, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85,
-        bgDim: 50, showSplash: true, showMs: true, hideUI: false,
-        vol: 0.5, hvol: 0.5, missVol: 0.5, off: 0, hitSound: 'default',
+        spd: 25, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85, noteSize: 100,
+        bgDim: 60, showSplash: true, showMs: true, hideUI: false,
+        vol: 0.5, hvol: 0.8, missVol: 0.6, off: 0, hitSound: 'default',
         stdAR: 9, stdCS: 4, stdK1: 'z', stdK2: 'x', stdTrail: true,
         tkDonL: 'f', tkDonR: 'j', tkKatsuL: 'd', tkKatsuR: 'k', tkSpeed: 1.0,
         ctSpeed: 10, ctLeft: 'ArrowLeft', ctRight: 'ArrowRight', ctDash: 'Shift', ctCS: 5,
@@ -44,44 +44,33 @@ window.loadSettings = function() {
         }
     };
 
+    // GENERAL
     setChk('cfg-perf-mode', 'perfMode');
     setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
     setVal('cfg-ui-skin', 'uiSkin');
     
+    // MANIA
     setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
-    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); setVal('cfg-hit-pos', 'hitPos');
+    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); 
+    setVal('cfg-hit-pos', 'hitPos'); setVal('cfg-note-size', 'noteSize');
     setVal('cfg-note-skin', 'noteSkin'); 
 
+    // STANDARD / TAIKO / CATCH
     setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS'); setChk('cfg-std-trail', 'stdTrail');
     setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2');
-
     setVal('cfg-tk-spd', 'tkSpeed');
     setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR'); setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
-    
     setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS');
     setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
 
+    // VISUALS & AUDIO
     setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
-    
     if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
-    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.5) * 100;
-    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.5) * 100;
+    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.8) * 100;
+    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.6) * 100;
     setVal('cfg-off', 'off'); setVal('cfg-hitsound', 'hitSound');
     
-    if(typeof populateSkinDropdowns === 'function') populateSkinDropdowns();
-};
-
-window.openSettingsPanel = function() {
-    window.loadSettings();
-    let modal = document.getElementById('modal-settings');
-    if (modal) { modal.style.display = 'flex'; } 
-    else if (typeof openModal === 'function') { openModal('settings'); }
-};
-
-window.closeSettingsPanel = function() {
-    let modal = document.getElementById('modal-settings');
-    if (modal) { modal.style.display = 'none'; } 
-    else if (typeof closeModal === 'function') { closeModal('settings'); }
+    if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
 };
 
 window.saveSettings = function() {
@@ -96,6 +85,7 @@ window.saveSettings = function() {
     window.cfg.spd = getVal('cfg-spd'); window.cfg.down = getChk('cfg-down'); 
     window.cfg.den = getVal('cfg-den'); window.cfg.fov = getVal('cfg-fov'); 
     window.cfg.noteOp = getVal('cfg-noteop'); window.cfg.hitPos = getVal('cfg-hit-pos');
+    window.cfg.noteSize = getVal('cfg-note-size');
     window.cfg.noteSkin = getStr('cfg-note-skin');
     
     window.cfg.stdAR = getVal('cfg-std-ar'); window.cfg.stdCS = getVal('cfg-std-cs'); window.cfg.stdTrail = getChk('cfg-std-trail');
@@ -112,8 +102,6 @@ window.saveSettings = function() {
 
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
     if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
-    
-    window.closeSettingsPanel();
 };
 
 window.switchSetTab = function(tabId) {
@@ -140,10 +128,11 @@ window.renderLaneConfig = function(k) {
         if (displayKey === ' ' || displayKey === 'SPACE') displayKey = 'SPC';
         
         html += `
-        <div style="display:flex; flex-direction:column; align-items:center; gap:5px; background:rgba(255,255,255,0.02); padding:10px; border-radius:10px; border:1px solid #333;">
-            <div style="color:#aaa; font-size:0.7rem; font-weight:bold;">T${i+1}</div>
-            <button id="kb-btn-${k}-${i}" onclick="window.waitForKey(${k}, ${i})" style="width:45px; height:45px; border-radius:8px; background:#111; color:white; border:2px solid ${l.c}; font-weight:900; font-size:1rem; cursor:pointer; transition:0.2s; box-shadow: 0 0 10px rgba(0,0,0,0.5);">${displayKey}</button>
-            <input type="color" value="${l.c}" onchange="window.updateLaneProp(${k}, ${i}, 'c', this.value)" style="width:30px; height:30px; border:none; background:none; cursor:pointer; padding:0; margin-top:5px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:5px; background:rgba(255,255,255,0.02); padding:15px 10px; border-radius:10px; border:1px solid #333; min-width:60px;">
+            <div style="color:#aaa; font-size:0.8rem; font-weight:bold; margin-bottom:5px;">LANE ${i+1}</div>
+            <button id="kb-btn-${k}-${i}" class="kb-btn" onclick="window.waitForKey(${k}, ${i})" style="width:50px; height:50px; border-radius:10px; background:#1a1a1a; color:white; border:3px solid ${l.c}; font-weight:900; font-size:1.2rem; cursor:pointer; transition:0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">${displayKey}</button>
+            <div style="margin-top:10px; font-size:0.7rem; color:#888;">COLOR</div>
+            <input type="color" value="${l.c}" onchange="window.updateLaneProp(${k}, ${i}, 'c', this.value)" style="width:35px; height:35px; border:none; background:none; cursor:pointer; padding:0;">
         </div>`;
     }
     cont.innerHTML = html;
@@ -155,7 +144,6 @@ window.updateLaneProp = function(k, lane, prop, val) {
     window.renderLaneConfig(k); 
 };
 
-// 🌟 SISTEMA DE PREVIEW REHECHO (Garantizado que funciona con CSS)
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box || !window.cfg || !window.cfg.modes[k]) return;
@@ -163,8 +151,6 @@ window.updatePreview = function(k) {
     let html = '';
     for(let i=0; i<k; i++) {
         let color = window.cfg.modes[k][i].c || "#00ffff";
-        
-        // Creamos notas puramente con CSS brillante para que nunca fallen
         html += `
         <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); background:linear-gradient(to top, rgba(255,255,255,0.08), transparent); display:flex; justify-content:center; align-items:flex-end; padding-bottom: 10px;">
             <div style="width: 80%; max-width: 50px; height: 25px; background: ${color}; border-radius: 12px; box-shadow: 0 0 20px ${color}, inset 0 0 10px rgba(255,255,255,0.8); border: 2px solid white;"></div>
@@ -173,71 +159,97 @@ window.updatePreview = function(k) {
     box.innerHTML = html;
 };
 
-// 🎮 NUEVO SISTEMA DE CAPTURA DE TECLAS (ANTI-BUGS)
+// 🎮 NUEVO SISTEMA DE CAPTURA INLINE (SEGURO Y SIN BUGS)
 window.waitForKey = function(k, lane) {
     const btn = document.getElementById(`kb-btn-${k}-${lane}`);
-    if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; btn.style.borderColor = "white"; }
-    
-    const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(10px);";
-    overlay.innerHTML = `
-        <div style="color:#00ffff; font-size:4rem; font-weight:900; text-shadow: 0 0 20px #00ffff;">NUEVA TECLA</div>
-        <div style="color:white; font-size:1.5rem; margin-top:10px;">Presiona la tecla para el Carril ${lane+1} (${k}K)</div>
-        <div style="color:#888; margin-top:20px; font-weight:bold;">Presiona [ESC] para cancelar</div>
-    `;
-    document.body.appendChild(overlay);
+    if(!btn || btn.dataset.waiting === "true") return;
 
-    // Retraso de 100ms para evitar que el click capture la tecla Espacio o Enter por accidente
+    // Restaurar otros botones por si el usuario hizo clic en otro sin terminar
+    document.querySelectorAll('.kb-btn').forEach(b => {
+        if(b.dataset.waiting === "true") {
+            b.dataset.waiting = "false";
+            b.innerText = b.dataset.origKey;
+            b.style.borderColor = b.dataset.origColor;
+            b.style.background = "#1a1a1a";
+        }
+    });
+
+    btn.dataset.origKey = btn.innerText;
+    btn.dataset.origColor = btn.style.borderColor;
+    btn.dataset.waiting = "true";
+    btn.innerText = "...";
+    btn.style.background = "#F9393F"; 
+    btn.style.borderColor = "white";
+    btn.blur();
+
+    const handler = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        
+        let key = e.key;
+        if(e.code === "Space") key = " ";
+        
+        if (key !== "Escape") {
+            window.cfg.modes[k][lane].k = key;
+        }
+        
+        document.removeEventListener('keydown', handler, true);
+        window.renderLaneConfig(k); 
+    };
+
+    // Retraso de 150ms para evitar falsos clics (espacio o enter rebotando)
     setTimeout(() => {
-        const handler = (e) => {
-            e.preventDefault(); e.stopPropagation();
-            
-            let key = e.key;
-            if(e.code === "Space") key = " ";
-            
-            if (key !== "Escape") {
-                window.cfg.modes[k][lane].k = key;
-            }
-            
-            overlay.remove();
-            document.removeEventListener('keydown', handler, true);
-            window.renderLaneConfig(k);
-        };
         document.addEventListener('keydown', handler, true);
-    }, 100);
+    }, 150);
 };
 
 window.captureSingleKey = function(btnId, cfgProp) {
     const btn = document.getElementById(btnId);
-    if(btn) { btn.blur(); btn.innerText = "?"; btn.style.background = "#ff66aa"; }
+    if(!btn || btn.dataset.waiting === "true") return;
     
-    const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(10px);";
-    overlay.innerHTML = `
-        <div style="color:#ff66aa; font-size:4rem; font-weight:900; text-shadow: 0 0 20px #ff66aa;">ASIGNAR TECLA</div>
-        <div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div>
-        <div style="color:#888; margin-top:20px; font-weight:bold;">Presiona [ESC] para cancelar</div>
-    `;
-    document.body.appendChild(overlay);
+    btn.dataset.origKey = btn.innerText;
+    btn.dataset.waiting = "true";
+    btn.innerText = "...";
+    btn.style.background = "#F9393F";
+    btn.blur();
+
+    const handler = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        
+        let key = e.key; 
+        if(e.code === "Space") key = "Space";
+        
+        if (key !== "Escape") {
+            window.cfg[cfgProp] = key;
+            btn.innerText = key.toUpperCase().replace('ARROW','');
+        } else {
+            btn.innerText = btn.dataset.origKey;
+        }
+        
+        btn.dataset.waiting = "false";
+        btn.style.background = "transparent";
+        document.removeEventListener('keydown', handler, true);
+    };
 
     setTimeout(() => {
-        const handler = (e) => {
-            e.preventDefault(); e.stopPropagation();
-            
-            let key = e.key; 
-            if(e.code === "Space") key = "Space";
-            
-            if (key !== "Escape") {
-                window.cfg[cfgProp] = key;
-                btn.innerText = key.toUpperCase().replace('ARROW','');
-            }
-            
-            btn.style.background = "#111"; // Regresa a su color original
-            overlay.remove();
-            document.removeEventListener('keydown', handler, true);
-        };
         document.addEventListener('keydown', handler, true);
-    }, 100);
+    }, 150);
 };
 
-if(typeof window.loadSettings === 'function') window.loadSettings();
+window.populateSkinDropdowns = function() {
+    const ns = document.getElementById('cfg-note-skin');
+    const ui = document.getElementById('cfg-ui-skin');
+    if(!ns || !ui || !window.user || !window.user.inventory || typeof SHOP_ITEMS === 'undefined') return;
+
+    window.user.inventory.forEach(itemId => {
+        let item = SHOP_ITEMS.find(i => i.id === itemId);
+        if(item) {
+            if(item.type === 'skin' && !ns.querySelector(`option[value="${item.id}"]`)) ns.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+            if(item.type === 'ui' && !ui.querySelector(`option[value="${item.id}"]`)) ui.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+        }
+    });
+    
+    ns.value = window.cfg.noteSkin || 'default';
+    ui.value = window.cfg.uiSkin || 'default';
+};
+
+window.loadSettings();
