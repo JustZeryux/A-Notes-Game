@@ -122,24 +122,7 @@ window.renderUnifiedGrid = function() {
     
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
-    let filtered = baseList.filter(song => {
-        if (window.currentFilters.type === 'recent') return true; 
-        
-        // NUEVO FILTRO: Si se buscan mecánicas, revisamos el array 'mechanics' de la BD
-        if (window.currentFilters.type === 'mechanics') {
-            return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
-        }
 
-        if (window.currentFilters.type === 'osu_mania' && (!song.isOsu || song.originalMode !== 'mania')) return false;
-        if (window.currentFilters.type === 'osu_standard' && (!song.isOsu || song.originalMode !== 'standard')) return false;
-        if (window.currentFilters.type === 'osu_taiko' && (!song.isOsu || song.originalMode !== 'taiko')) return false;
-        if (window.currentFilters.type === 'osu_catch' && (!song.isOsu || song.originalMode !== 'catch')) return false;
-        if (window.currentFilters.type === 'com' && song.isOsu) return false;
-        if (window.currentFilters.key !== 'all' && (song.originalMode === 'mania' || !song.isOsu)) { 
-            if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
-        }
-        return true;
-    });
 
     if (filtered.length === 0) { 
         grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones. 🌸</div>`; 
@@ -157,7 +140,33 @@ window.renderUnifiedGrid = function() {
         let starCol = stars >= 6 ? '#ff0055' : (stars >= 4 ? '#FFD700' : '#00ffcc');
         
         // --- LÓGICA DE BADGES ---
-        let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🎹'));
+        let mIcon = song.orlet filtered = baseList.filter(song => {
+        if (window.currentFilters.type === 'recent') return true; 
+        
+        // FILTRO CHARTED: Solo canciones comunitarias que tienen un array de notas (ya sea en "notes" o en un modo específico)
+        if (window.currentFilters.type === 'charted') {
+            if (song.isOsu) return false;
+            const hasNotes = song.raw && (
+                (song.raw.notes && song.raw.notes.length > 0) || 
+                Object.keys(song.raw).some(key => key.startsWith('notes_') && song.raw[key].length > 0)
+            );
+            return hasNotes;
+        }
+
+        if (window.currentFilters.type === 'mechanics') return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
+        
+        if (window.currentFilters.type === 'osu_mania' && (!song.isOsu || song.originalMode !== 'mania')) return false;
+        if (window.currentFilters.type === 'osu_standard' && (!song.isOsu || song.originalMode !== 'standard')) return false;
+        if (window.currentFilters.type === 'osu_taiko' && (!song.isOsu || song.originalMode !== 'taiko')) return false;
+        if (window.currentFilters.type === 'osu_catch' && (!song.isOsu || song.originalMode !== 'catch')) return false;
+        if (window.currentFilters.type === 'com' && song.isOsu) return false;
+        
+        if (window.currentFilters.key !== 'all' && (song.originalMode === 'mania' || !song.isOsu)) { 
+            if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
+        }
+        return true;
+    });
+        iginalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🎹'));
         let maniaKeys = (song.originalMode === 'mania' || !song.isOsu) 
             ? song.keysAvailable.map(k => `<div class="diff-badge" style="border: 1px solid var(--blue); color: var(--blue);">${k}K</div>`).join('') 
             : "";
