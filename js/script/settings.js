@@ -1,50 +1,150 @@
-/* =========================================================================
-   SISTEMA DE KEYBINDS Y PREVIEW DE MANIA (RECONSTRUIDO DESDE 0)
-   ========================================================================= */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL === */
 
-// 1. DICCIONARIO DE FORMAS (SHAPES)
 window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
 
 window.getShapeSvg = function(shapeName, color) {
     let s = shapeName || 'circle';
     let c = color || '#00ffff';
     switch(s) {
-        case 'circle': 
-            return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="40" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
-        case 'diamond': 
-            return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><polygon points="50,10 90,50 50,90 10,50" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
-        case 'bar': 
-            return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><rect x="15" y="35" width="70" height="30" rx="10" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
-        case 'ring': 
-            return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="35" fill="none" stroke="${c}" stroke-width="15"/></svg>`;
-        default:
-            return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
+        case 'circle': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="40" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
+        case 'diamond': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><polygon points="50,10 90,50 50,90 10,50" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
+        case 'bar': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><rect x="15" y="35" width="70" height="30" rx="10" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
+        case 'ring': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="35" fill="none" stroke="${c}" stroke-width="15"/></svg>`;
+        default: return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
     }
 };
 
-// 2. RENDERIZAR LOS CONTROLES (RESTAURA TUS CLASES ORIGINALES)
+window.loadSettings = function() {
+    let saved = localStorage.getItem('gameCfg');
+    
+    window.defaultCfg = {
+        perfMode: false, subtitles: true, showFps: true, 
+        spd: 25, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85, noteSize: 100,
+        bgDim: 60, showSplash: true, showMs: true, hideUI: false,
+        vol: 0.5, hvol: 0.8, missVol: 0.6, off: 0, hitSound: 'default',
+        stdAR: 9, stdCS: 4, stdK1: 'z', stdK2: 'x', stdTrail: true,
+        tkDonL: 'f', tkDonR: 'j', tkKatsuL: 'd', tkKatsuR: 'k', tkSpeed: 1.0,
+        ctSpeed: 10, ctLeft: 'ArrowLeft', ctRight: 'ArrowRight', ctDash: 'Shift', ctCS: 5,
+        noteSkin: 'default', uiSkin: 'default',
+        modes: {}
+    };
+
+    if (saved) {
+        try { window.cfg = Object.assign({}, window.defaultCfg, JSON.parse(saved)); } 
+        catch(e) { window.cfg = JSON.parse(JSON.stringify(window.defaultCfg)); }
+    } else {
+        window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
+    }
+    
+    if (!window.cfg.modes) window.cfg.modes = {};
+
+    for(let k = 1; k <= 10; k++) {
+        if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
+            window.cfg.modes[k] = [];
+            const defKeys = ['a','s','d','f','g','h','j','k','l',';'];
+            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
+        }
+    }
+
+    const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
+    const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
+    const setTxt = (id, prop) => { 
+        const el = document.getElementById(id); 
+        if(el) {
+            let txt = String(window.cfg[prop]||'').toUpperCase().replace('ARROW', '');
+            if(txt === ' ' || txt === 'SPACE') txt = 'SPC';
+            el.innerText = txt; 
+        }
+    };
+
+    setChk('cfg-perf-mode', 'perfMode'); setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
+    setVal('cfg-ui-skin', 'uiSkin'); setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
+    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); setVal('cfg-hit-pos', 'hitPos'); setVal('cfg-note-size', 'noteSize');
+    setVal('cfg-note-skin', 'noteSkin'); setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS'); setChk('cfg-std-trail', 'stdTrail');
+    setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2'); setVal('cfg-tk-spd', 'tkSpeed');
+    setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR'); setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
+    setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS'); setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
+    setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
+    
+    if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
+    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.8) * 100;
+    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.6) * 100;
+    setVal('cfg-off', 'off'); setVal('cfg-hitsound', 'hitSound');
+    
+    if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
+};
+
+window.openSettingsPanel = function() {
+    window.loadSettings();
+    let modal = document.getElementById('modal-settings');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.style.zIndex = '9999999';
+        const select = document.getElementById('kb-mode-select');
+        window.renderLaneConfig(parseInt(select ? select.value : 4));
+    } else if (typeof openModal === 'function') {
+        openModal('settings');
+    }
+};
+
+window.closeSettingsPanel = function() {
+    let modal = document.getElementById('modal-settings');
+    if (modal) modal.style.display = 'none';
+};
+
+window.saveSettings = function() {
+    const getVal = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : 0; };
+    const getStr = (id) => { const el = document.getElementById(id); return el ? el.value : 'default'; };
+    const getChk = (id) => { const el = document.getElementById(id); return el ? el.checked : false; };
+
+    window.cfg.perfMode = getChk('cfg-perf-mode'); window.cfg.showFps = getChk('cfg-show-fps'); window.cfg.subtitles = getChk('cfg-subtitles');
+    window.cfg.uiSkin = getStr('cfg-ui-skin'); window.cfg.spd = getVal('cfg-spd'); window.cfg.down = getChk('cfg-down'); 
+    window.cfg.den = getVal('cfg-den'); window.cfg.fov = getVal('cfg-fov'); window.cfg.noteOp = getVal('cfg-noteop'); 
+    window.cfg.hitPos = getVal('cfg-hit-pos'); window.cfg.noteSize = getVal('cfg-note-size'); window.cfg.noteSkin = getStr('cfg-note-skin');
+    window.cfg.stdAR = getVal('cfg-std-ar'); window.cfg.stdCS = getVal('cfg-std-cs'); window.cfg.stdTrail = getChk('cfg-std-trail');
+    window.cfg.tkSpeed = getVal('cfg-tk-spd'); window.cfg.ctSpeed = getVal('cfg-ct-spd'); window.cfg.ctCS = getVal('cfg-ct-cs');
+    window.cfg.bgDim = getVal('cfg-dim'); window.cfg.showSplash = getChk('cfg-splash'); window.cfg.showMs = getChk('cfg-show-ms'); window.cfg.hideUI = getChk('cfg-hide-ui');
+    
+    let volEl = document.getElementById('cfg-vol'); if(volEl) window.cfg.vol = parseFloat(volEl.value) / 100;
+    let hvolEl = document.getElementById('cfg-hvol'); if(hvolEl) window.cfg.hvol = parseFloat(hvolEl.value) / 100;
+    let mvolEl = document.getElementById('cfg-mvol'); if(mvolEl) window.cfg.missVol = parseFloat(mvolEl.value) / 100;
+    window.cfg.off = getVal('cfg-off'); window.cfg.hitSound = getStr('cfg-hitsound');
+
+    localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
+    if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
+    window.closeSettingsPanel();
+};
+
+window.switchSetTab = function(tabId) {
+    document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.set-section').forEach(s => s.style.display = 'none');
+    
+    if(event && event.currentTarget) event.currentTarget.classList.add('active');
+    const tab = document.getElementById(tabId);
+    if(tab) tab.style.display = 'block';
+    
+    if(tabId === 'set-mania') {
+        const select = document.getElementById('kb-mode-select');
+        window.renderLaneConfig(parseInt(select ? select.value : 4));
+    }
+};
+
 window.renderLaneConfig = function(k) {
     k = parseInt(k);
     if (!k || isNaN(k)) k = 4;
-    
     const cont = document.getElementById('lanes-container');
     if(!cont) return;
     
-    // Asegurar que exista la configuración base
-    if(!window.cfg) window.cfg = {};
-    if(!window.cfg.modes) window.cfg.modes = {};
     if(!window.cfg.modes[k]) {
         window.cfg.modes[k] = [];
         const defKeys = ['a','s','d','f','g','h','j','k','l',';'];
-        for(let i=0; i<k; i++) {
-            window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
-        }
+        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
     }
 
     let html = '';
     window.cfg.modes[k].forEach((lane, i) => {
         let keyText = lane.k === ' ' || lane.k === 'Space' ? 'SPC' : String(lane.k).toUpperCase();
-        keyText = keyText.replace('ARROW', '').replace('KEY', ''); // Limpieza visual
+        keyText = keyText.replace('ARROW', '').replace('KEY', '');
         
         let shapeSvg = window.getShapeSvg(lane.s, lane.c);
 
@@ -54,28 +154,20 @@ window.renderLaneConfig = function(k) {
                  style="width:70px; height:70px; border:3px solid ${lane.c}; border-radius:15px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.8rem; cursor:pointer; background:#111; color:white; transition:0.2s; box-shadow: 0 0 15px rgba(0,0,0,0.5);">
                 ${keyText}
             </div>
-            
             <div class="shape-indicator" onclick="window.cycleShape(${k}, ${i})" 
                  style="width:40px; height:40px; cursor:pointer; transition: transform 0.2s;" 
                  onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">
                 ${shapeSvg}
             </div>
-            
-            <input type="color" class="col-pk" value="${lane.c}" oninput="window.updateLaneColor(${k}, ${i}, this.value)" 
+            <input type="color" class="col-pk" value="${lane.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" 
                    style="width:60px; height:25px; border:none; padding:0; cursor:pointer; border-radius:5px;">
         </div>`;
     });
     
     cont.innerHTML = html;
-    
-    // Sincroniza el select del HTML para que muestre el modo correcto
-    const selector = document.getElementById('kb-mode-select');
-    if (selector) selector.value = k;
-    
     window.updatePreview(k);
 };
 
-// 3. FUNCIÓN DE CAMBIO DE FORMAS (CICLO)
 window.cycleShape = function(k, laneIdx) {
     if (!window.cfg.modes[k][laneIdx].s) window.cfg.modes[k][laneIdx].s = 'circle';
     let currentShape = window.cfg.modes[k][laneIdx].s;
@@ -83,20 +175,18 @@ window.cycleShape = function(k, laneIdx) {
     let nextShape = window.NOTE_SHAPES[(idx + 1) % window.NOTE_SHAPES.length];
     
     window.cfg.modes[k][laneIdx].s = nextShape;
-    window.renderLaneConfig(k); // Recarga para mostrar la nueva forma
+    window.renderLaneConfig(k);
 };
 
 window.updateLaneColor = function(k, laneIdx, newColor) {
     window.cfg.modes[k][laneIdx].c = newColor;
-    window.renderLaneConfig(k); // Recarga para aplicar el color al borde, forma y preview
+    window.renderLaneConfig(k); 
 };
 
-// 4. SISTEMA DE CAPTURA DE TECLAS A PRUEBA DE BALAS
 window.remapKey = function(k, laneIdx) {
     const btn = document.getElementById(`btn-bind-${k}-${laneIdx}`);
     if(!btn || btn.dataset.waiting === "true") return;
     
-    // Preparamos el botón visualmente
     btn.dataset.origKey = btn.innerText;
     btn.dataset.waiting = "true";
     btn.innerText = "...";
@@ -104,40 +194,58 @@ window.remapKey = function(k, laneIdx) {
     btn.style.borderColor = "white";
     btn.blur();
 
-    // Pantalla oscura de protección (Igual que en Taiko)
     const overlay = document.createElement('div');
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
-    overlay.innerHTML = `
-        <div style="color:#F9393F; font-size:4rem; font-weight:900; text-shadow:0 0 30px #F9393F; letter-spacing:3px;">ASIGNAR TECLA</div>
-        <div style="color:white; font-size:1.8rem; margin-top:15px;">Presiona la tecla para el Carril ${laneIdx + 1}</div>
-        <div style="color:#888; margin-top:30px; font-weight:bold; font-size:1.2rem;">Presiona [ESC] para cancelar</div>
-    `;
+    overlay.innerHTML = `<div style="color:#F9393F; font-size:4rem; font-weight:900; text-shadow:0 0 30px #F9393F;">ASIGNAR TECLA</div><div style="color:white; font-size:1.8rem; margin-top:15px;">Presiona la tecla para el Carril ${laneIdx + 1}</div><div style="color:#888; margin-top:30px; font-weight:bold;">Presiona [ESC] para cancelar</div>`;
     document.body.appendChild(overlay);
 
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
+        let key = e.key; if(e.code === "Space") key = " ";
+        if (key !== "Escape") window.cfg.modes[k][laneIdx].k = key;
         
-        let key = e.key;
-        if(e.code === "Space") key = " ";
-        
-        if (key !== "Escape") {
-            window.cfg.modes[k][laneIdx].k = key;
-        }
-        
-        // Limpiamos todo
         btn.dataset.waiting = "false";
         overlay.remove();
         document.removeEventListener('keydown', capture, true);
         window.renderLaneConfig(k); 
     };
 
-    // Retraso de seguridad para que el clic del mouse no asigne la tecla accidentalmente
-    setTimeout(() => {
-        document.addEventListener('keydown', capture, true);
-    }, 150);
+    setTimeout(() => { document.addEventListener('keydown', capture, true); }, 150);
 };
 
-// 5. RENDERIZADO DE LA VISTA PREVIA (NOTE PREVIEW)
+window.captureSingleKey = function(btnId, cfgProp) {
+    const btn = document.getElementById(btnId);
+    if(!btn || btn.dataset.waiting === "true") return;
+    
+    btn.dataset.origKey = btn.innerText;
+    btn.dataset.waiting = "true";
+    btn.innerText = "...";
+    btn.style.background = "#F9393F";
+    btn.blur();
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
+    overlay.innerHTML = `<div style="color:#ff66aa; font-size:4rem; font-weight:900;">ASIGNAR TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div>`;
+    document.body.appendChild(overlay);
+
+    const capture = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        let key = e.key; if(e.code === "Space") key = "Space";
+        if (key !== "Escape") {
+            window.cfg[cfgProp] = key;
+            btn.innerText = key.toUpperCase().replace('ARROW','');
+        } else {
+            btn.innerText = btn.dataset.origKey;
+        }
+        btn.dataset.waiting = "false";
+        btn.style.background = "transparent";
+        overlay.remove();
+        document.removeEventListener('keydown', capture, true);
+    };
+
+    setTimeout(() => document.addEventListener('keydown', capture, true), 150);
+};
+
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box) return;
@@ -149,46 +257,27 @@ window.updatePreview = function(k) {
         
         html += `
         <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
-            <div style="width:60px; height:60px; transform: translateY(0);">
-                ${shapeSvg}
-            </div>
+            <div style="width:60px; height:60px; transform: translateY(0);">${shapeSvg}</div>
         </div>`;
     }
     box.innerHTML = html;
 };
 
-// 6. ASEGURAR QUE SE CARGUE AL ABRIR LA PESTAÑA
-// Reemplazamos la función de cambio de pestaña para asegurarnos que llame al render
-window.switchSetTab = function(tabId) {
-    document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.set-section').forEach(s => s.style.display = 'none');
+window.populateSkinDropdowns = function() {
+    const ns = document.getElementById('cfg-note-skin');
+    const ui = document.getElementById('cfg-ui-skin');
+    if(!ns || !ui || !window.user || !window.user.inventory || typeof SHOP_ITEMS === 'undefined') return;
+
+    window.user.inventory.forEach(itemId => {
+        let item = SHOP_ITEMS.find(i => i.id === itemId);
+        if(item) {
+            if(item.type === 'skin' && !ns.querySelector(`option[value="${item.id}"]`)) ns.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+            if(item.type === 'ui' && !ui.querySelector(`option[value="${item.id}"]`)) ui.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+        }
+    });
     
-    if(event && event.currentTarget) event.currentTarget.classList.add('active');
-    const tab = document.getElementById(tabId);
-    if(tab) tab.style.display = 'block';
-    
-    // Si entramos a la pestaña de Mania, dibujamos los controles
-    if(tabId === 'set-mania') {
-        const select = document.getElementById('kb-mode-select');
-        let mode = select ? parseInt(select.value) : 4;
-        if (isNaN(mode)) mode = 4;
-        window.renderLaneConfig(mode);
-    }
+    ns.value = window.cfg.noteSkin || 'default';
+    ui.value = window.cfg.uiSkin || 'default';
 };
 
-// Inicializador para cuando se abre el panel
-window.openSettingsPanel = function() {
-    if(typeof window.loadSettings === 'function') window.loadSettings();
-    let modal = document.getElementById('modal-settings');
-    if (modal) {
-        modal.style.display = 'flex';
-        modal.style.zIndex = '9999999';
-        
-        // Forzar dibujado inicial en 4K
-        const select = document.getElementById('kb-mode-select');
-        let mode = select ? parseInt(select.value) : 4;
-        window.renderLaneConfig(mode);
-    } else if (typeof openModal === 'function') {
-        openModal('settings');
-    }
-};
+window.loadSettings();
