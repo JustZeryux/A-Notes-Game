@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (REPARADO) === */
 
 window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
 
@@ -10,14 +10,17 @@ window.getShapeSvg = function(shapeName, color) {
         case 'diamond': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><polygon points="50,10 90,50 50,90 10,50" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
         case 'bar': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><rect x="15" y="35" width="70" height="30" rx="10" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
         case 'ring': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="35" fill="none" stroke="${c}" stroke-width="15"/></svg>`;
-        default: return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
+        default: return `<svg viewBox="0 0 100 100" style="width:100%; height:100%;"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
     }
 };
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
-    window.defaultCfg = {
+    // 1. EL FIX DE LA SOBRESCRITURA: Respetamos globals.js si ya existe
+    if (!window.cfg) window.cfg = {};
+    
+    let baseDefaults = {
         perfMode: false, subtitles: true, showFps: true, 
         spd: 25, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85, noteSize: 100,
         bgDim: 60, showSplash: true, showMs: true, hideUI: false,
@@ -29,29 +32,49 @@ window.loadSettings = function() {
         modes: {}
     };
 
+    // Mezclamos en este orden: Defaults base -> Lo que ya está en globals.js
+    let merged = Object.assign({}, baseDefaults, window.cfg);
+
+    // Si hay guardado en local, lo aplicamos encima con cuidado de no romper 'modes'
     if (saved) {
-        try { window.cfg = Object.assign({}, window.defaultCfg, JSON.parse(saved)); } 
-        catch(e) { window.cfg = JSON.parse(JSON.stringify(window.defaultCfg)); }
-    } else {
-        window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
+        try { 
+            let parsed = JSON.parse(saved);
+            if (parsed.modes) {
+                merged.modes = Object.assign(merged.modes || {}, parsed.modes);
+                delete parsed.modes;
+            }
+            Object.assign(merged, parsed);
+        } 
+        catch(e) { console.error("Error al cargar settings:", e); }
     }
     
+    window.cfg = merged;
     if (!window.cfg.modes) window.cfg.modes = {};
+
+    // Configuraciones maestras de teclas por defecto correctas
+    const masterKeys = {
+        4: ['d','f','j','k'],
+        5: ['d','f',' ','j','k'],
+        6: ['s','d','f','j','k','l'],
+        7: ['s','d','f',' ','j','k','l'],
+        9: ['a','s','d','f',' ','h','j','k','l']
+    };
 
     for(let k = 1; k <= 10; k++) {
         if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
             window.cfg.modes[k] = [];
-            const defKeys = ['a','s','d','f','g','h','j','k','l',';'];
-            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
+            let dKeys = masterKeys[k] || ['a','s','d','f','g','h','j','k','l',';'];
+            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: dKeys[i]||' ', c: '#00ffff', s: 'circle' });
         }
     }
 
+    // --- Carga de UI ---
     const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
     const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
     const setTxt = (id, prop) => { 
         const el = document.getElementById(id); 
         if(el) {
-            let txt = String(window.cfg[prop]||'').toUpperCase().replace('ARROW', '');
+            let txt = String(window.cfg[prop]||'').toUpperCase().replace('ARROW', '').replace('KEY', '');
             if(txt === ' ' || txt === 'SPACE') txt = 'SPC';
             el.innerText = txt; 
         }
@@ -137,21 +160,18 @@ window.renderLaneConfig = function(k) {
     
     if(!window.cfg.modes[k]) {
         window.cfg.modes[k] = [];
-// Si es 4K usa DFJK, si es 6K usa SDFJKL, de lo contrario la fila normal
-const defKeys = (k === 4) ? ['d','f','j','k'] : 
-                (k === 6) ? ['s','d','f','j','k','l'] : 
-                ['a','s','d','f','g','h','j','k','l',';'];       
-        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defKeys[i]||' ', c: '#00ffff', s: 'circle' });
+        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: ' ', c: '#00ffff', s: 'circle' });
     }
 
     let html = '';
     window.cfg.modes[k].forEach((lane, i) => {
-        let keyText = lane.k === ' ' || lane.k === 'Space' ? 'SPC' : String(lane.k).toUpperCase();
+        // Limpieza visual profunda para arreglar el "KEYD"
+        let keyText = String(lane.k).toUpperCase();
+        if (keyText === ' ' || keyText === 'SPACE') keyText = 'SPC';
         keyText = keyText.replace('ARROW', '').replace('KEY', '');
         
         let shapeSvg = window.getShapeSvg(lane.s, lane.c);
 
-        // 🚨 FIX MAESTRO: Enviamos "this" en el onclick para que nunca más se pierda el botón 🚨
         html += `
         <div class="l-col" style="display:flex; flex-direction:column; align-items:center; gap:15px; margin: 0 5px;">
             <div class="key-bind" onclick="window.remapKey(this, ${k}, ${i})" 
@@ -169,7 +189,9 @@ const defKeys = (k === 4) ? ['d','f','j','k'] :
     });
     
     cont.innerHTML = html;
-    window.updatePreview(k);
+    
+    // 🚨 FIX MAESTRO: Timeout para asegurar que el DOM cargó antes de generar la vista previa
+    setTimeout(() => { window.updatePreview(k); }, 50);
 };
 
 window.cycleShape = function(k, laneIdx) {
@@ -187,7 +209,6 @@ window.updateLaneColor = function(k, laneIdx, newColor) {
     window.renderLaneConfig(k); 
 };
 
-// 🚨 NUEVO REMAPKEY: Usa el botón directo ("btnElement"), ya no depende de IDs defectuosos
 window.remapKey = function(btnElement, k, laneIdx) {
     if(!btnElement || btnElement.dataset.waiting === "true") return;
     
@@ -206,14 +227,11 @@ window.remapKey = function(btnElement, k, laneIdx) {
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
         
-        let key = e.key;
-        // Normalizar mayúsculas/minúsculas para evitar bugs en el gameplay
-        if (key.length === 1) key = key.toLowerCase(); 
+        let key = e.key; 
+        if (key.length === 1) key = key.toLowerCase(); // Normalización crítica para el gameplay
+        if (e.code === "Space") key = " ";
         
-        // Estandarizar la barra espaciadora
-        if(e.code === "Space") key = " "; 
-
-        if (key !== "Escape") {
+        if (key !== "escape" && key !== "Escape") {
             window.cfg.modes[k][laneIdx].k = key;
         }
         
@@ -243,10 +261,13 @@ window.captureSingleKey = function(btnId, cfgProp) {
 
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
-        let key = e.key; if(e.code === "Space") key = "Space";
-        if (key !== "Escape") {
+        let key = e.key; 
+        if (key.length === 1) key = key.toLowerCase();
+        if (e.code === "Space") key = " ";
+
+        if (key !== "escape" && key !== "Escape") {
             window.cfg[cfgProp] = key;
-            btn.innerText = key.toUpperCase().replace('ARROW','');
+            btn.innerText = key.toUpperCase().replace('ARROW','').replace('KEY', '');
         } else {
             btn.innerText = btn.dataset.origKey;
         }
@@ -263,14 +284,20 @@ window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box) return;
     
+    // 2. EL FIX DE LA VISTA PREVIA: Nos aseguramos de que no falle y muestre el SVG centrado
+    k = parseInt(k) || 4;
     let html = '';
+    
     for(let i=0; i<k; i++) {
         let laneData = window.cfg.modes[k][i];
+        if (!laneData) continue; 
         let shapeSvg = window.getShapeSvg(laneData.s, laneData.c);
         
         html += `
         <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
-            <div style="width:50px; height:50px; transform: translateY(0);">${shapeSvg}</div>
+            <div style="width:50px; height:50px; transform: translateY(0); display:flex; justify-content:center; align-items:center;">
+                ${shapeSvg}
+            </div>
         </div>`;
     }
     box.innerHTML = html;
@@ -293,4 +320,5 @@ window.populateSkinDropdowns = function() {
     ui.value = window.cfg.uiSkin || 'default';
 };
 
-window.loadSettings();
+// Al final, llamamos a loadSettings suavemente para que no rompa la inicialización de la app
+setTimeout(window.loadSettings, 100);
