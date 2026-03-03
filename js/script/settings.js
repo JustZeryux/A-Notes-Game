@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO V4 (1K a 10K) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO V4 (1K a 10K) REPARADO === */
 
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
@@ -59,20 +59,6 @@ window.loadSettings = function() {
     populateSkinDropdowns();
 };
 
-window.openSettingsPanel = function() {
-    window.loadSettings();
-    const modal = document.getElementById('modal-settings');
-    if(modal) {
-        modal.style.display = 'flex';
-        window.renderLaneConfig(4); 
-    }
-};
-
-window.closeSettingsPanel = function() {
-    const modal = document.getElementById('modal-settings');
-    if(modal) modal.style.display = 'none';
-};
-
 window.saveSettings = function() {
     const getVal = (id) => { const el = document.getElementById(id); return el ? parseFloat(el.value) : 0; };
     const getStr = (id) => { const el = document.getElementById(id); return el ? el.value : 'default'; };
@@ -97,8 +83,9 @@ window.saveSettings = function() {
     window.cfg.off = getVal('cfg-off'); window.cfg.hitSound = getStr('cfg-hitsound');
 
     localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
-    window.notify("Ajustes guardados con éxito.", "success");
-    window.closeSettingsPanel();
+    if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
+    
+    // FIX: Se eliminó window.closeSettingsPanel(), el botón del HTML ahora hace el cierre correctamente.
 };
 
 window.switchSetTab = function(tabId) {
@@ -236,4 +223,5 @@ window.captureSingleKey = function(btnId, cfgProp) {
     window.addEventListener('keydown', handler, true);
 };
 
-window.loadSettings();
+// Cargar ajustes al inicio
+if(typeof window.loadSettings === 'function') window.loadSettings();
