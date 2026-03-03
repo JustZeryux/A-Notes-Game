@@ -194,8 +194,6 @@ function getLaneColor(l, mode) {
     return colors[l % colors.length];
 }
 
-
-
 // ==========================================
 // CUSTOM MECHANICS MODAL
 // ==========================================
@@ -206,11 +204,37 @@ window.openMechanicsMenu = function() {
                 <h3 style="color:white; margin-top:0;">⚙️ MECÁNICAS DEL MAPA</h3>
                 <p style="color:#aaa; font-size:0.9rem;">Selecciona las mecánicas locas que tendrá este mapa. Los jugadores podrán filtrar por ellas.</p>
                 
-                <div style=// ==========================================
+                <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                    <label style="color:#12FA05;"><input type="checkbox" id="mech-mines" ${window.edMechanics.includes('mines')?'checked':''}> 💣 Minas (Pulsarlas resta vida)</label>
+                    <label style="color:#00ffff;"><input type="checkbox" id="mech-sv" ${window.edMechanics.includes('sv_changes')?'checked':''}> 🎢 Velocidad Variable (SV Changes)</label>
+                    <label style="color:#ff66aa;"><input type="checkbox" id="mech-flash" ${window.edMechanics.includes('flashlight')?'checked':''}> 🔦 Flashlight (Visión reducida)</label>
+                    <label style="color:#FFD700;"><input type="checkbox" id="mech-poison" ${window.edMechanics.includes('poison')?'checked':''}> ☠️ Notas Venenosas</label>
+                </div>
+                
+                <button class="action" onclick="saveMechanics()">APLICAR MECÁNICAS</button>
+                <button class="action secondary" style="margin-top:10px;" onclick="document.getElementById('mech-modal').remove()">CERRAR</button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+};
+
+window.saveMechanics = function() {
+    window.edMechanics = [];
+    if(document.getElementById('mech-mines').checked) window.edMechanics.push('mines');
+    if(document.getElementById('mech-sv').checked) window.edMechanics.push('sv_changes');
+    if(document.getElementById('mech-flash').checked) window.edMechanics.push('flashlight');
+    if(document.getElementById('mech-poison').checked) window.edMechanics.push('poison');
+    
+    document.getElementById('mech-modal').remove();
+    window.notify("Mecánicas aplicadas", "success");
+};
+
+// ==========================================
 // AUTO-MAPEO INTELIGENTE (BEAT DETECTION IA)
 // ==========================================
 window.autoFillMap = async function() {
-    if(!confirm("¿La IA analizará el audio para colocar las notas. Esto borrará tu mapa actual. ¿Continuar?")) return;
+    if(!confirm("La IA analizará el audio para colocar las notas. Esto borrará tu mapa actual. ¿Continuar?")) return;
     
     const btn = event.currentTarget;
     const oldText = btn.innerText;
@@ -296,30 +320,6 @@ window.calculateStarRating = function(notes, durationMs) {
     
     // Limitar entre 1 y 10 estrellas
     return Math.max(1, Math.min(10, stars)).toFixed(1);
-};"display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
-                    <label style="color:#12FA05;"><input type="checkbox" id="mech-mines" ${window.edMechanics.includes('mines')?'checked':''}> 💣 Minas (Pulsarlas resta vida)</label>
-                    <label style="color:#00ffff;"><input type="checkbox" id="mech-sv" ${window.edMechanics.includes('sv_changes')?'checked':''}> 🎢 Velocidad Variable (SV Changes)</label>
-                    <label style="color:#ff66aa;"><input type="checkbox" id="mech-flash" ${window.edMechanics.includes('flashlight')?'checked':''}> 🔦 Flashlight (Visión reducida)</label>
-                    <label style="color:#FFD700;"><input type="checkbox" id="mech-poison" ${window.edMechanics.includes('poison')?'checked':''}> ☠️ Notas Venenosas</label>
-                </div>
-                
-                <button class="action" onclick="saveMechanics()">APLICAR MECÁNICAS</button>
-                <button class="action secondary" style="margin-top:10px;" onclick="document.getElementById('mech-modal').remove()">CERRAR</button>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', html);
-};
-
-window.saveMechanics = function() {
-    window.edMechanics = [];
-    if(document.getElementById('mech-mines').checked) window.edMechanics.push('mines');
-    if(document.getElementById('mech-sv').checked) window.edMechanics.push('sv_changes');
-    if(document.getElementById('mech-flash').checked) window.edMechanics.push('flashlight');
-    if(document.getElementById('mech-poison').checked) window.edMechanics.push('poison');
-    
-    document.getElementById('mech-modal').remove();
-    window.notify("Mecánicas aplicadas", "success");
 };
 
 // ==========================================
