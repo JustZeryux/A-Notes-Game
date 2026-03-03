@@ -1,5 +1,25 @@
 /* === js/script/settings.js - MEGA CONFIGURADOR PRO V7 (INLINE KEYBINDS) === */
+// 🚨 FORZAR APERTURA
+window.openSettingsPanel = function() {
+    if(typeof window.loadSettings === 'function') window.loadSettings();
+    let modal = document.getElementById('modal-settings');
+    if (modal) { 
+        modal.style.display = 'flex'; 
+        modal.style.zIndex = '9999999'; // Lo pone por encima de todo
+    } else if (typeof openModal === 'function') { 
+        openModal('settings'); 
+    }
+};
 
+// 🚨 FORZAR CIERRE
+window.closeSettingsPanel = function() {
+    let modal = document.getElementById('modal-settings');
+    if (modal) { 
+        modal.style.display = 'none'; 
+    } else if (typeof closeModal === 'function') { 
+        closeModal('settings'); 
+    }
+};
 window.loadSettings = function() {
     let saved = localStorage.getItem('gameCfg');
     
