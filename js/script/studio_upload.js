@@ -51,26 +51,47 @@ window.openStudioDashboard = async function() {
                 </div>
             `;
             
-card.querySelector('.btn-edit').onclick = () => {
-                // Crear un mini-modal de selección de modo al vuelo
+// DENTRO de openStudioDashboard...
+            card.querySelector('.btn-edit').onclick = () => {
                 const modeHtml = `
                     <div id="ed-mode-selector" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(10px);">
-                        <div style="background:#111; padding:40px; border-radius:20px; border:2px solid #00ffff; text-align:center; width:600px; box-shadow:0 0 50px rgba(0,255,255,0.2);">
+                        
+                        <div id="ed-step-1" style="background:#111; padding:40px; border-radius:20px; border:2px solid #00ffff; text-align:center; width:600px; box-shadow:0 0 50px rgba(0,255,255,0.2);">
                             <h2 style="color:white; font-size:2rem; font-weight:900; margin-top:0;">¿QUÉ VAS A MAPEAR?</h2>
-                            <div style="color:#aaa; margin-bottom:30px;">Selecciona el modo de juego para crear su versión.</div>
+                            <div style="color:#aaa; margin-bottom:30px;">Selecciona el modo de juego base para crear.</div>
                             
                             <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:30px;">
-                                <button class="action" style="background:transparent; border:2px solid #ff66aa; color:#ff66aa;" onclick="launchStudio('${song.id}', 'mania', 4)">🎹 MANIA 4K</button>
-                                <button class="action" style="background:transparent; border:2px solid #12FA05; color:#12FA05;" onclick="launchStudio('${song.id}', 'mania', 7)">🎹 MANIA 7K</button>
+                                <button class="action" style="background:transparent; border:2px solid #ff66aa; color:#ff66aa;" onclick="showManiaKeySelector()">🎹 MANIA (1K - 10K)</button>
+                                <button class="action" style="background:transparent; border:2px solid #ff44b9; color:#ff44b9;" onclick="launchStudio('${song.id}', 'standard', 1)">🎯 STANDARD</button>
                                 <button class="action" style="background:transparent; border:2px solid #f95555; color:#f95555;" onclick="launchStudio('${song.id}', 'taiko', 2)">🥁 TAIKO</button>
-                                <button class="action" style="background:transparent; border:2px solid #44b9ff; color:#44b9ff;" onclick="launchStudio('${song.id}', 'catch', 4)">🍎 CATCH</button>
+                                <button class="action" style="background:transparent; border:2px solid #44b9ff; color:#44b9ff;" onclick="launchStudio('${song.id}', 'catch', 1)">🍎 CATCH</button>
                             </div>
                             <button class="action secondary" onclick="document.getElementById('ed-mode-selector').remove()">CANCELAR</button>
                         </div>
+
+                        <div id="ed-step-2" style="display:none; background:#111; padding:40px; border-radius:20px; border:2px solid #ff66aa; text-align:center; width:500px;">
+                            <h2 style="color:#ff66aa; font-size:2rem; font-weight:900; margin-top:0;">¿CUÁNTAS TECLAS?</h2>
+                            <div style="color:#aaa; margin-bottom:30px;">Desliza para elegir la cantidad de carriles.</div>
+                            
+                            <input type="range" id="ed-key-slider" min="1" max="10" value="4" style="width:100%; margin-bottom:15px; accent-color:#ff66aa;" oninput="document.getElementById('ed-key-disp').innerText = this.value + 'K'">
+                            <div id="ed-key-disp" style="font-size:4rem; font-weight:900; color:white; margin-bottom:30px; text-shadow:0 0 20px #ff66aa;">4K</div>
+
+                            <div style="display:flex; gap:10px;">
+                                <button class="action" style="flex:1; background:#ff66aa; color:black;" onclick="launchStudio('${song.id}', 'mania', document.getElementById('ed-key-slider').value)">CREAR MAPA</button>
+                                <button class="action secondary" style="flex:1;" onclick="document.getElementById('ed-step-2').style.display='none'; document.getElementById('ed-step-1').style.display='block';">⬅ ATRÁS</button>
+                            </div>
+                        </div>
+
                     </div>
                 `;
                 document.body.insertAdjacentHTML('beforeend', modeHtml);
             };
+
+// Agrega esta función global para cambiar la pantalla
+window.showManiaKeySelector = function() {
+    document.getElementById('ed-step-1').style.display = 'none';
+    document.getElementById('ed-step-2').style.display = 'block';
+};
             
             card.querySelector('.btn-del').onclick = async () => {
                 if(confirm(`¿Seguro que quieres borrar "${song.title}" para siempre?`)) {
