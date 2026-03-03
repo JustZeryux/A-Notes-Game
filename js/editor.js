@@ -327,26 +327,27 @@ window.saveMechanics = function() {
 // ==========================================
 window.saveEditorMap = async function() {
     if(!window.curSongData.id) return;
+    window.notify("Guardando y Calculando Dificultad...", "info");
     
-    window.notify("Guardando mapa en la Nube...", "info");
-    
-    // Guardamos las notas en una propiedad específica para que un mapa tenga múltiples dificultades/modos
     const mapKey = `notes_${window.edMode}_${window.edK}k`; 
-    
-    let updateData = { mechanics: window.edMechanics };
+    let updateData = { mechanics: window.edMechanics || [] };
     updateData[mapKey] = window.edMap;
     
-    // Para retrocompatibilidad con el buscador actual, dejamos "notes" como el mapa por defecto
+    // Calcular Estrellas y guardarlas en la BD
+    const durationMs = (window.edAudio.duration || 120) * 1000;
+    const calculatedStars = window.calculateStarRating(window.edMap, durationMs);
+    updateData[`stars_${window.edMode}_${window.edK}k`] = calculatedStars;
+    
+    // Fallback para versiones anteriores
     if(window.edMode === 'mania' && window.edK === 4) {
         updateData.notes = window.edMap;
+        updateData.starRating = calculatedStars; 
     }
 
     try {
         await window.db.collection("globalSongs").doc(window.curSongData.id).update(updateData);
-        window.notify("¡Mapa Pro Guardado con Éxito!", "success");
-    } catch(e) {
-        window.notify("Error al guardar en Firebase", "error");
-    }
+        window.notify(`¡Mapa Guardado! Dificultad: ⭐ ${calculatedStars}`, "success");
+    } catch(e) { window.notify("Error al guardar en Firebase", "error"); }
 };
 
 window.testMap = function() {
