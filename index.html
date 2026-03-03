@@ -108,11 +108,11 @@
             <button class="sidebar-btn" id="nav-friends" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openFriends()">👥 AMIGOS</button>
             <button class="sidebar-btn" id="nav-clans" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openClansModal()">🛡️ CLANES</button>
 
-            <button class="sidebar-btn" onclick="openStudioDashboard()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
+            <button class="sidebar-btn" onclick="openStudioDashboard()" onmouseenter="if(typeof playHover==='function') playHover()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
                 ✏️ CREATOR STUDIO
             </button>            
             <button class="sidebar-btn" id="imp-btn" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openCustomUploadModal()"><span id="imp-txt">☁️ SUBIR CANCIÓN</span></button>
-            <button class="sidebar-btn" onclick="openModal('news')">📰 NOVEDADES</button>
+            <button class="sidebar-btn" onclick="openModal('news')" onmouseenter="if(typeof playHover==='function') playHover()">📰 NOVEDADES</button>
             
             <button class="sidebar-btn" id="nav-admin" style="display:none; color: #ff003c;" onclick="openAdminPanel()">🚨 ADMIN PANEL</button>
         </aside>
@@ -211,7 +211,7 @@
     </div>
 
     <div id="modal-settings" class="modal-overlay" style="display: none; z-index: 999999; backdrop-filter: blur(10px);">
-        <div class="modal-panel" style="width: 1000px; max-width: 95vw; padding: 0; background: rgba(10,10,15,0.95); border: 1px solid #333; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
+        <div class="modal-panel" style="width: 1050px; max-width: 95vw; padding: 0; background: rgba(10,10,15,0.95); border: 1px solid #333; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
             
             <div style="background: linear-gradient(90deg, var(--accent), #0a0a0a); padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent);">
                 <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:white; text-shadow:0 0 10px black;">⚙️ CONFIGURACIÓN MAESTRA</h2>
@@ -224,6 +224,7 @@
             <div class="settings-grid">
                 <div class="settings-tabs">
                     <button class="set-tab-btn active" onclick="switchSetTab('set-ux')">🌐 GENERAL / UX</button>
+                    <button class="set-tab-btn" onclick="switchSetTab('set-controls')" style="color:#00ffff;">🎹 CONTROLES & SKINS</button>
                     <button class="set-tab-btn" onclick="switchSetTab('set-mania')">🌸 OSU! MANIA</button>
                     <button class="set-tab-btn" onclick="switchSetTab('set-std')">🎯 OSU! STANDARD</button>
                     <button class="set-tab-btn" onclick="switchSetTab('set-taiko')">🥁 OSU! TAIKO</button>
@@ -237,85 +238,117 @@
                     <div id="set-ux" class="set-section active">
                         <h3 style="color:#00ffff; margin-top:0;">Experiencia de Usuario</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Mostrar FPS y Ping</div><div class="set-sub">Ver rendimiento en la esquina superior.</div></div>
+                            <div><div class="set-label">Mostrar FPS y Ping</div><div class="set-sub">Ver rendimiento en tiempo real.</div></div>
                             <input type="checkbox" id="cfg-show-fps" style="width:25px; height:25px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Letras de Canciones (Lyrics)</div><div class="set-sub">Descarga y muestra subtítulos automáticos.</div></div>
+                            <div><div class="set-label">Letras de Canciones (Lyrics)</div><div class="set-sub">Descarga automática.</div></div>
                             <input type="checkbox" id="cfg-subtitles" style="width:25px; height:25px;">
+                        </div>
+                    </div>
+
+                    <div id="set-controls" class="set-section" style="display:none;">
+                        <h3 style="color:#00ffff; margin-top:0;">Editor de Teclas y Customización (1K a 10K)</h3>
+                        
+                        <div class="set-row" style="background:rgba(0,255,255,0.05); border-color:#00ffff;">
+                            <div><div class="set-label">Skin de Notas (Note Skin)</div><div class="set-sub">Elige la textura de las notas que caerán.</div></div>
+                            <select id="cfg-note-skin" class="set-input" style="width:200px;" onchange="window.cfg.noteSkin=this.value; window.updatePreview(document.getElementById('kb-mode-select').value)">
+                                <option value="default">Círculos Neón (Default)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="set-row" style="background:rgba(255,102,170,0.05); border-color:#ff66aa;">
+                            <div><div class="set-label">Skin de Interfaz (UI Skin)</div><div class="set-sub">El marco y diseño del juego.</div></div>
+                            <select id="cfg-ui-skin" class="set-input" style="width:200px;">
+                                <option value="default">Oscuro Neón (Default)</option>
+                            </select>
+                        </div>
+
+                        <div style="margin-top:20px; background:#000; padding:25px; border-radius:15px; border:1px solid #333;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                                <h4 style="color:white; margin:0;">ASIGNACIÓN DE TECLAS Y COLORES</h4>
+                                <select id="kb-mode-select" class="set-input" style="width:120px; font-size:1.2rem; margin:0;" onchange="window.renderLaneConfig(parseInt(this.value))">
+                                    <option value="1">1K</option><option value="2">2K</option><option value="3">3K</option>
+                                    <option value="4" selected>4K</option><option value="5">5K</option><option value="6">6K</option>
+                                    <option value="7">7K</option><option value="8">8K</option><option value="9">9K</option><option value="10">10K</option>
+                                </select>
+                            </div>
+                            
+                            <div id="lanes-container" style="display:flex; justify-content:center; gap:8px; margin-bottom:25px; flex-wrap:wrap;"></div>
+                            
+                            <div style="text-align:center; padding-top:20px; border-top:1px solid #333;">
+                                <div style="color:#888; font-weight:bold; margin-bottom:15px; letter-spacing:2px;">VISTA PREVIA DE LA PISTA (EN VIVO)</div>
+                                <div id="live-skin-preview" style="width:100%; height:180px; background:linear-gradient(to bottom, #000, #111); border:2px solid #444; border-radius:10px; display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px; gap:2px; box-shadow:inset 0 0 50px rgba(0,0,0,0.8);"></div>
+                            </div>
                         </div>
                     </div>
 
                     <div id="set-mania" class="set-section" style="display:none;">
                         <h3 style="color:#ff66aa; margin-top:0;">Ajustes de Mania</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Velocidad (Scroll Speed)</div><div class="set-sub">Multiplicador de caída de las notas.</div></div>
+                            <div><div class="set-label">Velocidad (Scroll Speed)</div></div>
                             <input type="number" id="cfg-spd" step="0.1" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Dirección (Downscroll)</div><div class="set-sub">Las notas caen de arriba hacia abajo.</div></div>
+                            <div><div class="set-label">Dirección (Downscroll)</div></div>
                             <input type="checkbox" id="cfg-down" style="width:25px; height:25px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Inclinación de Pista (FOV 3D)</div><div class="set-sub">Grados de inclinación para dar efecto de profundidad (0 a 60).</div></div>
+                            <div><div class="set-label">Inclinación (FOV 3D)</div></div>
                             <input type="number" id="cfg-fov" min="0" max="60" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Opacidad Notas Largas (%)</div><div class="set-sub">Transparencia del cuerpo de las Hold Notes.</div></div>
+                            <div><div class="set-label">Opacidad Notas Largas (%)</div></div>
                             <input type="number" id="cfg-noteop" min="10" max="100" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Densidad de Auto-Mapeo</div><div class="set-sub">Cantidad de notas generadas para audios custom (1-10).</div></div>
+                            <div><div class="set-label">Densidad Auto-Mapeo (1-10)</div></div>
                             <input type="number" id="cfg-den" min="1" max="10" class="set-input" style="width:80px; margin:0;">
-                        </div>
-                        
-                        <div style="margin-top:20px; background:#000; padding:20px; border-radius:15px; border:1px solid #333;">
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                                <h4 style="color:#00ffff; margin:0;">TECLAS Y VISTA PREVIA</h4>
-                                <select id="kb-mode-select" class="set-input" style="width:120px; margin:0;" onchange="window.renderLaneConfig(parseInt(this.value))">
-                                    <option value="4">4K</option><option value="5">5K</option><option value="6">6K</option><option value="7">7K</option><option value="8">8K</option><option value="9">9K</option>
-                                </select>
-                            </div>
-                            <div id="lanes-container" style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;"></div>
-                            
-                            <div id="live-skin-preview" style="width:120px; height:120px; background:#111; border:2px dashed #444; border-radius:20px; margin:0 auto; display:flex; align-items:center; justify-content:center;"></div>
                         </div>
                     </div>
 
                     <div id="set-std" class="set-section" style="display:none;">
                         <h3 style="color:#ff44b9; margin-top:0;">Ajustes de Standard</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Approach Rate (AR)</div><div class="set-sub">Velocidad del anillo (1-10)</div></div>
+                            <div><div class="set-label">Approach Rate (AR)</div></div>
                             <input type="number" id="cfg-std-ar" min="1" max="10" step="0.1" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Circle Size (CS)</div><div class="set-sub">Tamaño de los círculos (1-10)</div></div>
+                            <div><div class="set-label">Circle Size (CS)</div></div>
                             <input type="number" id="cfg-std-cs" min="1" max="10" step="0.1" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Tecla Izquierda (Click 1)</div></div>
-                            <button id="cfg-std-k1" class="set-input" onclick="captureSingleKey('cfg-std-k1', 'stdK1')" style="width:80px; cursor:pointer;">Z</button>
+                            <div><div class="set-label">Estela del Cursor (Trail)</div></div>
+                            <input type="checkbox" id="cfg-std-trail" style="width:25px; height:25px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Tecla Derecha (Click 2)</div></div>
-                            <button id="cfg-std-k2" class="set-input" onclick="captureSingleKey('cfg-std-k2', 'stdK2')" style="width:80px; cursor:pointer;">X</button>
+                            <div><div class="set-label">Tecla Z</div></div>
+                            <button id="cfg-std-k1" class="set-input" onclick="captureSingleKey('cfg-std-k1', 'stdK1')" style="width:80px;">Z</button>
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Tecla X</div></div>
+                            <button id="cfg-std-k2" class="set-input" onclick="captureSingleKey('cfg-std-k2', 'stdK2')" style="width:80px;">X</button>
                         </div>
                     </div>
 
                     <div id="set-taiko" class="set-section" style="display:none;">
                         <h3 style="color:#f95555; margin-top:0;">Ajustes de Taiko</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Don (Centro / Rojo)</div><div class="set-sub">Teclas interiores</div></div>
+                            <div><div class="set-label">Velocidad del Tambor</div></div>
+                            <input type="number" id="cfg-tk-spd" step="0.1" class="set-input" style="width:80px; margin:0;">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Don (Centro / Rojo)</div></div>
                             <div style="display:flex; gap:10px;">
-                                <button id="cfg-tk-dl" class="set-input" onclick="captureSingleKey('cfg-tk-dl', 'tkDonL')" style="width:60px; cursor:pointer;">F</button>
-                                <button id="cfg-tk-dr" class="set-input" onclick="captureSingleKey('cfg-tk-dr', 'tkDonR')" style="width:60px; cursor:pointer;">J</button>
+                                <button id="cfg-tk-dl" class="set-input" onclick="captureSingleKey('cfg-tk-dl', 'tkDonL')" style="width:60px;">F</button>
+                                <button id="cfg-tk-dr" class="set-input" onclick="captureSingleKey('cfg-tk-dr', 'tkDonR')" style="width:60px;">J</button>
                             </div>
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Katsu (Aro / Azul)</div><div class="set-sub">Teclas exteriores</div></div>
+                            <div><div class="set-label">Katsu (Aro / Azul)</div></div>
                             <div style="display:flex; gap:10px;">
-                                <button id="cfg-tk-kl" class="set-input" onclick="captureSingleKey('cfg-tk-kl', 'tkKatsuL')" style="width:60px; cursor:pointer;">D</button>
-                                <button id="cfg-tk-kr" class="set-input" onclick="captureSingleKey('cfg-tk-kr', 'tkKatsuR')" style="width:60px; cursor:pointer;">K</button>
+                                <button id="cfg-tk-kl" class="set-input" onclick="captureSingleKey('cfg-tk-kl', 'tkKatsuL')" style="width:60px;">D</button>
+                                <button id="cfg-tk-kr" class="set-input" onclick="captureSingleKey('cfg-tk-kr', 'tkKatsuR')" style="width:60px;">K</button>
                             </div>
                         </div>
                     </div>
@@ -327,15 +360,19 @@
                             <input type="number" id="cfg-ct-spd" class="set-input" style="width:80px; margin:0;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Mover Izquierda</div></div>
+                            <div><div class="set-label">Tamaño de Frutas (CS)</div></div>
+                            <input type="number" id="cfg-ct-cs" min="1" max="10" step="0.1" class="set-input" style="width:80px; margin:0;">
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Izquierda</div></div>
                             <button id="cfg-ct-l" class="set-input" onclick="captureSingleKey('cfg-ct-l', 'ctLeft')" style="width:100px;">LArrow</button>
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Mover Derecha</div></div>
+                            <div><div class="set-label">Derecha</div></div>
                             <button id="cfg-ct-r" class="set-input" onclick="captureSingleKey('cfg-ct-r', 'ctRight')" style="width:100px;">RArrow</button>
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Turbo (Dash)</div></div>
+                            <div><div class="set-label">Dash (Turbo)</div></div>
                             <button id="cfg-ct-d" class="set-input" onclick="captureSingleKey('cfg-ct-d', 'ctDash')" style="width:100px;">Shift</button>
                         </div>
                     </div>
@@ -343,19 +380,19 @@
                     <div id="set-vis" class="set-section" style="display:none;">
                         <h3 style="color:#12FA05; margin-top:0;">Ajustes Visuales</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Fondo de Juego (Dim)</div><div class="set-sub">Opacidad de la imagen de fondo (0 a 100).</div></div>
+                            <div><div class="set-label">Fondo de Juego (Dim)</div></div>
                             <input type="range" id="cfg-dim" min="0" max="100" class="set-input">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Efectos de Destello (Splash)</div><div class="set-sub">Iluminación de la pista al acertar notas.</div></div>
+                            <div><div class="set-label">Efectos Splash</div></div>
                             <input type="checkbox" id="cfg-splash" style="width:25px; height:25px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Mostrar Precisión (MS)</div><div class="set-sub">Muestra los milisegundos de error flotando.</div></div>
+                            <div><div class="set-label">Precisión (MS) Flotante</div></div>
                             <input type="checkbox" id="cfg-show-ms" style="width:25px; height:25px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Ocultar Interfaz (HUD)</div><div class="set-sub">Juega sin ver puntuación o combo (Inmersivo).</div></div>
+                            <div><div class="set-label">Ocultar HUD en Partida</div></div>
                             <input type="checkbox" id="cfg-hide-ui" style="width:25px; height:25px;">
                         </div>
                     </div>
@@ -363,19 +400,23 @@
                     <div id="set-audio" class="set-section" style="display:none;">
                         <h3 style="color:#FFD700; margin-top:0;">Audio y Sincronización</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Volumen Maestro (Música)</div></div>
+                            <div><div class="set-label">Sonido de Acierto (Hitsound)</div></div>
+                            <select id="cfg-hitsound" class="set-input" style="width:150px;">
+                                <option value="default">Normal</option>
+                                <option value="soft">Soft</option>
+                                <option value="drum">Drum</option>
+                            </select>
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Volumen Maestro</div></div>
                             <input type="range" id="cfg-vol" min="0" max="100" class="set-input">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Volumen de Acierto (Hit)</div></div>
+                            <div><div class="set-label">Volumen Hitsound</div></div>
                             <input type="range" id="cfg-hvol" min="0" max="100" class="set-input">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Volumen de Fallo (Miss)</div></div>
-                            <input type="range" id="cfg-mvol" min="0" max="100" class="set-input">
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label">Desfase Global (Offset MS)</div><div class="set-sub">Si notas que el audio va adelantado/atrasado.</div></div>
+                            <div><div class="set-label">Desfase (Offset MS)</div></div>
                             <input type="number" id="cfg-off" class="set-input" style="width:100px; margin:0;">
                         </div>
                     </div>
@@ -384,38 +425,26 @@
             </div>
         </div>
     </div>
+
     <div id="modal-diff" class="modal-overlay">
-        <div class="modal-panel" style="width: 950px; max-width: 95vw; background: rgba(15, 15, 20, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 24px; padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255, 255, 255, 0.05); display: flex; gap: 40px; align-items: stretch;">
+        <div class="modal-panel" style="width:1000px; text-align:center;">
+            <div class="m-title">SELECCIONA MODO</div>
             
-            <div style="flex: 0 0 320px; display: flex; flex-direction: column; text-align: center;">
-                <div style="position: relative; margin-bottom: 25px;">
-                    <div id="diff-song-cover" style="width: 100%; aspect-ratio: 1; border-radius: 20px; background-size: cover; background-position: center; border: 2px solid rgba(255,255,255,0.1); box-shadow: 0 15px 35px rgba(0,0,0,0.6); position: relative; z-index: 2;"></div>
-                    <div id="diff-song-glow" style="position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%); background: var(--accent); filter: blur(50px); opacity: 0.3; z-index: 1; border-radius: 50%; pointer-events: none;"></div>
-                </div>
-                
-                <div id="diff-song-title" style="font-size: 1.8rem; font-weight: 900; color: white; text-shadow: 0 4px 10px rgba(0,0,0,0.5); line-height: 1.2; margin-bottom: 8px;">...</div>
-                <div style="color: var(--accent); font-size: 0.85rem; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; margin-bottom: auto; padding-bottom: 20px;">Preparando Partida</div>
-                
-                <div class="ranked-toggle" style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); width: 100%; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; transition: 0.2s;">
-                    <input type="checkbox" id="chk-ranked" style="accent-color: var(--gold); transform: scale(1.3); cursor: pointer;">
-                    <label for="chk-ranked" style="margin-left: 12px; color: var(--gold); font-weight: 900; letter-spacing: 1px; cursor: pointer;">RANKED MODE</label>
-                </div>
+            <div id="diff-song-cover" style="width:200px; height:200px; margin:0 auto 20px; border-radius:15px; background-size:cover; background-position:center; border:3px solid var(--accent); box-shadow:0 0 40px rgba(255,102,170,0.2);"></div>
+            <div id="diff-song-title" style="font-size:2rem; font-weight:900; margin-bottom:30px; color:white;">...</div>
 
-                <button class="action secondary" style="width: 100%; border-radius: 12px; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;" onclick="closeModal('diff')">⬅ VOLVER</button>
+            <div class="diff-grid" style="text-align:left;"></div>
+            
+            <div class="ranked-toggle" style="margin-top:20px;">
+                <input type="checkbox" id="chk-ranked">
+                <label for="chk-ranked" style="margin-left:10px; color:var(--gold); font-weight:bold;">RANKED MODE (GANA PP)</label>
+            </div>
+            
+            <div id="create-lobby-opts" style="display:none; margin-top:20px;">
+                <button class="action" onclick="confirmCreateLobby()">CREAR SALA ONLINE</button>
             </div>
 
-            <div style="flex: 1; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 25px;">
-                    <h2 style="margin: 0; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: 1px;">SELECCIONA MODO</h2>
-                </div>
-
-                <div class="diff-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; max-height: 400px; overflow-y: auto; padding-right: 10px; align-content: flex-start;"></div>
-                
-                <div id="create-lobby-opts" style="display:none; margin-top: auto; padding-top: 20px;">
-                    <button class="action" style="width: 100%; border-radius: 12px; padding: 15px; background: linear-gradient(90deg, var(--blue), #00ffff); color: black;" onclick="confirmCreateLobby()">🌐 CREAR SALA ONLINE</button>
-                </div>
-            </div>
-
+            <button class="action secondary" style="margin-top:20px;" onclick="closeModal('diff')">CANCELAR</button>
         </div>
     </div>
 
@@ -487,7 +516,7 @@
         </div>
     </div>
 
-   <div id="modal-host" class="modal-overlay">
+    <div id="modal-host" class="modal-overlay">
         <div class="modal-panel" style="width:700px; text-align:center;">
             <div class="m-title" id="room-host-name">SALA</div>
             <div style="margin-bottom:20px;" id="room-song">...</div>
@@ -548,7 +577,6 @@
 
     <div id="modal-profile" class="modal-overlay">
         <div class="modal-panel" style="width: 95%; max-width: 800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
-            
             <div id="login-view" style="padding: 40px; text-align:center;">
                 <div class="m-title" style="color:var(--accent); border-color:var(--accent);">INICIAR SESIÓN</div>
                 <button class="btn-google" onclick="loginGoogle()" style="margin-bottom:20px;">ENTRAR CON GOOGLE</button>
