@@ -208,14 +208,15 @@
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:600; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     </div>
 
-    <div id="modal-settings" class="modal-overlay" style="z-index: 999999;">
+    
+   <div id="modal-settings" class="modal-overlay" style="z-index: 999999;">
         <div class="modal-panel" style="width: 1000px; max-width: 95vw; padding: 0; background: transparent; border: none; box-shadow: none;">
             
             <div style="background: linear-gradient(90deg, var(--accent), #111); padding: 15px 25px; border-radius: 15px 15px 0 0; display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:white; text-shadow:0 0 10px black;">⚙️ CONFIGURACIÓN GLOBAL</h2>
                 <div style="display:flex; gap:10px;">
-                    <button class="action" onclick="saveSettings()" style="padding: 10px 20px; font-size:1rem; box-shadow: 0 0 10px rgba(0,0,0,0.5);">GUARDAR Y APLICAR</button>
-                    <button onclick="if(typeof window.closeSettingsPanel === 'function') window.closeSettingsPanel(); else window.closeModal('settings');" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
+                    <button class="action" onclick="saveSettings(); window.closeModal('settings');" style="padding: 10px 20px; font-size:1rem; box-shadow: 0 0 10px rgba(0,0,0,0.5);">GUARDAR Y APLICAR</button>
+                    <button onclick="window.closeModal('settings')" style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;">✖</button>
                 </div>
             </div>
 
@@ -235,13 +236,7 @@
                     <div id="set-ux" class="set-section active">
                         <h3 style="color:#00ffff; margin-top:0; font-size:1.5rem; font-weight:900;">Experiencia de Usuario</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Skin de Interfaz (UI Skin)</div><div class="set-sub">Cambia el diseño y marcos del juego.</div></div>
-                            <select id="cfg-ui-skin" class="set-input" style="width:200px;">
-                                <option value="default">Default Neón</option>
-                            </select>
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label" style="color:var(--gold);">Modo Rendimiento (Bajos Recursos)</div><div class="set-sub">Desactiva videos, partículas complejas y optimiza el HUD.</div></div>
+                            <div><div class="set-label" style="color:var(--gold);">Modo Rendimiento (Low Specs)</div><div class="set-sub">Desactiva partículas, destellos y estelas complejas.</div></div>
                             <input type="checkbox" id="cfg-perf-mode" style="width:25px; height:25px; accent-color: var(--gold);">
                         </div>
                         <div class="set-row">
@@ -252,47 +247,55 @@
                             <div><div class="set-label">Subtítulos Automáticos (Lyrics)</div></div>
                             <input type="checkbox" id="cfg-subtitles" style="width:25px; height:25px;">
                         </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Skin de Interfaz (UI Skin)</div></div>
+                            <select id="cfg-ui-skin" class="set-input" style="width:200px;"><option value="default">Default Neón</option></select>
+                        </div>
                     </div>
 
                     <div id="set-mania" class="set-section" style="display:none;">
                         <h3 style="color:#ff66aa; margin-top:0; font-size:1.5rem; font-weight:900;">Ajustes de Mania</h3>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;">
                             <div class="set-row" style="flex-direction:column; align-items:flex-start;">
                                 <div class="set-label">Velocidad (Scroll Speed)</div>
-                                <input type="number" id="cfg-spd" step="0.1" class="set-input" style="width:100%;">
+                                <input type="number" id="cfg-spd" step="1" class="set-input" style="width:100%;">
                             </div>
                             <div class="set-row" style="flex-direction:column; align-items:flex-start;">
-                                <div class="set-label">Zona de Juicio (Hit Position) %</div>
-                                <input type="number" id="cfg-hit-pos" min="50" max="95" class="set-input" style="width:100%;" title="85 es abajo, 50 es al medio">
+                                <div class="set-label">Zona de Juicio (Posición Y %)</div>
+                                <input type="number" id="cfg-hit-pos" min="10" max="95" class="set-input" style="width:100%;" title="85=Abajo, 50=Medio, 15=Arriba">
+                            </div>
+                            <div class="set-row" style="flex-direction:column; align-items:flex-start;">
+                                <div class="set-label">Tamaño de Notas (%)</div>
+                                <input type="number" id="cfg-note-size" min="50" max="200" class="set-input" style="width:100%;">
                             </div>
                             <div class="set-row" style="flex-direction:column; align-items:flex-start;">
                                 <div class="set-label">Inclinación (FOV 3D)</div>
                                 <input type="number" id="cfg-fov" min="0" max="60" class="set-input" style="width:100%;">
                             </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:20px;">
+                            <div class="set-row">
+                                <div><div class="set-label">Dirección (Downscroll)</div></div>
+                                <input type="checkbox" id="cfg-down" style="width:25px; height:25px;">
+                            </div>
                             <div class="set-row" style="flex-direction:column; align-items:flex-start;">
-                                <div class="set-label">Opacidad Notas Largas %</div>
+                                <div class="set-label">Opacidad Holds (%)</div>
                                 <input type="number" id="cfg-noteop" min="10" max="100" class="set-input" style="width:100%;">
                             </div>
                         </div>
                         
-                        <div class="set-row">
-                            <div><div class="set-label">Dirección de Caída (Downscroll)</div></div>
-                            <input type="checkbox" id="cfg-down" style="width:25px; height:25px;">
-                        </div>
-
-                        <div style="margin-top:20px; background:#000; padding:20px; border-radius:10px; border:1px solid #333;">
+                        <div style="background:#000; padding:20px; border-radius:10px; border:1px solid #333;">
                             <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center;">
-                                <h4 style="color:#00ffff; margin:0;">EDITOR DE TECLAS Y SKINS</h4>
+                                <h4 style="color:#00ffff; margin:0;">EDITOR DE TECLAS Y COLORES</h4>
                                 <select id="cfg-note-skin" class="set-input" style="width:150px; margin:0;" onchange="if(typeof window.updatePreview==='function') window.updatePreview(document.getElementById('kb-mode-select').value)">
                                     <option value="default">Skin: Default</option>
                                 </select>
                                 <select id="kb-mode-select" class="set-input" style="margin:0;" onchange="window.renderLaneConfig(parseInt(this.value))">
-                                    <option value="4">4K</option><option value="5">5K</option>
-                                    <option value="6">6K</option><option value="7">7K</option>
-                                    <option value="8">8K</option><option value="9">9K</option>
-                                    <option value="10">10K</option>
+                                    <option value="4">4K</option><option value="5">5K</option><option value="6">6K</option><option value="7">7K</option>
+                                    <option value="8">8K</option><option value="9">9K</option><option value="10">10K</option>
                                 </select>
                             </div>
+                            <div style="color:#888; font-size:0.8rem; margin-bottom:15px; text-align:center;">Haz clic en una tecla para cambiarla. Presiona [ESC] para cancelar.</div>
                             <div id="lanes-container" style="display:flex; justify-content:center; gap:10px; margin-bottom:20px; flex-wrap:wrap;"></div>
                             
                             <div style="text-align:center; padding-top:20px; border-top:1px solid #333;">
@@ -305,11 +308,11 @@
                     <div id="set-std" class="set-section" style="display:none;">
                         <h3 style="color:#ff44b9; margin-top:0; font-size:1.5rem; font-weight:900;">Ajustes de Standard</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Approach Rate (AR)</div><div class="set-sub">Velocidad del anillo (1-10)</div></div>
+                            <div><div class="set-label">Approach Rate (AR)</div></div>
                             <input type="number" id="cfg-std-ar" min="1" max="10" step="0.1" class="set-input" style="width:80px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Circle Size (CS)</div><div class="set-sub">Tamaño de los círculos (1-10)</div></div>
+                            <div><div class="set-label">Circle Size (CS)</div></div>
                             <input type="number" id="cfg-std-cs" min="1" max="10" step="0.1" class="set-input" style="width:80px;">
                         </div>
                         <div class="set-row">
@@ -329,24 +332,22 @@
                     <div id="set-taiko" class="set-section" style="display:none;">
                         <h3 style="color:#f95555; margin-top:0; font-size:1.5rem; font-weight:900;">Ajustes de Taiko</h3>
                         <div class="set-row">
-                            <div><div class="set-label">Velocidad de Scroll</div></div>
+                            <div><div class="set-label">Velocidad del Tambor</div></div>
                             <input type="number" id="cfg-tk-spd" step="0.1" class="set-input" style="width:80px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Don Izquierdo (Rojo)</div></div>
-                            <button id="cfg-tk-dl" class="set-input" onclick="captureSingleKey('cfg-tk-dl', 'tkDonL')" style="width:80px;">F</button>
+                            <div><div class="set-label">Don (Centro / Rojo)</div></div>
+                            <div style="display:flex; gap:10px;">
+                                <button id="cfg-tk-dl" class="set-input" onclick="captureSingleKey('cfg-tk-dl', 'tkDonL')" style="width:60px;">F</button>
+                                <button id="cfg-tk-dr" class="set-input" onclick="captureSingleKey('cfg-tk-dr', 'tkDonR')" style="width:60px;">J</button>
+                            </div>
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Don Derecho (Rojo)</div></div>
-                            <button id="cfg-tk-dr" class="set-input" onclick="captureSingleKey('cfg-tk-dr', 'tkDonR')" style="width:80px;">J</button>
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label">Katsu Izquierdo (Azul)</div></div>
-                            <button id="cfg-tk-kl" class="set-input" onclick="captureSingleKey('cfg-tk-kl', 'tkKatsuL')" style="width:80px;">D</button>
-                        </div>
-                        <div class="set-row">
-                            <div><div class="set-label">Katsu Derecho (Azul)</div></div>
-                            <button id="cfg-tk-kr" class="set-input" onclick="captureSingleKey('cfg-tk-kr', 'tkKatsuR')" style="width:80px;">K</button>
+                            <div><div class="set-label">Katsu (Aro / Azul)</div></div>
+                            <div style="display:flex; gap:10px;">
+                                <button id="cfg-tk-kl" class="set-input" onclick="captureSingleKey('cfg-tk-kl', 'tkKatsuL')" style="width:60px;">D</button>
+                                <button id="cfg-tk-kr" class="set-input" onclick="captureSingleKey('cfg-tk-kr', 'tkKatsuR')" style="width:60px;">K</button>
+                            </div>
                         </div>
                     </div>
 
@@ -357,15 +358,19 @@
                             <input type="number" id="cfg-ct-spd" class="set-input" style="width:80px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Mover Izquierda</div></div>
-                            <button id="cfg-ct-l" class="set-input" onclick="captureSingleKey('cfg-ct-l', 'ctLeft')" style="width:100px;">ArrowLeft</button>
+                            <div><div class="set-label">Tamaño de Frutas (CS)</div></div>
+                            <input type="number" id="cfg-ct-cs" min="1" max="10" step="0.1" class="set-input" style="width:80px;">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Mover Derecha</div></div>
-                            <button id="cfg-ct-r" class="set-input" onclick="captureSingleKey('cfg-ct-r', 'ctRight')" style="width:100px;">ArrowRight</button>
+                            <div><div class="set-label">Izquierda</div></div>
+                            <button id="cfg-ct-l" class="set-input" onclick="captureSingleKey('cfg-ct-l', 'ctLeft')" style="width:100px;">LArrow</button>
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Turbo (Dash)</div></div>
+                            <div><div class="set-label">Derecha</div></div>
+                            <button id="cfg-ct-r" class="set-input" onclick="captureSingleKey('cfg-ct-r', 'ctRight')" style="width:100px;">RArrow</button>
+                        </div>
+                        <div class="set-row">
+                            <div><div class="set-label">Dash (Turbo)</div></div>
                             <button id="cfg-ct-d" class="set-input" onclick="captureSingleKey('cfg-ct-d', 'ctDash')" style="width:100px;">Shift</button>
                         </div>
                     </div>
@@ -413,7 +418,7 @@
                             <input type="range" id="cfg-mvol" min="0" max="100" class="set-input">
                         </div>
                         <div class="set-row">
-                            <div><div class="set-label">Desfase Global (Offset MS)</div><div class="set-sub">Positivo = Notas caen más tarde</div></div>
+                            <div><div class="set-label">Desfase Global (Offset MS)</div></div>
                             <input type="number" id="cfg-off" class="set-input" style="width:100px;">
                         </div>
                     </div>
