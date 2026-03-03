@@ -437,3 +437,63 @@ window.saveCustomMechanic = function() {
     window.notify(`Mecánica "${name}" lista en tu pincel. Haz clic en la pista para colocarla.`, "success");
     document.getElementById('mech-creator-modal').remove();
 };
+
+// === CREADOR DE MECÁNICAS (PEGAR AL FINAL DE editor.js) ===
+window.edActiveCustomFX = null;
+
+window.openCustomMechanicCreator = function() {
+    const html = `
+        <div id="mech-creator-modal" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:999999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px);">
+            <div style="background:#0a0a0a; padding:30px; border-radius:15px; border:2px solid #00ffff; width:500px; box-shadow: 0 0 30px rgba(0,255,255,0.2);">
+                <h2 style="color:#00ffff; margin-top:0;">🛠️ CREADOR DE MECÁNICAS</h2>
+                <p style="color:#888; font-size:0.9rem;">Crea un efecto visual complejo que se activará cuando la línea de tiempo llegue a la nota.</p>
+                
+                <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px;">
+                    <div>
+                        <label style="color:white; font-size:0.8rem;">Nombre de tu Mecánica</label>
+                        <input type="text" id="cm-name" class="log-inp" placeholder="Ej: Mundo Invertido">
+                    </div>
+                    
+                    <div>
+                        <label style="color:white; font-size:0.8rem;">Filtro CSS (El motor de renderizado)</label>
+                        <select id="cm-filter" class="log-inp" style="background:#111;">
+                            <option value="invert(1)">Invertir Colores</option>
+                            <option value="hue-rotate(90deg)">Glitch de Color (Hue)</option>
+                            <option value="blur(5px)">Visión Borrosa (Blur)</option>
+                            <option value="grayscale(1)">Blanco y Negro</option>
+                            <option value="contrast(3)">Alto Contraste Tóxico</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="color:white; font-size:0.8rem;">Duración (en Milisegundos)</label>
+                        <input type="number" id="cm-dur" class="log-inp" value="2000" min="100" max="10000">
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="action" onclick="saveCustomMechanic()">💾 GUARDAR COMO PINCEL</button>
+                    <button class="action secondary" onclick="document.getElementById('mech-creator-modal').remove()">CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', html);
+};
+
+window.saveCustomMechanic = function() {
+    const name = document.getElementById('cm-name').value || "Custom FX";
+    const filter = document.getElementById('cm-filter').value;
+    const dur = parseInt(document.getElementById('cm-dur').value);
+
+    // Creamos el payload de la mecánica
+    window.edActiveCustomFX = { name, filter, dur };
+    
+    // Forzamos el pincel a "custom_fx"
+    const brushSelect = document.querySelector('#pro-tools-container select:last-of-type');
+    if(brushSelect) brushSelect.value = 'custom_fx';
+    window.edBrush = 'custom_fx';
+
+    window.notify(`Mecánica "${name}" lista. Clic en la pista para ponerla.`, "success");
+    document.getElementById('mech-creator-modal').remove();
+};
