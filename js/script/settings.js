@@ -1,4 +1,4 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (REPARADO) === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO) === */
 
 window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
 
@@ -10,71 +10,54 @@ window.getShapeSvg = function(shapeName, color) {
         case 'diamond': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><polygon points="50,10 90,50 50,90 10,50" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
         case 'bar': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><rect x="15" y="35" width="70" height="30" rx="10" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
         case 'ring': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="35" fill="none" stroke="${c}" stroke-width="15"/></svg>`;
-        default: return `<svg viewBox="0 0 100 100" style="width:100%; height:100%;"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
+        default: return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
     }
 };
 
 window.loadSettings = function() {
-    let saved = localStorage.getItem('gameCfg');
-    
-    // 1. EL FIX DE LA SOBRESCRITURA: Respetamos globals.js si ya existe
+    // 1. Respetar siempre la estructura base
     if (!window.cfg) window.cfg = {};
-    
-    let baseDefaults = {
-        perfMode: false, subtitles: true, showFps: true, 
-        spd: 25, down: true, den: 5, fov: 0, noteOp: 100, hitPos: 85, noteSize: 100,
-        bgDim: 60, showSplash: true, showMs: true, hideUI: false,
-        vol: 0.5, hvol: 0.8, missVol: 0.6, off: 0, hitSound: 'default',
-        stdAR: 9, stdCS: 4, stdK1: 'z', stdK2: 'x', stdTrail: true,
-        tkDonL: 'f', tkDonR: 'j', tkKatsuL: 'd', tkKatsuR: 'k', tkSpeed: 1.0,
-        ctSpeed: 10, ctLeft: 'ArrowLeft', ctRight: 'ArrowRight', ctDash: 'Shift', ctCS: 5,
-        noteSkin: 'default', uiSkin: 'default',
-        modes: {}
-    };
+    if (!window.cfg.modes) window.cfg.modes = {};
 
-    // Mezclamos en este orden: Defaults base -> Lo que ya está en globals.js
-    let merged = Object.assign({}, baseDefaults, window.cfg);
-
-    // Si hay guardado en local, lo aplicamos encima con cuidado de no romper 'modes'
+    // 2. Cargar de localStorage (DEEP MERGE para no romper los arrays)
+    let saved = localStorage.getItem('gameCfg');
     if (saved) {
         try { 
             let parsed = JSON.parse(saved);
-            if (parsed.modes) {
-                merged.modes = Object.assign(merged.modes || {}, parsed.modes);
-                delete parsed.modes;
+            for (let key in parsed) {
+                if (key === 'modes') {
+                    for (let k in parsed.modes) {
+                        window.cfg.modes[k] = parsed.modes[k];
+                    }
+                } else {
+                    window.cfg[key] = parsed[key];
+                }
             }
-            Object.assign(merged, parsed);
-        } 
-        catch(e) { console.error("Error al cargar settings:", e); }
+        } catch(e) { console.warn("Error leyendo settings:", e); }
     }
-    
-    window.cfg = merged;
-    if (!window.cfg.modes) window.cfg.modes = {};
 
-    // Configuraciones maestras de teclas por defecto correctas
+    // 3. Restaurador de emergencia: Si falta algún modo, le inyectamos los defaults perfectos
     const masterKeys = {
-        4: ['d','f','j','k'],
-        5: ['d','f',' ','j','k'],
-        6: ['s','d','f','j','k','l'],
-        7: ['s','d','f',' ','j','k','l'],
+        4: ['d','f','j','k'], 5: ['d','f',' ','j','k'],
+        6: ['s','d','f','j','k','l'], 7: ['s','d','f',' ','j','k','l'],
         9: ['a','s','d','f',' ','h','j','k','l']
     };
 
     for(let k = 1; k <= 10; k++) {
         if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
             window.cfg.modes[k] = [];
-            let dKeys = masterKeys[k] || ['a','s','d','f','g','h','j','k','l',';'];
-            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: dKeys[i]||' ', c: '#00ffff', s: 'circle' });
+            let defs = masterKeys[k] || ['a','s','d','f','g','h','j','k','l',';'];
+            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: defs[i]||' ', c: '#00ffff', s: 'circle' });
         }
     }
 
-    // --- Carga de UI ---
-    const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
-    const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
+    // 4. Setear UI Visual
+    const setVal = (id, prop) => { const el = document.getElementById(id); if(el && window.cfg[prop] !== undefined) el.value = window.cfg[prop]; };
+    const setChk = (id, prop) => { const el = document.getElementById(id); if(el && window.cfg[prop] !== undefined) el.checked = !!window.cfg[prop]; };
     const setTxt = (id, prop) => { 
         const el = document.getElementById(id); 
-        if(el) {
-            let txt = String(window.cfg[prop]||'').toUpperCase().replace('ARROW', '').replace('KEY', '');
+        if(el && window.cfg[prop]) {
+            let txt = String(window.cfg[prop]).toUpperCase().replace('ARROW', '').replace('KEY', '');
             if(txt === ' ' || txt === 'SPACE') txt = 'SPC';
             el.innerText = txt; 
         }
@@ -89,9 +72,9 @@ window.loadSettings = function() {
     setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS'); setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
     setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
     
-    if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
-    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.8) * 100;
-    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.6) * 100;
+    if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol !== undefined ? window.cfg.vol : 0.5) * 100;
+    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol !== undefined ? window.cfg.hvol : 0.8) * 100;
+    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol !== undefined ? window.cfg.missVol : 0.6) * 100;
     setVal('cfg-off', 'off'); setVal('cfg-hitsound', 'hitSound');
     
     if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
@@ -158,17 +141,16 @@ window.renderLaneConfig = function(k) {
     const cont = document.getElementById('lanes-container');
     if(!cont) return;
     
-    if(!window.cfg.modes[k]) {
-        window.cfg.modes[k] = [];
-        for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: ' ', c: '#00ffff', s: 'circle' });
-    }
+    if(!window.cfg.modes[k]) window.loadSettings();
 
     let html = '';
     window.cfg.modes[k].forEach((lane, i) => {
-        // Limpieza visual profunda para arreglar el "KEYD"
-        let keyText = String(lane.k).toUpperCase();
-        if (keyText === ' ' || keyText === 'SPACE') keyText = 'SPC';
-        keyText = keyText.replace('ARROW', '').replace('KEY', '');
+        let kStr = String(lane.k);
+        let keyText = '';
+        
+        // Limpiador agresivo de textos para evitar el "KEYD"
+        if (kStr === ' ' || kStr.toLowerCase() === 'space') keyText = 'SPC';
+        else keyText = kStr.toUpperCase().replace('KEY', '').replace('DIGIT', '').replace('ARROW', '');
         
         let shapeSvg = window.getShapeSvg(lane.s, lane.c);
 
@@ -189,9 +171,7 @@ window.renderLaneConfig = function(k) {
     });
     
     cont.innerHTML = html;
-    
-    // 🚨 FIX MAESTRO: Timeout para asegurar que el DOM cargó antes de generar la vista previa
-    setTimeout(() => { window.updatePreview(k); }, 50);
+    window.updatePreview(k);
 };
 
 window.cycleShape = function(k, laneIdx) {
@@ -227,12 +207,19 @@ window.remapKey = function(btnElement, k, laneIdx) {
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
         
-        let key = e.key; 
-        if (key.length === 1) key = key.toLowerCase(); // Normalización crítica para el gameplay
-        if (e.code === "Space") key = " ";
+        let keyToSave = e.key;
         
-        if (key !== "escape" && key !== "Escape") {
-            window.cfg.modes[k][laneIdx].k = key;
+        // FIX MAESTRO PARA LA BARRA ESPACIADORA Y MOTOR GAME.JS
+        // El motor evalúa `e.key.toLowerCase()`. Si presionas espacio, devuelve " ".
+        // Debemos guardar explícitamente " " en la configuración para que haga match en el gameplay.
+        if (e.code === "Space" || e.key === " ") {
+            keyToSave = " "; 
+        } else if (keyToSave.length === 1) {
+            keyToSave = keyToSave.toLowerCase(); // Forzar minúscula en letras (D -> d)
+        }
+        
+        if (e.key !== "Escape" && e.key !== "Esc") {
+            window.cfg.modes[k][laneIdx].k = keyToSave;
         }
         
         btnElement.dataset.waiting = "false";
@@ -261,13 +248,10 @@ window.captureSingleKey = function(btnId, cfgProp) {
 
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
-        let key = e.key; 
-        if (key.length === 1) key = key.toLowerCase();
-        if (e.code === "Space") key = " ";
-
-        if (key !== "escape" && key !== "Escape") {
+        let key = e.key; if(e.code === "Space") key = "Space";
+        if (key !== "Escape" && key !== "Esc") {
             window.cfg[cfgProp] = key;
-            btn.innerText = key.toUpperCase().replace('ARROW','').replace('KEY', '');
+            btn.innerText = key.toUpperCase().replace('ARROW','');
         } else {
             btn.innerText = btn.dataset.origKey;
         }
@@ -284,20 +268,15 @@ window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box) return;
     
-    // 2. EL FIX DE LA VISTA PREVIA: Nos aseguramos de que no falle y muestre el SVG centrado
-    k = parseInt(k) || 4;
     let html = '';
-    
     for(let i=0; i<k; i++) {
         let laneData = window.cfg.modes[k][i];
-        if (!laneData) continue; 
+        if(!laneData) continue;
         let shapeSvg = window.getShapeSvg(laneData.s, laneData.c);
         
         html += `
         <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
-            <div style="width:50px; height:50px; transform: translateY(0); display:flex; justify-content:center; align-items:center;">
-                ${shapeSvg}
-            </div>
+            <div style="width:50px; height:50px; transform: translateY(0);">${shapeSvg}</div>
         </div>`;
     }
     box.innerHTML = html;
@@ -320,5 +299,5 @@ window.populateSkinDropdowns = function() {
     ui.value = window.cfg.uiSkin || 'default';
 };
 
-// Al final, llamamos a loadSettings suavemente para que no rompa la inicialización de la app
+// Auto-Iniciar carga al inyectar script
 setTimeout(window.loadSettings, 100);
