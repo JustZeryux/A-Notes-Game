@@ -203,28 +203,34 @@ window.drawEditorGrid = function() {
         note.style.width = '70px';
         
         let color = getLaneColor(n.l, window.edMode);
-        if(n.type === 'mine') color = '#F9393F';
+        
+        // Colores según el tipo de mecánica
+        if(n.type === 'mine') color = '#F9393F'; // Minas rojas
+        else if(n.type === 'dodge') color = '#00ffff'; // Dodge azul cyan
+        else if(n.type === 'fx_flash' || n.type === 'custom_fx') color = '#FFD700'; // FX dorados
+
         note.style.background = color;
 
         if(n.h && n.dur > 0) {
+            // NOTAS LARGAS
             note.style.height = (n.dur * (zoom / 100)) + 'px';
             note.style.border = `2px solid ${color}`;
-            note.style.background = `linear-gradient(to bottom, ${color} 0%, transparent 100%)`;
+            note.style.background = `linear-gradient(to bottom, ${color} 80%, transparent 100%)`;
             note.style.opacity = '0.8';
+            note.style.borderRadius = '5px';
+            
+            // FIX DE CRECIMIENTO: Forzamos a que crezca hacia abajo
+            note.style.transform = 'translateY(0)'; 
+            note.style.transformOrigin = 'top center';
         } else {
+            // NOTAS CORTAS NORMALES
             note.style.height = '20px';
             note.style.borderRadius = window.edMode === 'taiko' ? '50%' : '5px';
+            note.style.transform = 'translateY(-50%)'; 
         }
         grid.appendChild(note);
     });
 };
-
-function getLaneColor(l, mode) {
-    if(mode === 'taiko') return l === 0 ? '#f95555' : '#44b9ff'; 
-    if(mode === 'catch') return '#12FA05'; 
-    const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700', '#F9393F', '#a200ff'];
-    return colors[l % colors.length];
-}
 
 // === NUEVO MODAL PARA AUTO-MAPEO ===
 window.openAutoMapModal = function() {
