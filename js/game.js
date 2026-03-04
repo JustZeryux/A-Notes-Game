@@ -414,7 +414,7 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
     }
 
-    // === ZONA DE RENDERIZADO VISUAL ===
+// === 1. ZONA DE DIBUJADO VISUAL ===
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
@@ -426,8 +426,8 @@ function loop() {
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 
-                // Wrapper centrado matemáticamente
-                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; display: flex; justify-content: center; align-items: center; position: absolute; transform-style: preserve-3d;`; 
+                // 🚨 FIX MAESTRO CSS: Posición absoluta pura, sin flexbox.
+                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; position: absolute; z-index: 10;`; 
                 
                 let conf = window.cfg.modes[window.keys][n.l]; let color = conf.c; let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
                 
@@ -438,27 +438,9 @@ function loop() {
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                // 🌟 REDISEÑO TOTAL DE LA ESTELA (HOLD TRAIL) 🌟
-                let trailHTML = '';
-                let noteLen = n.len || n.dur || 0;
-                
-                if (n.type === 'hold' && noteLen > 0) { 
-                    const h = (noteLen / 1000) * (window.cfg.spd * 40); 
-                    
-                    // Diseño Neón con Opacidad dinámica
-                    let tStyle = `position: absolute; width: 25%; left: 50%; transform: translateX(-50%); opacity: ${(window.cfg.noteOp||100)/100}; border-radius: 8px; box-shadow: 0 0 20px ${color}88;`;
-                    
-                    if (window.cfg.down) { 
-                        tStyle += ` bottom: 50%; height: ${h}px; transform-origin: bottom center; background: linear-gradient(to top, ${color}dd 0%, ${color}22 100%); border: 2px solid ${color}; border-bottom: none;`; 
-                    } else { 
-                        tStyle += ` top: 50%; height: ${h}px; transform-origin: top center; background: linear-gradient(to bottom, ${color}dd 0%, ${color}22 100%); border: 2px solid ${color}; border-top: none;`; 
-                    } 
-                    trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
-                }
-
-                // CABEZA DE LA NOTA (Siempre encima del trail gracias al DOM order)
+                // CABEZA DE LA NOTA (Se renderiza al frente, z-index: 5)
+                let svgStyles = `display: block; width: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 10px ${color});`;
                 let svgHTML = '';
-                let svgStyles = `filter: drop-shadow(0 0 10px ${color}); position: relative; z-index: 5; width: 100%;`;
                 
                 if (n.type === 'mine') {
                     svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
@@ -471,10 +453,24 @@ function loop() {
                         svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
                     }
                 }
+
+                // CUERPO DE LA NOTA LARGA (HOLD) - Renderizado detrás (z-index: -1) y centrado.
+                let trailHTML = '';
+                let noteLen = n.len || n.dur || 0;
+                if (n.type === 'hold' && noteLen > 0) { 
+                    const h = (noteLen / 1000) * (window.cfg.spd * 40); 
+                    
+                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 25%; z-index: -1; opacity: ${(window.cfg.noteOp||100)/100}; box-shadow: 0 0 15px ${color}; border-radius: 8px;`;
+                    
+                    if (window.cfg.down) { 
+                        tStyle += ` bottom: 50%; height: ${h}px; transform-origin: bottom center; background: linear-gradient(to top, ${color}ff 0%, ${color}00 100%);`; 
+                    } else { 
+                        tStyle += ` top: 50%; height: ${h}px; transform-origin: top center; background: linear-gradient(to bottom, ${color}ff 0%, ${color}00 100%);`; 
+                    } 
+                    trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
+                }
                 
-                // El trail se inyecta PRIMERO, así queda físicamente detrás de la cabeza de la nota
                 el.innerHTML = trailHTML + svgHTML; 
-                
                 if(elTrack) elTrack.appendChild(el); 
                 n.el = el;
             }
@@ -482,7 +478,7 @@ function loop() {
         } else break; 
     }
 
-    // === ZONA DE ACTUALIZACIÓN LÓGICA (MOVIMIENTO) ===
+    // === 2. ZONA DE ACTUALIZACIÓN Y MOVIMIENTO ===
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if ((n.type === 'fx_flash' || n.type === 'custom_fx') && n.t < now - 100) { window.st.spawned.splice(i, 1); continue; }
@@ -500,39 +496,30 @@ function loop() {
             const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
             let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
             
-            // Movimiento normal
             if (n.type !== 'hold' || (n.type === 'hold' && !n.h)) { 
                 n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`; 
             }
             
-            // Comportamiento cuando estás presionando la nota HOLD
             if (n.type === 'hold' && n.h) {
-                 n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; // Ancla la cabeza
+                 n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; 
                  let noteLen = n.len || n.dur || 0;
                  const rem = (n.t + noteLen) - now; 
                  const tr = n.el.querySelector('.sustain-trail');
                  
-                 // Encoger visualmente la estela
                  if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
                  
-                 // Lógica si sueltas el botón antes de tiempo
                  if (!window.st.keys[n.l]) { 
                      n.el.style.opacity = 0.5; 
-                     n.el.style.filter = 'grayscale(0.8)'; // Feedback visual de ruptura
-                     if (rem > 100 && !n.broken) { 
-                         window.st.cmb = 0; n.broken = true; 
-                     } 
+                     n.el.style.filter = 'grayscale(0.8)';
+                     if (rem > 100 && !n.broken) { window.st.cmb = 0; n.broken = true; } 
                  } 
                  else { 
                      n.el.style.opacity = 1; 
                      n.el.style.filter = 'none';
-                     if(!n.broken) { 
-                         window.st.hp = Math.min(100, window.st.hp + 0.1); 
-                     }
+                     if(!n.broken) { window.st.hp = Math.min(100, window.st.hp + 0.1); }
                      updHUD(); 
                  }
                  
-                 // Borrado al terminar
                  if (now >= n.t + noteLen) { 
                      if(!n.broken) window.st.sc += 200; 
                      n.el.remove(); n.el = null; 
