@@ -433,7 +433,6 @@ window.playSongInternal = function(s) {
 function loop() {
     if (!window.st.act || window.st.paused) { gameLoopId = requestAnimationFrame(loop); return; }
     
-    // AQUÍ SE CALCULA EL TIEMPO PRIMERO PARA EVITAR EL CRASH
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
@@ -467,7 +466,7 @@ function loop() {
         }
     }
 
-  const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+    const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
     
     let activeSkin = null; 
     if (window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
@@ -479,14 +478,14 @@ function loop() {
         if (n.s) continue; 
         if (n.type === 'fx_flash' || n.type === 'custom_fx') { n.s = true; window.st.spawned.push(n); continue; }
 
-        // 🚨 FIX: Aumentamos el spawn a 4000ms para que caigan suavemente desde fuera de la pantalla
+        // 🚨 FIX: 4000ms de anticipación para que bajen desde afuera de la pantalla
         if (n.t - now < 4000) { 
             if (n.t - now > -200) { 
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 
-                // Centrado perfecto de la nota para que el Hold Trail no la aplaste
+                // 🚨 FIX CSS: Centrado absoluto de la nota para que el trail no la mueva
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; display: flex; justify-content: center; align-items: center; position: absolute;`; 
                 
                 let conf = window.cfg.modes[window.keys][n.l]; let color = conf.c; let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
@@ -511,15 +510,15 @@ function loop() {
                     }
                 }
                 
-                // 🚨 FIX MAESTRO PARA NOTAS HOLD (Trail posicionado desde el fondo y detrás de la nota)
+                // 🚨 FIX CSS 2: El trail ahora nace por DEBAJO (z-index:-1) y desde el centro de la nota
                 let noteLen = n.len || n.dur || 0;
                 if (n.type === 'hold' && noteLen > 0) { 
                     const h = (noteLen / 1000) * (window.cfg.spd * 40); 
-                    let trailStyle = `height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}; position:absolute; width:30%; z-index:1;`;
+                    let trailStyle = `height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}; position:absolute; width:30%; z-index:-1;`;
                     if (window.cfg.down) { 
-                        trailStyle += ` bottom: 50%; transform-origin: bottom center; border-radius: 10px 10px 0 0;`; 
+                        trailStyle += ` bottom: 50%; transform-origin: bottom center;`; 
                     } else { 
-                        trailStyle += ` top: 50%; transform-origin: top center; border-radius: 0 0 10px 10px;`; 
+                        trailStyle += ` top: 50%; transform-origin: top center;`; 
                     } 
                     
                     svg += `<div class="sustain-trail" style="${trailStyle}"></div>`; 
@@ -549,7 +548,6 @@ function loop() {
             let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
             if (n.type !== 'hold' || (n.type === 'hold' && !n.h)) { n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`; }
             
-            // FIX DE ENCOGIMIENTO DE HOLD NOTE Y VARIABLES DE DURACIÓN DEL EDITOR
             if (n.type === 'hold' && n.h) {
                  n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; 
                  let noteLen = n.len || n.dur || 0;
