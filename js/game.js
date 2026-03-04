@@ -515,59 +515,7 @@ const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHei
             }
             n.s = true; window.st.spawned.push(n);
         } else break; 
-    }    const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
-
     }
-
-    for (let i = 0; i < window.st.notes.length; i++) {
-        const n = window.st.notes[i];
-        if (n.s) continue; 
-        
-        // Bloquear renderizado de mecánicas invisibles puras para no buggear la pista
-        if (n.type === 'fx_flash' || n.type === 'custom_fx') {
-            n.s = true; window.st.spawned.push(n); continue;
-        }
-
-        if (n.t - now < 1500) { 
-            if (n.t - now > -200) { 
-                const el = document.createElement('div');
-                const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
-                el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
-                el.style.left = (n.l * w) + '%';
-                el.style.width = w + '%';
-                el.style.top = '0px'; 
-                
-                let conf = window.cfg.modes[window.keys][n.l];
-                let color = conf.c; 
-                let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
-
-                if (activeSkin) {
-                    if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
-                    if (activeSkin.fixed) color = activeSkin.color;
-                }
-
-                // Ajustes visuales de mecánicas
-                if(n.type === 'mine') color = '#F9393F';
-                if(n.type === 'dodge') color = '#00ffff';
-
-                let svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})">
-                    <path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>
-                </svg>`;
-                
-                if (n.type === 'hold') {
-                    const h = (n.len / 1000) * (window.cfg.spd * 40); 
-                    svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}"></div>`;
-                }
-
-                el.innerHTML = svg;
-                if(elTrack) elTrack.appendChild(el);
-                n.el = el;
-            }
-            n.s = true;
-            window.st.spawned.push(n);
-        } else break; 
-    }
-
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
 
