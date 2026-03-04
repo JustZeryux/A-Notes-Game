@@ -207,10 +207,12 @@ function playMiss() {
 }
 
 window.prepareAndPlaySong = async function(k) {
+    // 🚨 FIX MAESTRO: OBLIGAR A CARGAR SETTINGS ANTES DE CUALQUIER OTRA COSA
+    if (typeof window.loadSettings === 'function') window.loadSettings();
+
     if(window.currentLobbyId) window.isMultiplayer = true;
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
-    // Interceptor de Osu!
     if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
         if(typeof unlockAudio === 'function') unlockAudio();
         let realId = String(window.curSongData.id).replace('osu_', '');
@@ -249,41 +251,24 @@ window.prepareAndPlaySong = async function(k) {
         let mapKey = `notes_mania_${k}k`; 
 
         let isCharted = false;
-
-        if (rawData[mapKey] && rawData[mapKey].length > 0) { 
-            map = JSON.parse(JSON.stringify(rawData[mapKey])); 
-            isCharted = true;
-        } 
-        else if (rawData.notes && rawData.notes.length > 0) { 
-            map = JSON.parse(JSON.stringify(rawData.notes)); 
-            isCharted = true;
-        }
+        if (rawData[mapKey] && rawData[mapKey].length > 0) { map = JSON.parse(JSON.stringify(rawData[mapKey])); isCharted = true; } 
+        else if (rawData.notes && rawData.notes.length > 0) { map = JSON.parse(JSON.stringify(rawData.notes)); isCharted = true; }
 
         if (isCharted) {
-            // FIX 1 y 2: Sincronizar temporizador (3000ms) y reparar las notas largas sanadoras (dur -> len)
             map.forEach(n => {
-                n.t += 3000; // Sincroniza la nota con el temporizador 3-2-1
-                if (n.dur !== undefined) {
-                    n.len = n.dur; // Traduce el lenguaje del Editor al lenguaje del Motor
-                }
+                n.t += 3000; 
+                if (n.dur !== undefined) { n.len = n.dur; }
             });
             map.sort((a, b) => a.t - b.t); 
         } 
         else {
-            // FIX 3: Diferenciar canciones del Studio vs Canciones por defecto
             if (rawData.uploader) {
-                // Es una canción subida por un usuario, NO usar automapeo
                 if(loader) loader.style.display = 'none';
                 let ask = confirm("⚠️ Esta canción fue subida desde el Studio y aún no tiene notas mapeadas.\n\n¿Deseas abrir el Editor para chartearla ahora?");
-                
-                if (ask && typeof window.openEditor === 'function') {
-                    window.openEditor(window.curSongData, k, 'mania');
-                } else {
-                    document.getElementById('menu-container').classList.remove('hidden');
-                }
-                return; // Frenar ejecución
+                if (ask && typeof window.openEditor === 'function') { window.openEditor(window.curSongData, k, 'mania'); } 
+                else { document.getElementById('menu-container').classList.remove('hidden'); }
+                return; 
             } else {
-                // Es una canción estándar del sistema, podemos usar Auto-Mapeo
                 map = genMap(buffer, k); 
                 map.sort((a, b) => a.t - b.t);
             }
@@ -300,34 +285,30 @@ window.prepareAndPlaySong = async function(k) {
         alert("Error carga: " + e.message); 
     }
 };
+
 window.playSongInternal = function(s) {
+    // 🚨 FIX MAESTRO: DOBLE CHEQUEO PARA ASEGURAR QUE LAS TECLAS ESTÁN LISTAS
+    if (typeof window.loadSettings === 'function') window.loadSettings();
+
     if(!s) return;
     initMobileTouchControls(window.keys || 4);
     window.st.act = true; window.st.paused = false;
     window.st.notes = JSON.parse(JSON.stringify(s.map));
-    window.st.spawned = []; 
-    window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50; window.st.maxCmb = 0; 
-    window.st.stats = { s:0, g:0, b:0, m:0 };
-    window.st.hitCount = 0; window.st.totalOffset = 0; 
-    
-    window.st.fcStatus = "PFC"; 
-    window.st.trueMaxScore = 0;
+    window.st.spawned = []; window.st.sc = 0; window.st.cmb = 0; window.st.hp = 50; window.st.maxCmb = 0; 
+    window.st.stats = { s:0, g:0, b:0, m:0 }; window.st.hitCount = 0; window.st.totalOffset = 0; 
+    window.st.fcStatus = "PFC"; window.st.trueMaxScore = 0;
     window.st.notes.forEach(n => { window.st.trueMaxScore += 350; if(n.type === 'hold') window.st.trueMaxScore += 200; });
-
     window.st.keys = new Array(window.keys).fill(0);
     window.st.songDuration = s.buf.duration;
     window.keys = s.kVersion;
 
     document.getElementById('menu-container').classList.add('hidden');
     document.getElementById('game-layer').style.display = 'block';
-    
-    const oldIg = document.getElementById('ig-profile');
-    if (oldIg) oldIg.style.display = 'none'; 
+    const oldIg = document.getElementById('ig-profile'); if (oldIg) oldIg.style.display = 'none'; 
 
     let capsuleUI = document.getElementById('capsule-ui');
     if(!capsuleUI) {
-        capsuleUI = document.createElement('div');
-        capsuleUI.id = 'capsule-ui';
+        capsuleUI = document.createElement('div'); capsuleUI.id = 'capsule-ui';
         capsuleUI.style.cssText = 'position:absolute; top:0; left:0; width:100%; height:100%; z-index:9000; pointer-events:none;';
         document.getElementById('game-layer').appendChild(capsuleUI);
     }
@@ -338,94 +319,54 @@ window.playSongInternal = function(s) {
 
     capsuleUI.innerHTML = `
         <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; pointer-events:auto; backdrop-filter:blur(8px);">
-            <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white; box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
+            <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white;"></div>
             <div style="display:flex; flex-direction:column; justify-content:center; padding-right:10px;">
                 <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; letter-spacing:1px; line-height:1;">${uName}</div>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
                     <div style="color:var(--gold); font-weight:900; font-size:0.7rem;">LVL ${uLvl}</div>
-                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333; box-shadow:inset 0 0 5px black;">
-                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s; box-shadow:0 0 10px var(--good);"></div>
-                    </div>
+                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333;"><div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s;"></div></div>
                 </div>
             </div>
         </div>
+        <div id="countdown" style="position:absolute; top:0; left:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; pointer-events:none; z-index:9999; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     `;
 
     const uiToClose = ['modal-res', 'modal-pause', 'modal-lobbies', 'modal-lobby-room', 'modal-song-selector', 'modal-diff', 'loading-overlay'];
     uiToClose.forEach(id => { const m = document.getElementById(id); if(m) m.style.display = 'none'; });
 
     if(!document.getElementById('game-bg-container')) {
-        const bgCont = document.createElement('div');
-        bgCont.id = "game-bg-container";
+        const bgCont = document.createElement('div'); bgCont.id = "game-bg-container";
         bgCont.innerHTML = `<div id="game-bg-img"></div>`;
         document.getElementById('game-layer').insertBefore(bgCont, document.getElementById('track'));
-        
-        const subCont = document.createElement('div');
-        subCont.id = "subtitles-container";
+        const subCont = document.createElement('div'); subCont.id = "subtitles-container";
         subCont.innerHTML = `<div id="subtitles-text"></div>`;
         document.getElementById('game-layer').appendChild(subCont);
     }
     
-    const bgC = document.getElementById('game-bg-container');
-    const subC = document.getElementById('subtitles-container');
+    const bgC = document.getElementById('game-bg-container'); const subC = document.getElementById('subtitles-container');
+    if (window.cfg.bgEffects || window.cfg.subtitles) { bgC.style.display = 'block'; document.getElementById('game-bg-img').style.backgroundImage = window.curSongData.imageURL ? `url(${window.curSongData.imageURL})` : 'none'; } else { bgC.style.display = 'none'; }
+    if (window.cfg.subtitles) { window.st.parsedLyrics = []; window.st.currentLyricIdx = 0; subC.style.display = 'block'; document.getElementById('subtitles-text').innerText = "🎵"; if (window.curSongData.lyrics) { const lines = window.curSongData.lyrics.split('\n'); lines.forEach(l => { const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/); if(match) window.st.parsedLyrics.push({ t: (parseInt(match[1])*60 + parseFloat(match[2])) * 1000, tx: match[3].trim() }); }); window.st.parsedLyrics.sort((a,b) => a.t - b.t); } } else { subC.style.display = 'none'; }
+
+    initReceptors(window.keys); updHUD(); 
     
-    if (window.cfg.bgEffects || window.cfg.subtitles) {
-        bgC.style.display = 'block';
-        document.getElementById('game-bg-img').style.backgroundImage = window.curSongData.imageURL ? `url(${window.curSongData.imageURL})` : 'none';
-    } else {
-        bgC.style.display = 'none';
-    }
-
-    if (window.cfg.subtitles) {
-        window.st.parsedLyrics = [];
-        window.st.currentLyricIdx = 0;
-        subC.style.display = 'block';
-        document.getElementById('subtitles-text').innerText = "🎵"; 
-        
-        if (window.curSongData.lyrics) {
-            const lines = window.curSongData.lyrics.split('\n');
-            lines.forEach(l => {
-                const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/);
-                if(match) {
-                    const tMs = (parseInt(match[1])*60 + parseFloat(match[2])) * 1000;
-                    window.st.parsedLyrics.push({ t: tMs, tx: match[3].trim() });
-                }
-            });
-            window.st.parsedLyrics.sort((a,b) => a.t - b.t);
-        }
-    } else {
-        subC.style.display = 'none';
-    }
-
-    initReceptors(window.keys);
-    updHUD(); 
+    window.st.src = window.st.ctx.createBufferSource(); window.st.src.buffer = s.buf;
+    const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
+    window.st.src.connect(g); g.connect(window.st.ctx.destination);
+    window.st.src.onended = () => { if(window.st.act) end(false); };
+    
+    const now = window.st.ctx.currentTime; window.st.t0 = now; const AUDIO_DELAY = 3; 
+    window.st.src.start(now + AUDIO_DELAY);
 
     const cd = document.getElementById('countdown');
     if(cd) { cd.style.display = 'flex'; cd.innerText = "3"; }
-    
-    window.st.src = window.st.ctx.createBufferSource();
-    window.st.src.buffer = s.buf;
-    const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
-    window.st.src.connect(g); g.connect(window.st.ctx.destination);
-    
-    window.st.src.onended = () => { if(window.st.act) end(false); };
-    
-    const now = window.st.ctx.currentTime;
-    window.st.t0 = now;
-    const AUDIO_DELAY = 3; 
-    
-    window.st.src.start(now + AUDIO_DELAY);
-    gameLoopId = requestAnimationFrame(loop);
-
     let count = 3;
     const iv = setInterval(() => {
         count--;
-        if(cd) {
-            if (count > 0) cd.innerText = count;
-            else { clearInterval(iv); cd.innerText = "GO!"; setTimeout(() => { cd.style.display = 'none'; }, 500); }
-        } else { clearInterval(iv); }
+        if(cd) { if (count > 0) cd.innerText = count; else { clearInterval(iv); cd.innerText = "GO!"; setTimeout(() => { cd.style.display = 'none'; }, 500); } } else { clearInterval(iv); }
     }, 1000);
-}
+
+    gameLoopId = requestAnimationFrame(loop);
+};
 
 // ==========================================
 // 4. EL LOOP ULTRA-OPTIMIZADO 
