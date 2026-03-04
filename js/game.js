@@ -647,50 +647,57 @@ function showJudge(text, color, diffMs) {
 // ==========================================
 // === SISTEMA DE INPUT BLINDADO ===
 // === SISTEMA DE INPUT BLINDADO ===
+// === SISTEMA DE INPUT BLINDADO V4 (ANTI-FANTASMAS) ===
 window.onKd = function(e) {
     if (!window.st.act || window.st.paused) return;
     if (e.key === "Escape") { e.preventDefault(); window.togglePause(); return; }
     
-    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-    if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys] || e.repeat) return;
+    // Ignorar teclas si estás escribiendo en el chat
+    if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if (e.repeat) return; // Evita bugs si dejas la tecla presionada
     
     let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
     
-    const idx = window.cfg.modes[window.keys].findIndex(l => {
-        if (!l.k) return false;
-        let cfgKey = String(l.k).toLowerCase();
-        if (cfgKey === "space") cfgKey = " "; 
-        return cfgKey === pressedKey;
-    });
-
-    if (idx !== -1) {
-        e.preventDefault(); 
-        hit(idx, true);
+    if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
+        for (let i = 0; i < window.keys; i++) {
+            let cfgKey = window.cfg.modes[window.keys][i].k;
+            if (!cfgKey) continue;
+            cfgKey = String(cfgKey).toLowerCase();
+            if (cfgKey === "space") cfgKey = " ";
+            
+            if (cfgKey === pressedKey) {
+                e.preventDefault(); // Detiene el scroll de la página
+                hit(i, true);
+                return;
+            }
+        }
     }
 };
 
 window.onKu = function(e) {
-    if (!window.st.act || !window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
+    if (!window.st.act) return;
     let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
     
-    const idx = window.cfg.modes[window.keys].findIndex(l => {
-        if (!l.k) return false;
-        let cfgKey = String(l.k).toLowerCase();
-        if (cfgKey === "space") cfgKey = " ";
-        return cfgKey === pressedKey;
-    });
-
-    if (idx !== -1) hit(idx, false);
+    if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
+        for (let i = 0; i < window.keys; i++) {
+            let cfgKey = window.cfg.modes[window.keys][i].k;
+            if (!cfgKey) continue;
+            cfgKey = String(cfgKey).toLowerCase();
+            if (cfgKey === "space") cfgKey = " ";
+            
+            if (cfgKey === pressedKey) {
+                hit(i, false);
+                return;
+            }
+        }
+    }
 };
 
-// CAZADOR GLOBAL: Fuerza al navegador a enviar todas las teclas a nuestro motor
-document.addEventListener('keydown', function(e) {
-    if (typeof window.onKd === 'function') window.onKd(e);
-}, { capture: true });
-
-document.addEventListener('keyup', function(e) {
-    if (typeof window.onKu === 'function') window.onKu(e);
-}, { capture: true });
+// 🚨 FUERZA AL NAVEGADOR A LEER EL TECLADO SIN IMPORTAR NADA MÁS 🚨
+window.removeEventListener('keydown', window.onKd, { capture: true });
+window.removeEventListener('keyup', window.onKu, { capture: true });
+window.addEventListener('keydown', window.onKd, { capture: true });
+window.addEventListener('keyup', window.onKu, { capture: true });
 
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
