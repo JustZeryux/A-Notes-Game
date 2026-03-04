@@ -210,13 +210,11 @@ window.prepareAndPlaySong = async function(k) {
     if(window.currentLobbyId) window.isMultiplayer = true;
     if (!window.curSongData) { if(!window.isMultiplayer) alert("Error: No hay canción"); return; }
     
+    // Interceptor de Osu!
     if (window.curSongData.isOsu || (window.curSongData.id && String(window.curSongData.id).startsWith('osu_'))) {
         if(typeof unlockAudio === 'function') unlockAudio();
         let realId = String(window.curSongData.id).replace('osu_', '');
-        if(typeof downloadAndPlayOsu === 'function') {
-            downloadAndPlayOsu(realId, window.curSongData.title, window.curSongData.imageURL, k);
-            return; 
-        }
+        if(typeof downloadAndPlayOsu === 'function') { downloadAndPlayOsu(realId, window.curSongData.title, window.curSongData.imageURL, k); return; }
     }
     
     const loader = document.getElementById('loading-overlay');
@@ -237,7 +235,6 @@ window.prepareAndPlaySong = async function(k) {
 
         let buffer;
         let songInRam = window.ramSongs ? window.ramSongs.find(s => s.id === window.curSongData.id) : null;
-        
         if (songInRam) { buffer = songInRam.buf; } 
         else {
             const response = await fetch(window.curSongData.audioURL || window.curSongData.url); 
@@ -251,35 +248,58 @@ window.prepareAndPlaySong = async function(k) {
         let rawData = window.curSongData.raw || window.curSongData;
         let mapKey = `notes_mania_${k}k`; 
 
-        if (rawData[mapKey] && rawData[mapKey].length > 0) {
+        let isCharted = false;
+
+        if (rawData[mapKey] && rawData[mapKey].length > 0) { 
             map = JSON.parse(JSON.stringify(rawData[mapKey])); 
-        } else if (rawData.notes && rawData.notes.length > 0) {
-            map = JSON.parse(JSON.stringify(rawData.notes));
-        } else {
-            map = genMap(buffer, k); 
+            isCharted = true;
+        } 
+        else if (rawData.notes && rawData.notes.length > 0) { 
+            map = JSON.parse(JSON.stringify(rawData.notes)); 
+            isCharted = true;
         }
 
-        // 🚨 EL FIX MAESTRO PARA NOTAS DOBLES 🚨
-        // Las notas del editor se guardan desordenadas según las pusiste.
-        // El motor necesita que estén cronológicas para que no dejen de aparecer.
-        map.sort((a, b) => a.t - b.t);
+        if (isCharted) {
+            // FIX 1 y 2: Sincronizar temporizador (3000ms) y reparar las notas largas sanadoras (dur -> len)
+            map.forEach(n => {
+                n.t += 3000; // Sincroniza la nota con el temporizador 3-2-1
+                if (n.dur !== undefined) {
+                    n.len = n.dur; // Traduce el lenguaje del Editor al lenguaje del Motor
+                }
+            });
+            map.sort((a, b) => a.t - b.t); 
+        } 
+        else {
+            // FIX 3: Diferenciar canciones del Studio vs Canciones por defecto
+            if (rawData.uploader) {
+                // Es una canción subida por un usuario, NO usar automapeo
+                if(loader) loader.style.display = 'none';
+                let ask = confirm("⚠️ Esta canción fue subida desde el Studio y aún no tiene notas mapeadas.\n\n¿Deseas abrir el Editor para chartearla ahora?");
+                
+                if (ask && typeof window.openEditor === 'function') {
+                    window.openEditor(window.curSongData, k, 'mania');
+                } else {
+                    document.getElementById('menu-container').classList.remove('hidden');
+                }
+                return; // Frenar ejecución
+            } else {
+                // Es una canción estándar del sistema, podemos usar Auto-Mapeo
+                map = genMap(buffer, k); 
+                map.sort((a, b) => a.t - b.t);
+            }
+        }
 
         const songObj = { id: window.curSongData.id, buf: buffer, map: map, kVersion: k };
         window.preparedSong = songObj; 
 
-        if(window.currentLobbyId) {
-             if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
-        } else {
-             playSongInternal(songObj);
-             if(loader) loader.style.display = 'none';
-        }
-    } catch (e) {
-        console.error(e);
-        if(loader) loader.style.display = 'none';
-        alert("Error carga: " + e.message);
+        if(window.currentLobbyId) { if(typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded(); } 
+        else { playSongInternal(songObj); if(loader) loader.style.display = 'none'; }
+    } catch (e) { 
+        console.error(e); 
+        if(loader) loader.style.display = 'none'; 
+        alert("Error carga: " + e.message); 
     }
 };
-
 window.playSongInternal = function(s) {
     if(!s) return;
     initMobileTouchControls(window.keys || 4);
