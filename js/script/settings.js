@@ -257,4 +257,13 @@ window.populateSkinDropdowns = function() {
     ns.value = window.cfg.noteSkin || 'default'; ui.value = window.cfg.uiSkin || 'default';
 };
 
-window.addEventListener('DOMContentLoaded', window.loadSettings);
+// ==========================================
+// AUTO-INICIO INSTANTÁNEO (FIX RETRASO)
+// ==========================================
+// 1. Ejecutar al instante en la RAM para que game.js ya tenga tus teclas listas
+window.loadSettings();
+
+// 2. Ejecutar de nuevo cuando el HTML cargue para pintar los botones de la interfaz
+window.addEventListener('DOMContentLoaded', () => {
+    window.loadSettings();
+});
