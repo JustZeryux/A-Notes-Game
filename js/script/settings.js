@@ -1,4 +1,5 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL === */
+/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO) === */
+
 window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
 
 window.getShapeSvg = function(shapeName, color) {
@@ -42,7 +43,7 @@ window.loadSettings = function() {
     const setTxt = (id, prop) => { 
         const el=document.getElementById(id); 
         if(el && window.cfg[prop]) {
-            let txt = String(window.cfg[prop]).toUpperCase().replace('ARROW', '').replace('');
+            let txt = String(window.cfg[prop]).toUpperCase().replace(/KEY/g, '').replace(/DIGIT/g, '').replace(/ARROW/g, '');
             if(txt === ' ' || txt === 'SPACE') txt = 'SPC'; el.innerText = txt; 
         }
     };
@@ -114,15 +115,21 @@ window.renderLaneConfig = function(k) {
 
     let html = '';
     window.cfg.modes[k].forEach((lane, i) => {
-        let kStr = String(lane.k); let keyText = '';
-        if (kStr === ' ' || kStr.toLowerCase() === 'space') keyText = 'SPC';
-        else keyText = kStr.toUpperCase().replace('KEY', '').replace('DIGIT', '').replace('ARROW', '');
+        let kStr = String(lane.k || ''); let keyText = '';
+        
+        if (kStr === ' ' || kStr.toLowerCase() === 'space') {
+            keyText = 'SPC';
+        } else {
+            keyText = kStr.toUpperCase().replace(/KEY/g, '').replace(/DIGIT/g, '').replace(/ARROW/g, '');
+            if (keyText.length > 5) keyText = keyText.substring(0, 4) + '..';
+        }
+
         let shapeSvg = window.getShapeSvg(lane.s, lane.c);
 
         html += `
         <div class="l-col" style="display:flex; flex-direction:column; align-items:center; gap:15px; margin:0 5px;">
             <button class="key-bind" onclick="window.remapKey(this, ${k}, ${i})" 
-                 style="width:70px; height:70px; border:3px solid ${lane.c}; border-radius:15px; font-weight:900; font-size:1.8rem; cursor:pointer; background:#111; color:white; box-shadow:0 0 15px rgba(0,0,0,0.5);">
+                 style="width:70px; height:70px; border:3px solid ${lane.c}; border-radius:15px; font-weight:900; font-size:1.6rem; cursor:pointer; background:#111; color:white; box-shadow:0 0 15px rgba(0,0,0,0.5); overflow:hidden;">
                 ${keyText}
             </button>
             <div class="shape-indicator" onclick="window.cycleShape(${k}, ${i})" style="width:40px; height:40px; cursor:pointer;">${shapeSvg}</div>
@@ -146,49 +153,84 @@ window.updateLaneColor = function(k, laneIdx, newColor) { window.cfg.modes[k][la
 window.remapKey = function(btnElement, k, laneIdx) {
     if(btnElement.dataset.waiting === "true") return;
     btnElement.dataset.waiting = "true";
-    const origText = btnElement.innerText;
-    btnElement.innerText = "..."; btnElement.style.background = "#F9393F"; btnElement.blur();
+    btnElement.innerText = "..."; 
+    btnElement.style.background = "#F9393F"; 
+    btnElement.blur();
 
     const overlay = document.createElement('div');
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
-    overlay.innerHTML = `<div style="color:#F9393F; font-size:4rem; font-weight:900; text-shadow:0 0 30px #F9393F;">ASIGNAR TECLA</div><div style="color:white; font-size:1.8rem; margin-top:15px;">Presiona la tecla para el Carril ${laneIdx + 1}</div><div style="color:#888; margin-top:30px;">Presiona [ESC] para cancelar</div>`;
+    overlay.innerHTML = `<div style="color:#F9393F; font-size:4rem; font-weight:900; text-shadow:0 0 30px #F9393F;">ASIGNAR TECLA</div><div style="color:white; font-size:1.8rem; margin-top:15px;">Presiona la nueva tecla para el Carril ${laneIdx + 1}</div><div style="color:#888; margin-top:30px; font-size:1rem;">(Haz clic aquí o presiona ESC para cancelar)</div>`;
     document.body.appendChild(overlay);
+
+    const cleanUp = () => {
+        btnElement.dataset.waiting = "false";
+        overlay.remove(); 
+        window.removeEventListener('keydown', capture, { capture: true });
+        window.renderLaneConfig(k);
+    };
 
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
         let keyToSave = e.key;
+        
         if (e.code === "Space" || e.key === " ") keyToSave = " "; 
         else if (keyToSave.length === 1) keyToSave = keyToSave.toLowerCase();
         
-        if (e.key !== "Escape" && e.key !== "Esc") window.cfg.modes[k][laneIdx].k = keyToSave;
-        
-        overlay.remove(); document.removeEventListener('keydown', capture, true);
-        window.renderLaneConfig(k); 
+        if (e.key !== "Escape" && e.key !== "Esc") {
+            window.cfg.modes[k][laneIdx].k = keyToSave;
+        }
+        cleanUp();
     };
-    setTimeout(() => { document.addEventListener('keydown', capture, true); }, 150);
+    
+    overlay.onclick = cleanUp;
+
+    setTimeout(() => { 
+        window.addEventListener('keydown', capture, { capture: true }); 
+    }, 200);
 };
 
 window.captureSingleKey = function(btnId, cfgProp) {
-    const btn = document.getElementById(btnId); if(!btn || btn.dataset.waiting === "true") return;
-    const origText = btn.innerText; btn.dataset.waiting = "true"; btn.innerText = "..."; btn.style.background = "#F9393F"; btn.blur();
+    const btn = document.getElementById(btnId); 
+    if(!btn || btn.dataset.waiting === "true") return;
+    
+    const origText = btn.innerText; 
+    btn.dataset.waiting = "true"; 
+    btn.innerText = "..."; 
+    btn.style.background = "#F9393F"; 
+    btn.blur();
 
     const overlay = document.createElement('div');
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center;";
-    overlay.innerHTML = `<div style="color:#ff66aa; font-size:4rem; font-weight:900;">ASIGNAR TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div>`;
+    overlay.innerHTML = `<div style="color:#ff66aa; font-size:4rem; font-weight:900;">ASIGNAR TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div><div style="color:#888; margin-top:30px; font-size:1rem;">(Haz clic aquí o presiona ESC para cancelar)</div>`;
     document.body.appendChild(overlay);
+
+    const cleanUp = () => {
+        btn.dataset.waiting = "false"; 
+        btn.style.background = "transparent";
+        overlay.remove(); 
+        window.removeEventListener('keydown', capture, { capture: true });
+    };
 
     const capture = (e) => {
         e.preventDefault(); e.stopPropagation();
-        let key = e.key; if(e.code === "Space" || key === " ") key = " ";
+        let key = e.key; 
+        
+        if(e.code === "Space" || key === " ") key = " ";
         else if (key.length === 1) key = key.toLowerCase();
 
         if (e.key !== "Escape" && e.key !== "Esc") {
-            window.cfg[cfgProp] = key; btn.innerText = key === " " ? "SPC" : key.toUpperCase().replace('ARROW','');
-        } else { btn.innerText = origText; }
-        btn.dataset.waiting = "false"; btn.style.background = "transparent";
-        overlay.remove(); document.removeEventListener('keydown', capture, true);
+            window.cfg[cfgProp] = key; 
+            let display = key === " " ? "SPC" : key.toUpperCase().replace(/ARROW/g,'').replace(/KEY/g,'').replace(/DIGIT/g,'');
+            btn.innerText = display.length > 5 ? display.substring(0,4)+'..' : display;
+        } else { 
+            btn.innerText = origText; 
+        }
+        cleanUp();
     };
-    setTimeout(() => document.addEventListener('keydown', capture, true), 150);
+    
+    overlay.onclick = () => { btn.innerText = origText; cleanUp(); };
+
+    setTimeout(() => window.addEventListener('keydown', capture, { capture: true }), 200);
 };
 
 window.updatePreview = function(k) {
@@ -214,4 +256,5 @@ window.populateSkinDropdowns = function() {
     });
     ns.value = window.cfg.noteSkin || 'default'; ui.value = window.cfg.uiSkin || 'default';
 };
+
 window.addEventListener('DOMContentLoaded', window.loadSettings);
