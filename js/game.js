@@ -468,12 +468,55 @@ function loop() {
         }
     }
 
-    const w = 100 / window.keys;
-    const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+    
+    // --- FIX: LEER SKIN CORRECTA EN TIEMPO REAL ---
+    let activeSkin = null; 
+    if (window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    }
 
-    let activeSkin = null;
-    if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    for (let i = 0; i < window.st.notes.length; i++) {
+        const n = window.st.notes[i];
+        if (n.s) continue; 
+        if (n.type === 'fx_flash' || n.type === 'custom_fx') { n.s = true; window.st.spawned.push(n); continue; }
+
+        if (n.t - now < 1500) { 
+            if (n.t - now > -200) { 
+                const el = document.createElement('div');
+                const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
+                el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
+                el.style.left = (n.l * w) + '%'; el.style.width = w + '%'; el.style.top = '0px'; 
+                
+                let conf = window.cfg.modes[window.keys][n.l]; let color = conf.c; let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
+                
+                let isImageSkin = false;
+                if (activeSkin) { 
+                    if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape]; 
+                    if (activeSkin.fixed) color = activeSkin.color; 
+                    if (activeSkin.img) isImageSkin = true;
+                }
+
+                let svg = '';
+                if (n.type === 'mine') {
+                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #F9393F);"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
+                } else if (n.type === 'dodge') {
+                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #00ffff);"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
+                } else {
+                    if (isImageSkin) {
+                        svg = `<img src="${activeSkin.img}" style="width:100%; height:100%; filter:drop-shadow(0 0 8px ${color}); object-fit: contain;">`;
+                    } else {
+                        svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+                    }
+                }
+                
+                if (n.type === 'hold') { const h = (n.len / 1000) * (window.cfg.spd * 40); svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}"></div>`; }
+                el.innerHTML = svg; if(elTrack) elTrack.appendChild(el); n.el = el;
+            }
+            n.s = true; window.st.spawned.push(n);
+        } else break; 
+    }    const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+
     }
 
     for (let i = 0; i < window.st.notes.length; i++) {
@@ -933,50 +976,44 @@ function end(died) {
     }
 }
 function initReceptors(k) {
-    elTrack = document.getElementById('track');
-    if(!elTrack) return;
-    elTrack.innerHTML = '';
-    const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0;
-    elTrack.style.transform = `rotateX(${fov}deg)`;
-    document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
-    const y = window.cfg.down ? window.innerHeight - 140 : 80;
+    elTrack = document.getElementById('track'); if(!elTrack) return; elTrack.innerHTML = '';
+    const fov = (window.cfg && window.cfg.fov) ? window.cfg.fov : 0; elTrack.style.transform = `rotateX(${fov}deg)`; document.documentElement.style.setProperty('--lane-width', (100 / k) + '%');
+    const y = window.cfg.down ? window.innerHeight - 140 : 80; 
     
-    let activeSkin = null;
-    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
-        if (typeof SHOP_ITEMS !== 'undefined') activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    // --- FIX MAESTRO: LEER SKIN DESDE LA VARIABLE CORRECTA DE AJUSTES ---
+    let activeSkin = null; 
+    if (window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') { 
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin); 
     }
+    
     for (let i = 0; i < k; i++) {
-        const r = document.createElement('div');
-        r.className = `arrow-wrapper receptor`;
-        r.id = `rec-${i}`;
-        r.style.left = (i * (100 / k)) + '%';
-        r.style.top = y + 'px';
-        r.style.width = (100 / k) + '%';
-        let conf = window.cfg.modes[k][i];
-        let color = conf.c;
-        let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
-        if (activeSkin) {
-            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
-            if (activeSkin.fixed) color = activeSkin.color;
+        const r = document.createElement('div'); r.className = `arrow-wrapper receptor`; r.id = `rec-${i}`; r.style.left = (i * (100 / k)) + '%'; r.style.top = y + 'px'; r.style.width = (100 / k) + '%';
+        let conf = window.cfg.modes[k][i]; let color = conf.c; let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
+        
+        let htmlContent = "";
+        
+        if (activeSkin) { 
+            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape]; 
+            if (activeSkin.fixed) color = activeSkin.color; 
+            
+            // Si la skin es una imagen en lugar de un SVG
+            if (activeSkin.img) {
+                htmlContent = `<img src="${activeSkin.img}" style="width:100%; height:100%; filter:drop-shadow(0 0 8px ${color}); object-fit: contain;">`;
+            }
         }
-        r.style.setProperty('--active-c', color);
-        r.style.setProperty('--col', color); 
-        r.innerHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 5px ${color})">
-            <path class="arrow-path" d="${shapeData}" stroke="${color}" fill="none" stroke-width="4"/>
-        </svg>`;
+        
+        r.style.setProperty('--active-c', color); r.style.setProperty('--col', color); 
+        
+        // Si no es imagen, renderizamos la forma SVG
+        if(!htmlContent) {
+            htmlContent = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 5px ${color})"><path class="arrow-path" d="${shapeData}" stroke="${color}" fill="none" stroke-width="4"/></svg>`;
+        }
+        
+        r.innerHTML = htmlContent;
         elTrack.appendChild(r);
-        const l = document.createElement('div');
-        l.style.position = 'absolute';
-        l.style.left = (i * (100 / k)) + '%';
-        l.style.width = (100 / k) + '%';
-        l.style.height = '100%';
-        l.style.background = `linear-gradient(to bottom, transparent, ${color}22)`;
-        l.style.borderLeft = '1px solid rgba(255,255,255,0.05)';
-        l.style.zIndex = '-1';
-        elTrack.appendChild(l);
+        const l = document.createElement('div'); l.style.position = 'absolute'; l.style.left = (i * (100 / k)) + '%'; l.style.width = (100 / k) + '%'; l.style.height = '100%'; l.style.background = `linear-gradient(to bottom, transparent, ${color}22)`; l.style.borderLeft = '1px solid rgba(255,255,255,0.05)'; l.style.zIndex = '-1'; elTrack.appendChild(l);
     }
 }
-
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
 window.togglePause = function() {
