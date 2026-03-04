@@ -670,21 +670,53 @@ function showJudge(text, color, diffMs) {
 // ==========================================
 // 6. EVENTOS Y COLISIONES DE MECÁNICAS
 // ==========================================
+// === SISTEMA DE INPUT BLINDADO ===
 window.onKd = function(e) {
+    if (!window.st.act || window.st.paused) return;
     if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
-    if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
+    
+    // Evitar disparar notas si el usuario está escribiendo en el chat
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    
+    if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys] || e.repeat) return;
+    
+    // Normalizar Espacio y minúsculas para compatibilidad total
+    let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
+    
+    const idx = window.cfg.modes[window.keys].findIndex(l => {
+        if (!l.k) return false;
+        let cfgKey = String(l.k).toLowerCase();
+        if (cfgKey === "space") cfgKey = " "; // Parche para cachés viejos
+        return cfgKey === pressedKey;
+    });
 
-    if (!e.repeat) {
-        const idx = window.cfg.modes[window.keys].findIndex(l => l.k && l.k.toLowerCase() === e.key.toLowerCase());
-        if (idx !== -1) hit(idx, true);
+    if (idx !== -1) {
+        e.preventDefault(); // Bloquea el scroll de la página
+        hit(idx, true);
     }
 };
 
 window.onKu = function(e) {
+    if (!window.st.act) return;
     if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
-    const idx = window.cfg.modes[window.keys].findIndex(l => l.k && l.k.toLowerCase() === e.key.toLowerCase());
+    
+    let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
+    
+    const idx = window.cfg.modes[window.keys].findIndex(l => {
+        if (!l.k) return false;
+        let cfgKey = String(l.k).toLowerCase();
+        if (cfgKey === "space") cfgKey = " ";
+        return cfgKey === pressedKey;
+    });
+
     if (idx !== -1) hit(idx, false);
 };
+
+// 🚨 FORZAR AL NAVEGADOR A ESCUCHAR EL TECLADO SIN IMPORTAR QUÉ MÁS HAYA EN PANTALLA 🚨
+window.removeEventListener('keydown', window.onKd, { capture: true });
+window.removeEventListener('keyup', window.onKu, { capture: true });
+window.addEventListener('keydown', window.onKd, { capture: true });
+window.addEventListener('keyup', window.onKu, { capture: true });
 
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
