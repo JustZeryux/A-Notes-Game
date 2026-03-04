@@ -431,64 +431,43 @@ window.playSongInternal = function(s) {
 // 4. EL LOOP ULTRA-OPTIMIZADO 
 // ==========================================
 function loop() {
-    if (!window.st.act || window.st.paused) {
-        gameLoopId = requestAnimationFrame(loop);
-        return;
-    }
+    if (!window.st.act || window.st.paused) { gameLoopId = requestAnimationFrame(loop); return; }
     
+    // AQUÍ SE CALCULA EL TIEMPO PRIMERO PARA EVITAR EL CRASH
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
     if (window.st.songDuration > 0 && songTime > 0) {
-        let currentSec = songTime / 1000;
-        let totalSec = window.st.songDuration;
-        if (currentSec > totalSec) currentSec = totalSec;
-
+        let currentSec = songTime / 1000; let totalSec = window.st.songDuration; if (currentSec > totalSec) currentSec = totalSec;
         const pct = Math.min(100, (currentSec / totalSec) * 100);
-        const bar = document.getElementById('top-progress-fill');
-        if(bar) bar.style.width = pct + "%";
-
-        let curM = Math.floor(currentSec / 60);
-        let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
-        let totM = Math.floor(totalSec / 60);
-        let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
-        
-        const timeText = document.getElementById('top-progress-time');
-        if (timeText) timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
+        const bar = document.getElementById('top-progress-fill'); if(bar) bar.style.width = pct + "%";
+        let curM = Math.floor(currentSec / 60); let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
+        let totM = Math.floor(totalSec / 60); let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
+        const timeText = document.getElementById('top-progress-time'); if (timeText) timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
     }
 
     if (window.cfg.subtitles && window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
         let idx = window.st.currentLyricIdx;
         if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
-            const subEl = document.getElementById('subtitles-text');
-            subEl.innerText = window.st.parsedLyrics[idx].tx;
-            subEl.style.animation = 'none'; 
-            void subEl.offsetWidth; 
-            subEl.style.animation = 'subPop 0.2s ease-out forwards';
+            const subEl = document.getElementById('subtitles-text'); subEl.innerText = window.st.parsedLyrics[idx].tx;
+            subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
             window.st.currentLyricIdx++;
         }
     }
 
-    // LECTOR DE MECÁNICAS (Sin afectar DOM visual inútil)
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (!n.fxTriggered && n.t <= now) {
-            if (n.type === 'fx_flash') {
-                document.getElementById('game-layer').style.background = 'white';
-                setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150);
-            }
+            if (n.type === 'fx_flash') { document.getElementById('game-layer').style.background = 'white'; setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150); }
             if (n.type === 'custom_fx' && n.customData) {
-                const track = document.getElementById('track');
-                const oldFilter = track.style.filter;
-                track.style.filter = n.customData.filter;
-                track.style.transition = 'filter 0.2s';
+                const track = document.getElementById('track'); const oldFilter = track.style.filter; track.style.filter = n.customData.filter; track.style.transition = 'filter 0.2s';
                 setTimeout(() => { track.style.filter = oldFilter; }, n.customData.dur);
             }
             n.fxTriggered = true; 
         }
     }
 
-const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+    const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
     
     // --- FIX: LEER SKIN CORRECTA EN TIEMPO REAL ---
     let activeSkin = null; 
@@ -519,86 +498,71 @@ const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHei
 
                 let svg = '';
                 if (n.type === 'mine') {
-                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #F9393F);"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
+                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #F9393F); position:relative; z-index:2;"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
                 } else if (n.type === 'dodge') {
-                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #00ffff);"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
+                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #00ffff); position:relative; z-index:2;"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
                 } else {
                     if (isImageSkin) {
-                        svg = `<img src="${activeSkin.img}" style="width:100%; height:100%; filter:drop-shadow(0 0 8px ${color}); object-fit: contain;">`;
+                        svg = `<img src="${activeSkin.img}" style="width:100%; height:100%; filter:drop-shadow(0 0 8px ${color}); object-fit: contain; position:relative; z-index:2;">`;
                     } else {
-                        svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color})"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+                        svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color}); position:relative; z-index:2;"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
                     }
                 }
                 
-                if (n.type === 'hold') { const h = (n.len / 1000) * (window.cfg.spd * 40); svg += `<div class="sustain-trail" style="height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}"></div>`; }
+                // FIX MAESTRO PARA NOTAS HOLD (Posición Absoluta y z-index)
+                let noteLen = n.len || n.dur || 0;
+                if (n.type === 'hold' && noteLen > 0) { 
+                    const h = (noteLen / 1000) * (window.cfg.spd * 40); 
+                    let trailStyle = `height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}; position:absolute; width:30%; left:35%; z-index:-1;`;
+                    if (window.cfg.down) { trailStyle += ` bottom: 50px; transform-origin: bottom center;`; } 
+                    else { trailStyle += ` top: 50px; transform-origin: top center;`; } 
+                    
+                    svg += `<div class="sustain-trail" style="${trailStyle}"></div>`; 
+                }
+                
                 el.innerHTML = svg; if(elTrack) elTrack.appendChild(el); n.el = el;
             }
             n.s = true; window.st.spawned.push(n);
         } else break; 
     }
+
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
-
-        // Limpiar FX puros para que no generen MISS 
-        if ((n.type === 'fx_flash' || n.type === 'custom_fx') && n.t < now - 100) {
-            window.st.spawned.splice(i, 1); continue;
-        }
-
-        if (n.h && (n.type === 'tap' || n.type === 'mine' || n.type === 'dodge')) {
-            if(n.el) { n.el.remove(); n.el = null; }
-            window.st.spawned.splice(i, 1);
-            continue;
-        }
+        if ((n.type === 'fx_flash' || n.type === 'custom_fx') && n.t < now - 100) { window.st.spawned.splice(i, 1); continue; }
+        if (n.h && (n.type === 'tap' || n.type === 'mine' || n.type === 'dodge')) { if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; }
 
         const timeDiff = n.t - now + (window.cfg.off || 0);
 
         if (!n.h && timeDiff < -160) {
-            if (n.type === 'mine') {
-                // Pasó sin tocarse = BIEN
-                n.h = true;
-                if(n.el) { n.el.remove(); n.el = null; }
-                window.st.spawned.splice(i, 1);
-                continue;
-            } else if (n.type === 'dodge') {
-                // Esquivada = BIEN
-                n.h = true; window.st.sc += 100;
-                showJudge("DODGED", "#00ffff", 0);
-                if(n.el) { n.el.remove(); n.el = null; }
-                window.st.spawned.splice(i, 1);
-                continue;
-            } else {
-                miss(n); 
-                n.h = true; 
-                if(n.el) { n.el.remove(); n.el = null; }
-                window.st.spawned.splice(i, 1); 
-                continue;
-            }
+            if (n.type === 'mine') { n.h = true; if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; } 
+            else if (n.type === 'dodge') { n.h = true; window.st.sc += 100; showJudge("DODGED", "#00ffff", 0); if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; } 
+            else { miss(n); n.h = true; if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; }
         }
 
         if (n.el) {
             const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
             let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
+            if (n.type !== 'hold' || (n.type === 'hold' && !n.h)) { n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`; }
             
-            if (n.type !== 'hold' || (n.type === 'hold' && !n.h)) {
-                 n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`;
-            }
-
+            // FIX DE ENCOGIMIENTO DE HOLD NOTE Y VARIABLES DE DURACIÓN DEL EDITOR
             if (n.type === 'hold' && n.h) {
                  n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; 
-                 const rem = (n.t + n.len) - now;
+                 let noteLen = n.len || n.dur || 0;
+                 const rem = (n.t + noteLen) - now; 
                  const tr = n.el.querySelector('.sustain-trail');
                  if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
                  
                  if (!window.st.keys[n.l]) { 
-                     n.el.style.opacity = 0.4;
-                     if (rem > 100 && !n.broken) { window.st.cmb = 0; n.broken = true; }
-                 } else {
-                     n.el.style.opacity = 1;
+                     n.el.style.opacity = 0.4; 
+                     if (rem > 100 && !n.broken) { window.st.cmb = 0; n.broken = true; } 
+                 } 
+                 else { 
+                     n.el.style.opacity = 1; 
                      if(!n.broken) window.st.hp = Math.min(100, window.st.hp + 0.1); 
                      updHUD(); 
                  }
-
-                 if (now >= n.t + n.len) {
+                 
+                 if (now >= n.t + noteLen) { 
                      if(!n.broken) window.st.sc += 200; 
                      n.el.remove(); n.el = null; 
                      window.st.spawned.splice(i, 1); 
@@ -682,35 +646,31 @@ function showJudge(text, color, diffMs) {
 // 6. EVENTOS Y COLISIONES DE MECÁNICAS
 // ==========================================
 // === SISTEMA DE INPUT BLINDADO ===
+// === SISTEMA DE INPUT BLINDADO ===
 window.onKd = function(e) {
     if (!window.st.act || window.st.paused) return;
-    if (e.key === "Escape") { e.preventDefault(); togglePause(); return; }
+    if (e.key === "Escape") { e.preventDefault(); window.togglePause(); return; }
     
-    // Evitar disparar notas si el usuario está escribiendo en el chat
     if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-    
     if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys] || e.repeat) return;
     
-    // Normalizar Espacio y minúsculas para compatibilidad total
     let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
     
     const idx = window.cfg.modes[window.keys].findIndex(l => {
         if (!l.k) return false;
         let cfgKey = String(l.k).toLowerCase();
-        if (cfgKey === "space") cfgKey = " "; // Parche para cachés viejos
+        if (cfgKey === "space") cfgKey = " "; 
         return cfgKey === pressedKey;
     });
 
     if (idx !== -1) {
-        e.preventDefault(); // Bloquea el scroll de la página
+        e.preventDefault(); 
         hit(idx, true);
     }
 };
 
 window.onKu = function(e) {
-    if (!window.st.act) return;
-    if (!window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
-    
+    if (!window.st.act || !window.cfg || !window.cfg.modes || !window.cfg.modes[window.keys]) return;
     let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
     
     const idx = window.cfg.modes[window.keys].findIndex(l => {
@@ -723,11 +683,14 @@ window.onKu = function(e) {
     if (idx !== -1) hit(idx, false);
 };
 
-// 🚨 FORZAR AL NAVEGADOR A ESCUCHAR EL TECLADO SIN IMPORTAR QUÉ MÁS HAYA EN PANTALLA 🚨
-window.removeEventListener('keydown', window.onKd, { capture: true });
-window.removeEventListener('keyup', window.onKu, { capture: true });
-window.addEventListener('keydown', window.onKd, { capture: true });
-window.addEventListener('keyup', window.onKu, { capture: true });
+// CAZADOR GLOBAL: Fuerza al navegador a enviar todas las teclas a nuestro motor
+document.addEventListener('keydown', function(e) {
+    if (typeof window.onKd === 'function') window.onKd(e);
+}, { capture: true });
+
+document.addEventListener('keyup', function(e) {
+    if (typeof window.onKu === 'function') window.onKu(e);
+}, { capture: true });
 
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
@@ -735,9 +698,8 @@ function hit(l, p) {
     
     if (p) {
         if(!window.st.keys) window.st.keys = []; 
-        if(window.st.keys[l]) return; // <-- ANTI-DOBLE INPUT: Evita bugs de teclado
+        if(window.st.keys[l]) return; // ANTI-DOBLE INPUT (Evita bugs)
         window.st.keys[l] = 1; 
-        
         if(r) r.classList.add('pressed');
         
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
@@ -785,7 +747,6 @@ function hit(l, p) {
         if(r) r.classList.remove('pressed'); 
     }
 }
-
 function miss(n) {
     showJudge("MISS", "#F9393F");
     window.st.stats.m++; window.st.cmb = 0; window.st.hp -= 10; window.st.fcStatus = "CLEAR"; 
