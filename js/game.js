@@ -799,75 +799,76 @@ function end(died) {
     cancelAnimationFrame(gameLoopId); 
     if(window.st.src) try{ window.st.src.stop(); }catch(e){}
     
-    let vign = document.getElementById('near-death-vignette');
+    let vign = document.getElementById('near-death-vignette'); 
     if(vign) vign.classList.remove('danger-active');
-
-    let touchZones = document.getElementById('mobile-touch-zones'); if(touchZones) touchZones.style.display = 'none';               
+    
+    let touchZones = document.getElementById('mobile-touch-zones'); 
+    if(touchZones) touchZones.style.display = 'none';               
+    
     if(window.isMultiplayer) return; 
 
-    // Retorno al editor si estás probando un mapa
+    // RETORNO AL EDITOR
     if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
-        document.getElementById('game-layer').style.display = 'none';
+        document.getElementById('game-layer').style.display = 'none'; 
         window.isTestingMap = false; 
-        window.openEditor(window.curSongData, window.keys, window.curSongData.originalMode || 'mania');
+        window.openEditor(window.curSongData, window.keys, window.curSongData.originalMode || 'mania'); 
         return;
     }
 
     document.getElementById('game-layer').style.display = 'none';
     const modal = document.getElementById('modal-res');
+    
     if(modal) {
         modal.style.display = 'flex';
         const totalMax = window.st.trueMaxScore || 1; 
         const finalAcc = Math.round((window.st.sc / totalMax) * 1000) / 10;
         let r="D", c="#F9393F", titleHTML="";
         
-        if (!died) {
-            if (finalAcc >= 98) { r="SS"; c="#00FFFF" } else if (finalAcc >= 95) { r="S"; c="var(--gold)" } else if (finalAcc >= 90) { r="A"; c="#12FA05" } else if (finalAcc >= 80) { r="B"; c="yellow" } else if (finalAcc >= 70) { r="C"; c="orange" }
-            titleHTML = `<div id="winner-msg">¡CANCION COMPLETADA!</div>`;
-        } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
+        if (!died) { 
+            if (finalAcc >= 98) { r="SS"; c="#00FFFF"; } 
+            else if (finalAcc >= 95) { r="S"; c="var(--gold)"; } 
+            else if (finalAcc >= 90) { r="A"; c="#12FA05"; } 
+            else if (finalAcc >= 80) { r="B"; c="yellow"; } 
+            else if (finalAcc >= 70) { r="C"; c="orange"; } 
+            titleHTML = `<div id="winner-msg">¡CANCION COMPLETADA!</div>`; 
+        } else { 
+            r="F"; c="#F9393F"; 
+            titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; 
+        }
         
-        // --- 💰 SISTEMA MAESTRO DE RECOMPENSAS (XP, SP, PP) 💰 ---
-        let xpGain = 0, spGain = 0, ppGain = 0;
-        let chk = document.getElementById('chk-ranked');
-        let isRanked = chk ? chk.checked : false;
+        let xpGain = 0, spGain = 0, ppGain = 0; 
+        let chk = document.getElementById('chk-ranked'); 
+        let isRanked = chk ? chk.checked : false; 
         let rankText = isRanked ? "(Ranked)" : "(Unranked)";
-
+        
+        // CÁLCULO DE RECOMPENSAS
         if (!died && window.user && window.user.name !== "Guest") { 
-            // Cálculos matemáticos
             xpGain = Math.floor(window.st.sc / 250); 
-            spGain = Math.floor(window.st.sc / 100); // 1 SP por cada 100 puntos de Score
-            
-            // PP solo se otorga si está en Ranked y tiene más del 70% de precisión
-            if (isRanked && finalAcc >= 70) {
-                let stars = parseFloat(window.curSongData.starRating || 3);
-                ppGain = Math.floor((stars * 20) * (finalAcc / 100));
+            spGain = Math.floor(window.st.sc / 100); 
+            if (isRanked && finalAcc >= 70) { 
+                let stars = parseFloat(window.curSongData.starRating || 3); 
+                ppGain = Math.floor((stars * 20) * (finalAcc / 100)); 
             }
-
-            // Aplicar al perfil global
-            window.user.xp = (window.user.xp || 0) + xpGain;
-            window.user.sp = (window.user.sp || 0) + spGain;
-            window.user.pp = (window.user.pp || 0) + ppGain;
-            window.user.plays = (window.user.plays || 0) + 1;
+            window.user.xp = (window.user.xp || 0) + xpGain; 
+            window.user.sp = (window.user.sp || 0) + spGain; 
+            window.user.pp = (window.user.pp || 0) + ppGain; 
+            window.user.plays = (window.user.plays || 0) + 1; 
             window.user.score = (window.user.score || 0) + window.st.sc;
-
-            // Lógica de Subida de Nivel
-            let nextLevelXp = window.user.lvl * 1000;
-            if (window.user.xp >= nextLevelXp) {
-                window.user.lvl++;
-                window.user.xp -= nextLevelXp;
-                if(typeof window.notify === 'function') window.notify(`✨ ¡NIVEL ${window.user.lvl} ALCANZADO! ✨`, "success");
+            
+            let nextLevelXp = window.user.lvl * 1000; 
+            if (window.user.xp >= nextLevelXp) { 
+                window.user.lvl++; 
+                window.user.xp -= nextLevelXp; 
+                if(typeof window.notify === 'function') window.notify(`✨ ¡NIVEL ${window.user.lvl} ALCANZADO! ✨`, "success"); 
             }
-
-            // Guardado blindado directo a Firebase
             if(typeof save === 'function') save(); 
-            if (window.db) {
-                window.db.collection("users").doc(window.user.name).update({
+            if (window.db) { 
+                window.db.collection("users").doc(window.user.name).update({ 
                     xp: window.user.xp, sp: window.user.sp, pp: window.user.pp, 
-                    lvl: window.user.lvl, plays: window.user.plays, score: window.user.score
-                }).catch(e => console.warn("Sync bg update", e));
+                    lvl: window.user.lvl, plays: window.user.plays, score: window.user.score 
+                }).catch(e => console.warn(e)); 
             }
         }
-        // ---------------------------------------------------------
 
         const panel = modal.querySelector('.modal-panel');
         if(panel) {
@@ -899,12 +900,10 @@ function end(died) {
                 <div class="modal-neon-buttons">
                     <button class="action" onclick="toMenu()">VOLVER AL MENU</button>
                     <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
-                </div>
-            `;
+                </div>`;
         }
     }
 }
-
 function initReceptors(k) {
     elTrack = document.getElementById('track');
     if(!elTrack) return;
