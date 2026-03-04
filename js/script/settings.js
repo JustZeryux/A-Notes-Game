@@ -42,7 +42,7 @@ window.loadSettings = function() {
     const setTxt = (id, prop) => { 
         const el=document.getElementById(id); 
         if(el && window.cfg[prop]) {
-            let txt = String(window.cfg[prop]).toUpperCase().replace('ARROW', '').replace('KEY', '');
+            let txt = String(window.cfg[prop]).toUpperCase().replace('ARROW', '').replace('');
             if(txt === ' ' || txt === 'SPACE') txt = 'SPC'; el.innerText = txt; 
         }
     };
