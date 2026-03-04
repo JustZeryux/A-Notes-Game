@@ -721,61 +721,57 @@ window.addEventListener('keyup', window.onKu, { capture: true });
 function hit(l, p) {
     if (!window.st.act || window.st.paused) return;
     const r = document.getElementById(`rec-${l}`);
+    
     if (p) {
-        if(!window.st.keys) window.st.keys = [];
-        window.st.keys[l] = 1;
+        if(!window.st.keys) window.st.keys = []; 
+        if(window.st.keys[l]) return; // <-- ANTI-DOBLE INPUT: Evita bugs de teclado
+        window.st.keys[l] = 1; 
+        
         if(r) r.classList.add('pressed');
-
+        
         let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
         const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
 
         if (n) {
-            const diff = n.t - now; 
-            const absDiff = Math.abs(diff);
-            window.st.totalOffset += absDiff;
-            window.st.hitCount++;
-
+            const diff = n.t - now; const absDiff = Math.abs(diff); window.st.totalOffset += absDiff; window.st.hitCount++;
             let score=50, text="BAD", color="yellow";
 
-            if (n.type === 'mine') {
-                text = "OUCH!"; color = "#F9393F"; score = -200; window.st.hp -= 15;
-                window.st.cmb = 0; window.st.fcStatus = "CLEAR";
-                createSplash(l, true);
-                document.getElementById('game-layer').style.animation = 'cameraShake 0.3s';
-                setTimeout(()=>document.getElementById('game-layer').style.animation = '', 300);
-            } else if (n.type === 'dodge') {
-                text = "FAIL"; color = "#F9393F"; score = -100; window.st.hp -= 10;
-                window.st.cmb = 0; window.st.fcStatus = "CLEAR";
-                createSplash(l, true);
-            } else {
+            if (n.type === 'mine') { 
+                text = "OUCH!"; color = "#F9393F"; score = -200; window.st.hp -= 15; window.st.cmb = 0; window.st.fcStatus = "CLEAR"; 
+                createSplash(l, true); document.getElementById('game-layer').style.animation = 'cameraShake 0.3s'; 
+                setTimeout(()=>document.getElementById('game-layer').style.animation = '', 300); 
+            } 
+            else if (n.type === 'dodge') { 
+                text = "FAIL"; color = "#F9393F"; score = -100; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR"; 
+                createSplash(l, true); 
+            } 
+            else {
                 if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
                 else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); if(window.st.fcStatus === "PFC") window.st.fcStatus = "GFC"; }
                 else { window.st.stats.b++; window.st.hp-=2; if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; }
                 window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
             }
 
-            if(window.cfg.bgEffects && (text === "SICK!!" || text === "GOOD")) {
-                const bg = document.getElementById('game-bg-img');
-                if(bg) {
-                    bg.classList.remove('bg-bump-1', 'bg-bump-2', 'bg-bump-3');
-                    void bg.offsetWidth; 
-                    const randomBump = 'bg-bump-' + (Math.floor(Math.random() * 3) + 1);
-                    bg.classList.add(randomBump);
-                    setTimeout(() => bg.classList.remove(randomBump), 120);
-                }
+            if(window.cfg.bgEffects && (text === "SICK!!" || text === "GOOD")) { 
+                const bg = document.getElementById('game-bg-img'); 
+                if(bg) { 
+                    bg.classList.remove('bg-bump-1', 'bg-bump-2', 'bg-bump-3'); void bg.offsetWidth; 
+                    const randomBump = 'bg-bump-' + (Math.floor(Math.random() * 3) + 1); bg.classList.add(randomBump); 
+                    setTimeout(() => bg.classList.remove(randomBump), 120); 
+                } 
             }
-
+            
             window.st.sc += score; 
             if(n.type !== 'mine' && n.type !== 'dodge') window.st.hp = Math.min(100, window.st.hp+2);
             
             showJudge(text, color, diff); 
             playHit(); 
-            updHUD();
+            updHUD(); 
             n.h = true; 
         }
-    } else {
-        if(window.st.keys) window.st.keys[l] = 0;
-        if(r) r.classList.remove('pressed');
+    } else { 
+        if(window.st.keys) window.st.keys[l] = 0; 
+        if(r) r.classList.remove('pressed'); 
     }
 }
 
