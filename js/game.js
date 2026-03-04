@@ -467,9 +467,8 @@ function loop() {
         }
     }
 
-    const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+  const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
     
-    // --- FIX: LEER SKIN CORRECTA EN TIEMPO REAL ---
     let activeSkin = null; 
     if (window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
@@ -480,12 +479,15 @@ function loop() {
         if (n.s) continue; 
         if (n.type === 'fx_flash' || n.type === 'custom_fx') { n.s = true; window.st.spawned.push(n); continue; }
 
-        if (n.t - now < 1500) { 
+        // 🚨 FIX: Aumentamos el spawn a 4000ms para que caigan suavemente desde fuera de la pantalla
+        if (n.t - now < 4000) { 
             if (n.t - now > -200) { 
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
-                el.style.left = (n.l * w) + '%'; el.style.width = w + '%'; el.style.top = '0px'; 
+                
+                // Centrado perfecto de la nota para que el Hold Trail no la aplaste
+                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; display: flex; justify-content: center; align-items: center; position: absolute;`; 
                 
                 let conf = window.cfg.modes[window.keys][n.l]; let color = conf.c; let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
                 
@@ -498,24 +500,27 @@ function loop() {
 
                 let svg = '';
                 if (n.type === 'mine') {
-                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #F9393F); position:relative; z-index:2;"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
+                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #F9393F); position:relative; z-index:2; width:100%;"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
                 } else if (n.type === 'dodge') {
-                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #00ffff); position:relative; z-index:2;"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
+                    svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 15px #00ffff); position:relative; z-index:2; width:100%;"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
                 } else {
                     if (isImageSkin) {
-                        svg = `<img src="${activeSkin.img}" style="width:100%; height:100%; filter:drop-shadow(0 0 8px ${color}); object-fit: contain; position:relative; z-index:2;">`;
+                        svg = `<img src="${activeSkin.img}" style="width:100%; filter:drop-shadow(0 0 8px ${color}); object-fit: contain; position:relative; z-index:2;">`;
                     } else {
-                        svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color}); position:relative; z-index:2;"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+                        svg = `<svg class="arrow-svg" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px ${color}); position:relative; z-index:2; width:100%;"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
                     }
                 }
                 
-                // FIX MAESTRO PARA NOTAS HOLD (Posición Absoluta y z-index)
+                // 🚨 FIX MAESTRO PARA NOTAS HOLD (Trail posicionado desde el fondo y detrás de la nota)
                 let noteLen = n.len || n.dur || 0;
                 if (n.type === 'hold' && noteLen > 0) { 
                     const h = (noteLen / 1000) * (window.cfg.spd * 40); 
-                    let trailStyle = `height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}; position:absolute; width:30%; left:35%; z-index:-1;`;
-                    if (window.cfg.down) { trailStyle += ` bottom: 50px; transform-origin: bottom center;`; } 
-                    else { trailStyle += ` top: 50px; transform-origin: top center;`; } 
+                    let trailStyle = `height:${h}px; background:${color}; opacity:${(window.cfg.noteOp||100)/100}; position:absolute; width:30%; z-index:1;`;
+                    if (window.cfg.down) { 
+                        trailStyle += ` bottom: 50%; transform-origin: bottom center; border-radius: 10px 10px 0 0;`; 
+                    } else { 
+                        trailStyle += ` top: 50%; transform-origin: top center; border-radius: 0 0 10px 10px;`; 
+                    } 
                     
                     svg += `<div class="sustain-trail" style="${trailStyle}"></div>`; 
                 }
