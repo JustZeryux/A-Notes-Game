@@ -1,12 +1,13 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO FINAL (ANTI-CRASH + TRANSPARENCIA REAL + OSK SKINS) 🎯
+   ENGINE STANDARD V-PRO FINAL (CURVAS BEZIER + SKINS OSK + ANTI-CRASH) 🎯
    ========================================================================== */
 
+// 🌟 IMPORTADOR DE SKINS 🌟
 window.handleOskUpload = async function(e) {
     const file = e.target.files[0];
     if(!file) return;
     
-    if(typeof window.notify === 'function') window.notify("⏳ Extrayendo Skin... (Puede tardar unos segundos)", "info");
+    if(typeof window.notify === 'function') window.notify("⏳ Extrayendo Skin...", "info");
     
     try {
         const zip = await JSZip.loadAsync(file);
@@ -37,12 +38,35 @@ window.handleOskUpload = async function(e) {
         localStorage.setItem('osu_custom_skin', JSON.stringify(skinData));
         if(typeof window.notify === 'function') window.notify("✅ Skin Osu! instalada correctamente.", "success");
         else alert("Skin Instalada correctamente");
-        
     } catch(err) {
         console.error(err);
         if(typeof window.notify === 'function') window.notify("❌ Error al leer el archivo .osk", "error");
-        else alert("Error al leer el .osk");
     }
+}
+
+// 🌟 MOTOR MATEMÁTICO DE CURVAS BEZIER 🌟
+function getBezierPoint(pts, t) {
+    let tmp = pts.map(p => ({x: p.x, y: p.y}));
+    while(tmp.length > 1) {
+        for(let i=0; i<tmp.length-1; i++) {
+            tmp[i].x = tmp[i].x + (tmp[i+1].x - tmp[i].x) * t;
+            tmp[i].y = tmp[i].y + (tmp[i+1].y - tmp[i].y) * t;
+        }
+        tmp.pop();
+    }
+    return tmp[0];
+}
+
+function generateSmoothPath(controlPoints) {
+    if (!controlPoints || controlPoints.length < 2) return controlPoints;
+    if (controlPoints.length === 2) return controlPoints; // Línea recta
+    
+    let path = [];
+    // Calculamos 50 puntos a lo largo de la curva para que se vea súper suave
+    for(let t=0; t<=1; t+=0.02) {
+        path.push(getBezierPoint(controlPoints, t));
+    }
+    return path;
 }
 
 window.startNewEngine = async function(songObj) {
@@ -57,6 +81,7 @@ window.startNewEngine = async function(songObj) {
         if (window.isTestingMap && window.edMode === 'standard' && window.edMap) customMap = window.edMap; 
         else customMap = songObj.raw ? (songObj.raw.notes_standard || songObj.raw.notes) : songObj.notes_standard;
 
+        // 🚨 SI EL MAPA ES CUSTOM (CREADO POR TI EN EL EDITOR) 🚨
         if (customMap && customMap.length > 0 && !songObj.isOsu) {
             const response = await fetch(songObj.audioURL || songObj.url);
             const arrayBuffer = await response.arrayBuffer();
@@ -72,6 +97,15 @@ window.startNewEngine = async function(songObj) {
                 if(!n.type) n.type = 'circle';
                 n.color = colors[cIdx]; n.combo = comboNum++;
                 if (comboNum > 4) { comboNum = 1; cIdx = (cIdx + 1) % colors.length; }
+
+                // CONVERTIR LOS PUNTOS DEL EDITOR EN CURVAS REALES
+                if (n.type === 'slider' && n.curvePoints) {
+                    n.smoothPath = generateSmoothPath(n.curvePoints);
+                    n.slides = n.slides || 1;
+                    n.endX = n.smoothPath[n.smoothPath.length-1].x;
+                    n.endY = n.smoothPath[n.smoothPath.length-1].y;
+                    if(!n.endTime) n.endTime = n.t + 500; // Fallback por si acaso
+                }
             });
             map.sort((a,b) => a.t - b.t);
 
@@ -83,6 +117,7 @@ window.startNewEngine = async function(songObj) {
             return; 
         }
 
+        // === SI EL MAPA ES ORIGINAL DE OSU! (.OSU) ===
         let response = null;
         for (let url of [`https://api.nerinyan.moe/d/${songObj.id}`, `https://catboy.best/d/${songObj.id}`]) {
             try { response = await fetch(url); if (response.ok) break; } catch (e) {}
@@ -165,18 +200,28 @@ function parseStandardMap(text) {
             let tMs = parseInt(p[2]) + 3000; 
 
             if ((objType & 2) !== 0 && p.length >= 8) {
-                let curveData = p[5].split('|'); let slides = parseInt(p[6]); let length = parseFloat(p[7]);
+                let curveData = p[5].split('|'); 
+                let slides = parseInt(p[6]); let length = parseFloat(p[7]);
+                
+                // Extraer puntos de la curva
+                let curvePts = [{x: x, y: y}];
+                for(let ptIdx = 1; ptIdx < curveData.length; ptIdx++) {
+                    let coords = curveData[ptIdx].split(':');
+                    if(coords.length === 2) curvePts.push({x: parseInt(coords[0]), y: parseInt(coords[1])});
+                }
+                
+                let smoothPath = generateSmoothPath(curvePts);
+
                 let currentBP = timingPoints[0];
                 for(let tp of timingPoints) { if(tp.time + 3000 <= tMs) currentBP = tp; else break; }
                 let msPerBeat = currentBP.beatLength;
                 let sliderDuration = (length / (SM * 100)) * msPerBeat * slides;
                 
-                let lastPoint = curveData[curveData.length - 1].split(':');
-                let endX = parseInt(lastPoint[0]) || x; let endY = parseInt(lastPoint[1]) || y;
-
                 hitObjects.push({
                     type: 'slider', x: x, y: y, t: tMs, endTime: tMs + sliderDuration,
-                    endX: endX, endY: endY, clicked: false, missed: false,
+                    smoothPath: smoothPath,
+                    endX: smoothPath[smoothPath.length-1].x, endY: smoothPath[smoothPath.length-1].y, 
+                    clicked: false, missed: false,
                     active: false, broken: false, color: colors[cIdx], combo: comboNum, slides: slides
                 });
                 comboNum++;
@@ -246,6 +291,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     
     let isRunning = true; let particles = []; let cursorTrail = [];
     window.isPointerDown = false; 
+
+    let activeSkin = null;
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    } else if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    }
 
     const loadedSkin = { hitcircle: null, hitcircleoverlay: null, approachcircle: null, cursor: null };
     let hasCustomOsk = false;
@@ -321,6 +373,55 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         } catch(e) {}
     }
 
+    const userOp = (window.cfg && window.cfg.noteOp) ? (window.cfg.noteOp / 100) : 1;
+
+    // 🌟 DIBUJADOR DE NOTAS REALISTA 🌟
+    function drawOsuHitCircle(x, y, r, color, comboText, baseAlpha) {
+        ctx.globalAlpha = baseAlpha * userOp;
+        
+        if (hasCustomOsk) {
+            if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, x - r, y - r, r*2, r*2);
+            if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, x - r, y - r, r*2, r*2);
+            if (comboText !== "") {
+                ctx.fillStyle = 'white'; ctx.font = `bold ${r * 0.8}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(comboText, x, y + (r * 0.1));
+            }
+        } else {
+            // Sombra exterior
+            ctx.beginPath(); ctx.arc(x, y + (2 * scale), r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fill();
+
+            // Anillo de Color
+            ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
+            ctx.strokeStyle = color; ctx.lineWidth = 6 * scale; ctx.stroke();
+
+            // Anillo Blanco
+            ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * scale; ctx.stroke();
+
+            // Cristal Oscuro
+            ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(15, 15, 20, 0.65)'; 
+            ctx.fill();
+
+            // Brillo
+            const shine = ctx.createLinearGradient(x, y - r, x, y);
+            shine.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+            shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+            ctx.fillStyle = shine; ctx.fill();
+
+            // Número
+            if (comboText !== "") {
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${r * 0.9}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(comboText, x, y + (r * 0.05));
+            }
+        }
+    }
+
     function draw() {
         if (!isRunning || !window.st.act) return;
         if (window.st.paused) { window.st.animId = requestAnimationFrame(draw); return; }
@@ -373,69 +474,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             cursorTrail = cursorTrail.filter(t => t.life > 0);
         }
 
-        // 🚨 PREVENCIÓN DE CRASHEOS: SE BUSCA LA SKIN DENTRO DEL LOOP DE DIBUJADO DE FORMA SEGURA
-        let activeSkin = null;
-        if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-            activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
-        } else if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-            activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
-        }
-
-        // Opacidad maestra definida por el usuario en configuración (o 100% por defecto)
-        const userOp = (window.cfg && window.cfg.noteOp) ? (window.cfg.noteOp / 100) : 1;
-
-        // =======================================================
-        // 🌟 EL NUEVO MOTOR DE DIBUJADO DE NOTAS 🌟
-        // =======================================================
-        function drawOsuHitCircle(x, y, r, color, comboText, baseAlpha) {
-            ctx.globalAlpha = baseAlpha * userOp;
-            
-            if (hasCustomOsk) {
-                // Si importó una Skin (.osk), se dibuja tal cual
-                if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, x - r, y - r, r*2, r*2);
-                if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, x - r, y - r, r*2, r*2);
-                if (comboText !== "") {
-                    ctx.fillStyle = 'white'; ctx.font = `bold ${r * 0.8}px sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(comboText, x, y + (r * 0.1));
-                }
-            } else {
-                // ESTILO OSU! ORIGINAL (CENTRO TRANSPARENTE)
-                // 1. Sombra exterior
-                ctx.beginPath(); ctx.arc(x, y + (2 * scale), r, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fill();
-
-                // 2. Anillo Brillante Grueso
-                ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
-                ctx.strokeStyle = color; ctx.lineWidth = 6 * scale; ctx.stroke();
-
-                // 3. Anillo Blanco Interior
-                ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
-                ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * scale; ctx.stroke();
-
-                // 4. Fondo Oscuro Transparente (PERMITE VER DETRÁS)
-                ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(15, 15, 20, 0.65)'; 
-                ctx.fill();
-
-                // 5. Brillo Superior (Shine de cristal)
-                const shine = ctx.createLinearGradient(x, y - r, x, y);
-                shine.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-                shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
-                ctx.fillStyle = shine; ctx.fill();
-
-                // 6. Número del Combo legible
-                if (comboText !== "") {
-                    ctx.fillStyle = 'white';
-                    ctx.font = `bold ${r * 0.9}px sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(comboText, x, y + (r * 0.05));
-                }
-            }
-        }
-
-        // DIBUJADO FÍSICO DE LAS NOTAS
         for(let i = window.st.spawned.length - 1; i >= 0; i--) {
             const circle = window.st.spawned[i];
             const timeDiff = circle.t - now;
@@ -452,46 +490,56 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             const scaledRadius = radius * scale;
             
             let alpha = 1;
-            if (!circle.active) {
-                alpha = Math.max(0, Math.min(1, 1 - (timeDiff / preempt)));
-            }
+            if (!circle.active) alpha = Math.max(0, Math.min(1, 1 - (timeDiff / preempt)));
             
             let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
 
-            // 1️⃣ DIBUJAR SLIDERS
-            if (circle.type === 'slider') {
-                const endX = offsetX + (circle.endX * scale); 
-                const endY = offsetY + (circle.endY * scale);
-
-                // 🚨 FIX: CUERPO DEL SLIDER 60% TRANSPARENTE 🚨
+            // 1️⃣ DIBUJAR SLIDERS (AHORA LEE LOS PUNTOS DEL EDITOR)
+            if (circle.type === 'slider' && circle.smoothPath) {
                 ctx.globalAlpha = alpha * 0.6 * userOp; 
 
-                // Borde de Color Grueso
-                ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
-                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                // Dibujar la curva
+                ctx.beginPath();
+                ctx.moveTo(offsetX + circle.smoothPath[0].x * scale, offsetY + circle.smoothPath[0].y * scale);
+                for(let j=1; j<circle.smoothPath.length; j++) {
+                    ctx.lineTo(offsetX + circle.smoothPath[j].x * scale, offsetY + circle.smoothPath[j].y * scale);
+                }
+                
                 ctx.lineWidth = scaledRadius * 2; 
-                ctx.strokeStyle = drawColor; 
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; 
                 ctx.stroke();
 
-                // Interior Oscuro de la Pista
-                ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
                 ctx.lineWidth = scaledRadius * 2 - (6 * scale); 
-                ctx.strokeStyle = 'rgba(10, 10, 15, 0.8)'; 
+                ctx.strokeStyle = 'rgba(20, 20, 25, 0.8)'; 
                 ctx.stroke();
 
-                // Cola del Slider
-                drawOsuHitCircle(endX, endY, scaledRadius, drawColor, "", alpha);
+                // Dibujar cola
+                drawOsuHitCircle(offsetX + circle.endX * scale, offsetY + circle.endY * scale, scaledRadius, drawColor, "", alpha);
 
-                // Lógica de Movimiento y Seguimiento
+                // Lógica de Movimiento por la curva
                 if (circle.active) {
-                    let elapsed = now - circle.t; let duration = circle.endTime - circle.t; let timePerSlide = duration / circle.slides;
+                    let elapsed = now - circle.t; let duration = circle.endTime - circle.t; 
+                    let timePerSlide = duration / circle.slides;
                     let cycle = Math.floor(elapsed / timePerSlide); let p = (elapsed % timePerSlide) / timePerSlide;
                     if (cycle % 2 === 1) p = 1 - p; 
 
-                    let curX = screenX + (endX - screenX) * p; 
-                    let curY = screenY + (endY - screenY) * p;
+                    let totalSegments = circle.smoothPath.length - 1;
+                    let exactFloat = p * totalSegments;
+                    let index = Math.floor(exactFloat);
+                    let remainder = exactFloat - index;
+                    
+                    let curX, curY;
+                    if (index >= totalSegments) {
+                        curX = offsetX + circle.smoothPath[totalSegments].x * scale;
+                        curY = offsetY + circle.smoothPath[totalSegments].y * scale;
+                    } else {
+                        let p1 = circle.smoothPath[index]; let p2 = circle.smoothPath[index + 1];
+                        curX = offsetX + (p1.x + (p2.x - p1.x) * remainder) * scale;
+                        curY = offsetY + (p1.y + (p2.y - p1.y) * remainder) * scale;
+                    }
 
-                    ctx.globalAlpha = 1.0 * userOp; // La bola de seguimiento debe ser sólida
+                    // Bolita Rastreadora
+                    ctx.globalAlpha = 1.0 * userOp;
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 0.9, 0, Math.PI * 2);
                     ctx.fillStyle = '#ffaa00'; ctx.fill(); 
                     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 * scale; ctx.stroke();
@@ -511,11 +559,10 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 }
             }
 
-            // 2️⃣ DIBUJAR CIRCULO NORMAL (CABEZA)
+            // 2️⃣ DIBUJAR CABEZA / CIRCULO NORMAL
             if (!circle.active && !circle.missed) {
                 drawOsuHitCircle(screenX, screenY, scaledRadius, drawColor, circle.combo, alpha);
 
-                // Círculo de Aproximación
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
                 ctx.globalAlpha = alpha * userOp;
                 if (hasCustomOsk && loadedSkin.approachcircle) {
