@@ -377,7 +377,6 @@ window.playSongInternal = function(s) {
 function loop() {
     if (!window.st.act || window.st.paused) { gameLoopId = requestAnimationFrame(loop); return; }
     
-    // 🚨 FIX MAESTRO: DEFINIR LA PISTA PARA QUE LAS NOTAS SÍ APAREZCAN 🚨
     const elTrack = document.getElementById('track');
 
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
@@ -418,10 +417,12 @@ function loop() {
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
     const speedMult = window.cfg.spd * 40;
     
-    // 🚨 FIX: BUSCADOR DE SKINS BLINDADO
-    let activeSkin = null; 
-    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    // 🚨 FIX MAESTRO 2: RESPETAR LA OPCIÓN "DEFAULT" AL CAER 🚨
+    let activeSkin = null;
+    if (window.cfg && window.cfg.noteSkin) {
+        if (window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+            activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+        }
     } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
@@ -438,7 +439,8 @@ function loop() {
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 
-                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
+                // 🚨 FIX TAMAÑOS: Altura de 80px para que las figuras guarden proporción
+                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
                 let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l])
                            ? window.cfg.modes[kCount][n.l]
@@ -454,26 +456,28 @@ function loop() {
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                let innerPath = shapeData ? `<path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>` : `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="4"/>`;
-                let svgStyles = `display: block; width: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 10px ${color});`;
+                // 🚨 preserveAspectRatio="xMidYMid meet" forzará el tamaño perfecto
+                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 10px ${color});`;
                 let svgHTML = '';
                 
                 if (n.type === 'mine') {
-                    svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
+                    svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
                 } else if (n.type === 'dodge') {
-                    svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
+                    svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
                 } else {
                     if (isImageSkin) {
                         svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
                     } else {
-                        svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}">${innerPath}</svg>`;
+                        let innerPath = shapeData ? `<path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>` : `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="4"/>`;
+                        svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
                     }
                 }
 
                 let trailHTML = '';
                 let noteLen = n.len || n.dur || 0;
                 if (n.type === 'hold' && noteLen > 0) { 
-                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 25%; z-index: -1; opacity: ${(window.cfg.noteOp||100)/100}; box-shadow: 0 0 15px ${color}; border-radius: 8px;`;
+                    // Ancho del trail más delgado y elegante para acompañar las figuras
+                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 20%; z-index: -1; opacity: ${(window.cfg.noteOp||100)/100}; box-shadow: 0 0 15px ${color}; border-radius: 8px;`;
                     if (window.cfg.down) { 
                         tStyle += ` bottom: 50%; transform-origin: bottom center; background: linear-gradient(to top, ${color}ff 0%, ${color}00 100%);`; 
                     } else { 
@@ -484,7 +488,6 @@ function loop() {
                 
                 el.innerHTML = trailHTML + svgHTML; 
                 
-                // INYECTAR LAS NOTAS A LA PISTA FINALMENTE
                 if (elTrack) elTrack.appendChild(el); 
                 
                 n.el = el;
@@ -907,7 +910,7 @@ window.initReceptors = function(k) {
     if (!elTrack) return;
     elTrack.innerHTML = '';
 
-    // PISTA OSCURA, ELEGANTE Y NEUTRA (SIN CELESTE)
+    // Pista oscura y elegante
     elTrack.style.background = 'rgba(12, 12, 16, 0.9)';
     elTrack.style.boxShadow = '0 0 30px rgba(0, 0, 0, 0.8)';
     elTrack.style.borderLeft = '2px solid #222';
@@ -917,10 +920,12 @@ window.initReceptors = function(k) {
     const w = 100 / kCount;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // 🚨 FIX: LEER SKIN DE LOS AJUSTES O DEL PERFIL DEL USUARIO
+    // 🚨 FIX MAESTRO 1: RESPETAR LA OPCIÓN "DEFAULT" ESTRICTAMENTE
     let activeSkin = null;
-    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    if (window.cfg && window.cfg.noteSkin) {
+        if (window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+            activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+        }
     } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
@@ -933,9 +938,9 @@ window.initReceptors = function(k) {
         const rec = document.createElement('div');
         rec.id = `rec-${i}`;
         rec.className = 'receptor';
-        rec.style.cssText = `left: ${i * w}%; width: ${w}%; top: ${yReceptor}px; position: absolute; display: flex; justify-content: center; align-items: center; z-index: 20;`;
+        // 🚨 FIX TAMAÑOS: Altura controlada (80px) para no deformar figuras
+        rec.style.cssText = `left: ${i * w}%; width: ${w}%; top: ${yReceptor}px; height: 80px; position: absolute; display: flex; justify-content: center; align-items: center; z-index: 20;`;
 
-        // Leer configuraciones de Neón Cyberpunk o similares
         let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i])
                    ? window.cfg.modes[kCount][i]
                    : { c: '#00ffff', s: 'circle' };
@@ -950,14 +955,15 @@ window.initReceptors = function(k) {
             if (activeSkin.img) isImageSkin = true;
         }
 
-        let svgStyles = `display: block; width: 100%; filter: drop-shadow(0 0 5px ${color}); opacity: 0.6; transition: 0.1s;`;
+        // preserveAspectRatio evitará que la línea o el anillo se estiren deformes
+        let svgStyles = `display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 5px ${color}); opacity: 0.6; transition: 0.1s;`;
         let svgHTML = '';
 
         if (isImageSkin) {
             svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
         } else {
             let innerPath = shapeData ? `<path d="${shapeData}" fill="transparent" stroke="${color}" stroke-width="4"/>` : `<circle cx="50" cy="50" r="40" fill="transparent" stroke="${color}" stroke-width="4"/>`;
-            svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}">${innerPath}</svg>`;
+            svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
         }
 
         rec.innerHTML = svgHTML;
