@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO FINAL (CURVAS BEZIER + SKINS OSK + ANTI-CRASH) 🎯
+   ENGINE STANDARD V-PRO DEFINITIVO (ANTI-CRASH BLINDADO + BEZIER + OSK) 🎯
    ========================================================================== */
 
 // 🌟 IMPORTADOR DE SKINS 🌟
@@ -59,10 +59,9 @@ function getBezierPoint(pts, t) {
 
 function generateSmoothPath(controlPoints) {
     if (!controlPoints || controlPoints.length < 2) return controlPoints;
-    if (controlPoints.length === 2) return controlPoints; // Línea recta
+    if (controlPoints.length === 2) return controlPoints; 
     
     let path = [];
-    // Calculamos 50 puntos a lo largo de la curva para que se vea súper suave
     for(let t=0; t<=1; t+=0.02) {
         path.push(getBezierPoint(controlPoints, t));
     }
@@ -81,7 +80,6 @@ window.startNewEngine = async function(songObj) {
         if (window.isTestingMap && window.edMode === 'standard' && window.edMap) customMap = window.edMap; 
         else customMap = songObj.raw ? (songObj.raw.notes_standard || songObj.raw.notes) : songObj.notes_standard;
 
-        // 🚨 SI EL MAPA ES CUSTOM (CREADO POR TI EN EL EDITOR) 🚨
         if (customMap && customMap.length > 0 && !songObj.isOsu) {
             const response = await fetch(songObj.audioURL || songObj.url);
             const arrayBuffer = await response.arrayBuffer();
@@ -98,13 +96,12 @@ window.startNewEngine = async function(songObj) {
                 n.color = colors[cIdx]; n.combo = comboNum++;
                 if (comboNum > 4) { comboNum = 1; cIdx = (cIdx + 1) % colors.length; }
 
-                // CONVERTIR LOS PUNTOS DEL EDITOR EN CURVAS REALES
                 if (n.type === 'slider' && n.curvePoints) {
                     n.smoothPath = generateSmoothPath(n.curvePoints);
                     n.slides = n.slides || 1;
                     n.endX = n.smoothPath[n.smoothPath.length-1].x;
                     n.endY = n.smoothPath[n.smoothPath.length-1].y;
-                    if(!n.endTime) n.endTime = n.t + 500; // Fallback por si acaso
+                    if(!n.endTime) n.endTime = n.t + 500; 
                 }
             });
             map.sort((a,b) => a.t - b.t);
@@ -117,7 +114,6 @@ window.startNewEngine = async function(songObj) {
             return; 
         }
 
-        // === SI EL MAPA ES ORIGINAL DE OSU! (.OSU) ===
         let response = null;
         for (let url of [`https://api.nerinyan.moe/d/${songObj.id}`, `https://catboy.best/d/${songObj.id}`]) {
             try { response = await fetch(url); if (response.ok) break; } catch (e) {}
@@ -201,9 +197,9 @@ function parseStandardMap(text) {
 
             if ((objType & 2) !== 0 && p.length >= 8) {
                 let curveData = p[5].split('|'); 
-                let slides = parseInt(p[6]); let length = parseFloat(p[7]);
+                let slides = Math.max(1, parseInt(p[6]) || 1); // 🚨 Seguro contra mapas rotos
+                let length = parseFloat(p[7]);
                 
-                // Extraer puntos de la curva
                 let curvePts = [{x: x, y: y}];
                 for(let ptIdx = 1; ptIdx < curveData.length; ptIdx++) {
                     let coords = curveData[ptIdx].split(':');
@@ -375,7 +371,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
     const userOp = (window.cfg && window.cfg.noteOp) ? (window.cfg.noteOp / 100) : 1;
 
-    // 🌟 DIBUJADOR DE NOTAS REALISTA 🌟
+    // 🌟 DIBUJADOR DE NOTAS 🌟
     function drawOsuHitCircle(x, y, r, color, comboText, baseAlpha) {
         ctx.globalAlpha = baseAlpha * userOp;
         
@@ -388,31 +384,25 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 ctx.fillText(comboText, x, y + (r * 0.1));
             }
         } else {
-            // Sombra exterior
             ctx.beginPath(); ctx.arc(x, y + (2 * scale), r, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fill();
 
-            // Anillo de Color
             ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
             ctx.strokeStyle = color; ctx.lineWidth = 6 * scale; ctx.stroke();
 
-            // Anillo Blanco
             ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
             ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * scale; ctx.stroke();
 
-            // Cristal Oscuro
             ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(15, 15, 20, 0.65)'; 
             ctx.fill();
 
-            // Brillo
             const shine = ctx.createLinearGradient(x, y - r, x, y);
             shine.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
             shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
             ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
             ctx.fillStyle = shine; ctx.fill();
 
-            // Número
             if (comboText !== "") {
                 ctx.fillStyle = 'white';
                 ctx.font = `bold ${r * 0.9}px sans-serif`;
@@ -494,38 +484,52 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             
             let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
 
-            // 1️⃣ DIBUJAR SLIDERS (AHORA LEE LOS PUNTOS DEL EDITOR)
+            // 1️⃣ DIBUJAR SLIDERS
             if (circle.type === 'slider' && circle.smoothPath) {
                 ctx.globalAlpha = alpha * 0.6 * userOp; 
 
-                // Dibujar la curva
                 ctx.beginPath();
                 ctx.moveTo(offsetX + circle.smoothPath[0].x * scale, offsetY + circle.smoothPath[0].y * scale);
                 for(let j=1; j<circle.smoothPath.length; j++) {
                     ctx.lineTo(offsetX + circle.smoothPath[j].x * scale, offsetY + circle.smoothPath[j].y * scale);
                 }
                 
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.lineWidth = scaledRadius * 2; 
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; 
+                ctx.strokeStyle = drawColor; 
                 ctx.stroke();
 
                 ctx.lineWidth = scaledRadius * 2 - (6 * scale); 
-                ctx.strokeStyle = 'rgba(20, 20, 25, 0.8)'; 
+                ctx.strokeStyle = 'rgba(10, 10, 15, 0.8)'; 
                 ctx.stroke();
 
-                // Dibujar cola
                 drawOsuHitCircle(offsetX + circle.endX * scale, offsetY + circle.endY * scale, scaledRadius, drawColor, "", alpha);
 
-                // Lógica de Movimiento por la curva
+                // 🚨 CÁLCULO BLINDADO DE LA BOLITA EN LA CURVA 🚨
                 if (circle.active) {
-                    let elapsed = now - circle.t; let duration = circle.endTime - circle.t; 
-                    let timePerSlide = duration / circle.slides;
-                    let cycle = Math.floor(elapsed / timePerSlide); let p = (elapsed % timePerSlide) / timePerSlide;
+                    let elapsed = now - circle.t; 
+                    let duration = circle.endTime - circle.t; 
+                    
+                    // PREVIENE TIEMPO NEGATIVO (EL BUG QUE CRASHEÓ EL JUEGO)
+                    let activeElapsed = Math.max(0, elapsed); 
+                    
+                    let safeSlides = circle.slides || 1;
+                    let timePerSlide = duration / safeSlides;
+                    
+                    let cycle = Math.floor(activeElapsed / timePerSlide); 
+                    let p = (activeElapsed % timePerSlide) / timePerSlide;
                     if (cycle % 2 === 1) p = 1 - p; 
+
+                    // ASEGURA QUE P NUNCA SUPERE LOS LIMITES [0, 1]
+                    if (isNaN(p) || p < 0) p = 0;
+                    if (p > 1) p = 1;
 
                     let totalSegments = circle.smoothPath.length - 1;
                     let exactFloat = p * totalSegments;
                     let index = Math.floor(exactFloat);
+                    
+                    // ASEGURA QUE EL ÍNDICE NUNCA BUSQUE UN ARRAY QUE NO EXISTE (-1)
+                    index = Math.max(0, Math.min(totalSegments, index));
                     let remainder = exactFloat - index;
                     
                     let curX, curY;
@@ -533,12 +537,12 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                         curX = offsetX + circle.smoothPath[totalSegments].x * scale;
                         curY = offsetY + circle.smoothPath[totalSegments].y * scale;
                     } else {
-                        let p1 = circle.smoothPath[index]; let p2 = circle.smoothPath[index + 1];
+                        let p1 = circle.smoothPath[index]; 
+                        let p2 = circle.smoothPath[index + 1] || p1; // Fallback por si acaso
                         curX = offsetX + (p1.x + (p2.x - p1.x) * remainder) * scale;
                         curY = offsetY + (p1.y + (p2.y - p1.y) * remainder) * scale;
                     }
 
-                    // Bolita Rastreadora
                     ctx.globalAlpha = 1.0 * userOp;
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 0.9, 0, Math.PI * 2);
                     ctx.fillStyle = '#ffaa00'; ctx.fill(); 
