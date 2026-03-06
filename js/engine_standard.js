@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO (ANTI-CRASH + SKINS + LYRICS + GAME.JS SYNC) 🎯
+   ENGINE STANDARD V-PRO 2.0 (SLIDERS + NUMBERS + OSU! PHYSICS) 🎯
    ========================================================================== */
 
 window.startNewEngine = async function(songObj) {
@@ -53,21 +53,79 @@ window.startNewEngine = async function(songObj) {
 function parseStandardMap(text) {
     const lines = text.split('\n').map(l => l.trim());
     let hitObjIdx = lines.findIndex(l => l.includes('[HitObjects]'));
-    let audioFile = "audio.mp3"; let CS = 4; let AR = 5;
+    let timingIdx = lines.findIndex(l => l.includes('[TimingPoints]'));
+
+    let audioFile = "audio.mp3"; let CS = 4; let AR = 5; let SM = 1.4;
 
     for(let i=0; i<hitObjIdx; i++) {
         if(lines[i].startsWith('AudioFilename:')) audioFile = lines[i].split(':')[1].trim();
         if(lines[i].startsWith('CircleSize:')) CS = parseFloat(lines[i].split(':')[1]);
         if(lines[i].startsWith('ApproachRate:')) AR = parseFloat(lines[i].split(':')[1]);
+        if(lines[i].startsWith('SliderMultiplier:')) SM = parseFloat(lines[i].split(':')[1]);
     }
 
-    const hitObjects = []; const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700']; let cIdx = 0;
+    let timingPoints = [];
+    if (timingIdx !== -1) {
+        for(let i = timingIdx + 1; i < lines.length; i++) {
+            if(!lines[i] || lines[i].startsWith('[')) break;
+            const p = lines[i].split(',');
+            if(p.length >= 2) {
+                let time = parseFloat(p[0]);
+                let beatLength = parseFloat(p[1]);
+                if(beatLength > 0) timingPoints.push({ time: time, beatLength: beatLength });
+            }
+        }
+    }
+    if(timingPoints.length === 0) timingPoints.push({ time: 0, beatLength: 500 }); 
+
+    const hitObjects = []; 
+    const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700', '#a200ff']; 
+    let cIdx = 0; let comboNum = 1;
+
     for(let i = hitObjIdx + 1; i < lines.length; i++) {
         if(!lines[i]) continue;
         const p = lines[i].split(',');
+        
         if(p.length >= 5) {
-            if((parseInt(p[3]) & 4) !== 0) cIdx = (cIdx + 1) % colors.length;
-            hitObjects.push({ x: parseInt(p[0]), y: parseInt(p[1]), t: parseInt(p[2]) + 3000, clicked: false, missed: false, color: colors[cIdx] });
+            let objType = parseInt(p[3]);
+            let isNewCombo = (objType & 4) !== 0;
+
+            if(isNewCombo) { cIdx = (cIdx + 1) % colors.length; comboNum = 1; }
+
+            let x = parseInt(p[0]); let y = parseInt(p[1]);
+            let tMs = parseInt(p[2]) + 3000; 
+
+            // SLIDER 
+            if ((objType & 2) !== 0 && p.length >= 8) {
+                let curveData = p[5].split('|');
+                let slides = parseInt(p[6]);
+                let length = parseFloat(p[7]);
+
+                let currentBP = timingPoints[0];
+                for(let tp of timingPoints) { if(tp.time + 3000 <= tMs) currentBP = tp; else break; }
+                
+                let msPerBeat = currentBP.beatLength;
+                let sliderDuration = (length / (SM * 100)) * msPerBeat * slides;
+                let endTime = tMs + sliderDuration;
+
+                let lastPoint = curveData[curveData.length - 1].split(':');
+                let endX = parseInt(lastPoint[0]) || x;
+                let endY = parseInt(lastPoint[1]) || y;
+
+                hitObjects.push({
+                    type: 'slider', x: x, y: y, t: tMs, endTime: endTime,
+                    endX: endX, endY: endY, clicked: false, missed: false,
+                    active: false, broken: false, color: colors[cIdx], combo: comboNum, slides: slides
+                });
+                comboNum++;
+            } 
+            // CIRCLE
+            else if ((objType & 1) !== 0) {
+                hitObjects.push({
+                    type: 'circle', x: x, y: y, t: tMs, clicked: false, missed: false, color: colors[cIdx], combo: comboNum
+                });
+                comboNum++;
+            }
         }
     }
     return { hitObjects: hitObjects.sort((a,b) => a.t - b.t), audioFile, CS, AR };
@@ -134,6 +192,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     window.st.nextNote = 0; window.st.spawned = [];
     
     let isRunning = true; let particles = []; let cursorTrail = [];
+    window.isPointerDown = false; // RASTREADOR DE CLIC PARA SLIDERS
 
     let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
@@ -178,7 +237,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     function showJudgment(txt, color, x, y) {
         if(!isRunning) return;
         const jContainer = document.getElementById('std-judgements');
-        if(!jContainer) return; // BLINDAJE CONTRA CRASHEOS
+        if(!jContainer) return; 
         const el = document.createElement('div');
         el.innerText = txt;
         el.style.cssText = `position:absolute; left:${x}px; top:${y}px; transform:translate(-50%, -50%); color:${color}; font-size:3rem; font-weight:900; text-shadow:0 0 10px ${color}; pointer-events:none; animation: popFade 0.4s forwards;`;
@@ -187,8 +246,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     }
 
     function updateHUD() {
-        if(!isRunning) return; // BLINDAJE CONTRA DOM LEAK
-        
+        if(!isRunning) return; 
         try {
             document.getElementById('std-score').innerText = window.st.sc.toLocaleString();
             document.getElementById('std-combo').innerText = window.st.cmb > 0 ? window.st.cmb + "x" : "";
@@ -265,31 +323,89 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         for(let i = window.st.spawned.length - 1; i >= 0; i--) {
             const circle = window.st.spawned[i];
             const timeDiff = circle.t - now;
+            const scaledRadius = radius * scale;
+            let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
+            const screenX = offsetX + (circle.x * scale); 
+            const screenY = offsetY + (circle.y * scale);
 
-            if (timeDiff < -150) {
-                circle.missed = true; window.st.stats.m++; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR";
-                showJudgment("MISS", "#F9393F", offsetX + (circle.x * scale), offsetY + (circle.y * scale));
-                window.st.spawned.splice(i, 1);
-                updateHUD(); checkDeath(); continue;
+            // DIBUJADO DE SLIDERS Y TRAIL GRIS
+            if (circle.type === 'slider') {
+                const endX = offsetX + (circle.endX * scale);
+                const endY = offsetY + (circle.endY * scale);
+
+                // 1. Dibujar el camino gris (Trail)
+                ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
+                ctx.lineWidth = scaledRadius * 2; ctx.strokeStyle = 'rgba(50, 50, 50, 0.6)'; ctx.stroke();
+                ctx.lineWidth = scaledRadius * 2 + (4 * scale); ctx.strokeStyle = drawColor; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1.0;
+
+                // 2. Comportamiento en Vida del Slider
+                if (circle.active) {
+                    let elapsed = now - circle.t;
+                    let duration = circle.endTime - circle.t;
+                    let timePerSlide = duration / circle.slides;
+                    let cycle = Math.floor(elapsed / timePerSlide);
+                    let p = (elapsed % timePerSlide) / timePerSlide;
+                    if (cycle % 2 === 1) p = 1 - p; 
+
+                    let curX = screenX + (endX - screenX) * p;
+                    let curY = screenY + (endY - screenY) * p;
+
+                    // Bola Seguidora
+                    ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 1.5, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctx.fill();
+                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * scale; ctx.stroke();
+
+                    // Físicas de Puntero (Si se sale o suelta, rompe el combo)
+                    let dist = Math.hypot((window.mouseX||0) - curX, (window.mouseY||0) - curY);
+                    if (window.isPointerDown && dist < scaledRadius * 2.5) {
+                        circle.tracking = true; // Todo bien
+                    } else {
+                        circle.tracking = false; 
+                        if (!circle.broken) { circle.broken = true; window.st.cmb = 0; }
+                    }
+
+                    if (now >= circle.endTime) {
+                        if (!circle.broken) {
+                            window.st.sc += 300; window.st.cmb++; window.st.stats.s++;
+                            showJudgment("SICK!!", "#00FFFF", curX, curY); spawnRipple(curX, curY, "#00FFFF");
+                        } else {
+                            window.st.sc += 50; window.st.stats.b++;
+                            showJudgment("BAD", "#FFD700", curX, curY);
+                        }
+                        updateHUD(); window.st.spawned.splice(i, 1); continue;
+                    }
+                }
             }
 
-            const screenX = offsetX + (circle.x * scale); const screenY = offsetY + (circle.y * scale);
-            const scaledRadius = radius * scale;
-            const alpha = Math.min(1, 1 - (timeDiff / preempt));
-            ctx.globalAlpha = alpha;
-            
-            let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
+            // DIBUJADO NORMAL DE CIRCULOS Y CABEZAS DE SLIDER
+            if (!circle.active && !circle.missed) {
+                if (timeDiff < -150) {
+                    circle.missed = true; window.st.stats.m++; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR";
+                    showJudgment("MISS", "#F9393F", screenX, screenY);
+                    window.st.spawned.splice(i, 1); updateHUD(); checkDeath(); continue;
+                }
 
-            ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(10,10,15,0.9)'; ctx.fill(); 
-            ctx.lineWidth = 3 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
-            
-            ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
-            ctx.fillStyle = drawColor; ctx.fill();
+                const alpha = Math.min(1, 1 - (timeDiff / preempt));
+                ctx.globalAlpha = alpha;
 
-            const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
-            ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
-            ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
+                ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(10,10,15,0.9)'; ctx.fill(); 
+                ctx.lineWidth = 3 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
+                
+                ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
+                ctx.fillStyle = drawColor; ctx.fill();
+
+                // 🚨 FIX: NUMEROS EN LAS NOTAS (COMBO)
+                ctx.fillStyle = 'white';
+                ctx.font = `bold ${scaledRadius * 0.8}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(circle.combo, screenX, screenY + (scaledRadius * 0.1));
+
+                // Circulo de Aproximación
+                const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
+                ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
+                ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
+            }
         }
         ctx.globalAlpha = 1.0;
 
@@ -318,7 +434,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         let targetCircle = null; let targetIdx = -1;
         for(let i=0; i<window.st.spawned.length; i++) {
             const circle = window.st.spawned[i];
-            if(!circle.clicked && !circle.missed) {
+            if(!circle.clicked && !circle.missed && !circle.active) {
                 const screenX = offsetX + (circle.x * scale);
                 const screenY = offsetY + (circle.y * scale);
                 if (Math.hypot(clientX - screenX, clientY - screenY) <= radius * scale * 1.5) {
@@ -344,29 +460,38 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 spawnRipple(sx, sy, color);
                 showJudgment(txt, color, sx, sy);
                 try { if(typeof window.playHit === 'function') window.playHit(); else if(window.hitBuf && window.st.ctx) { const s = window.st.ctx.createBufferSource(); s.buffer = window.hitBuf; s.connect(window.st.ctx.destination); s.start(0); } } catch(e){}
+                
+                // 🚨 SI ES UN SLIDER, LO DEJAMOS VIVO Y ACTIVADO
+                if (targetCircle.type === 'slider') { targetCircle.active = true; return; }
             } else { 
                 window.st.cmb = 0; window.st.hp -= 10; showJudgment(txt, color, offsetX + targetCircle.x*scale, offsetY + targetCircle.y*scale); 
                 try { if(typeof window.playMiss === 'function') window.playMiss(); } catch(e){}
             }
             
-            window.st.spawned.splice(targetIdx, 1);
+            if (targetCircle.type !== 'slider' || points === 0) {
+                window.st.spawned.splice(targetIdx, 1);
+            }
             updateHUD(); checkDeath();
         }
     }
 
-    // EVENTOS BLINDADOS Y PROPAGACIÓN CORTADA (PARA ESC)
+    // EVENTOS BLINDADOS Y ESTADOS DE CLIC PARA SLIDERS
     window.st.mouseMoveHandler = (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; };
-    window.st.pointerDownHandler = (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; handleHit(e.clientX, e.clientY); };
+    window.st.pointerDownHandler = (e) => { window.isPointerDown = true; window.mouseX = e.clientX; window.mouseY = e.clientY; handleHit(e.clientX, e.clientY); };
+    window.st.pointerUpHandler = () => { window.isPointerDown = false; };
     window.st.keyHitHandler = (e) => {
         if(e.key === "Escape" && isRunning) { e.preventDefault(); e.stopPropagation(); window.toggleEnginePause(); return; }
-        if(e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') { handleHit(window.mouseX || canvas.width/2, window.mouseY || canvas.height/2); }
+        if(e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') { window.isPointerDown = true; handleHit(window.mouseX || canvas.width/2, window.mouseY || canvas.height/2); }
     };
+    window.st.keyUpHandler = (e) => { if(e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'x') window.isPointerDown = false; };
     window.st.resizeHandler = resize;
 
     window.addEventListener('resize', window.st.resizeHandler);
     window.addEventListener('mousemove', window.st.mouseMoveHandler);
     canvas.addEventListener('pointerdown', window.st.pointerDownHandler);
-    window.addEventListener('keydown', window.st.keyHitHandler, {capture: true}); // Captura antes que game.js
+    canvas.addEventListener('pointerup', window.st.pointerUpHandler);
+    window.addEventListener('keydown', window.st.keyHitHandler, {capture: true});
+    window.addEventListener('keyup', window.st.keyUpHandler, {capture: true});
 
     window.toggleEnginePause = function() {
         if(!window.st.act || !isRunning) return;
@@ -412,7 +537,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     };
 
     function endEngine(died) {
-        if(!isRunning) return; // FIX DE SEGURIDAD DEFINITIVO
+        if(!isRunning) return; 
         isRunning = false; window.st.act = false;
         cancelAnimationFrame(window.st.animId);
         try{ window.st.src.stop(); window.st.src.disconnect(); }catch(e){}
@@ -420,7 +545,9 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         window.removeEventListener('resize', window.st.resizeHandler);
         window.removeEventListener('mousemove', window.st.mouseMoveHandler);
         canvas.removeEventListener('pointerdown', window.st.pointerDownHandler);
+        canvas.removeEventListener('pointerup', window.st.pointerUpHandler);
         window.removeEventListener('keydown', window.st.keyHitHandler, {capture: true});
+        window.removeEventListener('keyup', window.st.keyUpHandler, {capture: true});
 
         if(canvas) canvas.style.display = 'none'; 
         if(uiLayer) uiLayer.remove();
