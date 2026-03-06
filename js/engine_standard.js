@@ -1,8 +1,7 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO 4.0 (SKIN IMPORTER + PRO VISUALS + SLIDERS) 🎯
+   ENGINE STANDARD V-PRO 5.0 (ULTRA-REALISTIC + ANTI-CRASH + OSK SKINS) 🎯
    ========================================================================== */
 
-// 🌟 SISTEMA DE IMPORTACIÓN DE SKINS .OSK 🌟
 window.handleOskUpload = async function(e) {
     const file = e.target.files[0];
     if(!file) return;
@@ -13,7 +12,6 @@ window.handleOskUpload = async function(e) {
         const zip = await JSZip.loadAsync(file);
         const skinData = {};
         
-        // Buscador inteligente de imágenes (busca normal y versión @2x HD)
         const getB64 = async (name) => {
             const files = Object.keys(zip.files);
             const exact = files.find(f => f.toLowerCase().endsWith(name.toLowerCase()));
@@ -249,7 +247,14 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     let isRunning = true; let particles = []; let cursorTrail = [];
     window.isPointerDown = false; 
 
-    // === CARGADOR DE SKIN CUSTOM (.OSK) O NATIVA ===
+    // === INICIALIZACIÓN DE SKINS BLINDADA ===
+    let activeSkin = null;
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    } else if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    }
+
     const loadedSkin = { hitcircle: null, hitcircleoverlay: null, approachcircle: null, cursor: null };
     let hasCustomOsk = false;
     try {
@@ -323,7 +328,60 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             if(hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
         } catch(e) {}
     }
-function draw() {
+
+    // =======================================================
+    // 🌟 MOTOR VISUAL ULTRA-REALISTA (OSU! DEFAULT) 🌟
+    // =======================================================
+    function drawOsuHitCircle(x, y, r, color, comboText, alphaMultiplier) {
+        ctx.globalAlpha = alphaMultiplier;
+        
+        if (hasCustomOsk) {
+            if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, x - r, y - r, r*2, r*2);
+            if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, x - r, y - r, r*2, r*2);
+            if (comboText !== "") {
+                ctx.fillStyle = 'white'; ctx.font = `bold ${r * 0.8}px sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(comboText, x, y + (r * 0.1));
+            }
+        } else {
+            // 1. Sombra exterior
+            ctx.beginPath(); ctx.arc(x, y + (3 * scale), r, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fill();
+
+            // 2. Anillo Blanco Grueso
+            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff'; ctx.fill();
+
+            // 3. Relleno con el color de la nota
+            ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
+            ctx.fillStyle = color; ctx.fill();
+
+            // 4. Efecto Burbuja / Shine 
+            const shine = ctx.createLinearGradient(x, y - r, x, y + (r * 0.5));
+            shine.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
+            shine.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+            shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
+            ctx.fillStyle = shine; ctx.fill();
+
+            // 5. Contorno interior sutil
+            ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'; ctx.lineWidth = 2 * scale; ctx.stroke();
+
+            // 6. Número del Combo
+            if (comboText !== "") {
+                ctx.fillStyle = 'white';
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.lineWidth = 3 * scale;
+                ctx.font = `bold ${r * 0.85}px "Segoe UI", Arial, sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.strokeText(comboText, x, y + (r * 0.05));
+                ctx.fillText(comboText, x, y + (r * 0.05));
+            }
+        }
+    }
+
+    function draw() {
         if (!isRunning || !window.st.act) return;
         if (window.st.paused) { window.st.animId = requestAnimationFrame(draw); return; }
 
@@ -375,67 +433,6 @@ function draw() {
             cursorTrail = cursorTrail.filter(t => t.life > 0);
         }
 
-        // =======================================================
-        // 🌟 NUEVO MOTOR VISUAL ULTRA-REALISTA (OSU! DEFAULT) 🌟
-        // =======================================================
-        function drawOsuHitCircle(x, y, r, color, comboText, alphaMultiplier) {
-            ctx.globalAlpha = alphaMultiplier;
-            
-            // Si el jugador subió una Skin, la dibujamos
-            if (hasCustomOsk) {
-                if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, x - r, y - r, r*2, r*2);
-                if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, x - r, y - r, r*2, r*2);
-                if (comboText !== "") {
-                    ctx.fillStyle = 'white'; ctx.font = `bold ${r * 0.8}px sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText(comboText, x, y + (r * 0.1));
-                }
-            } else {
-                // SI NO TIENE SKIN: Dibujamos el estilo Osu! Original mediante código
-                
-                // 1. Sombra exterior (Efecto de altura)
-                ctx.beginPath(); ctx.arc(x, y + (3 * scale), r, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fill();
-
-                // 2. Anillo Blanco Grueso
-                ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff'; ctx.fill();
-
-                // 3. Relleno con el color de la nota
-                ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
-                ctx.fillStyle = color; ctx.fill();
-
-                // 4. Efecto Burbuja / Shine (Gradiente blanco en la parte superior)
-                const shine = ctx.createLinearGradient(x, y - r, x, y + (r * 0.5));
-                shine.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
-                shine.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
-                shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
-                ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
-                ctx.fillStyle = shine; ctx.fill();
-
-                // 5. Contorno interior sutil
-                ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'; ctx.lineWidth = 2 * scale; ctx.stroke();
-
-                // 6. Número del Combo
-                if (comboText !== "") {
-                    ctx.fillStyle = 'white';
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-                    ctx.lineWidth = 3 * scale;
-                    // Fuente similar a Aller/Arial de osu!
-                    ctx.font = `bold ${r * 0.85}px "Segoe UI", Arial, sans-serif`;
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    
-                    // Sombreado del texto y texto frontal
-                    ctx.strokeText(comboText, x, y + (r * 0.05));
-                    ctx.fillText(comboText, x, y + (r * 0.05));
-                }
-            }
-        }
-
-        // =======================================================
-        // DIBUJADO DE LAS NOTAS EN PANTALLA
-        // =======================================================
         for(let i = window.st.spawned.length - 1; i >= 0; i--) {
             const circle = window.st.spawned[i];
             const timeDiff = circle.t - now;
@@ -451,7 +448,6 @@ function draw() {
             const screenY = offsetY + (circle.y * scale);
             const scaledRadius = radius * scale;
             
-            // Aparecer gradualmente
             let alpha = 1;
             if (!circle.active) {
                 alpha = Math.min(1, 1 - (timeDiff / preempt));
@@ -466,20 +462,20 @@ function draw() {
                 const endX = offsetX + (circle.endX * scale); 
                 const endY = offsetY + (circle.endY * scale);
 
-                // A) Borde Exterior de la Pista (Blanco)
+                // A) Borde Exterior (Blanco)
                 ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
                 ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.lineWidth = scaledRadius * 2; 
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; 
                 ctx.stroke();
 
-                // B) Interior de la Pista (Oscuro puro)
+                // B) Interior Oscuro
                 ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
                 ctx.lineWidth = scaledRadius * 2 - (6 * scale); 
                 ctx.strokeStyle = 'rgba(30, 30, 35, 0.9)'; 
                 ctx.stroke();
 
-                // C) Cola del slider (Círculo brillante, pero sin número)
+                // C) Cola
                 drawOsuHitCircle(endX, endY, scaledRadius, drawColor, "", alpha);
 
                 // D) Lógica de movimiento
@@ -491,12 +487,10 @@ function draw() {
                     let curX = screenX + (endX - screenX) * p; 
                     let curY = screenY + (endY - screenY) * p;
 
-                    // Bola Naranja Brillante de seguimiento
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 0.9, 0, Math.PI * 2);
                     ctx.fillStyle = '#ffaa00'; ctx.fill(); 
                     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 * scale; ctx.stroke();
 
-                    // Anillo Blanco exterior
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 1.8, 0, Math.PI * 2);
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; ctx.lineWidth = 2 * scale; ctx.stroke();
 
@@ -514,10 +508,8 @@ function draw() {
 
             // 2️⃣ DIBUJAR CABEZA / CIRCULO NORMAL
             if (!circle.active && !circle.missed) {
-                // Invocamos nuestra función maestra
                 drawOsuHitCircle(screenX, screenY, scaledRadius, drawColor, circle.combo, alpha);
 
-                // Circulo de Aproximación (Ring que se cierra)
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
                 ctx.globalAlpha = alpha;
                 if (hasCustomOsk && loadedSkin.approachcircle) {
@@ -587,9 +579,12 @@ function draw() {
                 const sx = offsetX + (targetCircle.x * scale); const sy = offsetY + (targetCircle.y * scale);
                 spawnRipple(sx, sy, color);
                 showJudgment(txt, color, sx, sy);
+                try { if(typeof window.playHit === 'function') window.playHit(); else if(window.hitBuf && window.st.ctx) { const s = window.st.ctx.createBufferSource(); s.buffer = window.hitBuf; s.connect(window.st.ctx.destination); s.start(0); } } catch(e){}
+                
                 if (targetCircle.type === 'slider') { targetCircle.active = true; return; }
             } else { 
                 window.st.cmb = 0; window.st.hp -= 10; showJudgment(txt, color, offsetX + targetCircle.x*scale, offsetY + targetCircle.y*scale); 
+                try { if(typeof window.playMiss === 'function') window.playMiss(); } catch(e){}
             }
             
             if (targetCircle.type !== 'slider' || points === 0) window.st.spawned.splice(targetIdx, 1);
@@ -618,6 +613,9 @@ function draw() {
         if(!window.st.act || !isRunning) return;
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
+        let vign = document.getElementById('near-death-vignette');
+        if(vign) vign.style.opacity = '0';
+
         if(window.st.paused) {
             window.st.pauseTime = performance.now();
             if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
