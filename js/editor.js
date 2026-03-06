@@ -1,5 +1,5 @@
 /* ==========================================================
-   CREATOR STUDIO PRO V9 - OSU! STANDARD FREEHAND SLIDERS 🎯
+   CREATOR STUDIO PRO V10 - PERFECT OSU! CIRCLES & SLIDERS 🎯
    ========================================================== */
 
 window.edMap = [];
@@ -13,6 +13,7 @@ window.edDragNote = null;
 window.edMechanics = []; 
 window.edBrush = 'tap'; 
 window.creatingStdSlider = null; 
+window.edGhostPoint = null; // Rastrea el ratón al dibujar sliders
 
 window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     if(!songData || !songData.id) return window.notify("Error: Canción inválida para editar", "error");
@@ -41,7 +42,11 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     initEditorGrid();
     drawEditorGrid();
     
-    window.notify("Studio Listo. Selecciona Lápiz Slider y dibuja libremente.", "success");
+    if (mode === 'standard') {
+        window.notify("NUEVO: Para Sliders, haz clic punto por punto. Clic Derecho para terminar.", "success");
+    } else {
+        window.notify("Studio Listo. Selecciona tu pincel.", "success");
+    }
 };
 
 function injectProTools() {
@@ -63,7 +68,7 @@ function injectProTools() {
                 <div style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Pincel Actual</div>
                 <select class="set-input" style="background:#000; color:#00ffff; border-color:#00ffff; font-size:0.9rem;" onchange="window.edBrush = this.value">
                     <option value="tap">🟦 Nota Normal (Círculo)</option>
-                    <option value="slider">🖌️ Lápiz Slider (Dibuja Curvas)</option>
+                    <option value="slider">🎯 Slider (Clic punto por punto)</option>
                     <option value="mine">💣 Mina (Daño)</option>
                     <option value="dodge">🛑 Dodge (Esquivar)</option>
                     <option value="custom_fx">✨ FX Custom</option>
@@ -102,6 +107,7 @@ function initEditorGrid() {
     const grid = document.getElementById('ed-grid');
     grid.innerHTML = '';
     
+    // 🚨 MODO OSU! STANDARD (CAJA 2D FIJA) 🚨
     if (window.edMode === 'standard') {
         grid.style.width = '512px'; grid.style.height = '384px';
         grid.style.position = 'absolute'; grid.style.top = '50%'; grid.style.left = '50%';
@@ -118,6 +124,7 @@ function initEditorGrid() {
             drawEditorGrid();
         });
 
+        // Calculador de Píxeles Exactos
         const getStdCoords = (e) => {
             const rect = grid.getBoundingClientRect();
             let x = Math.round((e.clientX - rect.left) * (512 / rect.width));
@@ -129,66 +136,69 @@ function initEditorGrid() {
             const pos = getStdCoords(e);
             let timeMs = window.edAudio ? Math.round(window.edAudio.currentTime * 1000) : 0;
             
-            if (e.button === 2) { // Borrar
+            // 🚨 CLIC DERECHO 🚨
+            if (e.button === 2) { 
+                // 1. Si estaba haciendo un Slider, lo termina!
+                if (window.creatingStdSlider) {
+                    if (window.creatingStdSlider.curvePoints.length < 2) {
+                        window.creatingStdSlider.type = 'circle'; 
+                        delete window.creatingStdSlider.curvePoints;
+                    } else {
+                        let pts = window.creatingStdSlider.curvePoints;
+                        let dist = 0;
+                        // Calcula distancia en píxeles para autocompletar el tiempo
+                        for(let i=1; i<pts.length; i++) dist += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+                        window.creatingStdSlider.endTime = window.creatingStdSlider.t + Math.round(dist * 2.5);
+                        window.creatingStdSlider.endX = pts[pts.length-1].x;
+                        window.creatingStdSlider.endY = pts[pts.length-1].y;
+                        window.creatingStdSlider.slides = 1;
+                    }
+                    window.creatingStdSlider = null;
+                    window.edGhostPoint = null;
+                    window.edMap.sort((a,b) => a.t - b.t);
+                    drawEditorGrid();
+                    return;
+                }
+
+                // 2. Si no estaba haciendo nada, Borra la nota cercana
                 let closestIdx = -1; let minDist = Infinity;
                 window.edMap.forEach((n, i) => {
                     let dist = Math.hypot(n.x - pos.x, n.y - pos.y);
-                    if (dist < 40 && Math.abs(n.t - timeMs) < 1500 && dist < minDist) { minDist = dist; closestIdx = i; }
+                    if (dist < 30 && Math.abs(n.t - timeMs) < 1500 && dist < minDist) { minDist = dist; closestIdx = i; }
                 });
                 if(closestIdx !== -1) { window.edMap.splice(closestIdx, 1); drawEditorGrid(); }
                 return;
             }
 
+            // 🚨 CLIC IZQUIERDO 🚨
             if (e.button !== 0) return; 
 
-            // 🚨 EL LÁPIZ MAGICO DE SLIDERS 🚨
             if (window.edBrush === 'slider') {
-                window.creatingStdSlider = { 
-                    type: 'slider', x: pos.x, y: pos.y, t: timeMs, 
-                    curvePoints: [{x: pos.x, y: pos.y}], // Inicia el trazo
-                    endTime: timeMs, slides: 1 
-                };
-                window.edMap.push(window.creatingStdSlider);
+                if (!window.creatingStdSlider) {
+                    // Crea un slider nuevo (Primer Punto)
+                    window.creatingStdSlider = { 
+                        type: 'slider', x: pos.x, y: pos.y, t: timeMs, 
+                        curvePoints: [{x: pos.x, y: pos.y}], 
+                        endTime: timeMs + 100
+                    };
+                    window.edMap.push(window.creatingStdSlider);
+                } else {
+                    // Añade un punto al slider existente (Curvas perfectas)
+                    window.creatingStdSlider.curvePoints.push({x: pos.x, y: pos.y});
+                }
+                drawEditorGrid();
             } else {
+                if(window.creatingStdSlider) return; // Evita mezclar modos
                 window.edMap.push({ type: window.edBrush, x: pos.x, y: pos.y, t: timeMs });
+                window.edMap.sort((a,b) => a.t - b.t);
+                drawEditorGrid();
             }
-            drawEditorGrid();
         };
 
         grid.onmousemove = (e) => {
             if (!window.creatingStdSlider) return;
-            const pos = getStdCoords(e);
-            let pts = window.creatingStdSlider.curvePoints;
-            let lastPt = pts[pts.length - 1];
-            
-            // Añade puntos a la curva si mueves el ratón lo suficiente
-            if (Math.hypot(pos.x - lastPt.x, pos.y - lastPt.y) > 10) {
-                pts.push({x: pos.x, y: pos.y});
-                
-                // AUTO-CALCULAR TIEMPO BASADO EN LA DISTANCIA DEL TRAZO
-                let dist = 0;
-                for(let i=1; i<pts.length; i++) dist += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
-                window.creatingStdSlider.endTime = window.creatingStdSlider.t + Math.round(dist * 2.5); // A mayor largo, más tiempo
-            }
+            window.edGhostPoint = getStdCoords(e); // Rastrea la línea fantasma hacia el ratón
             drawEditorGrid(); 
-        };
-
-        window.onmouseup = () => {
-            if(window.creatingStdSlider) {
-                if(window.creatingStdSlider.curvePoints.length < 3) {
-                    window.creatingStdSlider.type = 'circle'; 
-                    delete window.creatingStdSlider.curvePoints;
-                    delete window.creatingStdSlider.endTime; 
-                    delete window.creatingStdSlider.slides;
-                } else {
-                    let pts = window.creatingStdSlider.curvePoints;
-                    window.creatingStdSlider.endX = pts[pts.length-1].x;
-                    window.creatingStdSlider.endY = pts[pts.length-1].y;
-                }
-                window.creatingStdSlider = null;
-                window.edMap.sort((a,b) => a.t - b.t);
-                drawEditorGrid();
-            }
         };
 
     } else {
@@ -253,6 +263,7 @@ function initEditorGrid() {
     }
 }
 
+// === MOTOR DE RENDERIZADO VISUAL ===
 window.drawEditorGrid = function() {
     const grid = document.getElementById('ed-grid');
     let currentTime = window.edAudio ? window.edAudio.currentTime * 1000 : 0;
@@ -264,41 +275,52 @@ window.drawEditorGrid = function() {
         if(window.edAudio.duration) timeSlid.value = (window.edAudio.currentTime / window.edAudio.duration) * 100;
     }
 
+    // 🚨 RENDERIZADO VECTORIAL PERFECTO (SIN DISTORSIÓN DE ÓVALOS) 🚨
     if (window.edMode === 'standard') {
         let svgContent = '';
         
         window.edMap.forEach((n, idx) => {
             let timeDiff = n.t - currentTime;
-            let isSliderActive = n.type === 'slider' && currentTime >= n.t && currentTime <= n.endTime;
+            let isSliderActive = n.type === 'slider' && currentTime >= n.t && currentTime <= (n.endTime || n.t);
             
             if ((timeDiff > -1500 && timeDiff < 2000) || isSliderActive || n === window.creatingStdSlider) { 
                 let alpha = (timeDiff < 0 && !isSliderActive && n !== window.creatingStdSlider) ? 0.3 : 1;
-                let pxX = (n.x / 512 * 100) + '%'; let pxY = (n.y / 384 * 100) + '%';
                 let color = n.type === 'mine' ? '#F9393F' : (n.type==='dodge' ? '#00ffff' : '#ff66aa');
 
                 if (n.type === 'slider' && n.curvePoints) {
-                    // DIBUJAR TRAZO CURVO PERFECTO
-                    let pathD = `M ${n.curvePoints[0].x / 512 * 100} ${n.curvePoints[0].y / 384 * 100} `;
-                    for(let j=1; j<n.curvePoints.length; j++) {
-                        pathD += `L ${n.curvePoints[j].x / 512 * 100} ${n.curvePoints[j].y / 384 * 100} `;
-                    }
-                    
-                    let endX = n.curvePoints[n.curvePoints.length-1].x / 512 * 100;
-                    let endY = n.curvePoints[n.curvePoints.length-1].y / 384 * 100;
+                    // Creamos la pista de Puntos exacta
+                    let pts = [...n.curvePoints];
+                    // Si estamos creando este slider AHORA, añadimos un punto fantasma hacia donde está el ratón
+                    if (n === window.creatingStdSlider && window.edGhostPoint) pts.push(window.edGhostPoint);
 
-                    svgContent += `<path d="${pathD}" fill="none" stroke="rgba(100,100,100,0.6)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-                    svgContent += `<path d="${pathD}" fill="none" stroke="${color}" stroke-opacity="0.5" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-                    
-                    svgContent += `<circle cx="${endX}%" cy="${endY}%" r="20" fill="rgba(255,0,85,${alpha})" stroke="white" stroke-width="2" />`;
-                    if(n === window.creatingStdSlider) svgContent += `<text x="${endX}%" y="${endY}%" dy="-30" fill="white" font-size="12" font-weight="bold" text-anchor="middle">${n.endTime - n.t}ms</text>`;
+                    if (pts.length > 1) {
+                        let pathD = `M ${pts[0].x} ${pts[0].y} `;
+                        for(let j=1; j<pts.length; j++) {
+                            pathD += `L ${pts[j].x} ${pts[j].y} `;
+                        }
+                        
+                        let endX = pts[pts.length-1].x;
+                        let endY = pts[pts.length-1].y;
+
+                        // Pista del Slider (Borde Blanco grueso y Cuerpo oscuro)
+                        svgContent += `<path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />`;
+                        svgContent += `<path d="${pathD}" fill="none" stroke="rgba(30,30,35,0.9)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" />`;
+                        
+                        // Cola final del Slider
+                        svgContent += `<circle cx="${endX}" cy="${endY}" r="28" fill="${color}" fill-opacity="${alpha*0.5}" stroke="white" stroke-width="3" />`;
+                    }
                 }
 
-                svgContent += `<circle cx="${pxX}" cy="${pxY}" r="20" fill="${color}" fill-opacity="${alpha}" stroke="white" stroke-width="2" />`;
-                svgContent += `<text x="${pxX}" y="${pxY}" fill="white" font-size="14" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" opacity="${alpha}">${idx+1}</text>`;
+                // Cabeza de la Nota (Circulo Perfecto de 28px)
+                svgContent += `<circle cx="${n.x}" cy="${n.y}" r="28" fill="${color}" fill-opacity="${alpha}" stroke="white" stroke-width="3" />`;
+                
+                // Texto Centrado Perfecto
+                svgContent += `<text x="${n.x}" y="${n.y}" fill="white" font-size="20" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" dominant-baseline="central" opacity="${alpha}">${idx+1}</text>`;
             }
         });
 
-        grid.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none" style="pointer-events:none; position:absolute; top:0; left:0; width:100%; height:100%; overflow:visible;">${svgContent}</svg>`;
+        // viewBox en Píxeles Exactos arregla la distorsión del SVG
+        grid.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 512 384" style="pointer-events:none; position:absolute; top:0; left:0;">${svgContent}</svg>`;
         return; 
     }
 
