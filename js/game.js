@@ -377,6 +377,9 @@ window.playSongInternal = function(s) {
 function loop() {
     if (!window.st.act || window.st.paused) { gameLoopId = requestAnimationFrame(loop); return; }
     
+    // 🚨 FIX MAESTRO: DEFINIR LA PISTA PARA QUE LAS NOTAS SÍ APAREZCAN 🚨
+    const elTrack = document.getElementById('track');
+
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
     let songTime = now - 3000; 
     
@@ -410,15 +413,17 @@ function loop() {
         }
     }
 
-    // 🚨 FIX: Asegurar que leemos como número
     let kCount = parseInt(window.keys) || 4;
     const w = 100 / kCount; 
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
     const speedMult = window.cfg.spd * 40;
     
+    // 🚨 FIX: BUSCADOR DE SKINS BLINDADO
     let activeSkin = null; 
-    if (window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
     // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
@@ -435,13 +440,12 @@ function loop() {
                 
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
-                // 🚨 FIX MAESTRO: APLICAR TUS FORMAS Y COLORES A LAS NOTAS
                 let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l])
                            ? window.cfg.modes[kCount][n.l]
                            : { c: '#00ffff', s: 'circle' };
                 
-                let color = conf.c; 
-                let shapeData = (typeof PATHS !== 'undefined') && PATHS[conf.s] ? PATHS[conf.s] : (typeof PATHS !== 'undefined' ? PATHS['circle'] : "");
+                let color = conf.c || '#00ffff'; 
+                let shapeData = (typeof PATHS !== 'undefined' && PATHS[conf.s]) ? PATHS[conf.s] : (typeof PATHS !== 'undefined' ? PATHS['circle'] : "");
                 
                 let isImageSkin = false;
                 if (activeSkin) { 
@@ -479,9 +483,11 @@ function loop() {
                 }
                 
                 el.innerHTML = trailHTML + svgHTML; 
-                if(typeof elTrack !== 'undefined' && elTrack) elTrack.appendChild(el); 
+                
+                // INYECTAR LAS NOTAS A LA PISTA FINALMENTE
+                if (elTrack) elTrack.appendChild(el); 
+                
                 n.el = el;
-
                 if (n.type === 'hold') n.trailEl = el.querySelector('.sustain-trail');
                 
                 n.h = false; n.missed = false; n.broken = false; n.finished = false;
@@ -490,7 +496,7 @@ function loop() {
         } else break; 
     }
 
-    // === ZONA DE FÍSICAS ===
+    // === ZONA DE FÍSICAS Y MOVIMIENTO ===
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         
@@ -558,7 +564,6 @@ function loop() {
     }
     gameLoopId = requestAnimationFrame(loop);
 }
-
 // ==========================================
 // 5. VISUALS & JUEZ
 // ==========================================
@@ -902,24 +907,25 @@ window.initReceptors = function(k) {
     if (!elTrack) return;
     elTrack.innerHTML = '';
 
-    // 🚨 FIX MAESTRO: FORZAR PISTA OSCURA Y ELEGANTE (SIN TINTE CELESTE)
+    // PISTA OSCURA, ELEGANTE Y NEUTRA (SIN CELESTE)
     elTrack.style.background = 'rgba(12, 12, 16, 0.9)';
     elTrack.style.boxShadow = '0 0 30px rgba(0, 0, 0, 0.8)';
     elTrack.style.borderLeft = '2px solid #222';
     elTrack.style.borderRight = '2px solid #222';
 
-    // Asegurar que k sea un número matemático
     let kCount = parseInt(k) || 4;
     const w = 100 / kCount;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
+    // 🚨 FIX: LEER SKIN DE LOS AJUSTES O DEL PERFIL DEL USUARIO
     let activeSkin = null;
     if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+    } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
     for (let i = 0; i < kCount; i++) {
-        // Líneas tenues separadoras de carriles
         const lane = document.createElement('div');
         lane.style.cssText = `position:absolute; left:${i * w}%; width:${w}%; top:0; height:100%; border-right:1px solid rgba(255,255,255,0.03); pointer-events:none;`;
         elTrack.appendChild(lane);
@@ -929,13 +935,13 @@ window.initReceptors = function(k) {
         rec.className = 'receptor';
         rec.style.cssText = `left: ${i * w}%; width: ${w}%; top: ${yReceptor}px; position: absolute; display: flex; justify-content: center; align-items: center; z-index: 20;`;
 
-        // 🚨 FIX: LECTURA EXACTA DE TUS AJUSTES "NEÓN CYBERPUNK"
+        // Leer configuraciones de Neón Cyberpunk o similares
         let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i])
                    ? window.cfg.modes[kCount][i]
-                   : { c: '#00ffff', s: 'circle' }; // Fallback seguro
+                   : { c: '#00ffff', s: 'circle' };
 
-        let color = conf.c;
-        let shapeData = (typeof PATHS !== 'undefined') && PATHS[conf.s] ? PATHS[conf.s] : (typeof PATHS !== 'undefined' ? PATHS['circle'] : "");
+        let color = conf.c || '#00ffff';
+        let shapeData = (typeof PATHS !== 'undefined' && PATHS[conf.s]) ? PATHS[conf.s] : (typeof PATHS !== 'undefined' ? PATHS['circle'] : "");
 
         let isImageSkin = false;
         if (activeSkin) {
@@ -948,7 +954,7 @@ window.initReceptors = function(k) {
         let svgHTML = '';
 
         if (isImageSkin) {
-            svgHTML = `<img src="${activeSkin.img}" style="${svgStyles}">`;
+            svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
         } else {
             let innerPath = shapeData ? `<path d="${shapeData}" fill="transparent" stroke="${color}" stroke-width="4"/>` : `<circle cx="50" cy="50" r="40" fill="transparent" stroke="${color}" stroke-width="4"/>`;
             svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}">${innerPath}</svg>`;
