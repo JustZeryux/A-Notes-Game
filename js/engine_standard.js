@@ -1,8 +1,7 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO DEFINITIVO (ANTI-CRASH BLINDADO + BEZIER + OSK) 🎯
+   ENGINE STANDARD V-PRO (ANTI-CRASH ABSOLUTO + TOGGLE TRAIL + OSK) 🎯
    ========================================================================== */
 
-// 🌟 IMPORTADOR DE SKINS 🌟
 window.handleOskUpload = async function(e) {
     const file = e.target.files[0];
     if(!file) return;
@@ -44,7 +43,6 @@ window.handleOskUpload = async function(e) {
     }
 }
 
-// 🌟 MOTOR MATEMÁTICO DE CURVAS BEZIER 🌟
 function getBezierPoint(pts, t) {
     let tmp = pts.map(p => ({x: p.x, y: p.y}));
     while(tmp.length > 1) {
@@ -99,8 +97,10 @@ window.startNewEngine = async function(songObj) {
                 if (n.type === 'slider' && n.curvePoints) {
                     n.smoothPath = generateSmoothPath(n.curvePoints);
                     n.slides = n.slides || 1;
-                    n.endX = n.smoothPath[n.smoothPath.length-1].x;
-                    n.endY = n.smoothPath[n.smoothPath.length-1].y;
+                    if(n.smoothPath && n.smoothPath.length > 0) {
+                        n.endX = n.smoothPath[n.smoothPath.length-1].x;
+                        n.endY = n.smoothPath[n.smoothPath.length-1].y;
+                    }
                     if(!n.endTime) n.endTime = n.t + 500; 
                 }
             });
@@ -197,7 +197,7 @@ function parseStandardMap(text) {
 
             if ((objType & 2) !== 0 && p.length >= 8) {
                 let curveData = p[5].split('|'); 
-                let slides = Math.max(1, parseInt(p[6]) || 1); // 🚨 Seguro contra mapas rotos
+                let slides = Math.max(1, parseInt(p[6]) || 1);
                 let length = parseFloat(p[7]);
                 
                 let curvePts = [{x: x, y: y}];
@@ -207,6 +207,9 @@ function parseStandardMap(text) {
                 }
                 
                 let smoothPath = generateSmoothPath(curvePts);
+                
+                // Anti-Crash Fallback: Si se bugea la curva, se vuelve punto
+                if(!smoothPath || smoothPath.length === 0) smoothPath = [{x: x, y: y}];
 
                 let currentBP = timingPoints[0];
                 for(let tp of timingPoints) { if(tp.time + 3000 <= tMs) currentBP = tp; else break; }
@@ -371,7 +374,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
     const userOp = (window.cfg && window.cfg.noteOp) ? (window.cfg.noteOp / 100) : 1;
 
-    // 🌟 DIBUJADOR DE NOTAS 🌟
     function drawOsuHitCircle(x, y, r, color, comboText, baseAlpha) {
         ctx.globalAlpha = baseAlpha * userOp;
         
@@ -451,13 +453,21 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 2;
         ctx.strokeRect(offsetX, offsetY, 512 * scale, 384 * scale);
 
-        if (window.mouseX && window.mouseY) {
+        // 🚨 FIX: LEER SI EL TRAIL ESTÁ ACTIVADO O APAGADO EN AJUSTES
+        let drawMouseTrail = true;
+        if (window.cfg) {
+            if (window.cfg.trail === false || window.cfg.cursorTrail === false) drawMouseTrail = false;
+        }
+
+        if (drawMouseTrail && window.mouseX && window.mouseY) {
             cursorTrail.push({x: window.mouseX, y: window.mouseY, life: 1});
             if(cursorTrail.length > 20) cursorTrail.shift();
+        } else if (!drawMouseTrail) {
+            cursorTrail = []; // Lo vaciamos de inmediato
         }
         
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        if(cursorTrail.length > 0) {
+        if(drawMouseTrail && cursorTrail.length > 0) {
             ctx.beginPath(); ctx.moveTo(cursorTrail[0].x, cursorTrail[0].y);
             for(let i=1; i<cursorTrail.length; i++) { ctx.lineTo(cursorTrail[i].x, cursorTrail[i].y); cursorTrail[i].life -= 0.08; }
             ctx.strokeStyle = 'rgba(0, 229, 255, 0.3)'; ctx.lineWidth = 6; ctx.stroke();
@@ -485,7 +495,8 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
 
             // 1️⃣ DIBUJAR SLIDERS
-            if (circle.type === 'slider' && circle.smoothPath) {
+            // 🚨 BLINDAJE EXTRA: Verificar que smoothPath exista y tenga puntos 🚨
+            if (circle.type === 'slider' && circle.smoothPath && circle.smoothPath.length > 0) {
                 ctx.globalAlpha = alpha * 0.6 * userOp; 
 
                 ctx.beginPath();
@@ -494,23 +505,22 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                     ctx.lineTo(offsetX + circle.smoothPath[j].x * scale, offsetY + circle.smoothPath[j].y * scale);
                 }
                 
-                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.lineWidth = scaledRadius * 2; 
-                ctx.strokeStyle = drawColor; 
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; 
                 ctx.stroke();
 
                 ctx.lineWidth = scaledRadius * 2 - (6 * scale); 
-                ctx.strokeStyle = 'rgba(10, 10, 15, 0.8)'; 
+                ctx.strokeStyle = 'rgba(20, 20, 25, 0.8)'; 
                 ctx.stroke();
 
-                drawOsuHitCircle(offsetX + circle.endX * scale, offsetY + circle.endY * scale, scaledRadius, drawColor, "", alpha);
+                // Dibuja la cola del slider usando el último punto seguro
+                let lastPt = circle.smoothPath[circle.smoothPath.length - 1];
+                drawOsuHitCircle(offsetX + lastPt.x * scale, offsetY + lastPt.y * scale, scaledRadius, drawColor, "", alpha);
 
-                // 🚨 CÁLCULO BLINDADO DE LA BOLITA EN LA CURVA 🚨
                 if (circle.active) {
                     let elapsed = now - circle.t; 
                     let duration = circle.endTime - circle.t; 
                     
-                    // PREVIENE TIEMPO NEGATIVO (EL BUG QUE CRASHEÓ EL JUEGO)
                     let activeElapsed = Math.max(0, elapsed); 
                     
                     let safeSlides = circle.slides || 1;
@@ -520,7 +530,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                     let p = (activeElapsed % timePerSlide) / timePerSlide;
                     if (cycle % 2 === 1) p = 1 - p; 
 
-                    // ASEGURA QUE P NUNCA SUPERE LOS LIMITES [0, 1]
                     if (isNaN(p) || p < 0) p = 0;
                     if (p > 1) p = 1;
 
@@ -528,7 +537,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                     let exactFloat = p * totalSegments;
                     let index = Math.floor(exactFloat);
                     
-                    // ASEGURA QUE EL ÍNDICE NUNCA BUSQUE UN ARRAY QUE NO EXISTE (-1)
+                    // 🚨 FIX ANTI-CRASH MATEMÁTICO: LÍMITES ESTRICTOS 🚨
                     index = Math.max(0, Math.min(totalSegments, index));
                     let remainder = exactFloat - index;
                     
@@ -537,8 +546,11 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                         curX = offsetX + circle.smoothPath[totalSegments].x * scale;
                         curY = offsetY + circle.smoothPath[totalSegments].y * scale;
                     } else {
+                        // Rescate de variables para evitar undefined
                         let p1 = circle.smoothPath[index]; 
-                        let p2 = circle.smoothPath[index + 1] || p1; // Fallback por si acaso
+                        if (!p1) p1 = circle.smoothPath[0] || {x: circle.x, y: circle.y};
+                        let p2 = circle.smoothPath[index + 1] || p1; 
+                        
                         curX = offsetX + (p1.x + (p2.x - p1.x) * remainder) * scale;
                         curY = offsetY + (p1.y + (p2.y - p1.y) * remainder) * scale;
                     }
