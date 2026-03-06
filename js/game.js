@@ -207,7 +207,6 @@ function playMiss() {
 }
 
 window.prepareAndPlaySong = async function(k) {
-    // 🚨 FIX MAESTRO: OBLIGAR A CARGAR SETTINGS ANTES DE CUALQUIER OTRA COSA
     if (typeof window.loadSettings === 'function') window.loadSettings();
 
     if(window.currentLobbyId) window.isMultiplayer = true;
@@ -258,6 +257,11 @@ window.prepareAndPlaySong = async function(k) {
             map.forEach(n => {
                 n.t += 3000; 
                 if (n.dur !== undefined) { n.len = n.dur; }
+                // 🚨 FIX MAESTRO ANTI-LAG Y ANTI-DEFORMIDAD 🚨
+                // Forzamos a que el motor entienda que NO estás presionando la nota todavía
+                n.h = false; 
+                n.s = false;
+                n.broken = false;
             });
             map.sort((a, b) => a.t - b.t); 
         } 
@@ -285,7 +289,6 @@ window.prepareAndPlaySong = async function(k) {
         alert("Error carga: " + e.message); 
     }
 };
-
 window.playSongInternal = function(s) {
     // 🚨 FIX MAESTRO: DOBLE CHEQUEO PARA ASEGURAR QUE LAS TECLAS ESTÁN LISTAS
     if (typeof window.loadSettings === 'function') window.loadSettings();
@@ -408,13 +411,14 @@ function loop() {
     }
 
     const w = 100 / window.keys; const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
+    const speedMult = window.cfg.spd * 40;
     
     let activeSkin = null; 
     if (window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
     }
 
-// === 1. ZONA DE DIBUJADO VISUAL ===
+    // === ZONA DE GENERACIÓN VISUAL ===
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
@@ -426,8 +430,7 @@ function loop() {
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 
-                // 🚨 FIX MAESTRO CSS: Posición absoluta pura, sin flexbox.
-                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; position: absolute; z-index: 10;`; 
+                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
                 let conf = window.cfg.modes[window.keys][n.l]; let color = conf.c; let shapeData = (typeof PATHS !== 'undefined') ? (PATHS[conf.s] || PATHS['circle']) : "";
                 
@@ -438,7 +441,7 @@ function loop() {
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                // CABEZA DE LA NOTA (Se renderiza al frente, z-index: 5)
+                let innerPath = shapeData ? `<path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>` : `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="4"/>`;
                 let svgStyles = `display: block; width: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 10px ${color});`;
                 let svgHTML = '';
                 
@@ -450,22 +453,18 @@ function loop() {
                     if (isImageSkin) {
                         svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
                     } else {
-                        svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}"><path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+                        svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" style="${svgStyles}">${innerPath}</svg>`;
                     }
                 }
 
-                // CUERPO DE LA NOTA LARGA (HOLD) - Renderizado detrás (z-index: -1) y centrado.
                 let trailHTML = '';
                 let noteLen = n.len || n.dur || 0;
                 if (n.type === 'hold' && noteLen > 0) { 
-                    const h = (noteLen / 1000) * (window.cfg.spd * 40); 
-                    
                     let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 25%; z-index: -1; opacity: ${(window.cfg.noteOp||100)/100}; box-shadow: 0 0 15px ${color}; border-radius: 8px;`;
-                    
                     if (window.cfg.down) { 
-                        tStyle += ` bottom: 50%; height: ${h}px; transform-origin: bottom center; background: linear-gradient(to top, ${color}ff 0%, ${color}00 100%);`; 
+                        tStyle += ` bottom: 50%; transform-origin: bottom center; background: linear-gradient(to top, ${color}ff 0%, ${color}00 100%);`; 
                     } else { 
-                        tStyle += ` top: 50%; height: ${h}px; transform-origin: top center; background: linear-gradient(to bottom, ${color}ff 0%, ${color}00 100%);`; 
+                        tStyle += ` top: 50%; transform-origin: top center; background: linear-gradient(to bottom, ${color}ff 0%, ${color}00 100%);`; 
                     } 
                     trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
                 }
@@ -473,58 +472,78 @@ function loop() {
                 el.innerHTML = trailHTML + svgHTML; 
                 if(elTrack) elTrack.appendChild(el); 
                 n.el = el;
+
+                // 🚨 FIX ANTI-LAG: Guardar el trail en memoria cacheada
+                if (n.type === 'hold') {
+                    n.trailEl = el.querySelector('.sustain-trail');
+                }
             }
             n.s = true; window.st.spawned.push(n);
         } else break; 
     }
 
-    // === 2. ZONA DE ACTUALIZACIÓN Y MOVIMIENTO ===
+    // === ZONA DE FÍSICAS Y MOVIMIENTO ===
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         if ((n.type === 'fx_flash' || n.type === 'custom_fx') && n.t < now - 100) { window.st.spawned.splice(i, 1); continue; }
-        if (n.h && (n.type === 'tap' || n.type === 'mine' || n.type === 'dodge')) { if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; }
+        if (n.h && (n.type === 'tap' || n.type === 'mine' || n.type === 'dodge')) { if(n.el) { n.el.remove(); n.el = null; n.trailEl = null; } window.st.spawned.splice(i, 1); continue; }
 
         const timeDiff = n.t - now + (window.cfg.off || 0);
+        let noteLen = n.len || n.dur || 0;
+        const tailDiff = (n.t + noteLen) - now + (window.cfg.off || 0);
+
+        let headY = window.cfg.down ? (yReceptor - (timeDiff / 1000) * speedMult) : (yReceptor + (timeDiff / 1000) * speedMult);
+        let tailY = window.cfg.down ? (yReceptor - (tailDiff / 1000) * speedMult) : (yReceptor + (tailDiff / 1000) * speedMult);
 
         if (!n.h && timeDiff < -160) {
-            if (n.type === 'mine') { n.h = true; if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; } 
-            else if (n.type === 'dodge') { n.h = true; window.st.sc += 100; showJudge("DODGED", "#00ffff", 0); if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; } 
-            else { miss(n); n.h = true; if(n.el) { n.el.remove(); n.el = null; } window.st.spawned.splice(i, 1); continue; }
+            if (n.type === 'mine') { n.h = true; if(n.el) { n.el.remove(); n.el = null; n.trailEl = null; } window.st.spawned.splice(i, 1); continue; } 
+            else if (n.type === 'dodge') { n.h = true; window.st.sc += 100; showJudge("DODGED", "#00ffff", 0); if(n.el) { n.el.remove(); n.el = null; n.trailEl = null; } window.st.spawned.splice(i, 1); continue; } 
+            else { 
+                miss(n); 
+                n.h = true; 
+                if (n.type === 'hold') {
+                    n.broken = true; 
+                    if(n.el) { n.el.style.filter = 'grayscale(1)'; n.el.style.opacity = '0.4'; }
+                } else {
+                    if(n.el) { n.el.remove(); n.el = null; n.trailEl = null; } window.st.spawned.splice(i, 1); continue; 
+                }
+            }
         }
 
         if (n.el) {
-            const dist = (timeDiff / 1000) * (window.cfg.spd * 40); 
-            let finalY = window.cfg.down ? (yReceptor - dist) : (yReceptor + dist);
-            
-            if (n.type !== 'hold' || (n.type === 'hold' && !n.h)) { 
-                n.el.style.transform = `translate3d(0px, ${finalY}px, 0px)`; 
-            }
-            
-            if (n.type === 'hold' && n.h) {
-                 n.el.style.transform = `translate3d(0px, ${yReceptor}px, 0px)`; 
-                 let noteLen = n.len || n.dur || 0;
-                 const rem = (n.t + noteLen) - now; 
-                 const tr = n.el.querySelector('.sustain-trail');
-                 
-                 if (tr) tr.style.height = Math.max(0, (rem / 1000) * (window.cfg.spd * 40)) + 'px';
-                 
-                 if (!window.st.keys[n.l]) { 
-                     n.el.style.opacity = 0.5; 
-                     n.el.style.filter = 'grayscale(0.8)';
-                     if (rem > 100 && !n.broken) { window.st.cmb = 0; n.broken = true; } 
-                 } 
-                 else { 
-                     n.el.style.opacity = 1; 
-                     n.el.style.filter = 'none';
-                     if(!n.broken) { window.st.hp = Math.min(100, window.st.hp + 0.1); }
-                     updHUD(); 
-                 }
-                 
-                 if (now >= n.t + noteLen) { 
-                     if(!n.broken) window.st.sc += 200; 
-                     n.el.remove(); n.el = null; 
-                     window.st.spawned.splice(i, 1); 
-                 }
+            if (n.type === 'hold') {
+                if (n.h && !n.broken) {
+                    headY = yReceptor; 
+
+                    if (!window.st.keys[n.l]) { 
+                        n.broken = true; window.st.cmb = 0; 
+                        n.el.style.filter = 'grayscale(1)'; n.el.style.opacity = '0.4';
+                        headY = window.cfg.down ? (yReceptor - (timeDiff / 1000) * speedMult) : (yReceptor + (timeDiff / 1000) * speedMult);
+                    } else { 
+                        window.st.hp = Math.min(100, window.st.hp + 0.1); updHUD(); 
+                    }
+
+                    if (now >= n.t + noteLen) { 
+                        if(!n.broken) window.st.sc += 200; 
+                        n.el.remove(); n.el = null; n.trailEl = null; window.st.spawned.splice(i, 1); continue;
+                    }
+                }
+
+                if (n.broken) {
+                    if (tailDiff < -200) { 
+                        n.el.remove(); n.el = null; n.trailEl = null; window.st.spawned.splice(i, 1); continue;
+                    }
+                }
+
+                n.el.style.transform = `translate3d(0px, ${headY}px, 0px)`; 
+                
+                // 🚨 FIX ANTI-LAG: Cambiamos la altura SIN HACER QUERY 🚨
+                if (n.trailEl) {
+                    n.trailEl.style.height = `${Math.max(0, Math.abs(headY - tailY))}px`;
+                }
+
+            } else {
+                n.el.style.transform = `translate3d(0px, ${headY}px, 0px)`; 
             }
         }
     }
