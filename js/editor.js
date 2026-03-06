@@ -1,5 +1,5 @@
 /* ==========================================================
-   CREATOR STUDIO PRO V7 - OSU! STANDARD TIMELINE & SLIDERS 🎯
+   CREATOR STUDIO PRO V8 - OSU! STANDARD SMART SLIDERS 🎯
    ========================================================== */
 
 window.edMap = [];
@@ -12,7 +12,7 @@ window.edSnap = 50;
 window.edDragNote = null; 
 window.edMechanics = []; 
 window.edBrush = 'tap'; 
-let creatingStdSlider = null;
+window.creatingStdSlider = null; // Rastrear el slider en vivo
 
 window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     if(!songData || !songData.id) return window.notify("Error: Canción inválida para editar", "error");
@@ -22,7 +22,6 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     window.curSongData = songData; 
     window.edMechanics = songData.mechanics || [];
     
-    // FIX: EVITAR EL BUG DE 1K
     let mapKey = mode === 'standard' ? 'notes_standard' : `notes_${mode}_${keys}k`; 
     window.edMap = Array.isArray(songData[mapKey]) ? [...songData[mapKey]] : (Array.isArray(songData.notes) ? [...songData.notes] : []);
     
@@ -38,19 +37,17 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     window.edAudio.load();
 
     injectProTools(); 
-    injectTimeline(); // NUEVA LÍNEA DE TIEMPO
+    injectTimeline(); 
     initEditorGrid();
     drawEditorGrid();
     
-    window.notify("Studio Listo. Usa la rueda del ratón para avanzar el tiempo.", "success");
+    window.notify("Studio Listo. Mantén clic y arrastra + gira la rueda para crear Sliders.", "success");
 };
 
 function injectProTools() {
     if(document.getElementById('pro-tools-container')) return;
     const sidebar = document.querySelector('#editor-layer > div:nth-child(2) > div:nth-child(1)');
     
-    let extraBrush = window.edMode === 'standard' ? `<option value="slider">🎯 Slider Osu (Arrastrar)</option>` : '';
-
     const html = `
         <div id="pro-tools-container" style="display:flex; flex-direction:column; gap:15px; margin-top:20px; border-top:1px solid #333; padding-top:20px;">
             <div style="color:var(--gold); font-weight:bold;">⚡ HERRAMIENTAS</div>
@@ -65,8 +62,7 @@ function injectProTools() {
             <div style="background:#222; padding:10px; border-radius:8px;">
                 <div style="font-size:0.8rem; color:#aaa; margin-bottom:10px;">Pincel Actual</div>
                 <select class="set-input" style="background:#000; color:#00ffff; border-color:#00ffff; font-size:0.9rem;" onchange="window.edBrush = this.value">
-                    <option value="tap">🟦 Nota Normal</option>
-                    ${extraBrush}
+                    <option value="tap">🟦 Nota / Slider Automático</option>
                     <option value="mine">💣 Mina (Daño)</option>
                     <option value="dodge">🛑 Dodge (Esquivar)</option>
                     <option value="fx_flash">🔦 FX: Flashlight</option>
@@ -106,7 +102,6 @@ function initEditorGrid() {
     const grid = document.getElementById('ed-grid');
     grid.innerHTML = '';
     
-    // 🚨 MODO OSU! STANDARD 🚨
     if (window.edMode === 'standard') {
         grid.style.width = '512px';
         grid.style.height = '384px';
@@ -117,20 +112,21 @@ function initEditorGrid() {
         grid.style.border = '2px solid #444';
         grid.style.overflow = 'hidden';
         grid.style.cursor = 'crosshair';
-        grid.oncontextmenu = e => e.preventDefault(); // Bloquear menú derecho
+        grid.oncontextmenu = e => e.preventDefault(); 
         
-        // RUEDA DEL RATÓN = AVANZAR EL TIEMPO
+        // Magia: La rueda del ratón avanza el tiempo
         grid.addEventListener('wheel', (e) => {
             e.preventDefault();
-            if(!window.edAudio || window.edAudio.duration === NaN) return;
+            if(!window.edAudio || isNaN(window.edAudio.duration)) return;
             
             const dir = e.deltaY > 0 ? 1 : -1;
             const shiftSecs = (window.edSnap / 1000) * dir;
             window.edAudio.currentTime = Math.max(0, Math.min(window.edAudio.duration, window.edAudio.currentTime + shiftSecs));
             
-            // Si está creando un slider, la rueda extiende la duración
-            if (creatingStdSlider) {
-                creatingStdSlider.endTime = Math.max(creatingStdSlider.t + 50, Math.round(window.edAudio.currentTime * 1000));
+            // Si tiene el clic apretado, estiramos la duración del slider
+            if (window.creatingStdSlider) {
+                let newMs = Math.round(window.edAudio.currentTime * 1000);
+                if (newMs > window.creatingStdSlider.t) window.creatingStdSlider.endTime = newMs;
             }
             drawEditorGrid();
         });
@@ -139,14 +135,14 @@ function initEditorGrid() {
             const rect = grid.getBoundingClientRect();
             let x = Math.round((e.clientX - rect.left) * (512 / rect.width));
             let y = Math.round((e.clientY - rect.top) * (384 / rect.height));
-            return { x, y };
+            return { x: Math.max(0, Math.min(512, x)), y: Math.max(0, Math.min(384, y)) };
         };
 
         grid.onmousedown = (e) => {
             const pos = getStdCoords(e);
             let timeMs = window.edAudio ? Math.round(window.edAudio.currentTime * 1000) : 0;
             
-            // CLIC DERECHO = BORRAR NOTA
+            // Clic derecho = Borrar
             if (e.button === 2) {
                 let closestIdx = -1; let minDist = Infinity;
                 window.edMap.forEach((n, i) => {
@@ -157,40 +153,44 @@ function initEditorGrid() {
                 return;
             }
 
-            if (e.button !== 0) return; // Solo clic izquierdo
+            if (e.button !== 0) return; 
 
-            if (window.edBrush === 'slider') {
-                creatingStdSlider = { type: 'slider', x: pos.x, y: pos.y, t: timeMs, endX: pos.x, endY: pos.y, endTime: timeMs, slides: 1 };
-                window.edMap.push(creatingStdSlider);
+            // AL CLICAR: Nace un potencial Slider
+            let isMappable = (window.edBrush === 'tap' || window.edBrush === 'slider' || !window.edBrush);
+            
+            if (isMappable) {
+                window.creatingStdSlider = { type: 'slider', x: pos.x, y: pos.y, t: timeMs, endX: pos.x, endY: pos.y, endTime: timeMs, slides: 1 };
+                window.edMap.push(window.creatingStdSlider);
             } else {
-                window.edMap.push({ type: window.edBrush || 'circle', x: pos.x, y: pos.y, t: timeMs });
+                window.edMap.push({ type: window.edBrush, x: pos.x, y: pos.y, t: timeMs });
             }
             drawEditorGrid();
         };
 
         grid.onmousemove = (e) => {
-            if (!creatingStdSlider) return;
+            if (!window.creatingStdSlider) return;
             const pos = getStdCoords(e);
-            creatingStdSlider.endX = pos.x;
-            creatingStdSlider.endY = pos.y;
-            drawEditorGrid();
+            window.creatingStdSlider.endX = pos.x;
+            window.creatingStdSlider.endY = pos.y;
+            drawEditorGrid(); // Dibuja la línea en vivo
         };
 
         window.onmouseup = () => {
-            if(creatingStdSlider) {
-                if(creatingStdSlider.endTime <= creatingStdSlider.t + 50) {
-                    creatingStdSlider.type = 'circle'; // Se vuelve circulo si no giró la rueda para darle tiempo
-                    delete creatingStdSlider.endX; delete creatingStdSlider.endY; delete creatingStdSlider.endTime; delete creatingStdSlider.slides;
+            if(window.creatingStdSlider) {
+                // Si no avanzaste el tiempo, se colapsa a un círculo normal automáticamente
+                if(window.creatingStdSlider.endTime <= window.creatingStdSlider.t + 50) {
+                    window.creatingStdSlider.type = 'circle'; 
+                    delete window.creatingStdSlider.endX; delete window.creatingStdSlider.endY; 
+                    delete window.creatingStdSlider.endTime; delete window.creatingStdSlider.slides;
                 }
-                creatingStdSlider = null;
+                window.creatingStdSlider = null;
                 window.edMap.sort((a,b) => a.t - b.t);
                 drawEditorGrid();
             }
         };
 
     } else {
-        // === MODO MANIA / TAIKO (CARRILES) ===
-        // ... (El código de Mania se mantiene intacto para no romperte tus otros mapas)
+        // === MODO MANIA / TAIKO (CARRILES NORMALES) ===
         grid.style.width = (window.edK * 80) + 'px'; 
         grid.style.height = 'auto'; grid.style.position = 'relative'; grid.style.top = '0'; grid.style.transform = 'none'; grid.style.margin = '0';
         
@@ -251,12 +251,10 @@ function initEditorGrid() {
     }
 }
 
-// === EL MOTOR VISUAL ===
 window.drawEditorGrid = function() {
     const grid = document.getElementById('ed-grid');
     let currentTime = window.edAudio ? window.edAudio.currentTime * 1000 : 0;
     
-    // Actualizar UI del Scrubber
     const timeDisp = document.getElementById('ed-time-display');
     const timeSlid = document.getElementById('ed-time-slider');
     if (timeDisp && window.edAudio) {
@@ -264,7 +262,6 @@ window.drawEditorGrid = function() {
         if(window.edAudio.duration) timeSlid.value = (window.edAudio.currentTime / window.edAudio.duration) * 100;
     }
 
-    // 🚨 DIBUJADOR VECTORIAL STANDARD (SVGs) 🚨
     if (window.edMode === 'standard') {
         let svgContent = '';
         
@@ -272,31 +269,35 @@ window.drawEditorGrid = function() {
             let timeDiff = n.t - currentTime;
             let isSliderActive = n.type === 'slider' && currentTime >= n.t && currentTime <= n.endTime;
             
-            // Mostrar notas que están cerca en el tiempo
-            if ((timeDiff > -1000 && timeDiff < 2000) || isSliderActive) { 
-                let alpha = (timeDiff < 0 && !isSliderActive) ? 0.3 : 1;
-                let pxX = (n.x / 512 * 100) + '%';
-                let pxY = (n.y / 384 * 100) + '%';
-                
+            if ((timeDiff > -1500 && timeDiff < 2000) || isSliderActive || n === window.creatingStdSlider) { 
+                let alpha = (timeDiff < 0 && !isSliderActive && n !== window.creatingStdSlider) ? 0.3 : 1;
+                let pxX = (n.x / 512 * 100) + '%'; let pxY = (n.y / 384 * 100) + '%';
                 let color = n.type === 'mine' ? '#F9393F' : (n.type==='dodge' ? '#00ffff' : '#ff66aa');
 
                 if (n.type === 'slider') {
-                    let endPxX = (n.endX / 512 * 100) + '%';
-                    let endPxY = (n.endY / 384 * 100) + '%';
-                    // Cuerpo del Slider
+                    let endPxX = (n.endX / 512 * 100) + '%'; let endPxY = (n.endY / 384 * 100) + '%';
+                    
+                    // Línea gris gorda del cuerpo
                     svgContent += `<line x1="${pxX}" y1="${pxY}" x2="${endPxX}" y2="${endPxY}" stroke="rgba(100,100,100,0.6)" stroke-width="40" stroke-linecap="round" />`;
+                    // Borde de color del slider
                     svgContent += `<line x1="${pxX}" y1="${pxY}" x2="${endPxX}" y2="${endPxY}" stroke="${color}" stroke-opacity="0.5" stroke-width="44" stroke-linecap="round" />`;
+                    
                     // Bola final
                     svgContent += `<circle cx="${endPxX}" cy="${endPxY}" r="20" fill="rgba(255,0,85,${alpha})" stroke="white" stroke-width="2" />`;
+                    
+                    // Contador de milisegundos visible solo cuando lo estás creando
+                    if(n === window.creatingStdSlider) {
+                        svgContent += `<text x="${endPxX}" y="${endPxY}" dy="-30" fill="white" font-size="12" font-weight="bold" text-anchor="middle">${n.endTime - n.t}ms</text>`;
+                    }
                 }
 
-                // Cabeza de la nota
+                // Círculo de la cabeza
                 svgContent += `<circle cx="${pxX}" cy="${pxY}" r="20" fill="${color}" fill-opacity="${alpha}" stroke="white" stroke-width="2" />`;
                 svgContent += `<text x="${pxX}" y="${pxY}" fill="white" font-size="14" font-weight="bold" font-family="sans-serif" text-anchor="middle" dominant-baseline="central" opacity="${alpha}">${idx+1}</text>`;
             }
         });
 
-        grid.innerHTML = `<svg width="100%" height="100%" style="pointer-events:none;">${svgContent}</svg>`;
+        grid.innerHTML = `<svg width="100%" height="100%" style="pointer-events:none; position:absolute; top:0; left:0;">${svgContent}</svg>`;
         return; 
     }
 
@@ -332,9 +333,7 @@ window.drawEditorGrid = function() {
             note.style.transform = 'translateY(0)'; note.style.transformOrigin = 'top center';
             note.style.alignItems = 'flex-start'; note.style.paddingTop = '5px'; note.style.fontSize = '1.5rem';
         } else {
-            note.style.height = '20px';
-            note.style.borderRadius = '5px';
-            note.style.transform = 'translateY(-50%)';
+            note.style.height = '20px'; note.style.borderRadius = '5px'; note.style.transform = 'translateY(-50%)';
         }
         grid.appendChild(note);
     });
@@ -342,8 +341,7 @@ window.drawEditorGrid = function() {
 
 window.calculateStarRating = function(notes, durationMs) {
     if(!notes || notes.length === 0) return 0;
-    const durationSecs = durationMs / 1000;
-    let stars = (notes.length / durationSecs) * 0.8;
+    const durationSecs = durationMs / 1000; let stars = (notes.length / durationSecs) * 0.8;
     return Math.max(1, Math.min(10, stars)).toFixed(1);
 };
 
@@ -351,7 +349,6 @@ window.saveEditorMap = async function() {
     if(!window.curSongData || !window.curSongData.id) return window.notify("Error: No ID", "error");
     window.notify("Guardando...", "info");
     
-    // 🚨 GUARDADO INTELIGENTE 🚨
     window.edMap.sort((a,b) => a.t - b.t);
     const mapKey = window.edMode === 'standard' ? 'notes_standard' : `notes_${window.edMode}_${window.edK}k`; 
     
@@ -400,11 +397,19 @@ window.closeEditor = function() {
     if(window.edAudio) window.edAudio.pause();
 };
 
+// 🚨 BUCLE MAGICO PARA CREAR SLIDERS MIENTRAS SE REPRODUCE LA MUSICA 🚨
 setInterval(() => {
     if(!window.isEditing || !window.edAudio) return;
     
-    if (window.edMode === 'standard' && !window.edAudio.paused) {
-        window.drawEditorGrid(); 
+    if (window.edMode === 'standard') {
+        if (!window.edAudio.paused) {
+            // Estira el slider automáticamente si mantienes el ratón presionado mientras la música suena
+            if (window.creatingStdSlider) {
+                let nowMs = Math.round(window.edAudio.currentTime * 1000);
+                if (nowMs > window.creatingStdSlider.t) window.creatingStdSlider.endTime = nowMs;
+            }
+            window.drawEditorGrid(); 
+        }
     } 
     else if (window.edMode !== 'standard' && !window.edAudio.paused) {
         const zoom = document.getElementById('ed-zoom').value;
