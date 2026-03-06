@@ -1,6 +1,51 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO 3.0 (CUSTOM MAPS + SLIDERS + NO LAG) 🎯
+   ENGINE STANDARD V-PRO 4.0 (SKIN IMPORTER + PRO VISUALS + SLIDERS) 🎯
    ========================================================================== */
+
+// 🌟 SISTEMA DE IMPORTACIÓN DE SKINS .OSK 🌟
+window.handleOskUpload = async function(e) {
+    const file = e.target.files[0];
+    if(!file) return;
+    
+    if(typeof window.notify === 'function') window.notify("⏳ Extrayendo Skin... (Puede tardar unos segundos)", "info");
+    
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const skinData = {};
+        
+        // Buscador inteligente de imágenes (busca normal y versión @2x HD)
+        const getB64 = async (name) => {
+            const files = Object.keys(zip.files);
+            const exact = files.find(f => f.toLowerCase().endsWith(name.toLowerCase()));
+            const hd = files.find(f => f.toLowerCase().endsWith(name.replace('.png', '@2x.png').toLowerCase()));
+            
+            let fileObj = zip.files[exact] || zip.files[hd];
+            if(fileObj) {
+                const blob = await fileObj.async("blob");
+                return new Promise(res => {
+                    const reader = new FileReader();
+                    reader.onload = ev => res(ev.target.result);
+                    reader.readAsDataURL(blob);
+                });
+            }
+            return null;
+        };
+
+        skinData.hitcircle = await getB64('hitcircle.png');
+        skinData.hitcircleoverlay = await getB64('hitcircleoverlay.png');
+        skinData.approachcircle = await getB64('approachcircle.png');
+        skinData.cursor = await getB64('cursor.png');
+        
+        localStorage.setItem('osu_custom_skin', JSON.stringify(skinData));
+        if(typeof window.notify === 'function') window.notify("✅ Skin Osu! instalada correctamente.", "success");
+        else alert("Skin Instalada correctamente");
+        
+    } catch(err) {
+        console.error(err);
+        if(typeof window.notify === 'function') window.notify("❌ Error al leer el archivo .osk", "error");
+        else alert("Error al leer el .osk");
+    }
+}
 
 window.startNewEngine = async function(songObj) {
     if(window.currentLobbyId) window.isMultiplayer = true;
@@ -10,33 +55,24 @@ window.startNewEngine = async function(songObj) {
     try {
         if(typeof unlockAudio === 'function') unlockAudio();
 
-        // 🚨 FIX MAESTRO: ¿ES UN MAPA CREADO EN EL STUDIO (CUSTOM)?
         let customMap = null;
-        if (window.isTestingMap && window.edMode === 'standard' && window.edMap) {
-            customMap = window.edMap; // Mapeo en vivo
-        } else {
-            customMap = songObj.raw ? (songObj.raw.notes_standard || songObj.raw.notes) : songObj.notes_standard;
-        }
+        if (window.isTestingMap && window.edMode === 'standard' && window.edMap) customMap = window.edMap; 
+        else customMap = songObj.raw ? (songObj.raw.notes_standard || songObj.raw.notes) : songObj.notes_standard;
 
-        // SI ES UN MAPA CUSTOM (CREADO POR TI)
         if (customMap && customMap.length > 0 && !songObj.isOsu) {
             const response = await fetch(songObj.audioURL || songObj.url);
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
             
             let map = JSON.parse(JSON.stringify(customMap));
-            
-            // Auto-generador de Combos y Colores para mapas Custom
             const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700', '#a200ff'];
             let cIdx = 0; let comboNum = 1;
 
             map.forEach(n => {
-                n.t += 3000; // Sincronía del countdown 3-2-1
+                n.t += 3000; 
                 n.clicked = false; n.missed = false; n.active = false;
                 if(!n.type) n.type = 'circle';
-                n.color = colors[cIdx];
-                n.combo = comboNum++;
-                // Resetear combo cada 4 notas
+                n.color = colors[cIdx]; n.combo = comboNum++;
                 if (comboNum > 4) { comboNum = 1; cIdx = (cIdx + 1) % colors.length; }
             });
             map.sort((a,b) => a.t - b.t);
@@ -46,10 +82,9 @@ window.startNewEngine = async function(songObj) {
             if(window.currentLobbyId && typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
             
             runStandardEngine(audioBuffer, map, 4, 5, songObj);
-            return; // Termina aquí
+            return; 
         }
 
-        // === SI ES UN MAPA ORIGINAL DE OSU! (API) ===
         let response = null;
         for (let url of [`https://api.nerinyan.moe/d/${songObj.id}`, `https://catboy.best/d/${songObj.id}`]) {
             try { response = await fetch(url); if (response.ok) break; } catch (e) {}
@@ -66,7 +101,6 @@ window.startNewEngine = async function(songObj) {
         
         const audioKey = files.find(f => f.toLowerCase().includes(parsed.audioFile.toLowerCase()));
         const audioArrayBuffer = await (await zip.file(audioKey).async("blob")).arrayBuffer();
-        
         const audioBuffer = await window.st.ctx.decodeAudioData(audioArrayBuffer);
 
         if (loader) loader.style.display = 'none';
@@ -111,8 +145,7 @@ function parseStandardMap(text) {
             if(!lines[i] || lines[i].startsWith('[')) break;
             const p = lines[i].split(',');
             if(p.length >= 2) {
-                let time = parseFloat(p[0]);
-                let beatLength = parseFloat(p[1]);
+                let time = parseFloat(p[0]); let beatLength = parseFloat(p[1]);
                 if(beatLength > 0) timingPoints.push({ time: time, beatLength: beatLength });
             }
         }
@@ -126,41 +159,30 @@ function parseStandardMap(text) {
     for(let i = hitObjIdx + 1; i < lines.length; i++) {
         if(!lines[i]) continue;
         const p = lines[i].split(',');
-        
         if(p.length >= 5) {
-            let objType = parseInt(p[3]);
-            let isNewCombo = (objType & 4) !== 0;
-
+            let objType = parseInt(p[3]); let isNewCombo = (objType & 4) !== 0;
             if(isNewCombo) { cIdx = (cIdx + 1) % colors.length; comboNum = 1; }
 
             let x = parseInt(p[0]); let y = parseInt(p[1]);
             let tMs = parseInt(p[2]) + 3000; 
 
-            // SLIDER 
             if ((objType & 2) !== 0 && p.length >= 8) {
-                let curveData = p[5].split('|');
-                let slides = parseInt(p[6]);
-                let length = parseFloat(p[7]);
-
+                let curveData = p[5].split('|'); let slides = parseInt(p[6]); let length = parseFloat(p[7]);
                 let currentBP = timingPoints[0];
                 for(let tp of timingPoints) { if(tp.time + 3000 <= tMs) currentBP = tp; else break; }
-                
                 let msPerBeat = currentBP.beatLength;
                 let sliderDuration = (length / (SM * 100)) * msPerBeat * slides;
-                let endTime = tMs + sliderDuration;
-
+                
                 let lastPoint = curveData[curveData.length - 1].split(':');
-                let endX = parseInt(lastPoint[0]) || x;
-                let endY = parseInt(lastPoint[1]) || y;
+                let endX = parseInt(lastPoint[0]) || x; let endY = parseInt(lastPoint[1]) || y;
 
                 hitObjects.push({
-                    type: 'slider', x: x, y: y, t: tMs, endTime: endTime,
+                    type: 'slider', x: x, y: y, t: tMs, endTime: tMs + sliderDuration,
                     endX: endX, endY: endY, clicked: false, missed: false,
                     active: false, broken: false, color: colors[cIdx], combo: comboNum, slides: slides
                 });
                 comboNum++;
             } 
-            // CIRCLE
             else if ((objType & 1) !== 0) {
                 hitObjects.push({ type: 'circle', x: x, y: y, t: tMs, clicked: false, missed: false, color: colors[cIdx], combo: comboNum });
                 comboNum++;
@@ -197,12 +219,10 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         <div style="position:fixed; top:20px; left:20px; background:rgba(10,10,14,0.95); padding:6px 20px 6px 6px; border-radius:50px; border:1px solid var(--accent); display:flex; align-items:center; gap:12px; box-shadow:0 0 20px rgba(255,0,85,0.3); z-index:9500; backdrop-filter:blur(8px);">
             <div style="width:45px; height:45px; border-radius:50%; background:url('${avUrl}') center/cover; border:2px solid white;"></div>
             <div style="display:flex; flex-direction:column; justify-content:center; padding-right:10px;">
-                <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; letter-spacing:1px; line-height:1;">${uName}</div>
+                <div style="color:white; font-weight:900; font-size:1rem; text-transform:uppercase; line-height:1;">${uName}</div>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:5px;">
                     <div style="color:var(--gold); font-weight:900; font-size:0.7rem;">LVL ${uLvl}</div>
-                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333;">
-                        <div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s;"></div>
-                    </div>
+                    <div style="width:100px; height:8px; background:#111; border-radius:4px; overflow:hidden; border:1px solid #333;"><div id="engine-hp-fill" style="width:100%; height:100%; background:var(--good); transition:0.2s;"></div></div>
                 </div>
             </div>
         </div>
@@ -213,10 +233,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         </div>
         <div id="std-combo" style="position:absolute; bottom:20px; left:30px; color:white; font-size:5rem; font-weight:900; text-shadow:0 0 30px var(--accent); transition:transform 0.1s;">0x</div>
         <div id="std-judgements" style="position:absolute; top:0; left:0; width:100%; height:100%;"></div>
-        <div id="subtitles-container" style="position:absolute; bottom:15%; left:0; width:100%; text-align:center; display:none;">
-            <div id="subtitles-text" style="display:inline-block; background:rgba(0,0,0,0.7); padding:10px 20px; border-radius:10px; color:white; font-size:2rem; font-weight:bold; border:2px solid var(--blue); text-shadow:0 0 10px var(--blue);"></div>
-        </div>
-        <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s; box-shadow: inset 0 0 150px 50px rgba(249,57,63,0.8);"></div>
         <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:9999; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     `;
     document.body.appendChild(uiLayer);
@@ -227,28 +243,25 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     
     window.st.sc = 0; window.st.cmb = 0; window.st.hp = 100;
     window.st.stats = { s:0, g:0, b:0, m:0 };
-    window.st.fcStatus = "PFC";
-    window.st.trueMaxScore = map.length * 300;
+    window.st.fcStatus = "PFC"; window.st.trueMaxScore = map.length * 300;
     window.st.nextNote = 0; window.st.spawned = [];
     
     let isRunning = true; let particles = []; let cursorTrail = [];
     window.isPointerDown = false; 
 
-    let activeSkin = null;
-    if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
-    }
-
-    if (window.cfg && window.cfg.subtitles && songObj.lyrics) {
-        document.getElementById('subtitles-container').style.display = 'block';
-        window.st.parsedLyrics = []; window.st.currentLyricIdx = 0;
-        const lines = songObj.lyrics.split('\n');
-        lines.forEach(l => {
-            const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/);
-            if(match) window.st.parsedLyrics.push({ t: (parseInt(match[1])*60 + parseFloat(match[2])) * 1000, tx: match[3].trim() });
-        });
-        window.st.parsedLyrics.sort((a,b) => a.t - b.t);
-    }
+    // === CARGADOR DE SKIN CUSTOM (.OSK) O NATIVA ===
+    const loadedSkin = { hitcircle: null, hitcircleoverlay: null, approachcircle: null, cursor: null };
+    let hasCustomOsk = false;
+    try {
+        const savedOsk = JSON.parse(localStorage.getItem('osu_custom_skin'));
+        if(savedOsk && (savedOsk.hitcircle || savedOsk.hitcircleoverlay)) {
+            hasCustomOsk = true;
+            if(savedOsk.hitcircle) { loadedSkin.hitcircle = new Image(); loadedSkin.hitcircle.src = savedOsk.hitcircle; }
+            if(savedOsk.hitcircleoverlay) { loadedSkin.hitcircleoverlay = new Image(); loadedSkin.hitcircleoverlay.src = savedOsk.hitcircleoverlay; }
+            if(savedOsk.approachcircle) { loadedSkin.approachcircle = new Image(); loadedSkin.approachcircle.src = savedOsk.approachcircle; }
+            if(savedOsk.cursor) { loadedSkin.cursor = new Image(); loadedSkin.cursor.src = savedOsk.cursor; }
+        }
+    } catch(e) {}
 
     const bgImg = new Image(); let bgLoaded = false;
     if(songObj.imageURL) { bgImg.src = songObj.imageURL; bgImg.onload = () => bgLoaded = true; }
@@ -308,11 +321,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
             const hpBar = document.getElementById('engine-hp-fill');
             if(hpBar) { hpBar.style.width = Math.max(0, window.st.hp) + "%"; hpBar.style.background = window.st.hp > 20 ? 'var(--good)' : 'var(--miss)'; }
-            
-            const vign = document.getElementById('near-death-vignette');
-            if(vign) vign.style.opacity = window.st.hp < 20 ? '1' : '0';
-            
-            if(window.isMultiplayer && typeof sendLobbyScore === 'function') sendLobbyScore(window.st.sc);
         } catch(e) {}
     }
 
@@ -321,23 +329,9 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if (window.st.paused) { window.st.animId = requestAnimationFrame(draw); return; }
 
         const now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        let songTime = now - 3000;
-
-        if (window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
-            let idx = window.st.currentLyricIdx;
-            if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
-                const subEl = document.getElementById('subtitles-text');
-                if(subEl) {
-                    subEl.innerText = window.st.parsedLyrics[idx].tx;
-                    subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
-                }
-                window.st.currentLyricIdx++;
-            }
-        }
         
         while(window.st.nextNote < map.length && map[window.st.nextNote].t - now <= preempt) {
-            window.st.spawned.push(map[window.st.nextNote]);
-            window.st.nextNote++;
+            window.st.spawned.push(map[window.st.nextNote]); window.st.nextNote++;
         }
         
         ctx.fillStyle = '#0a0a0a';
@@ -355,10 +349,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; ctx.lineWidth = 2;
         ctx.strokeRect(offsetX, offsetY, 512 * scale, 384 * scale);
 
-        if (window.mouseX && window.mouseY) {
-            cursorTrail.push({x: window.mouseX, y: window.mouseY, life: 1});
-            if(cursorTrail.length > 20) cursorTrail.shift();
-        }
+        if (window.mouseX && window.mouseY) { cursorTrail.push({x: window.mouseX, y: window.mouseY, life: 1}); if(cursorTrail.length > 20) cursorTrail.shift(); }
         
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         if(cursorTrail.length > 0) {
@@ -372,49 +363,34 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             const circle = window.st.spawned[i];
             const timeDiff = circle.t - now;
             const scaledRadius = radius * scale;
-            let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
+            let drawColor = circle.color;
             const screenX = offsetX + (circle.x * scale); 
             const screenY = offsetY + (circle.y * scale);
 
             if (circle.type === 'slider') {
-                const endX = offsetX + (circle.endX * scale);
-                const endY = offsetY + (circle.endY * scale);
+                const endX = offsetX + (circle.endX * scale); const endY = offsetY + (circle.endY * scale);
 
                 ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
-                ctx.lineWidth = scaledRadius * 2; ctx.strokeStyle = 'rgba(50, 50, 50, 0.6)'; ctx.stroke();
+                ctx.lineWidth = scaledRadius * 2; ctx.strokeStyle = 'rgba(20, 20, 25, 0.85)'; ctx.stroke();
                 ctx.lineWidth = scaledRadius * 2 + (4 * scale); ctx.strokeStyle = drawColor; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1.0;
 
                 if (circle.active) {
-                    let elapsed = now - circle.t;
-                    let duration = circle.endTime - circle.t;
-                    let timePerSlide = duration / circle.slides;
-                    let cycle = Math.floor(elapsed / timePerSlide);
-                    let p = (elapsed % timePerSlide) / timePerSlide;
+                    let elapsed = now - circle.t; let duration = circle.endTime - circle.t; let timePerSlide = duration / circle.slides;
+                    let cycle = Math.floor(elapsed / timePerSlide); let p = (elapsed % timePerSlide) / timePerSlide;
                     if (cycle % 2 === 1) p = 1 - p; 
 
-                    let curX = screenX + (endX - screenX) * p;
-                    let curY = screenY + (endY - screenY) * p;
+                    let curX = screenX + (endX - screenX) * p; let curY = screenY + (endY - screenY) * p;
 
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 1.5, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctx.fill();
-                    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * scale; ctx.stroke();
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * scale; ctx.stroke();
 
                     let dist = Math.hypot((window.mouseX||0) - curX, (window.mouseY||0) - curY);
-                    if (window.isPointerDown && dist < scaledRadius * 2.5) {
-                        circle.tracking = true;
-                    } else {
-                        circle.tracking = false; 
-                        if (!circle.broken) { circle.broken = true; window.st.cmb = 0; }
-                    }
+                    if (window.isPointerDown && dist < scaledRadius * 2.5) circle.tracking = true;
+                    else { circle.tracking = false; if (!circle.broken) { circle.broken = true; window.st.cmb = 0; } }
 
                     if (now >= circle.endTime) {
-                        if (!circle.broken) {
-                            window.st.sc += 300; window.st.cmb++; window.st.stats.s++;
-                            showJudgment("SICK!!", "#00FFFF", curX, curY); spawnRipple(curX, curY, "#00FFFF");
-                        } else {
-                            window.st.sc += 50; window.st.stats.b++;
-                            showJudgment("BAD", "#FFD700", curX, curY);
-                        }
+                        if (!circle.broken) { window.st.sc += 300; window.st.cmb++; window.st.stats.s++; showJudgment("SICK!!", "#00FFFF", curX, curY); spawnRipple(curX, curY, "#00FFFF"); } 
+                        else { window.st.sc += 50; window.st.stats.b++; showJudgment("BAD", "#FFD700", curX, curY); }
                         updateHUD(); window.st.spawned.splice(i, 1); continue;
                     }
                 }
@@ -429,22 +405,37 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
 
                 const alpha = Math.min(1, 1 - (timeDiff / preempt));
                 ctx.globalAlpha = alpha;
-
-                ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(10,10,15,0.9)'; ctx.fill(); 
-                ctx.lineWidth = 3 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
-                
-                ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
-                ctx.fillStyle = drawColor; ctx.fill();
-
-                ctx.fillStyle = 'white';
-                ctx.font = `bold ${scaledRadius * 0.8}px sans-serif`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(circle.combo, screenX, screenY + (scaledRadius * 0.1));
-
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
-                ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
-                ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
+
+                // 🚨 RENDERIZADO VISUAL (IMPORTADO VS PRO DEFAULT) 🚨
+                if (hasCustomOsk) {
+                    if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, screenX - scaledRadius, screenY - scaledRadius, scaledRadius*2, scaledRadius*2);
+                    if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, screenX - scaledRadius, screenY - scaledRadius, scaledRadius*2, scaledRadius*2);
+                    
+                    if(loadedSkin.approachcircle) {
+                        const appSize = scaledRadius * 2 * approachRatio;
+                        ctx.drawImage(loadedSkin.approachcircle, screenX - appSize/2, screenY - appSize/2, appSize, appSize);
+                    } else {
+                        ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
+                        ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
+                    }
+                } else {
+                    // ESTILO PRO 100% (Igual al video: Aros vivos, centro oscuro, punto blanco, SIN NÚMEROS)
+                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(15, 15, 18, 0.85)'; ctx.fill(); 
+                    
+                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.85, 0, Math.PI * 2);
+                    ctx.strokeStyle = drawColor; ctx.lineWidth = 5 * scale; ctx.stroke();
+                    
+                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * scale; ctx.stroke(); 
+                    
+                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.15, 0, Math.PI * 2);
+                    ctx.fillStyle = 'white'; ctx.fill();
+
+                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
+                    ctx.strokeStyle = drawColor; ctx.lineWidth = 4 * scale; ctx.stroke();
+                }
             }
         }
         ctx.globalAlpha = 1.0;
@@ -458,8 +449,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         ctx.globalAlpha = 1.0;
 
         if(window.mouseX && window.mouseY) {
-            ctx.beginPath(); ctx.arc(window.mouseX, window.mouseY, 12, 0, Math.PI*2);
-            ctx.fillStyle = '#00e5ff'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+            if(hasCustomOsk && loadedSkin.cursor) {
+                const curSize = 40 * scale;
+                ctx.drawImage(loadedSkin.cursor, window.mouseX - curSize/2, window.mouseY - curSize/2, curSize, curSize);
+            } else {
+                ctx.beginPath(); ctx.arc(window.mouseX, window.mouseY, 15 * scale, 0, Math.PI*2);
+                ctx.fillStyle = '#ff66aa'; ctx.fill(); ctx.strokeStyle = 'white'; ctx.lineWidth = 3 * scale; ctx.stroke();
+            }
         }
 
         window.st.animId = requestAnimationFrame(draw);
@@ -499,17 +495,12 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 const sx = offsetX + (targetCircle.x * scale); const sy = offsetY + (targetCircle.y * scale);
                 spawnRipple(sx, sy, color);
                 showJudgment(txt, color, sx, sy);
-                try { if(typeof window.playHit === 'function') window.playHit(); else if(window.hitBuf && window.st.ctx) { const s = window.st.ctx.createBufferSource(); s.buffer = window.hitBuf; s.connect(window.st.ctx.destination); s.start(0); } } catch(e){}
-                
                 if (targetCircle.type === 'slider') { targetCircle.active = true; return; }
             } else { 
                 window.st.cmb = 0; window.st.hp -= 10; showJudgment(txt, color, offsetX + targetCircle.x*scale, offsetY + targetCircle.y*scale); 
-                try { if(typeof window.playMiss === 'function') window.playMiss(); } catch(e){}
             }
             
-            if (targetCircle.type !== 'slider' || points === 0) {
-                window.st.spawned.splice(targetIdx, 1);
-            }
+            if (targetCircle.type !== 'slider' || points === 0) window.st.spawned.splice(targetIdx, 1);
             updateHUD(); checkDeath();
         }
     }
@@ -535,9 +526,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if(!window.st.act || !isRunning) return;
         window.st.paused = !window.st.paused;
         const modal = document.getElementById('modal-pause');
-        let vign = document.getElementById('near-death-vignette');
-        if(vign) vign.style.opacity = '0';
-
         if(window.st.paused) {
             window.st.pauseTime = performance.now();
             if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
@@ -591,7 +579,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if(uiLayer) uiLayer.remove();
         if(window.isMultiplayer) return; 
 
-        // 🚨 RETORNO DIRECTO AL EDITOR SI ESTABAS PROBANDO MAPA
         if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
             window.isTestingMap = false; 
             window.openEditor(window.curSongData, window.keys || 4, 'standard');
