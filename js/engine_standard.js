@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO 5.0 (ULTRA-REALISTIC + ANTI-CRASH + OSK SKINS) 🎯
+   ENGINE STANDARD V-PRO FINAL (ANTI-CRASH + TRANSPARENCIA REAL + OSK SKINS) 🎯
    ========================================================================== */
 
 window.handleOskUpload = async function(e) {
@@ -247,14 +247,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     let isRunning = true; let particles = []; let cursorTrail = [];
     window.isPointerDown = false; 
 
-    // === INICIALIZACIÓN DE SKINS BLINDADA ===
-    let activeSkin = null;
-    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
-    } else if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
-    }
-
     const loadedSkin = { hitcircle: null, hitcircleoverlay: null, approachcircle: null, cursor: null };
     let hasCustomOsk = false;
     try {
@@ -329,58 +321,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         } catch(e) {}
     }
 
-    // =======================================================
-    // 🌟 MOTOR VISUAL ULTRA-REALISTA (OSU! DEFAULT) 🌟
-    // =======================================================
-    function drawOsuHitCircle(x, y, r, color, comboText, alphaMultiplier) {
-        ctx.globalAlpha = alphaMultiplier;
-        
-        if (hasCustomOsk) {
-            if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, x - r, y - r, r*2, r*2);
-            if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, x - r, y - r, r*2, r*2);
-            if (comboText !== "") {
-                ctx.fillStyle = 'white'; ctx.font = `bold ${r * 0.8}px sans-serif`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(comboText, x, y + (r * 0.1));
-            }
-        } else {
-            // 1. Sombra exterior
-            ctx.beginPath(); ctx.arc(x, y + (3 * scale), r, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.fill();
-
-            // 2. Anillo Blanco Grueso
-            ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff'; ctx.fill();
-
-            // 3. Relleno con el color de la nota
-            ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
-            ctx.fillStyle = color; ctx.fill();
-
-            // 4. Efecto Burbuja / Shine 
-            const shine = ctx.createLinearGradient(x, y - r, x, y + (r * 0.5));
-            shine.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
-            shine.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
-            shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
-            ctx.fillStyle = shine; ctx.fill();
-
-            // 5. Contorno interior sutil
-            ctx.beginPath(); ctx.arc(x, y, r * 0.88, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)'; ctx.lineWidth = 2 * scale; ctx.stroke();
-
-            // 6. Número del Combo
-            if (comboText !== "") {
-                ctx.fillStyle = 'white';
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.lineWidth = 3 * scale;
-                ctx.font = `bold ${r * 0.85}px "Segoe UI", Arial, sans-serif`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.strokeText(comboText, x, y + (r * 0.05));
-                ctx.fillText(comboText, x, y + (r * 0.05));
-            }
-        }
-    }
-
     function draw() {
         if (!isRunning || !window.st.act) return;
         if (window.st.paused) { window.st.animId = requestAnimationFrame(draw); return; }
@@ -433,6 +373,69 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             cursorTrail = cursorTrail.filter(t => t.life > 0);
         }
 
+        // 🚨 PREVENCIÓN DE CRASHEOS: SE BUSCA LA SKIN DENTRO DEL LOOP DE DIBUJADO DE FORMA SEGURA
+        let activeSkin = null;
+        if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+            activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
+        } else if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+            activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+        }
+
+        // Opacidad maestra definida por el usuario en configuración (o 100% por defecto)
+        const userOp = (window.cfg && window.cfg.noteOp) ? (window.cfg.noteOp / 100) : 1;
+
+        // =======================================================
+        // 🌟 EL NUEVO MOTOR DE DIBUJADO DE NOTAS 🌟
+        // =======================================================
+        function drawOsuHitCircle(x, y, r, color, comboText, baseAlpha) {
+            ctx.globalAlpha = baseAlpha * userOp;
+            
+            if (hasCustomOsk) {
+                // Si importó una Skin (.osk), se dibuja tal cual
+                if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, x - r, y - r, r*2, r*2);
+                if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, x - r, y - r, r*2, r*2);
+                if (comboText !== "") {
+                    ctx.fillStyle = 'white'; ctx.font = `bold ${r * 0.8}px sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(comboText, x, y + (r * 0.1));
+                }
+            } else {
+                // ESTILO OSU! ORIGINAL (CENTRO TRANSPARENTE)
+                // 1. Sombra exterior
+                ctx.beginPath(); ctx.arc(x, y + (2 * scale), r, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)'; ctx.fill();
+
+                // 2. Anillo Brillante Grueso
+                ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
+                ctx.strokeStyle = color; ctx.lineWidth = 6 * scale; ctx.stroke();
+
+                // 3. Anillo Blanco Interior
+                ctx.beginPath(); ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * scale; ctx.stroke();
+
+                // 4. Fondo Oscuro Transparente (PERMITE VER DETRÁS)
+                ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(15, 15, 20, 0.65)'; 
+                ctx.fill();
+
+                // 5. Brillo Superior (Shine de cristal)
+                const shine = ctx.createLinearGradient(x, y - r, x, y);
+                shine.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+                shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.beginPath(); ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+                ctx.fillStyle = shine; ctx.fill();
+
+                // 6. Número del Combo legible
+                if (comboText !== "") {
+                    ctx.fillStyle = 'white';
+                    ctx.font = `bold ${r * 0.9}px sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(comboText, x, y + (r * 0.05));
+                }
+            }
+        }
+
+        // DIBUJADO FÍSICO DE LAS NOTAS
         for(let i = window.st.spawned.length - 1; i >= 0; i--) {
             const circle = window.st.spawned[i];
             const timeDiff = circle.t - now;
@@ -450,11 +453,9 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             
             let alpha = 1;
             if (!circle.active) {
-                alpha = Math.min(1, 1 - (timeDiff / preempt));
-                if (alpha < 0) alpha = 0;
+                alpha = Math.max(0, Math.min(1, 1 - (timeDiff / preempt)));
             }
             
-            ctx.globalAlpha = alpha;
             let drawColor = activeSkin && activeSkin.fixed ? activeSkin.color : circle.color;
 
             // 1️⃣ DIBUJAR SLIDERS
@@ -462,23 +463,26 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 const endX = offsetX + (circle.endX * scale); 
                 const endY = offsetY + (circle.endY * scale);
 
-                // A) Borde Exterior (Blanco)
+                // 🚨 FIX: CUERPO DEL SLIDER 60% TRANSPARENTE 🚨
+                ctx.globalAlpha = alpha * 0.6 * userOp; 
+
+                // Borde de Color Grueso
                 ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
                 ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                 ctx.lineWidth = scaledRadius * 2; 
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; 
+                ctx.strokeStyle = drawColor; 
                 ctx.stroke();
 
-                // B) Interior Oscuro
+                // Interior Oscuro de la Pista
                 ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
                 ctx.lineWidth = scaledRadius * 2 - (6 * scale); 
-                ctx.strokeStyle = 'rgba(30, 30, 35, 0.9)'; 
+                ctx.strokeStyle = 'rgba(10, 10, 15, 0.8)'; 
                 ctx.stroke();
 
-                // C) Cola
+                // Cola del Slider
                 drawOsuHitCircle(endX, endY, scaledRadius, drawColor, "", alpha);
 
-                // D) Lógica de movimiento
+                // Lógica de Movimiento y Seguimiento
                 if (circle.active) {
                     let elapsed = now - circle.t; let duration = circle.endTime - circle.t; let timePerSlide = duration / circle.slides;
                     let cycle = Math.floor(elapsed / timePerSlide); let p = (elapsed % timePerSlide) / timePerSlide;
@@ -487,6 +491,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                     let curX = screenX + (endX - screenX) * p; 
                     let curY = screenY + (endY - screenY) * p;
 
+                    ctx.globalAlpha = 1.0 * userOp; // La bola de seguimiento debe ser sólida
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 0.9, 0, Math.PI * 2);
                     ctx.fillStyle = '#ffaa00'; ctx.fill(); 
                     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 * scale; ctx.stroke();
@@ -506,12 +511,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 }
             }
 
-            // 2️⃣ DIBUJAR CABEZA / CIRCULO NORMAL
+            // 2️⃣ DIBUJAR CIRCULO NORMAL (CABEZA)
             if (!circle.active && !circle.missed) {
                 drawOsuHitCircle(screenX, screenY, scaledRadius, drawColor, circle.combo, alpha);
 
+                // Círculo de Aproximación
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
-                ctx.globalAlpha = alpha;
+                ctx.globalAlpha = alpha * userOp;
                 if (hasCustomOsk && loadedSkin.approachcircle) {
                     const appSize = scaledRadius * 2 * approachRatio;
                     ctx.drawImage(loadedSkin.approachcircle, screenX - appSize/2, screenY - appSize/2, appSize, appSize);
