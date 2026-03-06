@@ -332,6 +332,13 @@
                             <label class="set-label" style="font-size:1.2rem;">Estela del Cursor (Trail)</label>
                             <input type="checkbox" id="cfg-std-trail" style="width:30px; height:30px; accent-color: #ff44b9;">
                         </div>
+
+                        <div style="background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-top:20px;">
+    <h3 style="color:#ff66aa; margin-top:0;">🎨 IMPORTAR SKIN DE OSU! (.osk)</h3>
+    <p style="color:#aaa; font-size:0.9rem;">Sube un archivo .osk o .zip para usar tus propios círculos, anillos y cursores.</p>
+    <input type="file" id="osk-upload" accept=".osk,.zip" style="display:none;" onchange="handleOskUpload(event)">
+    <button class="action" style="background:#00ffff; color:black; font-weight:bold;" onclick="document.getElementById('osk-upload').click()">📁 SELECCIONAR .OSK</button>
+</div>
                         <div class="set-row" style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 10px;">
                             <label class="set-label" style="font-size:1.2rem;">Tecla Principal (Click Izquierdo)</label>
                             <button id="cfg-std-k1" class="set-input" onclick="captureSingleKey('cfg-std-k1', 'stdK1')" style="width:100px; height:50px; font-size:1.2rem; cursor:pointer; font-weight:bold;">Z</button>
