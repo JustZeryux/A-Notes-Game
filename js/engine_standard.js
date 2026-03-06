@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ENGINE STANDARD V-PRO 2.0 (SLIDERS + NUMBERS + OSU! PHYSICS) 🎯
+   ENGINE STANDARD V-PRO 3.0 (CUSTOM MAPS + SLIDERS + NO LAG) 🎯
    ========================================================================== */
 
 window.startNewEngine = async function(songObj) {
@@ -8,11 +8,53 @@ window.startNewEngine = async function(songObj) {
     if (loader) { loader.style.display = 'flex'; document.getElementById('loading-text').innerText = "PREPARANDO OSU! STANDARD..."; }
 
     try {
+        if(typeof unlockAudio === 'function') unlockAudio();
+
+        // 🚨 FIX MAESTRO: ¿ES UN MAPA CREADO EN EL STUDIO (CUSTOM)?
+        let customMap = null;
+        if (window.isTestingMap && window.edMode === 'standard' && window.edMap) {
+            customMap = window.edMap; // Mapeo en vivo
+        } else {
+            customMap = songObj.raw ? (songObj.raw.notes_standard || songObj.raw.notes) : songObj.notes_standard;
+        }
+
+        // SI ES UN MAPA CUSTOM (CREADO POR TI)
+        if (customMap && customMap.length > 0 && !songObj.isOsu) {
+            const response = await fetch(songObj.audioURL || songObj.url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await window.st.ctx.decodeAudioData(arrayBuffer);
+            
+            let map = JSON.parse(JSON.stringify(customMap));
+            
+            // Auto-generador de Combos y Colores para mapas Custom
+            const colors = ['#00ffff', '#ff66aa', '#12FA05', '#FFD700', '#a200ff'];
+            let cIdx = 0; let comboNum = 1;
+
+            map.forEach(n => {
+                n.t += 3000; // Sincronía del countdown 3-2-1
+                n.clicked = false; n.missed = false; n.active = false;
+                if(!n.type) n.type = 'circle';
+                n.color = colors[cIdx];
+                n.combo = comboNum++;
+                // Resetear combo cada 4 notas
+                if (comboNum > 4) { comboNum = 1; cIdx = (cIdx + 1) % colors.length; }
+            });
+            map.sort((a,b) => a.t - b.t);
+
+            if (loader) loader.style.display = 'none';
+            document.getElementById('menu-container').classList.add('hidden');
+            if(window.currentLobbyId && typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
+            
+            runStandardEngine(audioBuffer, map, 4, 5, songObj);
+            return; // Termina aquí
+        }
+
+        // === SI ES UN MAPA ORIGINAL DE OSU! (API) ===
         let response = null;
         for (let url of [`https://api.nerinyan.moe/d/${songObj.id}`, `https://catboy.best/d/${songObj.id}`]) {
             try { response = await fetch(url); if (response.ok) break; } catch (e) {}
         }
-        if (!response) throw new Error("Servidores saturados.");
+        if (!response) throw new Error("Servidores saturados o no es un mapa válido.");
 
         const oszBuffer = await response.arrayBuffer();
         const zip = await JSZip.loadAsync(oszBuffer);
@@ -25,8 +67,6 @@ window.startNewEngine = async function(songObj) {
         const audioKey = files.find(f => f.toLowerCase().includes(parsed.audioFile.toLowerCase()));
         const audioArrayBuffer = await (await zip.file(audioKey).async("blob")).arrayBuffer();
         
-        if(!window.st.ctx) { window.st.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-        if(window.st.ctx.state === 'suspended') window.st.ctx.resume();
         const audioBuffer = await window.st.ctx.decodeAudioData(audioArrayBuffer);
 
         if (loader) loader.style.display = 'none';
@@ -44,6 +84,7 @@ window.startNewEngine = async function(songObj) {
         
         if(window.currentLobbyId && typeof window.notifyLobbyLoaded === 'function') window.notifyLobbyLoaded();
         runStandardEngine(audioBuffer, parsed.hitObjects, parsed.CS, parsed.AR, songObj);
+
     } catch (e) {
         if (loader) loader.style.display = 'none';
         alert("Error cargando mapa: " + e.message);
@@ -121,9 +162,7 @@ function parseStandardMap(text) {
             } 
             // CIRCLE
             else if ((objType & 1) !== 0) {
-                hitObjects.push({
-                    type: 'circle', x: x, y: y, t: tMs, clicked: false, missed: false, color: colors[cIdx], combo: comboNum
-                });
+                hitObjects.push({ type: 'circle', x: x, y: y, t: tMs, clicked: false, missed: false, color: colors[cIdx], combo: comboNum });
                 comboNum++;
             }
         }
@@ -178,6 +217,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             <div id="subtitles-text" style="display:inline-block; background:rgba(0,0,0,0.7); padding:10px 20px; border-radius:10px; color:white; font-size:2rem; font-weight:bold; border:2px solid var(--blue); text-shadow:0 0 10px var(--blue);"></div>
         </div>
         <div id="near-death-vignette" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; pointer-events:none; transition:0.3s; box-shadow: inset 0 0 150px 50px rgba(249,57,63,0.8);"></div>
+        <div id="countdown" style="position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:9999; font-size:15rem; font-weight:900; color:white; text-shadow:0 0 60px black;"></div>
     `;
     document.body.appendChild(uiLayer);
 
@@ -192,7 +232,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     window.st.nextNote = 0; window.st.spawned = [];
     
     let isRunning = true; let particles = []; let cursorTrail = [];
-    window.isPointerDown = false; // RASTREADOR DE CLIC PARA SLIDERS
+    window.isPointerDown = false; 
 
     let activeSkin = null;
     if (window.user && window.user.equipped && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
@@ -231,6 +271,14 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
     window.st.t0 = window.st.ctx.currentTime;
     window.st.src.start(window.st.t0 + 3);
     window.st.src.onended = () => { if(isRunning && window.st.act) endEngine(false); };
+
+    const cd = document.getElementById('countdown');
+    if(cd) { cd.style.display = 'flex'; cd.innerText = "3"; }
+    let count = 3;
+    const iv = setInterval(() => {
+        count--;
+        if(cd) { if (count > 0) cd.innerText = count; else { clearInterval(iv); cd.innerText = "GO!"; setTimeout(() => { cd.style.display = 'none'; }, 500); } } else { clearInterval(iv); }
+    }, 1000);
 
     function spawnRipple(x, y, color) { particles.push({ x, y, life: 1, color }); }
 
@@ -328,17 +376,14 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
             const screenX = offsetX + (circle.x * scale); 
             const screenY = offsetY + (circle.y * scale);
 
-            // DIBUJADO DE SLIDERS Y TRAIL GRIS
             if (circle.type === 'slider') {
                 const endX = offsetX + (circle.endX * scale);
                 const endY = offsetY + (circle.endY * scale);
 
-                // 1. Dibujar el camino gris (Trail)
                 ctx.beginPath(); ctx.moveTo(screenX, screenY); ctx.lineTo(endX, endY);
                 ctx.lineWidth = scaledRadius * 2; ctx.strokeStyle = 'rgba(50, 50, 50, 0.6)'; ctx.stroke();
                 ctx.lineWidth = scaledRadius * 2 + (4 * scale); ctx.strokeStyle = drawColor; ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1.0;
 
-                // 2. Comportamiento en Vida del Slider
                 if (circle.active) {
                     let elapsed = now - circle.t;
                     let duration = circle.endTime - circle.t;
@@ -350,15 +395,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                     let curX = screenX + (endX - screenX) * p;
                     let curY = screenY + (endY - screenY) * p;
 
-                    // Bola Seguidora
                     ctx.beginPath(); ctx.arc(curX, curY, scaledRadius * 1.5, 0, Math.PI * 2);
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'; ctx.fill();
                     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3 * scale; ctx.stroke();
 
-                    // Físicas de Puntero (Si se sale o suelta, rompe el combo)
                     let dist = Math.hypot((window.mouseX||0) - curX, (window.mouseY||0) - curY);
                     if (window.isPointerDown && dist < scaledRadius * 2.5) {
-                        circle.tracking = true; // Todo bien
+                        circle.tracking = true;
                     } else {
                         circle.tracking = false; 
                         if (!circle.broken) { circle.broken = true; window.st.cmb = 0; }
@@ -377,7 +420,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 }
             }
 
-            // DIBUJADO NORMAL DE CIRCULOS Y CABEZAS DE SLIDER
             if (!circle.active && !circle.missed) {
                 if (timeDiff < -150) {
                     circle.missed = true; window.st.stats.m++; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR";
@@ -395,13 +437,11 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
                 ctx.fillStyle = drawColor; ctx.fill();
 
-                // 🚨 FIX: NUMEROS EN LAS NOTAS (COMBO)
                 ctx.fillStyle = 'white';
                 ctx.font = `bold ${scaledRadius * 0.8}px sans-serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(circle.combo, screenX, screenY + (scaledRadius * 0.1));
 
-                // Circulo de Aproximación
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
                 ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
                 ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
@@ -461,7 +501,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 showJudgment(txt, color, sx, sy);
                 try { if(typeof window.playHit === 'function') window.playHit(); else if(window.hitBuf && window.st.ctx) { const s = window.st.ctx.createBufferSource(); s.buffer = window.hitBuf; s.connect(window.st.ctx.destination); s.start(0); } } catch(e){}
                 
-                // 🚨 SI ES UN SLIDER, LO DEJAMOS VIVO Y ACTIVADO
                 if (targetCircle.type === 'slider') { targetCircle.active = true; return; }
             } else { 
                 window.st.cmb = 0; window.st.hp -= 10; showJudgment(txt, color, offsetX + targetCircle.x*scale, offsetY + targetCircle.y*scale); 
@@ -475,7 +514,6 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         }
     }
 
-    // EVENTOS BLINDADOS Y ESTADOS DE CLIC PARA SLIDERS
     window.st.mouseMoveHandler = (e) => { window.mouseX = e.clientX; window.mouseY = e.clientY; };
     window.st.pointerDownHandler = (e) => { window.isPointerDown = true; window.mouseX = e.clientX; window.mouseY = e.clientY; handleHit(e.clientX, e.clientY); };
     window.st.pointerUpHandler = () => { window.isPointerDown = false; };
@@ -552,6 +590,13 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         if(canvas) canvas.style.display = 'none'; 
         if(uiLayer) uiLayer.remove();
         if(window.isMultiplayer) return; 
+
+        // 🚨 RETORNO DIRECTO AL EDITOR SI ESTABAS PROBANDO MAPA
+        if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
+            window.isTestingMap = false; 
+            window.openEditor(window.curSongData, window.keys || 4, 'standard');
+            return;
+        }
         
         const modal = document.getElementById('modal-res');
         if(modal) {
