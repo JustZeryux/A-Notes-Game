@@ -407,7 +407,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 ctx.globalAlpha = alpha;
                 const approachRatio = Math.max(1, timeDiff / preempt * 3 + 1);
 
-                // 🚨 RENDERIZADO VISUAL (IMPORTADO VS PRO DEFAULT) 🚨
+// 🚨 RENDERIZADO VISUAL (IMPORTADO VS DEFAULT BRILLANTE) 🚨
                 if (hasCustomOsk) {
                     if(loadedSkin.hitcircle) ctx.drawImage(loadedSkin.hitcircle, screenX - scaledRadius, screenY - scaledRadius, scaledRadius*2, scaledRadius*2);
                     if(loadedSkin.hitcircleoverlay) ctx.drawImage(loadedSkin.hitcircleoverlay, screenX - scaledRadius, screenY - scaledRadius, scaledRadius*2, scaledRadius*2);
@@ -419,20 +419,28 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                         ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
                         ctx.strokeStyle = drawColor; ctx.lineWidth = 3 * scale; ctx.stroke();
                     }
+                    
+                    // Números sobre la skin custom
+                    ctx.fillStyle = 'white';
+                    ctx.font = `bold ${scaledRadius * 0.8}px sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(circle.combo, screenX, screenY + (scaledRadius * 0.1));
                 } else {
-                    // ESTILO PRO 100% (Igual al video: Aros vivos, centro oscuro, punto blanco, SIN NÚMEROS)
+                    // ESTILO BOLA BRILLANTE CON NÚMEROS (Default)
                     ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(15, 15, 18, 0.85)'; ctx.fill(); 
+                    ctx.fillStyle = 'rgba(10,10,15,0.9)'; ctx.fill(); 
+                    ctx.lineWidth = 3 * scale; ctx.strokeStyle = 'white'; ctx.stroke(); 
                     
-                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.85, 0, Math.PI * 2);
-                    ctx.strokeStyle = drawColor; ctx.lineWidth = 5 * scale; ctx.stroke();
-                    
-                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius, 0, Math.PI * 2);
-                    ctx.strokeStyle = 'white'; ctx.lineWidth = 2 * scale; ctx.stroke(); 
-                    
-                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.15, 0, Math.PI * 2);
-                    ctx.fillStyle = 'white'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * 0.8, 0, Math.PI * 2);
+                    ctx.fillStyle = drawColor; ctx.fill(); // Bola sólida brillante
 
+                    // Números
+                    ctx.fillStyle = 'white';
+                    ctx.font = `bold ${scaledRadius * 0.8}px sans-serif`;
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText(circle.combo, screenX, screenY + (scaledRadius * 0.1));
+
+                    // Círculo de aproximación
                     ctx.beginPath(); ctx.arc(screenX, screenY, scaledRadius * approachRatio, 0, Math.PI * 2);
                     ctx.strokeStyle = drawColor; ctx.lineWidth = 4 * scale; ctx.stroke();
                 }
