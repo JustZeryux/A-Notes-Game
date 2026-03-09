@@ -1303,6 +1303,10 @@ input[type="range"]::-webkit-slider-thumb { appearance: none; width: 20px; heigh
     transition: none;
 }
 
+button, a, .receptor, .song-card {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
 /* Efecto de cristal para la barra lateral */
 #editor-layer > div:first-child {
     backdrop-filter: blur(10px);
