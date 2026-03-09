@@ -756,11 +756,23 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 titleHTML = `<div id="winner-msg">¡MAPA COMPLETADO!</div>`;
             } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
             
+// Bloque para guardar XP y Mejor Rango en la nube
             let xpGain = 0;
             if (!died && window.user && window.user.name !== "Guest") { 
                 xpGain = Math.floor(window.st.sc / 250); 
                 window.user.xp = (window.user.xp || 0) + xpGain; 
-                if(typeof save === 'function') save(); 
+                
+                // 🌟 NUEVO: GUARDAR EL MEJOR RANGO (SS, S, A)
+                if (!window.user.scores) window.user.scores = {};
+                let currentBest = window.user.scores[window.curSongData.id];
+                let oldScore = currentBest ? currentBest.score : 0;
+                
+                // Solo guarda si el nuevo puntaje es mayor al anterior
+                if (window.st.sc > oldScore) {
+                    window.user.scores[window.curSongData.id] = { grade: r, score: window.st.sc };
+                }
+
+                if(typeof save === 'function') save(); // Sube a Firebase
             }
 
             modal.querySelector('.modal-panel').innerHTML = `
