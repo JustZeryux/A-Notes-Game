@@ -26,39 +26,11 @@ window.showEmptyMapModal = function(k, songData) {
     document.getElementById('btn-empty-play').onclick = () => {
         document.getElementById('modal-empty-map').remove();
         
-        // Ejecuta la misma función poderosa que le pusimos al editor para analizar el audio
-        if (typeof window.applyEditorAutoMap === 'function') {
-            window.edMode = 'mania';
-            window.edKeys = k;
-            window.applyEditorAutoMap().then(() => {
-                songData[`notes_${k}k`] = JSON.parse(JSON.stringify(window.edNotes));
-                if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
-                else if (typeof window.startGame === 'function') window.startGame(k);
-            });
-        } else {
-            // Fallback en caso de emergencia
-            if(typeof window.notify === 'function') window.notify("⚙️ Generando Auto-Mapeo Rítmico...", "info");
-            let mapData = []; let bpm = songData.bpm || 120; let msPerBeat = 60000 / bpm;
-            for (let t = 3000; t < 120000; t += msPerBeat) { 
-                let lane = Math.floor(Math.random() * k);
-                mapData.push({ t: t, l: lane, type: 'tap' });
-                if (Math.random() > 0.8) { 
-                    let extraLane = Math.floor(Math.random() * k);
-                    if(extraLane !== lane) mapData.push({ t: t, l: extraLane, type: 'tap' });
-                }
-            }
-            songData[`notes_${k}k`] = mapData;
-            if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
-            else if (typeof window.startGame === 'function') window.startGame(k);
-        }
+        // Simplemente mandamos la señal limpia al game.js para que use su propio sistema
+        if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+        else if (typeof window.startGame === 'function') window.startGame(k);
     };
-
-    document.getElementById('btn-empty-edit').onclick = () => {
-        document.getElementById('modal-empty-map').remove();
-        if (typeof window.openEditor === 'function') window.openEditor(songData, k, 'mania');
-    };
-};
-
+   
 window.openUnifiedDiffModal = function(song) {
     const titleEl = document.getElementById('diff-song-title');
     const coverEl = document.getElementById('diff-song-cover');
