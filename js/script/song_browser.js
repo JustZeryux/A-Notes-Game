@@ -1,16 +1,8 @@
-/* === SONGS_BROWSER.JS - REPARACIÓN TOTAL V5 (FIXED) === */
+/* === SONGS_BROWSER.JS - REPARACIÓN TOTAL V6 (BLINDADO) === */
 
 window.currentFilters = { type: 'all', key: 'all', stars: 'all' };
 window.unifiedSongs = [];
 window.lastQuery = "";     
-
-window.saveToRecents = function(songObj) {
-    let recents = JSON.parse(localStorage.getItem('recentSongs') || '[]');
-    recents = recents.filter(s => s.id !== songObj.id);
-    recents.unshift(songObj);
-    if(recents.length > 30) recents.pop();
-    localStorage.setItem('recentSongs', JSON.stringify(recents));
-};
 
 window.setFilter = function(category, val) {
     window.currentFilters[category] = val;
@@ -32,7 +24,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 
     try {
         if (!append && window.db) {
-            let snap = await window.db.collection("globalSongs").limit(100).get();
+            let snap = await window.db.collection("globalSongs").limit(50).get();
             snap.forEach(doc => {
                 let data = doc.data();
                 if (!query || data.title.toLowerCase().includes(query.toLowerCase())) {
@@ -67,10 +59,14 @@ window.renderUnifiedGrid = function() {
 
     let filtered = baseList.filter(song => {
         const f = window.currentFilters;
+
+        // 1. Filtro de Teclas
         if (f.key !== 'all') {
             const tk = parseInt(f.key);
             if (!song.keysAvailable || !song.keysAvailable.includes(tk)) return false;
         }
+
+        // 2. Filtro de Estrellas
         if (f.stars !== 'all') {
             const ts = parseInt(f.stars);
             if (song.isOsu && song.raw.beatmaps) {
@@ -100,13 +96,16 @@ window.renderUnifiedGrid = function() {
     filtered.forEach(song => {
         const card = document.createElement('div');
         card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
+        
+        // 🚨 FIX VISUAL: Background blindado para evitar cuadros negros
         card.innerHTML = `
-            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; filter: brightness(0.6);"></div>
-            <div class="song-info" style="position: relative; z-index: 2; padding: 15px;">
-                <div class="song-title" style="font-weight: 900; font-size: 1.2rem;">${song.title}</div>
-                <div class="song-author">by ${song.artist}</div>
+            <div class="song-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background:url('${song.imageURL}'), url('icon.png') center/cover; filter:brightness(0.5); transition:0.3s; z-index:1;"></div>
+            <div class="song-info" style="position:relative; z-index:2; padding:15px;">
+                <div class="song-title" style="font-weight:900; font-size:1.1rem; text-shadow:0 2px 10px black;">${song.title}</div>
+                <div class="song-author" style="opacity:0.7; font-size:0.8rem;">by ${song.artist}</div>
             </div>`;
-        card.onclick = () => window.openUnifiedDiffModal(song);
+        
+        card.onclick = () => { if(typeof window.openUnifiedDiffModal === 'function') window.openUnifiedDiffModal(song); };
         grid.appendChild(card);
     });
 };
@@ -114,8 +113,8 @@ window.renderUnifiedGrid = function() {
 function detectKeys(data) {
     let keys = [];
     Object.keys(data).forEach(k => { if (k.startsWith('notes_mania_')) { let n = parseInt(k.split('_')[2]); if (!isNaN(n)) keys.push(n); } });
-    if (keys.length === 0 && data.notes) keys.push(4);
-    return keys;
+    if (keys.length === 0 && data.notes && data.notes.length > 0) keys.push(4);
+    return keys.sort((a,b)=>a-b);
 }
 
 function countTotalNotes(data) {
@@ -124,4 +123,5 @@ function countTotalNotes(data) {
     return max;
 }
 
+window.debounceSearch = (val) => { clearTimeout(window.searchTimeout); window.searchTimeout = setTimeout(() => window.fetchUnifiedData(val), 500); };
 document.addEventListener('DOMContentLoaded', () => window.fetchUnifiedData());
