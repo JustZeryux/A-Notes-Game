@@ -135,6 +135,34 @@ const SHOP_ITEMS = [
     { id: 'fx_smoke', name: 'Humo Ninja', price: 4000, type: 'hit_fx', desc: 'Desaparición en humo.', color: '#FFF', fixed: false }
 ];
 
+window.filterStore = function(category, btnElement) {
+    // 1. Efecto visual en las pestañas (Opcional, si tus botones comparten una clase como 'store-tab')
+    if (btnElement) {
+        let allTabs = btnElement.parentElement.querySelectorAll('button, .store-tab');
+        allTabs.forEach(tab => {
+            tab.style.background = 'transparent';
+            tab.style.color = 'white'; // Color inactivo
+        });
+        btnElement.style.background = 'white'; // Color activo
+        btnElement.style.color = 'black';
+    }
+
+    // 2. Filtrar las tarjetas de la tienda
+    // Busca todas las tarjetas de los items de la tienda (Asegúrate de que tengan esta clase)
+    let items = document.querySelectorAll('.shop-item-card'); 
+    
+    items.forEach(item => {
+        // Leemos de qué tipo es esta tarjeta (skin, cursor, fx)
+        let itemType = item.getAttribute('data-type'); 
+        
+        if (category === 'all' || itemType === category) {
+            item.style.display = 'flex'; // Mostrar
+        } else {
+            item.style.display = 'none'; // Ocultar
+        }
+    });
+};
+
 function createLanes(k) {
     const k4=['d', 'f', 'j', 'k'], k6=['s', 'd', 'f', 'j', 'k', 'l'], k7=['s', 'd', 'f', ' ', 'j', 'k', 'l'], k9=['a', 's', 'd', 'f', ' ', 'h', 'j', 'k', 'l'];
     const cols = ['#00FFFF', '#12FA05', '#F9393F', '#FFD700', '#BD00FF', '#0055FF', '#FF8800', '#FFFFFF', '#AAAAAA'];
