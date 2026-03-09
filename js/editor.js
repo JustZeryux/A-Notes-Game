@@ -425,45 +425,119 @@ setInterval(() => {
 }, 16);
 
 
-window.applyEditorAutoMap = function() {
-    // Si ya hay notas en el editor, pedimos confirmación para no borrar por accidente el trabajo del usuario
+// =========================================================================
+// 🧠 MOTOR DE AUTO-MAPEO INTELIGENTE (ANÁLISIS DE ONDAS DE AUDIO REAL)
+// =========================================================================
+
+window.applyEditorAutoMap = async function() {
     if (window.edNotes && window.edNotes.length > 0) {
-        if (!confirm("⚠️ Esto borrará todas las notas actuales que tienes en el editor para generar unas nuevas. ¿Estás seguro?")) return;
+        if (!confirm("⚠️ Esto borrará todas las notas actuales del editor. ¿Estás seguro?")) return;
     }
-    
-    window.edNotes = []; // Limpiamos la pista del editor
-    
-    // Obtenemos la escala elegida en el menú desplegable (1, 2, 4 u 8)
+
+    if(typeof window.notify === 'function') window.notify("🧠 Analizando espectro de audio... Espere.", "info");
+
+    window.edNotes = []; 
     let diffMult = parseFloat(document.getElementById('auto-map-diff').value) || 2;
-    
-    // Obtenemos el BPM de la canción actual (o 120 por defecto)
-    let bpm = window.curSongData.bpm || 120;
-    
-    // Calculamos cuánto dura la canción (para saber cuándo dejar de poner notas)
-    let durationMs = (window.st.songDuration || window.edAudioDuration || 120) * 1000; 
-    
-    // Cálculo matemático: Cuántos milisegundos hay entre cada nota según la dificultad
-    let msPerStep = (60000 / bpm) / diffMult; 
-    
-    // Empezamos a poner notas desde el segundo 3 (3000ms) hasta que acabe la canción
-    for (let t = 3000; t < durationMs; t += msPerStep) {
-        // Elegimos un carril al azar (dependiendo si estás en 4K, 6K, 10K, etc.)
-        let lane = Math.floor(Math.random() * window.edKeys);
-        
-        // ¡Magia! Inyectamos la nota directo a la memoria del editor
-        window.edNotes.push({ t: Math.floor(t), l: lane, type: 'tap' });
-        
-        // Si la dificultad es Normal o mayor, hay un 20% de probabilidad de que salga una nota doble
-        if (diffMult >= 2 && Math.random() > 0.8) {
-            let extraLane = Math.floor(Math.random() * window.edKeys);
-            if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
-        }
+    let audioUrl = window.curSongData.audioURL || window.curSongData.url;
+
+    if (!audioUrl) {
+        if(typeof window.notify === 'function') window.notify("❌ Error: No se encontró el archivo de audio.", "error");
+        return;
     }
-    
-    // 🚨 ESTO ES LO MÁS IMPORTANTE 🚨
-    // Estas dos líneas le dicen al editor que redibuje la pantalla para que las notas aparezcan
-    if (typeof renderEditorNotes === 'function') renderEditorNotes();
-    if (typeof updateTimeline === 'function') updateTimeline();
-    
-    if (typeof window.notify === 'function') window.notify(`✅ Auto-mapa generado (${window.edNotes.length} notas)`, "success");
+
+    try {
+        // 1. DESCARGAR Y DECODIFICAR EL AUDIO REAL
+        const response = await fetch(audioUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        
+        // Creamos un motor de audio invisible para leer las ondas
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        
+        // 2. EXTRACCIÓN DE DATOS (Capa izquierda del audio)
+        const channelData = audioBuffer.getChannelData(0);
+        const sampleRate = audioBuffer.sampleRate;
+        
+        // Dividimos la canción en "ventanas" de 50 milisegundos
+        const windowSize = Math.floor(sampleRate * 0.05); 
+        let energies = [];
+        let sumEnergy = 0;
+
+        // Calculamos la "Fuerza" de cada ventana de 50ms
+        for (let i = 0; i < channelData.length; i += windowSize) {
+            let energy = 0;
+            for (let j = 0; j < windowSize && (i + j) < channelData.length; j++) {
+                energy += Math.abs(channelData[i + j]); // Suma la amplitud de la onda
+            }
+            energies.push(energy);
+            sumEnergy += energy;
+        }
+
+        // 3. IA DE DECISIÓN DE NOTAS
+        let avgEnergy = sumEnergy / energies.length; // Promedio de volumen de la canción
+        
+        // El umbral dinámico decide qué tan fuerte debe sonar algo para ser una nota.
+        // Dificultades altas bajan el umbral (atrapan más sonidos).
+        let threshold = avgEnergy * (3.5 - (diffMult * 0.3)); 
+        let strongThreshold = threshold * 1.5; // Umbral para notas especiales/dobles
+        
+        // Evita que las notas se encimen creando una "velocidad máxima" según el BPM
+        let minMsBetweenNotes = (60000 / (window.curSongData.bpm || 120)) / diffMult;
+        let lastNoteTimeMs = 0;
+        
+        // Identificar el modo de juego actual en el editor
+        let mode = window.edMode || window.curSongData.originalMode || 'mania';
+        let keys = window.edKeys || 4;
+
+        // 4. GENERACIÓN DEL MAPA
+        for (let i = 0; i < energies.length; i++) {
+            if (energies[i] > threshold) {
+                let timeMs = (i * windowSize / sampleRate) * 1000; // Convertimos de vuelta a Milisegundos
+                
+                // Empezamos desde el segundo 2 para ignorar ruido de inicio
+                if (timeMs > 2000 && (timeMs - lastNoteTimeMs) >= minMsBetweenNotes) {
+                    
+                    if (mode === 'mania') {
+                        // === LÓGICA MANIA ===
+                        let lane = Math.floor(Math.random() * keys);
+                        window.edNotes.push({ t: Math.floor(timeMs), l: lane, type: 'tap' });
+                        
+                        // Si el golpe de batería es MUY fuerte, lanza nota doble (Acorde)
+                        if (energies[i] > strongThreshold && diffMult >= 2) {
+                            let extraLane = Math.floor(Math.random() * keys);
+                            if(extraLane !== lane) window.edNotes.push({ t: Math.floor(timeMs), l: extraLane, type: 'tap' });
+                        }
+                    } 
+                    else if (mode === 'standard' || mode === 'catch') {
+                        // === LÓGICA OSU! STANDARD Y CATCH ===
+                        // Genera coordenadas X/Y dentro de la pantalla segura de Osu (512x384)
+                        let x = Math.floor(Math.random() * 400) + 56; // Evita los bordes extremos
+                        let y = Math.floor(Math.random() * 280) + 52;
+                        window.edNotes.push({ t: Math.floor(timeMs), x: x, y: y, type: 'circle' });
+                    }
+                    else if (mode === 'taiko') {
+                        // === LÓGICA TAIKO ===
+                        // Si el golpe es suave es DON (Rojo, tipo 1), si es muy fuerte es KAT (Azul, tipo 2/8)
+                        let isKat = energies[i] > strongThreshold;
+                        // Nota: Ajusta 'type' al formato que lea tu motor de Taiko. 
+                        // Usualmente OsuTaiko lee "0" para normal y "8" para claps/finishers.
+                        let tType = isKat ? 8 : 1; 
+                        window.edNotes.push({ t: Math.floor(timeMs), x: 256, y: 192, type: 'circle', taikoType: tType });
+                    }
+
+                    lastNoteTimeMs = timeMs;
+                }
+            }
+        }
+
+        // 5. REFRESCO VISUAL
+        if (typeof renderEditorNotes === 'function') renderEditorNotes();
+        if (typeof updateTimeline === 'function') updateTimeline();
+        
+        if (typeof window.notify === 'function') window.notify(`✅ IA Mapeo Completado: ${window.edNotes.length} notas extraídas del audio.`, "success");
+
+    } catch (error) {
+        console.error("Error en Auto-Mapper Inteligente:", error);
+        if (typeof window.notify === 'function') window.notify("❌ Error analizando las frecuencias de audio.", "error");
+    }
 };
