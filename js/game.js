@@ -481,17 +481,19 @@ function loop() {
 
                 let trailHTML = '';
                 let noteLen = n.len || n.dur || 0;
-                if (n.type === 'hold' && noteLen > 0) { 
-                    // 🚨 FIX TRAILS: Diseño clásico y sin lag. Color sólido + Opacidad. Sin sombras raras.
-                    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6; // Ligeramente transparente
-                    let tStyle = `position: absolute; left: 50%; margin-left: -15%; width: 30%; z-index: -1; opacity: ${opacityVal}; background: ${color}; border-radius: 4px;`;
-                    if (window.cfg.down) { 
-                        tStyle += ` bottom: 50%; transform-origin: bottom center;`; 
-                    } else { 
-                        tStyle += ` top: 50%; transform-origin: top center;`; 
-                    } 
-                    trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
-                }
+                // Busca dentro del bucle de generación visual (donde dice trailHTML = ...)
+if (n.type === 'hold' && noteLen > 0) { 
+    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.5;
+    // 🚨 FIX: Cambiamos 'bottom: 50%' por 'bottom: 0' (para Downscroll) o 'top: 0' (para Upscroll)
+    let tStyle = `position: absolute; left: 50%; margin-left: -20%; width: 40%; z-index: -1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 4px;`;
+    
+    if (window.cfg.down) { 
+        tStyle += ` bottom: 0px; transform-origin: bottom center;`; 
+    } else { 
+        tStyle += ` top: 0px; transform-origin: top center;`; 
+    } 
+    trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
+}
                 
                 el.innerHTML = trailHTML + svgHTML; 
                 
