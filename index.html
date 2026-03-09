@@ -616,8 +616,10 @@
         <div class="modal-panel" style="width: 95%; max-width: 800px; padding:0; overflow:hidden; background:#0a0a0a; border-radius: 15px; border: 1px solid #333;">
             <div id="login-view" style="padding: 40px; text-align:center;">
                 <div class="m-title" style="color:var(--accent); border-color:var(--accent);">INICIAR SESIÓN</div>
-                <button class="btn-google" onclick="loginGoogle()" style="margin-bottom:20px;">ENTRAR CON GOOGLE</button>
-                <input type="text" id="l-user" class="log-inp" placeholder="Usuario Local (Opcional)">
+<button onclick="iniciarSesionGoogle()" style="display: flex; align-items: center; justify-content: center; gap: 12px; background: white; color: #444; border: none; padding: 12px 24px; border-radius: 30px; font-weight: 900; font-size: 1.1rem; cursor: pointer; width: 100%; max-width: 300px; margin: 20px auto; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" style="width: 24px; height: 24px;">
+    Continuar con Google
+</button>                <input type="text" id="l-user" class="log-inp" placeholder="Usuario Local (Opcional)">
                 <input type="password" id="l-pass" class="log-inp" placeholder="Contraseña Local">
                 <div style="display:flex; gap:10px; margin-top:20px;">
                     <button class="action" onclick="login()" style="flex:1;">ENTRAR</button>
