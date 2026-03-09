@@ -155,62 +155,73 @@ window.renderUnifiedGrid = function() {
     const grid = document.getElementById('song-grid'); if(!grid) return; grid.innerHTML = '';
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
-  let filtered = baseList.filter(song => {
-        const f = window.currentFilters;
+ let filtered = baseList.filter(song => {
+    const f = window.currentFilters;
 
-        // 1. FILTRO DE TIPO (TODO, COMUNIDAD, MANIA, etc.)
-        if (f.type !== 'all' && f.type !== 'recent') {
-            if (f.type === 'com' || f.type === 'comunidad') {
-                if (song.isOsu) return false;
-            } else if (f.type === 'charted') {
-                if (song.isOsu || countTotalNotes(song.raw) === 0) return false;
-            } else if (f.type.startsWith('osu_')) {
-                const mode = f.type.replace('osu_', '');
-                if (song.originalMode !== mode) return false;
-            }
+    // 1. FILTRO DE TIPO (TODO, COMUNIDAD, MANIA, CUSTOM, etc.)
+    if (f.type !== 'all' && f.type !== 'recent') {
+        if (f.type === 'com' || f.type === 'comunidad') {
+            if (song.isOsu) return false;
+        } else if (f.type === 'charted') {
+            if (song.isOsu || countTotalNotes(song.raw) === 0) return false;
+        } else if (f.type === 'custom' || f.type === 'mechanics') { 
+            // NUEVO: Manejo correcto del botón Custom Mechanics
+            if (song.isOsu || !song.raw || !song.raw.mechanics || song.raw.mechanics.length === 0) return false;
+        } else if (f.type.startsWith('osu_')) {
+            const mode = f.type.replace('osu_', '');
+            if (song.originalMode !== mode) return false;
         }
+    }
 
-        // 2. FILTRO DE TECLAS (ESTRICTO)
-        if (f.key !== 'all') {
-            const targetK = parseInt(f.key);
-            // Si eliges teclas, ocultamos Standard/Taiko/Catch de Osu!
-            if (song.isOsu && song.originalMode !== 'mania') return false;
-            
-            // Verificamos si el mapa tiene esa tecla disponible
-            if (song.keysAvailable && song.keysAvailable.length > 0) {
-                if (!song.keysAvailable.includes(targetK)) return false;
-            } else if (song.isOsu) {
-                return false; 
-            }
-        }
-
-        // 3. FILTRO DE ESTRELLAS (🚨 EL ARREGLO MAESTRO)
-        if (f.stars !== 'all') {
-            const targetS = parseInt(f.stars);
-            let sNum = 0;
-
-            if (song.isOsu && song.raw && song.raw.beatmaps) {
-                // Buscamos si ALGUNA dificultad del paquete cumple el rango
-                const hasMatchingDiff = song.raw.beatmaps.some(b => {
-                    let bStars = b.difficulty_rating || 0;
-                    if (targetS === 1) return bStars < 2.0;
-                    if (targetS === 5) return bStars >= 5.0;
-                    return bStars >= targetS && bStars < targetS + 1;
-                });
-                if (!hasMatchingDiff) return false;
-            } else {
-                // Lógica para mapas de la comunidad
-                let n = countTotalNotes(song.raw || song);
-                sNum = n === 0 ? 0 : (n / 200) + 1;
-                
-                if (targetS === 1 && sNum >= 2.0) return false;
-                if (targetS >= 2 && targetS <= 4 && (sNum < targetS || sNum >= targetS + 1)) return false;
-                if (targetS === 5 && sNum < 5.0) return false;
-            }
-        }
+    // 2. FILTRO DE TECLAS (ESTRICTO)
+    if (f.key !== 'all') {
+        const targetK = parseInt(f.key);
+        // Si eliges teclas, ocultamos Standard/Taiko/Catch de Osu!
+        if (song.isOsu && song.originalMode !== 'mania') return false;
         
-        return true;
-    });ight:bold; font-size:1.5rem;">No se encontraron canciones con estos filtros. 🌸</div>`; return; }
+        // Verificamos si el mapa tiene esa tecla disponible
+        if (song.keysAvailable && song.keysAvailable.length > 0) {
+            if (!song.keysAvailable.includes(targetK)) return false;
+        } else {
+            // CORRECCIÓN: Si no tiene teclas detectadas, debe ocultarse (antes solo ocultaba los de Osu)
+            return false; 
+        }
+    }
+
+    // 3. FILTRO DE ESTRELLAS (🚨 ARREGLO MAESTRO CORREGIDO)
+    if (f.stars !== 'all') {
+        const targetS = parseInt(f.stars);
+
+        if (song.isOsu && song.raw && song.raw.beatmaps) {
+            // Buscamos si ALGUNA dificultad del paquete cumple AMBOS rangos (Teclas Y Estrellas)
+            const hasMatchingDiff = song.raw.beatmaps.some(b => {
+                // Si hay filtro de teclas, ESTA dificultad específica debe coincidir
+                if (f.key !== 'all') {
+                    const tk = parseInt(f.key);
+                    const isMania = (b.mode_int === 3 || b.mode === 3 || b.mode === 'mania');
+                    if (!isMania || Math.floor(b.cs) !== tk) return false;
+                }
+
+                let bStars = b.difficulty_rating || 0;
+                if (targetS === 1) return bStars < 2.0;
+                if (targetS === 5) return bStars >= 5.0;
+                return bStars >= targetS && bStars < targetS + 1;
+            });
+            if (!hasMatchingDiff) return false;
+        } else {
+            // Lógica para mapas de la comunidad
+            let n = countTotalNotes(song.raw || song);
+            let sNum = n === 0 ? 0 : (n / 200) + 1;
+            
+            if (targetS === 1 && sNum >= 2.0) return false;
+            if (targetS >= 2 && targetS <= 4 && (sNum < targetS || sNum >= targetS + 1)) return false;
+            if (targetS === 5 && sNum < 5.0) return false;
+        }
+    }
+    
+    return true;
+});
+ight:bold; font-size:1.5rem;">No se encontraron canciones con estos filtros. 🌸</div>`; return; }
 
     filtered.forEach(song => {
         const card = document.createElement('div'); card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
