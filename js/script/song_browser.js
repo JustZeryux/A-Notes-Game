@@ -201,28 +201,42 @@ window.renderUnifiedGrid = function() {
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
     let filtered = baseList.filter(song => {
-        if (window.currentFilters.type === 'recent') return true; 
-        
-        if (window.currentFilters.type === 'charted') {
-            if (song.isOsu) return false;
-            return countTotalNotes(song.raw) > 0;
+        let type = window.currentFilters.type;
+
+        // 1. FILTRO DE TIPO (Ignora esto si estás viendo 'Recientes')
+        if (type !== 'recent' && type !== 'all') {
+            if (type === 'charted') { if (song.isOsu) return false; return countTotalNotes(song.raw) > 0; }
+            if (type === 'mechanics') return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
+            if (type === 'osu_mania' && song.originalMode !== 'mania') return false;
+            if (type === 'osu_standard' && song.originalMode !== 'standard') return false;
+            if (type === 'osu_taiko' && song.originalMode !== 'taiko') return false;
+            if (type === 'osu_catch' && song.originalMode !== 'catch') return false;
+            if ((type === 'com' || type === 'comunidad' || type === 'community') && song.isOsu) return false;
         }
 
-        if (window.currentFilters.type === 'mechanics') return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
-        
-        if (window.currentFilters.type === 'osu_mania' && song.originalMode !== 'mania') return false;
-        if (window.currentFilters.type === 'osu_standard' && song.originalMode !== 'standard') return false;
-        if (window.currentFilters.type === 'osu_taiko' && song.originalMode !== 'taiko') return false;
-        if (window.currentFilters.type === 'osu_catch' && song.originalMode !== 'catch') return false;
-        
-        if (window.currentFilters.type === 'com' && song.isOsu) return false;
-        
+        // 2. FILTRO DE TECLAS (Ahora sí se aplica aunque estés en Recientes)
         if (window.currentFilters.key !== 'all' && (song.originalMode === 'mania' || !song.isOsu)) { 
-            if (!song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
+            if (!song.keysAvailable || !song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
         }
+
+        // 3. FILTRO DE ESTRELLAS (Ahora sí se aplica a todo)
+        if (window.currentFilters.stars !== 'all') {
+            let sNum = 0;
+            if (song.isOsu) {
+                sNum = parseFloat(song.starRating || 0);
+            } else { 
+                let n = countTotalNotes(song.raw || song); 
+                sNum = n === 0 ? 0 : (n / 200) + 1; 
+            }
+            
+            let tStar = parseInt(window.currentFilters.stars);
+            if (tStar === 1 && sNum >= 2.0) return false; // 1.0 a 1.9
+            if (tStar > 1 && tStar < 5 && (sNum < tStar || sNum >= tStar + 1)) return false; // 2.x, 3.x, 4.x
+            if (tStar === 5 && sNum < 5.0) return false; // 5.0+
+        }
+        
         return true;
     });
-
     if (filtered.length === 0) { 
         grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones. 🌸</div>`; 
         return; 
