@@ -173,36 +173,140 @@ window.playRandomBGM = async function() {
 };
 
 // Intentar reproducir en la primera interacción del usuario (Regla de navegadores)
-document.addEventListener('click', function initAudioContext() {
-    if(!window.bgmStarted) {
-        window.bgmStarted = true;
-        const bgm = document.getElementById('menu-bgm');
-        if(bgm && !bgm.src) window.playRandomBGM();
-        if(bgm && bgm.src && bgm.paused) bgm.play().catch(e=>{});
-        
-        // Desvincular para no ejecutar esto en cada clic
-        document.removeEventListener('click', initAudioContext);
+// =====================================================================
+// 🔔 SISTEMA GLOBAL DE CIERRE DE VENTANAS Y NOTIFICACIONES
+// =====================================================================
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modals = document.querySelectorAll('.modal-overlay');
+        modals.forEach(m => {
+            if(m.style.display !== 'none' && m.id !== 'loading-overlay' && m.id !== 'modal-res' && m.id !== 'automap-modal') {
+                m.style.display = 'none';
+            }
+        });
+        const notifPanel = document.getElementById('notif-panel');
+        if (notifPanel) notifPanel.style.display = 'none';
     }
 });
 
-// Controladores globales para apagar la música al jugar
-window.pauseBGM = function() {
-    const bgm = document.getElementById('menu-bgm');
-    if(bgm) bgm.pause();
-};
-window.resumeBGM = function() {
-    const bgm = document.getElementById('menu-bgm');
-    // Solo resumir si no estamos en la pantalla de juego o editor
-    const gameLayer = document.getElementById('game-layer');
-    const editorLayer = document.getElementById('editor-layer');
-    if((!gameLayer || gameLayer.style.display === 'none') && (!editorLayer || editorLayer.style.display === 'none')) {
-        if(bgm) bgm.play().catch(e=>{});
+document.addEventListener('click', (e) => {
+    // Cierra modal si das clic en el fondo oscuro
+    if (e.target.classList.contains('modal-overlay') && e.target.id !== 'loading-overlay' && e.target.id !== 'modal-res') {
+        e.target.style.display = 'none';
+    }
+
+    // 🚨 FIX: Cierre inteligente usando TU botón exacto
+    const notifPanel = document.getElementById('notif-panel');
+    const notifBtn = document.getElementById('notif-bell'); // <--- Conectado a tu HTML
+    
+    if (notifPanel && notifPanel.style.display !== 'none') {
+        if (!notifPanel.contains(e.target) && (!notifBtn || !notifBtn.contains(e.target))) {
+            notifPanel.style.display = 'none';
+        }
+    }
+});
+
+// =====================================================================
+// 🔔 MOTOR INTELIGENTE DE NOTIFICACIONES (CON CONTADOR ROJO)
+// =====================================================================
+
+// Abrir el panel y limpiar el contador de mensajes nuevos
+window.openNotifPanel = function() {
+    const panel = document.getElementById('notif-panel');
+    const badge = document.getElementById('notif-badge');
+    
+    if (!panel) return;
+    
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+        // Limpiamos el contador rojo al abrir las notificaciones
+        if (badge) {
+            badge.innerText = '0';
+            badge.style.display = 'none';
+        }
+    } else {
+        panel.style.display = 'none';
     }
 };
 
-// 🚨 IMPORTANTE: Inyectar pauseBGM en tus funciones de empezar juego y resume en toMenu()
-const originalToMenu = window.toMenu;
-window.toMenu = function() {
-    if(typeof originalToMenu === 'function') originalToMenu();
-    window.resumeBGM();
+function initNotifPanel() {
+    let panel = document.getElementById('notif-panel');
+    if (panel && !document.getElementById('notif-list')) {
+        panel.innerHTML = `
+            <div style="padding: 15px; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; background: #0a0a0a;">
+                <h3 style="margin: 0; color: #00ffff; font-size: 1.2rem; text-shadow: 0 0 10px #00ffff;">🔔 NOTIFICACIONES</h3>
+                <button onclick="clearNotifs()" style="background: none; border: none; color: #F9393F; cursor: pointer; font-weight: bold;">Limpiar</button>
+            </div>
+            <div id="notif-list" style="max-height: 350px; overflow-y: auto; padding: 10px; background: #111;">
+                <div id="notif-empty" style="color: #666; text-align: center; padding: 20px;">No hay notificaciones recientes.</div>
+            </div>
+        `;
+    }
+}
+
+window.clearNotifs = function() {
+    const list = document.getElementById('notif-list');
+    if(list) list.innerHTML = '<div id="notif-empty" style="color: #666; text-align: center; padding: 20px;">No hay notificaciones recientes.</div>';
 };
+
+window.notify = function(msg, type = "info") {
+    // 1. TOAST FLOTANTE
+    let toastContainer = document.getElementById('notification-area');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'notification-area';
+        toastContainer.style.cssText = 'position:fixed; bottom:20px; right:20px; z-index:9999999; display:flex; flex-direction:column; gap:10px; pointer-events:none;';
+        document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    let color = type === 'success' ? '#12FA05' : (type === 'error' ? '#F9393F' : '#00ffff');
+    
+    toast.style.cssText = `
+        background: rgba(10, 10, 14, 0.95); border-left: 4px solid ${color};
+        color: white; padding: 15px 20px; border-radius: 4px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-weight: bold; font-family: sans-serif;
+        transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        min-width: 250px; pointer-events: none;
+    `;
+    toast.innerHTML = `<span style="color:${color}; margin-right:8px;">●</span> ${msg}`;
+    toastContainer.appendChild(toast);
+    
+    requestAnimationFrame(() => toast.style.transform = 'translateX(0)');
+    setTimeout(() => {
+        toast.style.transform = 'translateX(120%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+
+    // 🚨 FILTRO: Ignorar el mensaje de bienvenida para no saturar
+    if (msg.toLowerCase().includes('bienvenid')) return; 
+
+    // 2. REGISTRO EN EL PANEL
+    initNotifPanel();
+    const list = document.getElementById('notif-list');
+    const emptyMsg = document.getElementById('notif-empty');
+    
+    if (list) {
+        if (emptyMsg) emptyMsg.remove();
+        
+        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const item = document.createElement('div');
+        item.style.cssText = `padding: 12px; border-bottom: 1px solid #222; font-size: 0.95rem; display: flex; gap: 10px; align-items: start; animation: popFade 0.3s forwards;`;
+        item.innerHTML = `
+            <span style="color: ${color}; font-weight: 900; font-size: 0.8rem; margin-top: 3px;">[${time}]</span> 
+            <span style="color: #ddd; line-height: 1.4;">${msg}</span>
+        `;
+        list.insertBefore(item, list.firstChild); 
+        
+        // 3. AUMENTAR EL CONTADOR ROJO
+        const badge = document.getElementById('notif-badge');
+        const panel = document.getElementById('notif-panel');
+        // Solo sumamos a la bolita roja si el panel está CERRADO
+        if (badge && (!panel || panel.style.display === 'none' || panel.style.display === '')) {
+            let count = parseInt(badge.innerText) || 0;
+            badge.innerText = count + 1;
+            badge.style.display = 'block';
+        }
+    }
+};;
