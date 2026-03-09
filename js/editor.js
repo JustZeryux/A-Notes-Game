@@ -423,3 +423,47 @@ setInterval(() => {
         window.drawEditorGrid();
     }
 }, 16);
+
+
+window.applyEditorAutoMap = function() {
+    // Si ya hay notas en el editor, pedimos confirmación para no borrar por accidente el trabajo del usuario
+    if (window.edNotes && window.edNotes.length > 0) {
+        if (!confirm("⚠️ Esto borrará todas las notas actuales que tienes en el editor para generar unas nuevas. ¿Estás seguro?")) return;
+    }
+    
+    window.edNotes = []; // Limpiamos la pista del editor
+    
+    // Obtenemos la escala elegida en el menú desplegable (1, 2, 4 u 8)
+    let diffMult = parseFloat(document.getElementById('auto-map-diff').value) || 2;
+    
+    // Obtenemos el BPM de la canción actual (o 120 por defecto)
+    let bpm = window.curSongData.bpm || 120;
+    
+    // Calculamos cuánto dura la canción (para saber cuándo dejar de poner notas)
+    let durationMs = (window.st.songDuration || window.edAudioDuration || 120) * 1000; 
+    
+    // Cálculo matemático: Cuántos milisegundos hay entre cada nota según la dificultad
+    let msPerStep = (60000 / bpm) / diffMult; 
+    
+    // Empezamos a poner notas desde el segundo 3 (3000ms) hasta que acabe la canción
+    for (let t = 3000; t < durationMs; t += msPerStep) {
+        // Elegimos un carril al azar (dependiendo si estás en 4K, 6K, 10K, etc.)
+        let lane = Math.floor(Math.random() * window.edKeys);
+        
+        // ¡Magia! Inyectamos la nota directo a la memoria del editor
+        window.edNotes.push({ t: Math.floor(t), l: lane, type: 'tap' });
+        
+        // Si la dificultad es Normal o mayor, hay un 20% de probabilidad de que salga una nota doble
+        if (diffMult >= 2 && Math.random() > 0.8) {
+            let extraLane = Math.floor(Math.random() * window.edKeys);
+            if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
+        }
+    }
+    
+    // 🚨 ESTO ES LO MÁS IMPORTANTE 🚨
+    // Estas dos líneas le dicen al editor que redibuje la pantalla para que las notas aparezcan
+    if (typeof renderEditorNotes === 'function') renderEditorNotes();
+    if (typeof updateTimeline === 'function') updateTimeline();
+    
+    if (typeof window.notify === 'function') window.notify(`✅ Auto-mapa generado (${window.edNotes.length} notas)`, "success");
+};
