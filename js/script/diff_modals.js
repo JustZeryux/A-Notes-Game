@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODALS.JS - FILTRO DE TECLAS INTELIGENTE (FIXED)
+   DIFF_MODALS.JS - FILTRO DE TECLAS INTELIGENTE (FIXED V3)
    ========================================================== */
 
 window.showEmptyMapModal = function(k, songData) {
@@ -12,10 +12,10 @@ window.showEmptyMapModal = function(k, songData) {
                 <h2 class="modal-neon-title" style="color: #ff66aa; font-size: 2rem;">⚠️ PISTA VACÍA</h2>
             </div>
             <div class="modal-neon-content" style="padding: 10px 20px 30px 20px;">
-                <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 25px;">Esta canción no tiene notas mapeadas en ${k}K. ¿Qué deseas hacer?</p>
+                <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 25px;">Esta canción no tiene notas en ${k}K. ¿Qué deseas hacer?</p>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <button class="action" id="btn-empty-play" style="width: 100%; background: #00ffff; color: black; font-weight: 900;">🎮 JUGAR (AUTO-MAPEO)</button>
-                    <button class="action secondary" id="btn-empty-edit" style="width: 100%; color: #ff66aa; border-color: #ff66aa;">✏️ MAPEAR (EDITOR)</button>
+                    <button class="action secondary" id="btn-empty-edit" style="width: 100%; color: #ff66aa; border-color: #ff66aa; font-weight: bold;">✏️ MAPEAR (EDITOR)</button>
                     <button class="action secondary" onclick="document.getElementById('modal-empty-map').remove()" style="width: 100%; color: #F9393F; border-color: #F9393F;">❌ CANCELAR</button>
                 </div>
             </div>
@@ -51,42 +51,17 @@ window.openUnifiedDiffModal = function(song) {
     
     let cleanId = String(song.id).replace('osu_', '');
     const standardModes = [4, 6, 7, 9];
-    
-    // 🚨 DETERMINAR SI EL MAPA ESTÁ TOTALMENTE VACÍO
     let isCharted = song.keysAvailable && song.keysAvailable.length > 0;
     
-    // Si no está charteado, mostramos los 4 standard para permitir auto-mapeo
-    // Si ya está charteado, mostramos los standard + lo que ya exista
+    // Si no está charteado, habilitamos los 4 básicos para permitir crear notas
     let allModes = !isCharted ? standardModes : [...new Set([...standardModes, ...song.keysAvailable])].sort((a,b)=>a-b);
-
-    const colors = {4: '#00FFFF', 6: '#12FA05', 7: '#FFD700', 9: '#F9393F'};
-    const labels = {4: 'EASY', 6: 'NORMAL', 7: 'INSANE', 9: 'DEMON'};
 
     allModes.forEach(k => {
         let btn = document.createElement('div'); btn.className = 'diff-card';
-        
-        // 🚨 EL FIX MAESTRO:
-        // Si es de Osu!, solo habilitamos si la tecla existe en el paquete.
-        // Si es de la comunidad:
-        //   - Si el mapa está VACÍO, habilitamos 4, 6, 7 y 9 para que pueda auto-mapear.
-        //   - Si el mapa YA TIENE NOTAS, solo habilitamos las teclas que existan.
-        let isAvailable = false;
-        if (song.isOsu) {
-            isAvailable = song.keysAvailable && song.keysAvailable.includes(k);
-        } else {
-            if (!isCharted) {
-                isAvailable = standardModes.includes(k); // Habilitar standard para mapas nuevos
-            } else {
-                isAvailable = song.keysAvailable.includes(k); // Solo lo que ya tenga notas
-            }
-        }
-
-        let c = colors[k] || '#ff66aa';
-        let l = labels[k] || 'CUSTOM';
+        let isAvailable = song.isOsu ? (song.keysAvailable && song.keysAvailable.includes(k)) : (!isCharted ? standardModes.includes(k) : song.keysAvailable.includes(k));
 
         if (isAvailable) {
-            btn.style.borderColor = c; btn.style.color = c;
-            btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num">${k}K</div><div class="diff-label">${l}</div>`;
+            btn.innerHTML = `<div class="diff-num">${k}K</div><div class="diff-label">MANIA</div>`;
             btn.onclick = () => {
                 window.closeModal('diff');
                 if(song.isOsu) { downloadAndPlayOsu(cleanId, song.title, song.imageURL, k); }
@@ -98,17 +73,16 @@ window.openUnifiedDiffModal = function(song) {
                 }
             };
         } else {
-            btn.style.opacity = "0.2"; btn.style.cursor = "not-allowed"; btn.style.filter = "grayscale(1)";
-            btn.innerHTML = `<div class="diff-bg-icon">🔒</div><div class="diff-num">${k}K</div><div class="diff-label">BLOQUEADO</div>`;
+            btn.style.opacity = "0.2"; btn.style.cursor = "not-allowed";
+            btn.innerHTML = `<div class="diff-num">🔒 ${k}K</div><div class="diff-label">N/A</div>`;
         }
         grid.appendChild(btn);
     });
 
-    // Botón de Editor siempre al final para canciones de la comunidad
     if (!song.isOsu) {
         let editBtn = document.createElement('div'); editBtn.className = 'diff-card'; editBtn.style.gridColumn = "1 / -1";
         editBtn.style.borderColor = "#ff66aa"; editBtn.style.color = "#ff66aa"; editBtn.style.marginTop = "10px";
-        editBtn.innerHTML = `<div class="diff-num" style="font-size:1.5rem;">✏️ EDITOR STUDIO</div><div class="diff-label">Crea o modifica notas</div>`;
+        editBtn.innerHTML = `<div class="diff-num" style="font-size:1.5rem;">✏️ EDITOR STUDIO</div>`;
         editBtn.onclick = () => { window.closeModal('diff'); openEditor(song.raw || song, 4); };
         grid.appendChild(editBtn);
     }
