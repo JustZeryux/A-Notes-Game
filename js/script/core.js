@@ -126,52 +126,67 @@ document.addEventListener('click', (e) => {
 });
 
 // =====================================================================
-// 🎵 SISTEMA DE MÚSICA DE FONDO (BGM) GLOBAL
+// 🎵 SISTEMA DE MÚSICA DE FONDO (BGM) GLOBAL - FIJADO
 // =====================================================================
 window.bgmStarted = false;
 
 window.updateBgmVolume = function(val) {
     const bgm = document.getElementById('menu-bgm');
     if(bgm) bgm.volume = val / 100;
-    if(window.cfg) window.cfg.bgmVol = val;
-    if(typeof saveConfig === 'function') saveConfig();
-};
-
-window.setCustomBGM = function(event) {
-    const file = event.target.files[0];
-    if(!file) return;
-    const bgm = document.getElementById('menu-bgm');
-    const url = URL.createObjectURL(file);
-    bgm.src = url;
-    bgm.play().catch(e => console.warn("Esperando interacción para BGM..."));
-    if(typeof window.notify === 'function') window.notify("🎵 Música de menú actualizada", "success");
+    // Guardamos en la config global para que persista
+    if(!window.cfg) window.cfg = {};
+    window.cfg.bgmVol = val;
+    localStorage.setItem('a_notes_cfg', JSON.stringify(window.cfg));
 };
 
 window.playRandomBGM = async function() {
     const bgm = document.getElementById('menu-bgm');
-    if(!bgm) return;
+    if(!bgm || window.bgmStarted) return;
     
-    // Aplicar volumen guardado
-    bgm.volume = (window.cfg && window.cfg.bgmVol !== undefined) ? (window.cfg.bgmVol / 100) : 0.2;
-
-    // Si ya subió una personalizada en esta sesión, no la pisamos
+    // Si el usuario ya subió su propio MP3 en esta sesión, no lo molestamos
     if(bgm.src && bgm.src.includes('blob:')) return;
 
+    // Aplicar volumen desde la configuración
+    bgm.volume = (window.cfg && window.cfg.bgmVol !== undefined) ? (window.cfg.bgmVol / 100) : 0.2;
+
     try {
-        // Buscar una canción random top de Osu!
-        const terms = ["anime", "fnf", "vocaloid", "camellia"];
+        const terms = ["anime", "vocaloid", "camellia", "touhou", "j-pop", "future core"];
         const q = terms[Math.floor(Math.random() * terms.length)];
-        const res = await fetch(`https://api.nerinyan.moe/search?q=${q}&m=3`);
+        
+        // Buscamos en la API de Osu!
+        const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(q)}&m=3`);
         const data = await res.json();
         
         if (data && data.length > 0) {
             const randomSong = data[Math.floor(Math.random() * data.length)];
-            // Usamos la preview de audio de Osu para no cargar un mp3 de 5MB en el menú
+            
+            // 🚨 CONFIGURACIÓN DE LA CANCIÓN 🚨
             bgm.src = `https://b.ppy.sh/preview/${randomSong.id}.mp3`;
+            bgm.loop = true;
+            
+            // 🚨 EL FIX: Intentar reproducir y marcar como iniciado
+            await bgm.play();
+            window.bgmStarted = true;
+            console.log("🎶 BGM de Osu! iniciado: " + randomSong.title);
         }
-    } catch(e) { console.warn("No se pudo cargar BGM de Osu", e); }
+    } catch(e) { 
+        console.warn("⚠️ No se pudo cargar BGM de Osu. Reintentando en el próximo clic.", e); 
+    }
 };
 
+// 🚨 TRIGGER MAESTRO: Activa el BGM en el primer clic del usuario en la pantalla
+document.addEventListener('mousedown', function startEverything() {
+    // Desbloqueamos el audio general del juego
+    window.unlockAudio();
+    
+    // Si el BGM aún no suena, lo lanzamos
+    if (!window.bgmStarted) {
+        window.playRandomBGM();
+    }
+    
+    // Eliminamos este "escuchador" para que no se ejecute en cada clic
+    document.removeEventListener('mousedown', startEverything);
+}, { once: true });
 // Intentar reproducir en la primera interacción del usuario (Regla de navegadores)
 // =====================================================================
 // 🔔 SISTEMA GLOBAL DE CIERRE DE VENTANAS Y NOTIFICACIONES
