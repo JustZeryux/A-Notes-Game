@@ -1,269 +1,122 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO) === */
+/* ==========================================================
+   SETTINGS.JS - MOTOR DE CONFIGURACIÓN MAESTRO V3
+   ========================================================== */
 
-window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
+// Helper anti-bugs: Evita que el número "0" sea ignorado
+function getNum(id, defaultValue) {
+    let el = document.getElementById(id);
+    if (!el || el.value === "") return defaultValue;
+    let val = parseFloat(el.value);
+    return isNaN(val) ? defaultValue : val;
+}
 
-window.getShapeSvg = function(shapeName, color) {
-    let s = shapeName || 'circle', c = color || '#00ffff';
-    switch(s) {
-        case 'circle': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="40" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
-        case 'diamond': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><polygon points="50,10 90,50 50,90 10,50" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
-        case 'bar': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><rect x="15" y="35" width="70" height="30" rx="10" fill="${c}" stroke="white" stroke-width="5"/></svg>`;
-        case 'ring': return `<svg viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${c});"><circle cx="50" cy="50" r="35" fill="none" stroke="${c}" stroke-width="15"/></svg>`;
-        default: return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="${c}"/></svg>`;
-    }
+window.saveSettings = function() {
+    if (!window.cfg) window.cfg = {};
+
+    // 1. MANIA & TECLAS
+    window.cfg.spd = getNum('cfg-spd', 25);
+    window.cfg.judgeY = getNum('cfg-hit-pos', 85);
+    window.cfg.noteScale = getNum('cfg-note-size', 100) / 100;
+    window.cfg.den = getNum('cfg-den', 7);
+    window.cfg.fov = getNum('cfg-fov', 0);
+    window.cfg.noteOp = getNum('cfg-noteop', 100);
+    
+    let chkDown = document.getElementById('cfg-down');
+    window.cfg.down = chkDown ? chkDown.checked : false;
+
+    // 2. VISUALES
+    window.cfg.trackOp = getNum('cfg-dim', 50);
+    
+    let chkSplash = document.getElementById('cfg-splash');
+    window.cfg.showSplash = chkSplash ? chkSplash.checked : true;
+    
+    let chkMs = document.getElementById('cfg-show-ms');
+    window.cfg.showMs = chkMs ? chkMs.checked : true;
+    
+    let chkUi = document.getElementById('cfg-hide-ui');
+    window.cfg.hideHud = chkUi ? chkUi.checked : false;
+
+    // 3. AUDIO (Convertimos de la barra 0-100 a decimal 0.0 - 1.0 para el juego)
+    let hitSoundEl = document.getElementById('cfg-hitsound');
+    window.cfg.hitsound = hitSoundEl ? hitSoundEl.value : 'default';
+    
+    // 🚨 FIX DEL VOLUMEN EN 0:
+    window.cfg.vol = getNum('cfg-vol', 50) / 100;
+    window.cfg.hvol = getNum('cfg-hvol', 60) / 100;
+    window.cfg.missVol = getNum('cfg-mvol', 40) / 100;
+    window.cfg.off = getNum('cfg-off', 0);
+
+    // 4. RENDIMIENTO Y UX
+    let chkPerf = document.getElementById('cfg-perf-mode');
+    window.cfg.perfMode = chkPerf ? chkPerf.checked : false;
+    window.cfg.vivid = !window.cfg.perfMode; // Si activa rendimiento, apaga lo vívido
+    
+    let chkFps = document.getElementById('cfg-show-fps');
+    window.cfg.showFps = chkFps ? chkFps.checked : false;
+
+    let chkSub = document.getElementById('cfg-subtitles');
+    window.cfg.showLyrics = chkSub ? chkSub.checked : true;
+
+    // GUARDAR EN LA MEMORIA DEL NAVEGADOR
+    localStorage.setItem('a_notes_cfg', JSON.stringify(window.cfg));
+
+    if(typeof window.notify === 'function') window.notify("✅ Ajustes guardados y aplicados", "success");
+    if(typeof window.closeModal === 'function') window.closeModal('settings');
 };
 
 window.loadSettings = function() {
-    if (!window.cfg) window.cfg = {};
-    if (!window.cfg.modes) window.cfg.modes = {};
-
-    let saved = localStorage.getItem('gameCfg');
+    // 1. Recuperar de la memoria
+    let saved = localStorage.getItem('a_notes_cfg');
     if (saved) {
-        try { 
+        try {
             let parsed = JSON.parse(saved);
-            for (let key in parsed) {
-                if (key === 'modes') {
-                    for (let k in parsed.modes) window.cfg.modes[k] = parsed.modes[k];
-                } else { window.cfg[key] = parsed[key]; }
-            }
-        } catch(e) { console.warn("Error leyendo settings"); }
+            window.cfg = { ...window.cfg, ...parsed }; 
+        } catch(e) { console.warn("Error cargando cfg"); }
     }
 
-    const defKeys = { 4:['d','f','j','k'], 5:['d','f',' ','j','k'], 6:['s','d','f','j','k','l'], 7:['s','d','f',' ','j','k','l'], 9:['a','s','d','f',' ','h','j','k','l'] };
-    for(let k = 1; k <= 10; k++) {
-        if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
-            window.cfg.modes[k] = [];
-            let kArr = defKeys[k] || ['a','s','d','f','g','h','j','k','l',';'];
-            for(let i=0; i<k; i++) window.cfg.modes[k].push({ k: kArr[i]||' ', c: '#00ffff', s: 'circle' });
-        }
-    }
+    // 2. Pintar los valores en los inputs del menú para que los veas al abrir
+    if (document.getElementById('cfg-spd')) document.getElementById('cfg-spd').value = window.cfg.spd || 25;
+    if (document.getElementById('cfg-hit-pos')) document.getElementById('cfg-hit-pos').value = window.cfg.judgeY || 85;
+    if (document.getElementById('cfg-note-size')) document.getElementById('cfg-note-size').value = (window.cfg.noteScale || 1) * 100;
+    if (document.getElementById('cfg-den')) document.getElementById('cfg-den').value = window.cfg.den || 7;
+    if (document.getElementById('cfg-fov')) document.getElementById('cfg-fov').value = window.cfg.fov || 0;
+    if (document.getElementById('cfg-noteop')) document.getElementById('cfg-noteop').value = window.cfg.noteOp || 100;
+    if (document.getElementById('cfg-down')) document.getElementById('cfg-down').checked = !!window.cfg.down;
 
-    const setVal = (id, prop) => { const el=document.getElementById(id); if(el && window.cfg[prop]!==undefined) el.value=window.cfg[prop]; };
-    const setChk = (id, prop) => { const el=document.getElementById(id); if(el && window.cfg[prop]!==undefined) el.checked=!!window.cfg[prop]; };
-    const setTxt = (id, prop) => { 
-        const el=document.getElementById(id); 
-        if(el && window.cfg[prop]) {
-            let txt = String(window.cfg[prop]).toUpperCase().replace(/KEY/g, '').replace(/DIGIT/g, '').replace(/ARROW/g, '');
-            if(txt === ' ' || txt === 'SPACE') txt = 'SPC'; el.innerText = txt; 
-        }
-    };
+    if (document.getElementById('cfg-dim')) document.getElementById('cfg-dim').value = window.cfg.trackOp || 50;
+    if (document.getElementById('cfg-splash')) document.getElementById('cfg-splash').checked = !!window.cfg.showSplash;
+    if (document.getElementById('cfg-show-ms')) document.getElementById('cfg-show-ms').checked = !!window.cfg.showMs;
+    if (document.getElementById('cfg-hide-ui')) document.getElementById('cfg-hide-ui').checked = !!window.cfg.hideHud;
 
-    setChk('cfg-perf-mode', 'perfMode'); setChk('cfg-show-fps', 'showFps'); setChk('cfg-subtitles', 'subtitles');
-    setVal('cfg-ui-skin', 'uiSkin'); setVal('cfg-spd', 'spd'); setChk('cfg-down', 'down'); setVal('cfg-den', 'den');
-    setVal('cfg-fov', 'fov'); setVal('cfg-noteop', 'noteOp'); setVal('cfg-hit-pos', 'hitPos'); setVal('cfg-note-size', 'noteSize');
-    setVal('cfg-note-skin', 'noteSkin'); setVal('cfg-std-ar', 'stdAR'); setVal('cfg-std-cs', 'stdCS'); setChk('cfg-std-trail', 'stdTrail');
-    setTxt('cfg-std-k1', 'stdK1'); setTxt('cfg-std-k2', 'stdK2'); setVal('cfg-tk-spd', 'tkSpeed');
-    setTxt('cfg-tk-dl', 'tkDonL'); setTxt('cfg-tk-dr', 'tkDonR'); setTxt('cfg-tk-kl', 'tkKatsuL'); setTxt('cfg-tk-kr', 'tkKatsuR');
-    setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS'); setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
-    setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
+    if (document.getElementById('cfg-hitsound')) document.getElementById('cfg-hitsound').value = window.cfg.hitsound || 'default';
     
-    if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol !== undefined ? window.cfg.vol : 0.5) * 100;
-    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol !== undefined ? window.cfg.hvol : 0.8) * 100;
-    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol !== undefined ? window.cfg.missVol : 0.6) * 100;
-    setVal('cfg-off', 'off'); setVal('cfg-hitsound', 'hitSound');
-    if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
+    // Convertir de decimal (0.5) a barra visual (50)
+    if (document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol !== undefined ? window.cfg.vol : 0.5) * 100;
+    if (document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol !== undefined ? window.cfg.hvol : 0.6) * 100;
+    if (document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol !== undefined ? window.cfg.missVol : 0.4) * 100;
+    if (document.getElementById('cfg-off')) document.getElementById('cfg-off').value = window.cfg.off || 0;
+
+    if (document.getElementById('cfg-perf-mode')) document.getElementById('cfg-perf-mode').checked = !!window.cfg.perfMode;
+    if (document.getElementById('cfg-show-fps')) document.getElementById('cfg-show-fps').checked = !!window.cfg.showFps;
+    if (document.getElementById('cfg-subtitles')) document.getElementById('cfg-subtitles').checked = !!window.cfg.showLyrics;
 };
 
-window.openSettingsPanel = function() {
-    window.loadSettings();
-    let modal = document.getElementById('modal-settings');
-    if (modal) { modal.style.display = 'flex'; modal.style.zIndex = '9999999'; }
-    const select = document.getElementById('kb-mode-select');
-    window.renderLaneConfig(parseInt(select ? select.value : 4));
-};
-
-window.closeSettingsPanel = function() {
-    let modal = document.getElementById('modal-settings');
-    if (modal) modal.style.display = 'none';
-};
-
-window.saveSettings = function() {
-    const getVal = (id) => { const el=document.getElementById(id); return el ? parseFloat(el.value) : 0; };
-    const getStr = (id) => { const el=document.getElementById(id); return el ? el.value : 'default'; };
-    const getChk = (id) => { const el=document.getElementById(id); return el ? el.checked : false; };
-
-    window.cfg.perfMode = getChk('cfg-perf-mode'); window.cfg.showFps = getChk('cfg-show-fps'); window.cfg.subtitles = getChk('cfg-subtitles');
-    window.cfg.uiSkin = getStr('cfg-ui-skin'); window.cfg.spd = getVal('cfg-spd'); window.cfg.down = getChk('cfg-down'); 
-    window.cfg.den = getVal('cfg-den'); window.cfg.fov = getVal('cfg-fov'); window.cfg.noteOp = getVal('cfg-noteop'); 
-    window.cfg.hitPos = getVal('cfg-hit-pos'); window.cfg.noteSize = getVal('cfg-note-size'); window.cfg.noteSkin = getStr('cfg-note-skin');
-    window.cfg.stdAR = getVal('cfg-std-ar'); window.cfg.stdCS = getVal('cfg-std-cs'); window.cfg.stdTrail = getChk('cfg-std-trail');
-    window.cfg.tkSpeed = getVal('cfg-tk-spd'); window.cfg.ctSpeed = getVal('cfg-ct-spd'); window.cfg.ctCS = getVal('cfg-ct-cs');
-    window.cfg.bgDim = getVal('cfg-dim'); window.cfg.showSplash = getChk('cfg-splash'); window.cfg.showMs = getChk('cfg-show-ms'); window.cfg.hideUI = getChk('cfg-hide-ui');
-    
-    let volEl = document.getElementById('cfg-vol'); if(volEl) window.cfg.vol = parseFloat(volEl.value) / 100;
-    let hvolEl = document.getElementById('cfg-hvol'); if(hvolEl) window.cfg.hvol = parseFloat(hvolEl.value) / 100;
-    let mvolEl = document.getElementById('cfg-mvol'); if(mvolEl) window.cfg.missVol = parseFloat(mvolEl.value) / 100;
-    window.cfg.off = getVal('cfg-off'); window.cfg.hitSound = getStr('cfg-hitsound');
-
-    localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
-    if (typeof window.notify === 'function') window.notify("Ajustes guardados.", "success");
-    window.closeSettingsPanel();
-};
-
+// Lógica visual para cambiar entre las pestañas del menú de ajustes
 window.switchSetTab = function(tabId) {
-    document.querySelectorAll('.set-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.set-section').forEach(s => s.style.display = 'none');
-    if(event && event.currentTarget) event.currentTarget.classList.add('active');
-    const tab = document.getElementById(tabId); if(tab) tab.style.display = 'block';
-    if(tabId === 'set-mania') window.renderLaneConfig(parseInt(document.getElementById('kb-mode-select').value || 4));
-};
-
-window.renderLaneConfig = function(k) {
-    k = parseInt(k); if (!k || isNaN(k)) k = 4;
-    const cont = document.getElementById('lanes-container'); if(!cont) return;
-    if(!window.cfg.modes[k]) window.loadSettings();
-
-    let html = '';
-    window.cfg.modes[k].forEach((lane, i) => {
-        let kStr = String(lane.k || ''); let keyText = '';
-        
-        if (kStr === ' ' || kStr.toLowerCase() === 'space') {
-            keyText = 'SPC';
-        } else {
-            keyText = kStr.toUpperCase().replace(/KEY/g, '').replace(/DIGIT/g, '').replace(/ARROW/g, '');
-            if (keyText.length > 5) keyText = keyText.substring(0, 4) + '..';
-        }
-
-        let shapeSvg = window.getShapeSvg(lane.s, lane.c);
-
-        html += `
-        <div class="l-col" style="display:flex; flex-direction:column; align-items:center; gap:15px; margin:0 5px;">
-            <button class="key-bind" onclick="window.remapKey(this, ${k}, ${i})" 
-                 style="width:70px; height:70px; border:3px solid ${lane.c}; border-radius:15px; font-weight:900; font-size:1.6rem; cursor:pointer; background:#111; color:white; box-shadow:0 0 15px rgba(0,0,0,0.5); overflow:hidden;">
-                ${keyText}
-            </button>
-            <div class="shape-indicator" onclick="window.cycleShape(${k}, ${i})" style="width:40px; height:40px; cursor:pointer;">${shapeSvg}</div>
-            <input type="color" value="${lane.c}" onchange="window.updateLaneColor(${k}, ${i}, this.value)" style="width:60px; height:25px; border:none; cursor:pointer; padding:0;">
-        </div>`;
-    });
-    cont.innerHTML = html;
-    window.updatePreview(k);
-};
-
-window.cycleShape = function(k, laneIdx) {
-    if (!window.cfg.modes[k][laneIdx].s) window.cfg.modes[k][laneIdx].s = 'circle';
-    let curr = window.cfg.modes[k][laneIdx].s;
-    let next = window.NOTE_SHAPES[(window.NOTE_SHAPES.indexOf(curr) + 1) % window.NOTE_SHAPES.length];
-    window.cfg.modes[k][laneIdx].s = next;
-    window.renderLaneConfig(k);
-};
-
-window.updateLaneColor = function(k, laneIdx, newColor) { window.cfg.modes[k][laneIdx].c = newColor; window.renderLaneConfig(k); };
-
-window.remapKey = function(btnElement, k, laneIdx) {
-    if(btnElement.dataset.waiting === "true") return;
-    btnElement.dataset.waiting = "true";
-    btnElement.innerText = "..."; 
-    btnElement.style.background = "#F9393F"; 
-    btnElement.blur();
-
-    const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
-    overlay.innerHTML = `<div style="color:#F9393F; font-size:4rem; font-weight:900; text-shadow:0 0 30px #F9393F;">ASIGNAR TECLA</div><div style="color:white; font-size:1.8rem; margin-top:15px;">Presiona la nueva tecla para el Carril ${laneIdx + 1}</div><div style="color:#888; margin-top:30px; font-size:1rem;">(Haz clic aquí o presiona ESC para cancelar)</div>`;
-    document.body.appendChild(overlay);
-
-    const cleanUp = () => {
-        btnElement.dataset.waiting = "false";
-        overlay.remove(); 
-        window.removeEventListener('keydown', capture, { capture: true });
-        window.renderLaneConfig(k);
-    };
-
-    const capture = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        let keyToSave = e.key;
-        
-        if (e.code === "Space" || e.key === " ") keyToSave = " "; 
-        else if (keyToSave.length === 1) keyToSave = keyToSave.toLowerCase();
-        
-        if (e.key !== "Escape" && e.key !== "Esc") {
-            window.cfg.modes[k][laneIdx].k = keyToSave;
-        }
-        cleanUp();
-    };
+    document.querySelectorAll('.set-section').forEach(sec => sec.style.display = 'none');
+    document.querySelectorAll('.set-tab-btn').forEach(btn => btn.classList.remove('active'));
     
-    overlay.onclick = cleanUp;
-
-    setTimeout(() => { 
-        window.addEventListener('keydown', capture, { capture: true }); 
-    }, 200);
-};
-
-window.captureSingleKey = function(btnId, cfgProp) {
-    const btn = document.getElementById(btnId); 
-    if(!btn || btn.dataset.waiting === "true") return;
+    let target = document.getElementById(tabId);
+    if(target) target.style.display = 'block';
     
-    const origText = btn.innerText; 
-    btn.dataset.waiting = "true"; 
-    btn.innerText = "..."; 
-    btn.style.background = "#F9393F"; 
-    btn.blur();
-
-    const overlay = document.createElement('div');
-    overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center;";
-    overlay.innerHTML = `<div style="color:#ff66aa; font-size:4rem; font-weight:900;">ASIGNAR TECLA</div><div style="color:white; font-size:1.5rem; margin-top:10px;">Toca cualquier tecla...</div><div style="color:#888; margin-top:30px; font-size:1rem;">(Haz clic aquí o presiona ESC para cancelar)</div>`;
-    document.body.appendChild(overlay);
-
-    const cleanUp = () => {
-        btn.dataset.waiting = "false"; 
-        btn.style.background = "transparent";
-        overlay.remove(); 
-        window.removeEventListener('keydown', capture, { capture: true });
-    };
-
-    const capture = (e) => {
-        e.preventDefault(); e.stopPropagation();
-        let key = e.key; 
-        
-        if(e.code === "Space" || key === " ") key = " ";
-        else if (key.length === 1) key = key.toLowerCase();
-
-        if (e.key !== "Escape" && e.key !== "Esc") {
-            window.cfg[cfgProp] = key; 
-            let display = key === " " ? "SPC" : key.toUpperCase().replace(/ARROW/g,'').replace(/KEY/g,'').replace(/DIGIT/g,'');
-            btn.innerText = display.length > 5 ? display.substring(0,4)+'..' : display;
-        } else { 
-            btn.innerText = origText; 
-        }
-        cleanUp();
-    };
-    
-    overlay.onclick = () => { btn.innerText = origText; cleanUp(); };
-
-    setTimeout(() => window.addEventListener('keydown', capture, { capture: true }), 200);
-};
-
-window.updatePreview = function(k) {
-    const box = document.getElementById('live-skin-preview'); if(!box) return;
-    let html = '';
-    for(let i=0; i<k; i++) {
-        let laneData = window.cfg.modes[k][i]; if(!laneData) continue;
-        let shapeSvg = window.getShapeSvg(laneData.s, laneData.c);
-        html += `<div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);"><div style="width:50px; height:50px;">${shapeSvg}</div></div>`;
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
     }
-    box.innerHTML = html;
 };
 
-window.populateSkinDropdowns = function() {
-    const ns = document.getElementById('cfg-note-skin'), ui = document.getElementById('cfg-ui-skin');
-    if(!ns || !ui || !window.user || !window.user.inventory || typeof SHOP_ITEMS === 'undefined') return;
-    window.user.inventory.forEach(itemId => {
-        let item = SHOP_ITEMS.find(i => i.id === itemId);
-        if(item) {
-            if(item.type === 'skin' && !ns.querySelector(`option[value="${item.id}"]`)) ns.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-            if(item.type === 'ui' && !ui.querySelector(`option[value="${item.id}"]`)) ui.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-        }
-    });
-    ns.value = window.cfg.noteSkin || 'default'; ui.value = window.cfg.uiSkin || 'default';
-};
-
-// ==========================================
-// AUTO-INICIO INSTANTÁNEO (FIX RETRASO)
-// ==========================================
-// 1. Ejecutar al instante en la RAM para que game.js ya tenga tus teclas listas
-window.loadSettings();
-
-// 2. Ejecutar de nuevo cuando el HTML cargue para pintar los botones de la interfaz
-window.addEventListener('DOMContentLoaded', () => {
-    window.loadSettings();
+// Cargar ajustes automáticamente cuando entras a la página
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        if(typeof window.loadSettings === 'function') window.loadSettings();
+    }, 500);
 });
