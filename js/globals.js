@@ -150,6 +150,18 @@ function createLanes(k) {
     return arr;
 }
 
+window.filtrarTienda = function(categoria) {
+    const items = document.querySelectorAll('.shop-item-card'); // Asegúrate que al crear ítems en tu tienda, les pongas esta clase
+    items.forEach(item => {
+        // Necesitas añadir data-category="skin" (o la categoría correspondiente) al HTML de los ítems de tu tienda.
+        if(categoria === 'all' || item.dataset.category === categoria) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
 window.cfg = { 
     spd: 22, den: 5, down: false, middleScroll: false, off: 0,
     vivid: true, shake: true, trackOp: 10, noteOp: 100,
