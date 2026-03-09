@@ -212,7 +212,10 @@ document.addEventListener('click', (e) => {
 // =====================================================================
 
 // Abrir el panel y limpiar el contador de mensajes nuevos
-window.openNotifPanel = function() {
+window.openNotifPanel = function(event) {
+    // 🚨 ESCUDO ANTI-CIERRE: Evita que el clic se propague al fondo
+    if (event) event.stopPropagation(); 
+    
     const panel = document.getElementById('notif-panel');
     const badge = document.getElementById('notif-badge');
     
@@ -220,7 +223,7 @@ window.openNotifPanel = function() {
     
     if (panel.style.display === 'none' || panel.style.display === '') {
         panel.style.display = 'block';
-        // Limpiamos el contador rojo al abrir las notificaciones
+        // Limpiamos el contador rojo
         if (badge) {
             badge.innerText = '0';
             badge.style.display = 'none';
