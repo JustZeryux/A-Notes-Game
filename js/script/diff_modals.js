@@ -26,22 +26,12 @@ window.showEmptyMapModal = function(k, songData) {
 document.getElementById('btn-empty-play').onclick = () => {
         document.getElementById('modal-empty-map').remove();
         
-        // 1. Banderas globales: Le avisamos a tu game.js que QUEREMOS usar su automapeo
-        window.useNativeAutomap = true; 
-        window.forceAutomap = true;
+        // La llave maestra que le avisará a game.js que se salte la alerta
+        window.forceAutomap = true; 
         
-        // 2. Llamamos a tu juego de forma limpia (Sin inyectar notas falsas)
-        if (typeof window.prepareAndPlaySong === 'function') {
-            window.prepareAndPlaySong(k, true); // Mandamos un 'true' por si tu función lo lee
-        } else if (typeof window.startGame === 'function') {
-            window.startGame(k, true);
-        }
+        if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+        else if (typeof window.startGame === 'function') window.startGame(k);
     };
-    document.getElementById('btn-empty-edit').onclick = () => {
-        document.getElementById('modal-empty-map').remove();
-        if (typeof window.openEditor === 'function') window.openEditor(songData, k, 'mania');
-    };
-};
 
 window.openUnifiedDiffModal = function(song) {
     const titleEl = document.getElementById('diff-song-title');
