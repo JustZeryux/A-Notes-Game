@@ -429,137 +429,168 @@ setInterval(() => {
 // 🧠 MOTOR DE AUTO-MAPEO INTELIGENTE (ANÁLISIS DE ONDAS DE AUDIO REAL)
 // =========================================================================
 
+// =========================================================================
+// 1️⃣ INYECCIÓN CSS: ARREGLO DE LA LÍNEA ROJA Y RECEPTORES BLANCOS
+// =========================================================================
+const fixEditorUI = document.createElement('style');
+fixEditorUI.innerHTML = `
+    /* Oculta los receptores blancos/celestes SOLO dentro del editor */
+    #editor-layer .receptor, 
+    #editor-layer .arrow-wrapper.receptor, 
+    #editor-layer .game-receptor {
+        display: none !important;
+    }
+    
+    /* Clava la línea roja (playhead) en la parte inferior de la pista */
+    #editor-layer #playhead, 
+    #editor-layer .playhead, 
+    #editor-layer #editor-red-line {
+        position: absolute !important;
+        bottom: 100px !important; /* Ajusta este número si la quieres más arriba o abajo */
+        top: auto !important; 
+        width: 100% !important;
+        height: 3px !important;
+        background: #F9393F !important;
+        box-shadow: 0 0 15px #F9393F !important;
+        z-index: 100 !important;
+        left: 0 !important;
+        margin: 0 !important;
+        transform: none !important;
+    }
+`;
+document.head.appendChild(fixEditorUI);
+
+
+// =========================================================================
+// 2️⃣ FIX: BORRAR TODAS LAS NOTAS (SIN FANTASMAS)
+// =========================================================================
+window.clearAllEditorNotes = function() {
+    if (!confirm("⚠️ ¿Estás seguro de que quieres borrar TODAS las notas de este mapa?")) return;
+    
+    // 🚨 EL FIX VITAL: Vaciar conservando la referencia de memoria
+    if (window.edNotes) window.edNotes.length = 0; 
+    
+    // Si tu editor usa curSongData de respaldo, también lo vaciamos
+    if (window.curSongData && window.edKeys) {
+        let keyStr = `notes_${window.edKeys}k`;
+        if (window.curSongData[keyStr]) window.curSongData[keyStr].length = 0;
+    }
+
+    // Destrucción visual forzada
+    let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
+    if (notesContainer) notesContainer.innerHTML = '';
+    document.querySelectorAll('#editor-layer .ed-note, #editor-layer .editor-note, #editor-layer .arrow-wrapper:not(.receptor)').forEach(el => el.remove());
+    
+    if (typeof renderEditorNotes === 'function') renderEditorNotes();
+    if (typeof updateTimeline === 'function') updateTimeline();
+    
+    if(typeof window.notify === 'function') window.notify("🗑️ Mapa limpiado por completo.", "success");
+};
+
+
+// =========================================================================
+// 3️⃣ MOTOR DE AUTO-MAPEO INTELIGENTE (CON PLAN B MATEMÁTICO ANTI-CORS)
+// =========================================================================
 window.applyEditorAutoMap = async function() {
     if (window.edNotes && window.edNotes.length > 0) {
         if (!confirm("⚠️ Esto borrará todas las notas actuales del editor. ¿Estás seguro?")) return;
     }
 
-    if(typeof window.notify === 'function') window.notify("🧠 Analizando espectro de audio... Espere.", "info");
+    if(typeof window.notify === 'function') window.notify("🧠 Analizando audio... Espere.", "info");
 
-window.edNotes = []; 
-    
-    // 🚨 FIX VISUAL: Destruir todas las notas viejas de la pantalla antes de dibujar las nuevas
-    let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
-    if (notesContainer) notesContainer.innerHTML = '';
-    document.querySelectorAll('.ed-note, .editor-note, .arrow-wrapper, .editor-arrow').forEach(el => el.remove());
+    // 🚨 Vaciar memoria sin romper la referencia
+    if (window.edNotes) window.edNotes.length = 0;
+
+    let diffMult = parseFloat(document.getElementById('auto-map-diff').value) || 2;
     let audioUrl = window.curSongData.audioURL || window.curSongData.url;
 
-    if (!audioUrl) {
-        if(typeof window.notify === 'function') window.notify("❌ Error: No se encontró el archivo de audio.", "error");
-        return;
-    }
+    // --- PLAN B: Auto-Mapeo Matemático Rítmico ---
+    let fallbackMathMap = () => {
+        if(typeof window.notify === 'function') window.notify("⚠️ Audio protegido en la nube. Usando mapeo rítmico matemático.", "warning");
+        let bpm = window.curSongData.bpm || 120;
+        let durationMs = (window.st.songDuration || window.edAudioDuration || 120) * 1000;
+        let msPerStep = (60000 / bpm) / diffMult;
+        
+        for (let t = 3000; t < durationMs; t += msPerStep) {
+            let lane = Math.floor(Math.random() * window.edKeys);
+            window.edNotes.push({ t: Math.floor(t), l: lane, type: 'tap' });
+            if (diffMult >= 2 && Math.random() > 0.8) {
+                let extraLane = Math.floor(Math.random() * window.edKeys);
+                if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
+            }
+        }
+        refreshEditor();
+    };
 
+    // --- FUNCIÓN PARA REFRESCAR PANTALLA ---
+    let refreshEditor = () => {
+        let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
+        if (notesContainer) notesContainer.innerHTML = '';
+        document.querySelectorAll('#editor-layer .ed-note, #editor-layer .editor-note, #editor-layer .arrow-wrapper:not(.receptor)').forEach(el => el.remove());
+
+        if (typeof renderEditorNotes === 'function') renderEditorNotes();
+        if (typeof updateTimeline === 'function') updateTimeline();
+        if (typeof window.notify === 'function') window.notify(`✅ Mapa base generado (${window.edNotes.length} notas).`, "success");
+    };
+
+    if (!audioUrl) return fallbackMathMap();
+
+    // --- PLAN A: IA Analizador de Espectro ---
     try {
-        // 1. DESCARGAR Y DECODIFICAR EL AUDIO REAL
         const response = await fetch(audioUrl);
         const arrayBuffer = await response.arrayBuffer();
-        
-        // Creamos un motor de audio invisible para leer las ondas
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        
-        // 2. EXTRACCIÓN DE DATOS (Capa izquierda del audio)
         const channelData = audioBuffer.getChannelData(0);
         const sampleRate = audioBuffer.sampleRate;
-        
-        // Dividimos la canción en "ventanas" de 50 milisegundos
-        const windowSize = Math.floor(sampleRate * 0.05); 
+        const windowSize = Math.floor(sampleRate * 0.05);
         let energies = [];
         let sumEnergy = 0;
 
-        // Calculamos la "Fuerza" de cada ventana de 50ms
         for (let i = 0; i < channelData.length; i += windowSize) {
             let energy = 0;
             for (let j = 0; j < windowSize && (i + j) < channelData.length; j++) {
-                energy += Math.abs(channelData[i + j]); // Suma la amplitud de la onda
+                energy += Math.abs(channelData[i + j]);
             }
             energies.push(energy);
             sumEnergy += energy;
         }
 
-        // 3. IA DE DECISIÓN DE NOTAS
-        let avgEnergy = sumEnergy / energies.length; // Promedio de volumen de la canción
-        
-        // El umbral dinámico decide qué tan fuerte debe sonar algo para ser una nota.
-        // Dificultades altas bajan el umbral (atrapan más sonidos).
-        let threshold = avgEnergy * (3.5 - (diffMult * 0.3)); 
-        let strongThreshold = threshold * 1.5; // Umbral para notas especiales/dobles
-        
-        // Evita que las notas se encimen creando una "velocidad máxima" según el BPM
+        let avgEnergy = sumEnergy / energies.length;
+        let threshold = avgEnergy * (3.5 - (diffMult * 0.3));
+        let strongThreshold = threshold * 1.5;
         let minMsBetweenNotes = (60000 / (window.curSongData.bpm || 120)) / diffMult;
         let lastNoteTimeMs = 0;
-        
-        // Identificar el modo de juego actual en el editor
         let mode = window.edMode || window.curSongData.originalMode || 'mania';
         let keys = window.edKeys || 4;
 
-        // 4. GENERACIÓN DEL MAPA
         for (let i = 0; i < energies.length; i++) {
             if (energies[i] > threshold) {
-                let timeMs = (i * windowSize / sampleRate) * 1000; // Convertimos de vuelta a Milisegundos
-                
-                // Empezamos desde el segundo 2 para ignorar ruido de inicio
+                let timeMs = (i * windowSize / sampleRate) * 1000;
                 if (timeMs > 2000 && (timeMs - lastNoteTimeMs) >= minMsBetweenNotes) {
-                    
                     if (mode === 'mania') {
-                        // === LÓGICA MANIA ===
                         let lane = Math.floor(Math.random() * keys);
                         window.edNotes.push({ t: Math.floor(timeMs), l: lane, type: 'tap' });
-                        
-                        // Si el golpe de batería es MUY fuerte, lanza nota doble (Acorde)
                         if (energies[i] > strongThreshold && diffMult >= 2) {
                             let extraLane = Math.floor(Math.random() * keys);
                             if(extraLane !== lane) window.edNotes.push({ t: Math.floor(timeMs), l: extraLane, type: 'tap' });
                         }
-                    } 
-                    else if (mode === 'standard' || mode === 'catch') {
-                        // === LÓGICA OSU! STANDARD Y CATCH ===
-                        // Genera coordenadas X/Y dentro de la pantalla segura de Osu (512x384)
-                        let x = Math.floor(Math.random() * 400) + 56; // Evita los bordes extremos
+                    } else if (mode === 'standard' || mode === 'catch') {
+                        let x = Math.floor(Math.random() * 400) + 56;
                         let y = Math.floor(Math.random() * 280) + 52;
                         window.edNotes.push({ t: Math.floor(timeMs), x: x, y: y, type: 'circle' });
-                    }
-                    else if (mode === 'taiko') {
-                        // === LÓGICA TAIKO ===
-                        // Si el golpe es suave es DON (Rojo, tipo 1), si es muy fuerte es KAT (Azul, tipo 2/8)
+                    } else if (mode === 'taiko') {
                         let isKat = energies[i] > strongThreshold;
-                        // Nota: Ajusta 'type' al formato que lea tu motor de Taiko. 
-                        // Usualmente OsuTaiko lee "0" para normal y "8" para claps/finishers.
-                        let tType = isKat ? 8 : 1; 
-                        window.edNotes.push({ t: Math.floor(timeMs), x: 256, y: 192, type: 'circle', taikoType: tType });
+                        window.edNotes.push({ t: Math.floor(timeMs), x: 256, y: 192, type: 'circle', taikoType: isKat ? 8 : 1 });
                     }
-
                     lastNoteTimeMs = timeMs;
                 }
             }
         }
-
-        // 5. REFRESCO VISUAL
-        if (typeof renderEditorNotes === 'function') renderEditorNotes();
-        if (typeof updateTimeline === 'function') updateTimeline();
-        
-        if (typeof window.notify === 'function') window.notify(`✅ IA Mapeo Completado: ${window.edNotes.length} notas extraídas del audio.`, "success");
-
+        refreshEditor();
     } catch (error) {
-        console.error("Error en Auto-Mapper Inteligente:", error);
-        if (typeof window.notify === 'function') window.notify("❌ Error analizando las frecuencias de audio.", "error");
+        // SI LA NUBE BLOQUEA EL AUDIO, CAEMOS AL PLAN B
+        console.warn("IA Falló por protección CORS de la nube. Cambiando a Plan B...", error);
+        fallbackMathMap();
     }
-};
-
-window.clearAllEditorNotes = function() {
-    if (!confirm("⚠️ ¿Estás seguro de que quieres borrar TODAS las notas de este mapa?")) return;
-    
-    // 1. Limpiar memoria
-    window.edNotes = []; 
-    
-    // 2. Limpiar pantalla a la fuerza
-    let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
-    if (notesContainer) notesContainer.innerHTML = '';
-    document.querySelectorAll('.ed-note, .editor-note, .arrow-wrapper, .editor-arrow').forEach(el => el.remove());
-    
-    // 3. Refrescar timeline
-    if (typeof renderEditorNotes === 'function') renderEditorNotes();
-    if (typeof updateTimeline === 'function') updateTimeline();
-    
-    if(typeof window.notify === 'function') window.notify("🗑️ Mapa limpiado por completo.", "success");
 };
