@@ -93,10 +93,12 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         
         let modeParam = ""; 
         const fType = window.currentFilters.type;
-        if (fType.includes('taiko')) modeParam = "&m=1";
-        else if (fType.includes('catch')) modeParam = "&m=2";
-        else if (fType.includes('standard')) modeParam = "&m=0";
-        else if (fType.includes('mania')) modeParam = "&m=3";
+        
+        // 🚨 FIX: Fuerzo la API a buscar SOLO el modo exacto que seleccionaste
+        if (fType === 'osu_taiko') modeParam = "&m=1";
+        else if (fType === 'osu_catch') modeParam = "&m=2";
+        else if (fType === 'osu_standard') modeParam = "&m=0";
+        else if (fType === 'osu_mania') modeParam = "&m=3";
 
         const res1 = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}${modeParam}&p=${pageA}`);
         const d1 = await res1.json();
