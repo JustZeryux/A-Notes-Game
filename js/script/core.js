@@ -124,3 +124,85 @@ document.addEventListener('click', (e) => {
         }
     }
 });
+
+// =====================================================================
+// 🎵 SISTEMA DE MÚSICA DE FONDO (BGM) GLOBAL
+// =====================================================================
+window.bgmStarted = false;
+
+window.updateBgmVolume = function(val) {
+    const bgm = document.getElementById('menu-bgm');
+    if(bgm) bgm.volume = val / 100;
+    if(window.cfg) window.cfg.bgmVol = val;
+    if(typeof saveConfig === 'function') saveConfig();
+};
+
+window.setCustomBGM = function(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    const bgm = document.getElementById('menu-bgm');
+    const url = URL.createObjectURL(file);
+    bgm.src = url;
+    bgm.play().catch(e => console.warn("Esperando interacción para BGM..."));
+    if(typeof window.notify === 'function') window.notify("🎵 Música de menú actualizada", "success");
+};
+
+window.playRandomBGM = async function() {
+    const bgm = document.getElementById('menu-bgm');
+    if(!bgm) return;
+    
+    // Aplicar volumen guardado
+    bgm.volume = (window.cfg && window.cfg.bgmVol !== undefined) ? (window.cfg.bgmVol / 100) : 0.2;
+
+    // Si ya subió una personalizada en esta sesión, no la pisamos
+    if(bgm.src && bgm.src.includes('blob:')) return;
+
+    try {
+        // Buscar una canción random top de Osu!
+        const terms = ["anime", "fnf", "vocaloid", "camellia"];
+        const q = terms[Math.floor(Math.random() * terms.length)];
+        const res = await fetch(`https://api.nerinyan.moe/search?q=${q}&m=3`);
+        const data = await res.json();
+        
+        if (data && data.length > 0) {
+            const randomSong = data[Math.floor(Math.random() * data.length)];
+            // Usamos la preview de audio de Osu para no cargar un mp3 de 5MB en el menú
+            bgm.src = `https://b.ppy.sh/preview/${randomSong.id}.mp3`;
+        }
+    } catch(e) { console.warn("No se pudo cargar BGM de Osu", e); }
+};
+
+// Intentar reproducir en la primera interacción del usuario (Regla de navegadores)
+document.addEventListener('click', function initAudioContext() {
+    if(!window.bgmStarted) {
+        window.bgmStarted = true;
+        const bgm = document.getElementById('menu-bgm');
+        if(bgm && !bgm.src) window.playRandomBGM();
+        if(bgm && bgm.src && bgm.paused) bgm.play().catch(e=>{});
+        
+        // Desvincular para no ejecutar esto en cada clic
+        document.removeEventListener('click', initAudioContext);
+    }
+});
+
+// Controladores globales para apagar la música al jugar
+window.pauseBGM = function() {
+    const bgm = document.getElementById('menu-bgm');
+    if(bgm) bgm.pause();
+};
+window.resumeBGM = function() {
+    const bgm = document.getElementById('menu-bgm');
+    // Solo resumir si no estamos en la pantalla de juego o editor
+    const gameLayer = document.getElementById('game-layer');
+    const editorLayer = document.getElementById('editor-layer');
+    if((!gameLayer || gameLayer.style.display === 'none') && (!editorLayer || editorLayer.style.display === 'none')) {
+        if(bgm) bgm.play().catch(e=>{});
+    }
+};
+
+// 🚨 IMPORTANTE: Inyectar pauseBGM en tus funciones de empezar juego y resume en toMenu()
+const originalToMenu = window.toMenu;
+window.toMenu = function() {
+    if(typeof originalToMenu === 'function') originalToMenu();
+    window.resumeBGM();
+};
