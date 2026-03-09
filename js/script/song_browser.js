@@ -155,43 +155,54 @@ window.renderUnifiedGrid = function() {
     const grid = document.getElementById('song-grid'); if(!grid) return; grid.innerHTML = '';
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
-    let filtered = baseList.filter(song => {
-        let type = window.currentFilters.type;
+   let filtered = baseList.filter(song => {
+        const f = window.currentFilters;
 
-        // 1. FILTRO DE TIPO
-        if (type !== 'recent' && type !== 'all') {
-            if (type === 'charted') { if (song.isOsu) return false; return countTotalNotes(song.raw) > 0; }
-            if (type === 'mechanics') return song.raw && song.raw.mechanics && song.raw.mechanics.length > 0;
-            if (type === 'osu_mania' && song.originalMode !== 'mania') return false;
-            if (type === 'osu_standard' && song.originalMode !== 'standard') return false;
-            if (type === 'osu_taiko' && song.originalMode !== 'taiko') return false;
-            if (type === 'osu_catch' && song.originalMode !== 'catch') return false;
-            if ((type === 'com' || type === 'comunidad' || type === 'community') && song.isOsu) return false;
+        // 1. FILTRO DE TIPO (TODO, COMUNIDAD, RECIENTES, MANIA, etc.)
+        if (f.type !== 'all' && f.type !== 'recent') {
+            if (f.type === 'com' || f.type === 'comunidad') {
+                if (song.isOsu) return false;
+            } else if (f.type === 'charted') {
+                if (song.isOsu || countTotalNotes(song.raw) === 0) return false;
+            } else if (f.type === 'mechanics') {
+                if (!song.raw || !song.raw.mechanics || song.raw.mechanics.length === 0) return false;
+            } else if (f.type.startsWith('osu_')) {
+                const mode = f.type.replace('osu_', '');
+                if (song.originalMode !== mode) return false;
+            } else {
+                if (song.originalMode !== f.type) return false;
+            }
         }
 
-        // 2. FILTRO DE TECLAS (🚨 FIX: Oculta Standard si eliges teclas)
-        if (window.currentFilters.key !== 'all') {
-            let targetKey = parseInt(window.currentFilters.key);
+        // 2. FILTRO DE TECLAS (EL REPARADOR MAESTRO) 🚨
+        if (f.key !== 'all') {
+            const targetK = parseInt(f.key);
+            // Si el mapa es de Osu y NO es Mania (Standard/Taiko/Catch), ¡OCÚLTALO! No tienen teclas.
+            if (song.isOsu && song.originalMode !== 'mania') return false;
             
-            // Si el mapa es de Osu y NO es Mania, ¡OCULTALO! (Standard no tiene 5K)
-            if (song.isOsu && song.originalMode !== 'mania') return false; 
-            
-            // Permitir mostrar las canciones vacías de la comunidad
-            if (!song.keysAvailable || song.keysAvailable.length === 0) return true; 
-            
-            if (!song.keysAvailable.includes(targetKey)) return false; 
+            // Si es de la Comunidad o Mania, comprobamos si tiene la tecla o si está vacío (permitido)
+            if (song.keysAvailable && song.keysAvailable.length > 0) {
+                if (!song.keysAvailable.includes(targetK)) return false;
+            } else {
+                // Si el mapa es de Osu Mania pero no reporta teclas, lo ocultamos por seguridad
+                if (song.isOsu) return false;
+            }
         }
 
         // 3. FILTRO DE ESTRELLAS
-        if (window.currentFilters.stars !== 'all') {
+        if (f.stars !== 'all') {
+            const targetS = parseInt(f.stars);
             let sNum = 0;
-            if (song.isOsu) { sNum = parseFloat(song.starRating || 0); } 
-            else { let n = countTotalNotes(song.raw || song); sNum = n === 0 ? 0 : (n / 200) + 1; }
+            if (song.isOsu) {
+                sNum = parseFloat(song.starRating || 0);
+            } else { 
+                let n = countTotalNotes(song.raw || song); 
+                sNum = n === 0 ? 0 : (n / 200) + 1; 
+            }
             
-            let tStar = parseInt(window.currentFilters.stars);
-            if (tStar === 1 && sNum >= 2.0) return false; 
-            if (tStar > 1 && tStar < 5 && (sNum < tStar || sNum >= tStar + 1)) return false; 
-            if (tStar === 5 && sNum < 5.0) return false; 
+            if (targetS === 1 && sNum >= 2.0) return false;
+            if (targetS >= 2 && targetS <= 4 && (sNum < targetS || sNum >= targetS + 1)) return false;
+            if (targetS === 5 && sNum < 5.0) return false;
         }
         
         return true;
