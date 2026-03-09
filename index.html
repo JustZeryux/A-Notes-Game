@@ -562,7 +562,12 @@
                     🪙 <span id="shop-sp">0</span> SP
                 </div>
             </div>
-            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
+    <button class="action" onclick="filtrarTienda('all')" style="padding: 5px 15px; font-size: 0.9rem;">Todo</button>
+    <button class="action secondary" onclick="filtrarTienda('skin')" style="padding: 5px 15px; font-size: 0.9rem; color: #ff66aa; border-color: #ff66aa;">Skins</button>
+    <button class="action secondary" onclick="filtrarTienda('cursor')" style="padding: 5px 15px; font-size: 0.9rem; color: #00ffff; border-color: #00ffff;">Cursores</button>
+    <button class="action secondary" onclick="filtrarTienda('fx')" style="padding: 5px 15px; font-size: 0.9rem; color: var(--gold); border-color: var(--gold);">Efectos</button>
+</div>
             <div class="shop-grid" id="shop-items" style="flex:1; overflow-y:auto; padding:40px; display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:35px; align-content: flex-start;">
                 </div>
             
