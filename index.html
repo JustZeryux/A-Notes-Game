@@ -629,11 +629,13 @@
                     🪙 <span id="shop-sp">0</span> SP
                 </div>
             </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;">
-<button class="store-tab" onclick="filterStore('all', this)">TODO</button>
-<button class="store-tab" onclick="filterStore('skin', this)">SKINS</button>
-<button class="store-tab" onclick="filterStore('cursor', this)">CURSORES</button>
-<button class="store-tab" onclick="filterStore('fx', this)">EFECTOS</button>
+<div class="store-tabs-container">
+    <button class="store-tab active" onclick="filterStore('all', this)">TODO</button>
+    <button class="store-tab" onclick="filterStore('skin', this)">SKINS</button>
+    <button class="store-tab" onclick="filterStore('tag', this)">TAGS</button>
+    <button class="store-tab" onclick="filterStore('ui', this)">MARCOS</button>
+    <button class="store-tab" onclick="filterStore('track', this)">PISTAS</button>
+    <button class="store-tab" onclick="filterStore('hit_fx', this)">EFECTOS</button>
 </div>
             <div class="shop-grid" id="shop-items" style="flex:1; overflow-y:auto; padding:40px; display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:35px; align-content: flex-start;">
                 </div>
