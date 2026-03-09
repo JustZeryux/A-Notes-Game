@@ -1312,3 +1312,52 @@ button, a, .receptor, .song-card {
     backdrop-filter: blur(10px);
     background: rgba(10,10,15,0.8) !important;
 }
+
+/* ==========================================================
+   DISEÑO NEÓN PARA PESTAÑAS DE LA TIENDA
+   ========================================================== */
+.store-tabs-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+}
+
+.store-tab {
+    background: transparent;
+    border: 2px solid #555;
+    border-radius: 20px;
+    padding: 8px 25px;
+    font-weight: 900;
+    font-family: sans-serif;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.store-tab:hover {
+    transform: scale(1.05);
+}
+
+/* Colores específicos por categoría */
+.store-tab[onclick*="'all'"] { border-color: #ffffff; color: #ffffff; }
+.store-tab[onclick*="'all'"].active { background: #ffffff; color: #000000; box-shadow: 0 0 15px rgba(255,255,255,0.6); }
+
+.store-tab[onclick*="'skin'"] { border-color: #ff007f; color: #ff007f; }
+.store-tab[onclick*="'skin'"].active { background: #ff007f; color: #ffffff; box-shadow: 0 0 15px rgba(255,0,127,0.6); }
+
+.store-tab[onclick*="'tag'"] { border-color: #BD00FF; color: #BD00FF; }
+.store-tab[onclick*="'tag'"].active { background: #BD00FF; color: #ffffff; box-shadow: 0 0 15px rgba(189,0,255,0.6); }
+
+.store-tab[onclick*="'ui'"] { border-color: #00e5ff; color: #00e5ff; }
+.store-tab[onclick*="'ui'"].active { background: #00e5ff; color: #000000; box-shadow: 0 0 15px rgba(0,229,255,0.6); }
+
+.store-tab[onclick*="'track'"] { border-color: #FF0033; color: #FF0033; }
+.store-tab[onclick*="'track'"].active { background: #FF0033; color: #ffffff; box-shadow: 0 0 15px rgba(255,0,51,0.6); }
+
+.store-tab[onclick*="'hit_fx'"] { border-color: #FFD700; color: #FFD700; }
+.store-tab[onclick*="'hit_fx'"].active { background: #FFD700; color: #000000; box-shadow: 0 0 15px rgba(255,215,0,0.6); }
