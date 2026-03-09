@@ -77,9 +77,9 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         } catch(e) { console.warn("Error DB", e); }
     }
 
-    // 2. CARGA DE OSU! (API)
+  // 2. CARGA DE OSU! (API)
     try {
-        let safeQuery = window.lastQuery;
+        let safeQuery = window.lastQuery.trim();
         if (safeQuery === "") {
             if (!append) { 
                 const terms = ["anime", "fnf", "vocaloid", "camellia", "touhou", "rock", "pop"]; 
@@ -88,19 +88,24 @@ window.fetchUnifiedData = async function(query = "", append = false) {
             safeQuery = window.lastQuery;
         }
 
+        // 🚨 FIX: INYECTAR EL FILTRO DE TECLAS DIRECTO EN LA BÚSQUEDA 🚨
+        let apiQuery = safeQuery;
+        if (window.currentFilters.key !== 'all') {
+            apiQuery += ` keys=${window.currentFilters.key}`;
+        }
+
         const pageA = window.currentOsuPage; 
         window.currentOsuPage += 2;
         
         let modeParam = ""; 
         const fType = window.currentFilters.type;
-        
-        // 🚨 FIX: Fuerzo la API a buscar SOLO el modo exacto que seleccionaste
         if (fType === 'osu_taiko') modeParam = "&m=1";
         else if (fType === 'osu_catch') modeParam = "&m=2";
         else if (fType === 'osu_standard') modeParam = "&m=0";
         else if (fType === 'osu_mania') modeParam = "&m=3";
 
-        const res1 = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(safeQuery)}${modeParam}&p=${pageA}`);
+        // Ahora la API recibirá la orden de buscar solo las teclas exactas
+        const res1 = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(apiQuery)}${modeParam}&p=${pageA}`);
         const d1 = await res1.json();
         
         let rawOsuData = Array.isArray(d1) ? d1 : [];
