@@ -105,6 +105,7 @@
             <button class="sidebar-btn" id="nav-rank" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openLeaderboard()">🌐 RANKING</button>
             <button class="sidebar-btn" id="nav-friends" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openFriends()">👥 AMIGOS</button>
             <button class="sidebar-btn" id="nav-clans" onmouseenter="if(typeof playHover==='function') playHover()" onclick="openClansModal()">🛡️ CLANES</button>
+            <button class="action secondary" onclick="document.getElementById('modal-tutorial').style.display='flex'">❓ CÓMO JUGAR</button>
 
             <button class="sidebar-btn" onclick="openStudioDashboard()" onmouseenter="if(typeof playHover==='function') playHover()" style="color: #00ffff; border-left: 3px solid #00ffff; background: rgba(0, 255, 255, 0.05);">
                 ✏️ CREATOR STUDIO
@@ -973,6 +974,40 @@
             <div style="text-align:center; color:#666; padding:20px;">No tienes notificaciones nuevas.</div>
         </div>
     </div>
+
+    <div id="modal-tutorial" class="modal-overlay" style="display:none; z-index: 999999;">
+    <div class="modal-panel" style="max-width: 600px; text-align: left;">
+        <div class="modal-neon-header">
+            <h2 class="modal-neon-title" style="color: #00ffff;">🎮 GUÍA DE JUEGO</h2>
+        </div>
+        <div class="modal-neon-content" style="font-size: 1rem; color: #ccc; line-height: 1.6; max-height: 60vh; overflow-y: auto;">
+            
+            <h3 style="color: #ff66aa;">🎹 MODO MANIA (Pulsación)</h3>
+            <p>Las notas caerán desde arriba. Espera a que toquen los receptores en la parte inferior y presiona la tecla correspondiente al ritmo de la música.</p>
+            <ul>
+                <li><b>Teclas por defecto 4K:</b> S - D - J - K (Cámbialas en Ajustes).</li>
+                <li><b>Notas Largas (Hold):</b> Mantén presionada la tecla hasta que la estela termine.</li>
+                <li><b>Bombas rojas:</b> ¡No las toques! Restarán vida y puntos.</li>
+            </ul>
+
+            <h3 style="color: #00ffff; margin-top: 20px;">🎯 MODO STANDARD (Puntería)</h3>
+            <p>Usa el cursor del ratón (o el dedo en celular) para apuntar y hacer clic en los círculos siguiendo la numeración.</p>
+            <ul>
+                <li><b>Círculos (Tap):</b> Haz clic cuando el anillo exterior brillante se cierre exactamente sobre la nota.</li>
+                <li><b>Sliders (Largas):</b> Haz clic en el inicio y <b>mantén pulsado</b> siguiendo la bola brillante por toda la pista gris hasta el final.</li>
+                <li><b>Botones:</b> Puedes hacer clic izquierdo o usar las teclas Z y X en PC.</li>
+            </ul>
+
+            <div style="background: rgba(255, 215, 0, 0.1); padding: 10px; border-left: 4px solid gold; margin-top: 20px;">
+                <b>💡 TIP PRO:</b> Puedes importar Skins de osu! (.osk) en el menú de Ajustes para personalizar tu experiencia en Standard.
+            </div>
+
+        </div>
+        <div class="modal-neon-buttons">
+            <button class="action" onclick="document.getElementById('modal-tutorial').style.display='none'">¡ENTENDIDO!</button>
+        </div>
+    </div>
+</div>
 
     <script src="js/globals.js"></script>
     <script src="js/script/core.js"></script>
