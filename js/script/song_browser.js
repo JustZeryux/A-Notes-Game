@@ -1,4 +1,4 @@
-/* === SONGS_BROWSER.JS - Motor Maestro (Fix Visual Charted) === */
+/* === SONGS_BROWSER.JS - Motor Maestro (Fix Visual Charted + TROFEOS) === */
 
 window.currentFilters = { type: 'all', key: 'all' };
 window.unifiedSongs = [];
@@ -68,7 +68,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
                             imageURL: data.imageURL || 'icon.png', 
                             isOsu: false, 
                             originalMode: data.originalMode || 'mania',
-                            // Detección de claves disponibles basada en los datos reales
                             keysAvailable: detectKeys(data), 
                             raw: { ...data, id: doc.id } 
                         });
@@ -104,7 +103,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         
         let rawOsuData = Array.isArray(d1) ? d1 : [];
         
-        // Deduplicación por ID de Set
         const uniqueOsuMap = new Map();
         rawOsuData.forEach(item => uniqueOsuMap.set(item.id, item));
         
@@ -113,7 +111,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
                 let mNum = set.beatmaps[0].mode_int !== undefined ? set.beatmaps[0].mode_int : set.beatmaps[0].mode;
                 let mName = (mNum === 1) ? 'taiko' : (mNum === 2 ? 'catch' : (mNum === 3 || mNum === 'mania' ? 'mania' : 'standard'));
                 
-                // Filtrado estricto por modo
                 if (modeParam === "&m=1" && mName !== 'taiko') return;
                 if (modeParam === "&m=2" && mName !== 'catch') return;
                 if (modeParam === "&m=0" && mName !== 'standard') return;
@@ -136,7 +133,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
         });
     } catch(e) { console.warn("Error Osu API"); }
 
-    // Fusión y eliminación de duplicados (IDs ya existentes no se agregan)
     const existingIds = new Set(window.unifiedSongs.map(s => s.id));
     const uniqueNewSongs = [...fbSongs, ...osuSongs].filter(s => !existingIds.has(s.id));
     
@@ -149,26 +145,21 @@ window.fetchUnifiedData = async function(query = "", append = false) {
     window.renderUnifiedGrid();
 };
 
-// Función auxiliar para saber qué teclas tiene un mapa de la comunidad
 function detectKeys(data) {
     let keys = [];
-    // Revisar todas las propiedades que empiecen por "notes_"
     Object.keys(data).forEach(k => {
         if (k.startsWith('notes_')) {
-            // Ejemplo: notes_mania_4k -> extraer "4"
-            let parts = k.split('_'); // ["notes", "mania", "4k"]
+            let parts = k.split('_');
             if (parts.length === 3) {
                 let kNum = parseInt(parts[2].replace('k',''));
                 if (!isNaN(kNum) && !keys.includes(kNum)) keys.push(kNum);
             }
         }
     });
-    // Si no encontró nada pero tiene 'notes', asumimos 4k por defecto
     if (keys.length === 0 && data.notes && data.notes.length > 0) keys.push(4);
     return keys.sort((a,b)=>a-b);
 }
 
-// Función auxiliar para contar notas totales (cualquier modo)
 function countTotalNotes(data) {
     let max = 0;
     if (data.notes) max = data.notes.length;
@@ -190,7 +181,6 @@ window.renderUnifiedGrid = function() {
     let filtered = baseList.filter(song => {
         if (window.currentFilters.type === 'recent') return true; 
         
-        // Filtro Charted: Debe tener notas en algún lado
         if (window.currentFilters.type === 'charted') {
             if (song.isOsu) return false;
             return countTotalNotes(song.raw) > 0;
@@ -220,15 +210,13 @@ window.renderUnifiedGrid = function() {
         const card = document.createElement('div'); 
         card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
         
-        // CÁLCULO DE ESTRELLAS MEJORADO
         let stars = parseFloat(song.starRating || 0).toFixed(1);
         let noteCount = 0;
         
         if(!song.isOsu) {
             noteCount = countTotalNotes(song.raw);
-            // Fórmula: Notas / 200 + base (ajustable)
             let calculatedStars = (noteCount / 200) + 1;
-            if (noteCount === 0) calculatedStars = 0; // Si no tiene notas, es 0
+            if (noteCount === 0) calculatedStars = 0; 
             stars = calculatedStars.toFixed(1);
         }
         
@@ -244,7 +232,6 @@ window.renderUnifiedGrid = function() {
             ? `<div class="diff-badge" style="margin-left:auto; border-color: #ff66aa; color: #ff66aa;">${mIcon} ${song.originalMode.toUpperCase()}</div>` 
             : `<div class="diff-badge" style="margin-left:auto; border-color: var(--blue); color: var(--blue);">☁️ COMMUNITY</div>`;
 
-        // BADGE: Muestra "📝 CHARTED" si tiene notas y no es de Osu
         let chartedBadge = (!song.isOsu && noteCount > 0)
             ? `<div class="diff-badge" style="border-color:#12FA05; color:#12FA05; font-weight:900;">📝 CHARTED</div>`
             : ``;
@@ -253,8 +240,31 @@ window.renderUnifiedGrid = function() {
             ? `<div class="diff-badge" style="border-color:#00ffff; color:#00ffff; font-weight:900;">⚙️ FX</div>` 
             : ``;
 
+        // =========================================================
+        // 🌟 LÓGICA DE TROFEOS (SS, S, A) INYECTADA EN LA TARJETA 🌟
+        // =========================================================
+        let gradeBadgeHTML = '';
+        if (window.user && window.user.scores && window.user.scores[song.id]) {
+            let bestScoreData = window.user.scores[song.id];
+            let grade = typeof bestScoreData === 'object' ? bestScoreData.grade : null;
+            
+            if (grade) {
+                let badgeColor = grade === "SS" ? "#00ffff" : 
+                                 grade === "S" ? "gold" : 
+                                 grade === "A" ? "#12FA05" : 
+                                 grade === "B" ? "yellow" : 
+                                 grade === "C" ? "orange" : "#F9393F";
+                
+                gradeBadgeHTML = `
+                <div style="position: absolute; top: 8px; right: 8px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 2px solid ${badgeColor}; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; box-shadow: 0 0 10px ${badgeColor}; z-index: 10; font-family: sans-serif;">
+                    ${grade}
+                </div>`;
+            }
+        }
+        // =========================================================
+
         card.innerHTML = `
-            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; transition: 0.5s; filter: brightness(0.6);"></div>
+            ${gradeBadgeHTML} <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; transition: 0.5s; filter: brightness(0.6);"></div>
             
             <div class="song-info">
                 <div class="song-title">${song.title}</div>
