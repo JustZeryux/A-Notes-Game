@@ -837,72 +837,90 @@ function end(died) {
             titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; 
         }
         
+        // ==========================================
+        // 🌟 CÁLCULO DE RECOMPENSAS Y GUARDADO UNIFICADO 🌟
+        // ==========================================
         let xpGain = 0, spGain = 0, ppGain = 0; 
         let chk = document.getElementById('chk-ranked'); 
         let isRanked = chk ? chk.checked : false; 
         let rankText = isRanked ? "(Ranked)" : "(Unranked)";
         
-        // CÁLCULO DE RECOMPENSAS
         if (!died && window.user && window.user.name !== "Guest") { 
+            // 1. Cálculos matemáticos
             xpGain = Math.floor(window.st.sc / 250); 
             spGain = Math.floor(window.st.sc / 100); 
             if (isRanked && finalAcc >= 70) { 
                 let stars = parseFloat(window.curSongData.starRating || 3); 
                 ppGain = Math.floor((stars * 20) * (finalAcc / 100)); 
             }
+            
+            // 2. Suma a las stats del usuario
             window.user.xp = (window.user.xp || 0) + xpGain; 
             window.user.sp = (window.user.sp || 0) + spGain; 
             window.user.pp = (window.user.pp || 0) + ppGain; 
             window.user.plays = (window.user.plays || 0) + 1; 
             window.user.score = (window.user.score || 0) + window.st.sc;
             
+            // 3. Lógica de Subida de Nivel
             let nextLevelXp = window.user.lvl * 1000; 
             if (window.user.xp >= nextLevelXp) { 
                 window.user.lvl++; 
                 window.user.xp -= nextLevelXp; 
                 if(typeof window.notify === 'function') window.notify(`✨ ¡NIVEL ${window.user.lvl} ALCANZADO! ✨`, "success"); 
             }
+
+            // 4. Lógica de Rango (SS, S, A, etc)
+            if (!window.user.scores) window.user.scores = {};
+            let currentBest = window.user.scores[window.curSongData.id];
+            let oldScore = currentBest ? currentBest.score : 0;
+            
+            if (window.st.sc > oldScore) {
+                window.user.scores[window.curSongData.id] = { grade: r, score: window.st.sc };
+            }
+
+            // 5. Guardado Local y en Firebase
             if(typeof save === 'function') save(); 
             if (window.db) { 
                 window.db.collection("users").doc(window.user.name).update({ 
                     xp: window.user.xp, sp: window.user.sp, pp: window.user.pp, 
-                    lvl: window.user.lvl, plays: window.user.plays, score: window.user.score 
+                    lvl: window.user.lvl, plays: window.user.plays, score: window.user.score,
+                    scores: window.user.scores // <-- AHORA SÍ SE SUBE A LA NUBE
                 }).catch(e => console.warn(e)); 
             }
         }
 
-        const panel = modal.querySelector('.modal-panel');
-        if(panel) {
-            panel.innerHTML = `
-                <div class="modal-neon-header" style="border-bottom-color: ${c};">
-                    <h2 class="modal-neon-title" style="color:${c};">🏆 RESULTADOS</h2>
-                </div>
-                <div class="modal-neon-content">
-                    ${titleHTML}
-                    <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
-                        <div class="rank-big" style="color:${c}; text-shadow:0 0 20px ${c};">${r}</div>
-                        <div style="text-align:left;">
-                            <div id="res-score">${window.st.sc.toLocaleString()}</div>
-                            <div style="color:#aaa; font-size:1.5rem; font-weight:900;">ACC: <span style="color:white">${finalAcc}%</span></div>
-                            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; font-size:1.1rem; margin-top:5px;">+${ppGain} PP <span style="font-weight:normal; color:#888;">${rankText}</span></div>
-                        </div>
-                    </div>
-                    <div class="res-stats-grid">
-                        <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
-                        <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
-                        <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
-                        <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
-                    </div>
-                    <div style="display:flex; justify-content:space-around; background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; font-weight:bold;">
-                        <div style="color:var(--blue); font-size:1.3rem;">💙 +<span id="res-xp">${xpGain}</span> XP</div>
-                        <div style="color:var(--gold); font-size:1.3rem;">💰 +<span id="res-sp">${spGain}</span> SP</div>
+        // ==========================================
+        // 🌟 MOSTRAR RESULTADOS EN PANTALLA 🌟
+        // ==========================================
+        modal.querySelector('.modal-panel').innerHTML = `
+            <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
+                <h2 class="modal-neon-title" style="color:var(--gold);">🏆 RESULTADOS</h2>
+            </div>
+            <div class="modal-neon-content">
+                ${titleHTML}
+                <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-bottom: 25px;">
+                    <div class="rank-big" style="color:${c}; text-shadow:0 0 20px ${c};">${r}</div>
+                    <div style="text-align:left;">
+                        <div id="res-score">${window.st.sc.toLocaleString()}</div>
+                        <div style="color:#aaa; font-size:1.5rem; font-weight:900;">ACC: <span style="color:white">${finalAcc}%</span></div>
+                        <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; font-size:1.1rem; margin-top:5px;">+${ppGain} PP <span style="font-weight:normal; color:#888;">${rankText}</span></div>
                     </div>
                 </div>
-                <div class="modal-neon-buttons">
-                    <button class="action" onclick="toMenu()">VOLVER AL MENU</button>
-                    <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
-                </div>`;
-        }
+                <div class="res-stats-grid">
+                    <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                    <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                    <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                    <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                </div>
+                <div style="display:flex; justify-content:space-around; background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; font-weight:bold;">
+                    <div style="color:var(--blue); font-size:1.3rem;">💙 +<span id="res-xp">${xpGain}</span> XP</div>
+                    <div style="color:var(--gold); font-size:1.3rem;">💰 +<span id="res-sp">${spGain}</span> SP</div>
+                </div>
+            </div>
+            <div class="modal-neon-buttons">
+                <button class="action" onclick="window.toMenu()">VOLVER AL MENU</button>
+            </div>
+        `;
     }
 }
 window.initReceptors = function(k) {
