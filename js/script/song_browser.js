@@ -200,7 +200,7 @@ window.renderUnifiedGrid = function() {
     
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
-    let filtered = baseList.filter(song => {
+   let filtered = baseList.filter(song => {
         let type = window.currentFilters.type;
 
         // 1. FILTRO DE TIPO (Ignora esto si estás viendo 'Recientes')
@@ -214,12 +214,18 @@ window.renderUnifiedGrid = function() {
             if ((type === 'com' || type === 'comunidad' || type === 'community') && song.isOsu) return false;
         }
 
-        // 2. FILTRO DE TECLAS (Ahora sí se aplica aunque estés en Recientes)
-        if (window.currentFilters.key !== 'all' && (song.originalMode === 'mania' || !song.isOsu)) { 
-            if (!song.keysAvailable || !song.keysAvailable.includes(parseInt(window.currentFilters.key))) return false; 
+        // 2. FILTRO DE TECLAS (Más permisivo)
+        if (window.currentFilters.key !== 'all') {
+            let targetKey = parseInt(window.currentFilters.key);
+            // Si es de Osu y NO es Mania, ignoramos las teclas (porque en Standard no existen las 4K, 5K)
+            if (song.isOsu && song.originalMode !== 'mania') return true;
+            
+            // Si es de la comunidad o es Mania, comprobamos si tiene la tecla o permitimos mostrarla si está vacía
+            if (!song.keysAvailable || song.keysAvailable.length === 0) return true; // Mapa vacío, se permite mostrar
+            if (!song.keysAvailable.includes(targetKey)) return false; 
         }
 
-        // 3. FILTRO DE ESTRELLAS (Ahora sí se aplica a todo)
+        // 3. FILTRO DE ESTRELLAS (Blindado)
         if (window.currentFilters.stars !== 'all') {
             let sNum = 0;
             if (song.isOsu) {
@@ -230,9 +236,9 @@ window.renderUnifiedGrid = function() {
             }
             
             let tStar = parseInt(window.currentFilters.stars);
-            if (tStar === 1 && sNum >= 2.0) return false; // 1.0 a 1.9
-            if (tStar > 1 && tStar < 5 && (sNum < tStar || sNum >= tStar + 1)) return false; // 2.x, 3.x, 4.x
-            if (tStar === 5 && sNum < 5.0) return false; // 5.0+
+            if (tStar === 1 && sNum >= 2.0) return false; 
+            if (tStar > 1 && tStar < 5 && (sNum < tStar || sNum >= tStar + 1)) return false; 
+            if (tStar === 5 && sNum < 5.0) return false; 
         }
         
         return true;
