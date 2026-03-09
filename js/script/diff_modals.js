@@ -1,15 +1,10 @@
 /* ==========================================================
-   DIFF_MODAL.JS - Menú de Dificultades + UI de Auto-Mapeo Integrada 🚀
+   DIFF_MODAL.JS - Menú de Dificultades + Interceptor de Mapas Vacíos
    ========================================================== */
 
-// 🌟 GENERADOR DEL MENÚ CUSTOM PARA PISTAS VACÍAS 🌟
 window.showEmptyMapModal = function(k, songData) {
-    // Si ya existe un modal anterior, lo borramos para no duplicar
-    if(document.getElementById('modal-empty-map')) {
-        document.getElementById('modal-empty-map').remove();
-    }
+    if(document.getElementById('modal-empty-map')) document.getElementById('modal-empty-map').remove();
     
-    // Inyectamos el diseño Neón en el HTML
     const modalHTML = `
     <div id="modal-empty-map" class="modal-overlay" style="display:flex; z-index: 9999999; backdrop-filter: blur(10px);">
         <div class="modal-panel" style="max-width: 450px; text-align: center; border: 2px solid #ff66aa; box-shadow: 0 0 30px rgba(255,102,170,0.3);">
@@ -17,9 +12,9 @@ window.showEmptyMapModal = function(k, songData) {
                 <h2 class="modal-neon-title" style="color: #ff66aa; font-size: 2rem;">⚠️ PISTA VACÍA</h2>
             </div>
             <div class="modal-neon-content" style="padding: 10px 20px 30px 20px;">
-                <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 25px;">Esta canción fue subida desde la comunidad y aún no tiene notas mapeadas. ¿Qué deseas hacer?</p>
+                <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 25px;">Esta canción fue subida desde la comunidad y aún no tiene notas mapeadas en ${k}K. ¿Qué deseas hacer?</p>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="action" id="btn-empty-play" style="width: 100%; background: #00ffff; color: black; font-weight: 900; font-size: 1.1rem; text-shadow: none;">🎮 JUGAR (Auto-Mapeo)</button>
+                    <button class="action" id="btn-empty-play" style="width: 100%; background: #00ffff; color: black; font-weight: 900; font-size: 1.1rem; text-shadow: none;">🎮 JUGAR (Auto-Mapeo Inteligente)</button>
                     <button class="action secondary" id="btn-empty-edit" style="width: 100%; color: #ff66aa; border-color: #ff66aa; font-weight: bold;">✏️ MAPEAR (Abrir Editor)</button>
                     <button class="action secondary" onclick="document.getElementById('modal-empty-map').remove()" style="width: 100%; color: #F9393F; border-color: #F9393F; font-weight: bold;">❌ CANCELAR</button>
                 </div>
@@ -28,106 +23,78 @@ window.showEmptyMapModal = function(k, songData) {
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-    // LÓGICA: BOTÓN JUGAR
     document.getElementById('btn-empty-play').onclick = () => {
         document.getElementById('modal-empty-map').remove();
-        if(typeof window.notify === 'function') window.notify("⚙️ Generando Auto-Mapeo...", "info");
         
-        let mapData = [];
-        // Intentar usar tu propia función si existe
-        if (typeof window.generateAutoMap === 'function') {
-            mapData = window.generateAutoMap(k, songData);
-        } 
-        
-        // Fallback: Si no hay función, creamos un mapa rítmico automático aquí mismo
-        if (!mapData || mapData.length === 0) {
-            let bpm = songData.bpm || 120;
-            let msPerBeat = 60000 / bpm;
-            for (let t = 3000; t < 120000; t += msPerBeat) { // 2 minutos de notas
+        // Ejecuta la misma función poderosa que le pusimos al editor para analizar el audio
+        if (typeof window.applyEditorAutoMap === 'function') {
+            window.edMode = 'mania';
+            window.edKeys = k;
+            window.applyEditorAutoMap().then(() => {
+                songData[`notes_${k}k`] = JSON.parse(JSON.stringify(window.edNotes));
+                if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+                else if (typeof window.startGame === 'function') window.startGame(k);
+            });
+        } else {
+            // Fallback en caso de emergencia
+            if(typeof window.notify === 'function') window.notify("⚙️ Generando Auto-Mapeo Rítmico...", "info");
+            let mapData = []; let bpm = songData.bpm || 120; let msPerBeat = 60000 / bpm;
+            for (let t = 3000; t < 120000; t += msPerBeat) { 
                 let lane = Math.floor(Math.random() * k);
                 mapData.push({ t: t, l: lane, type: 'tap' });
-                if (Math.random() > 0.8) { // 20% de probabilidad de nota doble
+                if (Math.random() > 0.8) { 
                     let extraLane = Math.floor(Math.random() * k);
                     if(extraLane !== lane) mapData.push({ t: t, l: extraLane, type: 'tap' });
                 }
             }
+            songData[`notes_${k}k`] = mapData;
+            if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+            else if (typeof window.startGame === 'function') window.startGame(k);
         }
-        
-        // Guardamos las notas generadas en la canción temporal y arrancamos
-        songData[`notes_${k}k`] = mapData;
-        if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
-        else if (typeof window.startGame === 'function') window.startGame(k);
     };
 
-    // LÓGICA: BOTÓN MAPEAR
     document.getElementById('btn-empty-edit').onclick = () => {
         document.getElementById('modal-empty-map').remove();
         if (typeof window.openEditor === 'function') window.openEditor(songData, k, 'mania');
     };
 };
 
-
-// 🌟 FUNCIÓN PRINCIPAL DEL MODAL DE DIFICULTAD 🌟
 window.openUnifiedDiffModal = function(song) {
     const titleEl = document.getElementById('diff-song-title');
     const coverEl = document.getElementById('diff-song-cover');
     
     titleEl.innerText = song.title;
     coverEl.style.backgroundImage = `url('${song.imageURL}')`;
-    coverEl.style.position = 'relative'; 
+    coverEl.style.position = 'relative';
     
-    // --- INYECCIÓN DE TROFEOS (SS, S, A) EN LA PORTADA ---
     let gradeBadgeHTML = '';
     if (window.user && window.user.scores && window.user.scores[song.id]) {
         let bestScoreData = window.user.scores[song.id];
         let grade = typeof bestScoreData === 'object' ? bestScoreData.grade : null;
-        
         if (grade) {
             let badgeColor = grade === "SS" ? "#00ffff" : grade === "S" ? "gold" : grade === "A" ? "#12FA05" : grade === "B" ? "yellow" : grade === "C" ? "orange" : "#F9393F";
-            gradeBadgeHTML = `
-            <div style="position: absolute; top: -15px; right: -15px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 3px solid ${badgeColor}; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; box-shadow: 0 0 20px ${badgeColor}; z-index: 10; font-family: sans-serif;">
-                ${grade}
-            </div>`;
+            gradeBadgeHTML = `<div style="position: absolute; top: -15px; right: -15px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 3px solid ${badgeColor}; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; box-shadow: 0 0 20px ${badgeColor}; z-index: 10; font-family: sans-serif;">${grade}</div>`;
         }
     }
     coverEl.innerHTML = gradeBadgeHTML; 
 
     const grid = document.querySelector('.diff-grid');
-    grid.innerHTML = ''; 
-    grid.style.maxHeight = '260px'; 
-    grid.style.overflowY = 'auto';
-    grid.style.padding = '5px';
+    grid.innerHTML = ''; grid.style.maxHeight = '260px'; grid.style.overflowY = 'auto'; grid.style.padding = '5px';
     
     let safeMode = song.originalMode || 'mania';
-    
     let cleanId = String(song.id).replace('osu_', '');
     let engineSong = Object.assign({}, song);
     engineSong.id = cleanId;
 
     if (song.isOsu && safeMode !== 'mania') {
-        let btn = document.createElement('div');
-        btn.className = 'diff-card';
-        btn.style.gridColumn = "1 / -1";
-        
+        let btn = document.createElement('div'); btn.className = 'diff-card'; btn.style.gridColumn = "1 / -1";
         let icon = safeMode === 'standard' ? "🎯" : (safeMode === 'taiko' ? "🥁" : "🍎");
         let color = safeMode === 'standard' ? "#ff44b9" : (safeMode === 'taiko' ? "#f95555" : "#44b9ff");
         let stars = parseFloat(song.starRating || 0).toFixed(1);
 
-        btn.style.borderColor = color; btn.style.color = color;
-        btn.style.boxShadow = `0 0 20px ${color}44`;
-        btn.style.display = "flex"; btn.style.justifyContent = "space-between"; btn.style.alignItems = "center";
-        btn.style.padding = "20px";
-
-        btn.innerHTML = `
-            <div style="text-align:left; position:relative; z-index:2;">
-                <div style="font-size:2.5rem; font-weight:900; text-shadow: 0 0 10px ${color};">${icon} ${safeMode.toUpperCase()}</div>
-                <div style="font-size:0.9rem; font-weight:bold; opacity:0.8;">MODO ORIGINAL DE OSU!</div>
-            </div>
-            <div style="background:rgba(0,0,0,0.8); padding:10px 20px; border-radius:10px; border:2px solid gold; color:gold; font-weight:900; font-size:1.8rem; box-shadow: 0 0 15px rgba(255,215,0,0.3);">
-                ⭐ ${stars}
-            </div>
-            <div class="diff-bg-icon" style="position:absolute; right:10px; bottom:-10px; font-size:6rem; opacity:0.1; pointer-events:none;">${icon}</div>
-        `;
+        btn.style.borderColor = color; btn.style.color = color; btn.style.boxShadow = `0 0 20px ${color}44`;
+        btn.style.display = "flex"; btn.style.justifyContent = "space-between"; btn.style.alignItems = "center"; btn.style.padding = "20px";
+        btn.innerHTML = `<div style="text-align:left; position:relative; z-index:2;"><div style="font-size:2.5rem; font-weight:900; text-shadow: 0 0 10px ${color};">${icon} ${safeMode.toUpperCase()}</div><div style="font-size:0.9rem; font-weight:bold; opacity:0.8;">MODO ORIGINAL DE OSU!</div></div><div style="background:rgba(0,0,0,0.8); padding:10px 20px; border-radius:10px; border:2px solid gold; color:gold; font-weight:900; font-size:1.8rem; box-shadow: 0 0 15px rgba(255,215,0,0.3);">⭐ ${stars}</div><div class="diff-bg-icon" style="position:absolute; right:10px; bottom:-10px; font-size:6rem; opacity:0.1; pointer-events:none;">${icon}</div>`;
 
         btn.onclick = () => {
             window.closeModal('diff');
@@ -140,33 +107,31 @@ window.openUnifiedDiffModal = function(song) {
     else {
         const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F', 10: '#ff0000'};
         const labels = {1: 'RHYTHM', 2: 'BASIC', 3: 'EASY', 4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON', 10: 'IMPOSSIBLE'};
-        
         const standardModes = [4, 6, 7, 9];
         let allModes = [...new Set([...standardModes, ...(song.keysAvailable || [])])].sort((a,b) => a - b);
         
         allModes.forEach(k => {
-            let c = colors[k] || '#ff66aa';
-            let l = labels[k] || 'CUSTOM';
-            let btn = document.createElement('div');
-            btn.className = 'diff-card';
+            let c = colors[k] || '#ff66aa'; let l = labels[k] || 'CUSTOM';
+            let btn = document.createElement('div'); btn.className = 'diff-card';
             
-            if (song.keysAvailable && song.keysAvailable.includes(k)) {
+            // 🚨 EL FIX MAESTRO: Si es una canción de la comunidad (!song.isOsu), 
+            // SIEMPRE desbloqueamos los botones para permitir usar el Auto-Mapper.
+            let isUnlocked = (!song.isOsu) || (song.keysAvailable && song.keysAvailable.includes(k));
+            
+            if (isUnlocked) {
                 btn.style.borderColor = c; btn.style.color = c;
                 btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">${k}K</div><div class="diff-label">${l}</div>`;
-                
                 btn.onclick = () => {
                     window.closeModal('diff');
                     if(typeof window.asegurarModo === 'function') window.asegurarModo(k); 
                     if(typeof window.saveToRecents === 'function') window.saveToRecents(song);
                     
-                    if(song.isOsu) {
-                        downloadAndPlayOsu(cleanId, song.title, song.imageURL, k);
-                    } else {
+                    if(song.isOsu) downloadAndPlayOsu(cleanId, song.title, song.imageURL, k);
+                    else {
                         window.curSongData = song.raw || song; 
-                        
-                        // 🚨 INTERCEPCIÓN INTELIGENTE: Verificar si la pista está vacía antes de enviarla a game.js
                         let mapData = window.curSongData[`notes_${k}k`] || window.curSongData.notes || [];
                         
+                        // Si está vacía, lanzamos tu modal de automapeo
                         if (!mapData || mapData.length === 0) {
                             window.showEmptyMapModal(k, window.curSongData);
                         } else {
@@ -184,8 +149,7 @@ window.openUnifiedDiffModal = function(song) {
     }
 
     if (!song.isOsu) {
-        let editBtn = document.createElement('div');
-        editBtn.className = 'diff-card'; editBtn.style.gridColumn = "1 / -1";
+        let editBtn = document.createElement('div'); editBtn.className = 'diff-card'; editBtn.style.gridColumn = "1 / -1";
         editBtn.style.borderColor = "#ff66aa"; editBtn.style.color = "#ff66aa"; editBtn.style.marginTop = "10px"; editBtn.style.minHeight = "80px";
         editBtn.innerHTML = `<div class="diff-bg-icon">✏️</div><div class="diff-num" style="font-size:1.5rem; font-weight:900;">✏️ EDITOR STUDIO</div><div class="diff-label">Crea y edita tu propio mapa</div>`;
         editBtn.onclick = () => { window.closeModal('diff'); if(typeof openEditor === 'function') openEditor(song.raw || song, 4); };
@@ -193,5 +157,5 @@ window.openUnifiedDiffModal = function(song) {
     }
     
     if (typeof window.openModal === 'function') window.openModal('diff');
-    else { const m = document.getElementById('modal-diff'); if(m) m.style.display = 'flex'; }
+    else { const modal = document.getElementById('modal-diff'); if(modal) modal.style.display = 'flex'; }
 };
