@@ -428,6 +428,7 @@
                                 <option value="default">Normal (Click)</option>
                                 <option value="soft">Soft</option>
                                 <option value="drum">Drum (Batería)</option>
+                                
                             </select>
                         </div>
                         <div class="set-row" style="background: rgba(255,255,255,0.03); padding: 15px; border-radius: 10px;">
@@ -446,6 +447,18 @@
                             <div><div class="set-label" style="font-size:1.2rem;">Desfase Global (Offset MS)</div><div class="set-sub">Positivo = Notas caen más tarde</div></div>
                             <input type="number" id="cfg-off" class="set-input" style="font-size:1.2rem; width:100px; text-align:center;">
                         </div>
+                        <div style="background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-top:20px;">
+    <h3 style="color:#00ffff; margin-top:0;">🎵 MÚSICA DEL MENÚ (BGM)</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <label style="color:#aaa; font-weight:bold;">Volumen Menú</label>
+        <input type="range" id="cfg-bgm-vol" min="0" max="100" value="20" oninput="updateBgmVolume(this.value)" style="width: 150px;">
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <label style="color:#aaa; font-weight:bold; font-size:0.9rem;">Subir MP3 Propio (Menú)</label>
+        <input type="file" id="cfg-bgm-file" accept="audio/*" onchange="setCustomBGM(event)" style="display:none;">
+        <button class="action secondary" style="font-size:0.8rem; padding:5px 10px;" onclick="document.getElementById('cfg-bgm-file').click()">📁 SELECCIONAR</button>
+    </div>
+</div>
                     </div>
 
                 </div>
