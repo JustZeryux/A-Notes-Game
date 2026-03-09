@@ -1,6 +1,6 @@
 /* === SONGS_BROWSER.JS - Motor Maestro (Fix Visual Charted + TROFEOS) === */
 
-window.currentFilters = { type: 'all', key: 'all' };
+window.currentFilters = { type: 'all', key: 'all', stars: 'all' };
 window.unifiedSongs = [];
 window.searchTimeout = null;
 window.currentOsuPage = 0; 
@@ -175,6 +175,21 @@ function countTotalNotes(data) {
             max = Math.max(max, data[k].length);
         }
     });
+    // FILTRO DE ESTRELLAS
+        if (window.currentFilters.stars !== 'all') {
+            let sNum = 0;
+            if (song.isOsu) {
+                sNum = parseFloat(song.starRating || 0);
+            } else {
+                let noteCount = countTotalNotes(song.raw);
+                sNum = noteCount === 0 ? 0 : (noteCount / 200) + 1;
+            }
+            
+            let targetStar = parseInt(window.currentFilters.stars);
+            if (targetStar === 1 && sNum >= 2.0) return false; // 1 ⭐: de 0 a 1.9
+            if (targetStar > 1 && targetStar < 5 && (sNum < targetStar || sNum >= targetStar + 1)) return false; // 2 a 4 ⭐
+            if (targetStar === 5 && sNum < 5.0) return false; // 5+ ⭐
+        }
     return max;
 }
 
