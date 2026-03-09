@@ -1,7 +1,10 @@
-/* === js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO) === */
+/* ==========================================================
+   js/script/settings.js - MEGA CONFIGURADOR PRO VFINAL (BLINDADO)
+   ========================================================== */
 
 window.NOTE_SHAPES = ['circle', 'diamond', 'bar', 'ring'];
 
+// Generador de SVG para la vista previa y los botones
 window.getShapeSvg = function(shapeName, color) {
     let s = shapeName || 'circle';
     let c = color || '#00ffff';
@@ -15,7 +18,8 @@ window.getShapeSvg = function(shapeName, color) {
 };
 
 window.loadSettings = function() {
-    let saved = localStorage.getItem('gameCfg');
+    // 🚨 Usamos 'a_notes_cfg' para no perder tus datos anteriores
+    let saved = localStorage.getItem('a_notes_cfg');
     
     window.defaultCfg = {
         perfMode: false, subtitles: true, showFps: true, 
@@ -36,8 +40,8 @@ window.loadSettings = function() {
         window.cfg = JSON.parse(JSON.stringify(window.defaultCfg));
     }
     
+    // Inicializar modos del 1 al 10 si no existen
     if (!window.cfg.modes) window.cfg.modes = {};
-
     for(let k = 1; k <= 10; k++) {
         if(!window.cfg.modes[k] || window.cfg.modes[k].length !== k) {
             window.cfg.modes[k] = [];
@@ -46,6 +50,7 @@ window.loadSettings = function() {
         }
     }
 
+    // Helpers para pintar la UI
     const setVal = (id, prop) => { const el = document.getElementById(id); if(el) el.value = window.cfg[prop]; };
     const setChk = (id, prop) => { const el = document.getElementById(id); if(el) el.checked = !!window.cfg[prop]; };
     const setTxt = (id, prop) => { 
@@ -66,9 +71,10 @@ window.loadSettings = function() {
     setVal('cfg-ct-spd', 'ctSpeed'); setVal('cfg-ct-cs', 'ctCS'); setTxt('cfg-ct-l', 'ctLeft'); setTxt('cfg-ct-r', 'ctRight'); setTxt('cfg-ct-d', 'ctDash');
     setVal('cfg-dim', 'bgDim'); setChk('cfg-splash', 'showSplash'); setChk('cfg-show-ms', 'showMs'); setChk('cfg-hide-ui', 'hideUI');
     
-    if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol || 0.5) * 100;
-    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol || 0.8) * 100;
-    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol || 0.6) * 100;
+    // 🚨 FIX DEL CERO: Asignar volumenes multiplicando por 100 para las barras
+    if(document.getElementById('cfg-vol')) document.getElementById('cfg-vol').value = (window.cfg.vol !== undefined ? window.cfg.vol : 0.5) * 100;
+    if(document.getElementById('cfg-hvol')) document.getElementById('cfg-hvol').value = (window.cfg.hvol !== undefined ? window.cfg.hvol : 0.8) * 100;
+    if(document.getElementById('cfg-mvol')) document.getElementById('cfg-mvol').value = (window.cfg.missVol !== undefined ? window.cfg.missVol : 0.6) * 100;
     setVal('cfg-off', 'off'); setVal('cfg-hitsound', 'hitSound');
     
     if(typeof window.populateSkinDropdowns === 'function') window.populateSkinDropdowns();
@@ -105,13 +111,14 @@ window.saveSettings = function() {
     window.cfg.tkSpeed = getVal('cfg-tk-spd'); window.cfg.ctSpeed = getVal('cfg-ct-spd'); window.cfg.ctCS = getVal('cfg-ct-cs');
     window.cfg.bgDim = getVal('cfg-dim'); window.cfg.showSplash = getChk('cfg-splash'); window.cfg.showMs = getChk('cfg-show-ms'); window.cfg.hideUI = getChk('cfg-hide-ui');
     
+    // 🚨 FIX DEL CERO: Leer volumenes y dividir entre 100 para el motor
     let volEl = document.getElementById('cfg-vol'); if(volEl) window.cfg.vol = parseFloat(volEl.value) / 100;
     let hvolEl = document.getElementById('cfg-hvol'); if(hvolEl) window.cfg.hvol = parseFloat(hvolEl.value) / 100;
     let mvolEl = document.getElementById('cfg-mvol'); if(mvolEl) window.cfg.missVol = parseFloat(mvolEl.value) / 100;
     window.cfg.off = getVal('cfg-off'); window.cfg.hitSound = getStr('cfg-hitsound');
 
-    localStorage.setItem('gameCfg', JSON.stringify(window.cfg));
-    if (typeof window.notify === 'function') window.notify("Ajustes guardados con éxito.", "success");
+    localStorage.setItem('a_notes_cfg', JSON.stringify(window.cfg));
+    if (typeof window.notify === 'function') window.notify("✅ Ajustes guardados con éxito.", "success");
     window.closeSettingsPanel();
 };
 
@@ -145,10 +152,8 @@ window.renderLaneConfig = function(k) {
     window.cfg.modes[k].forEach((lane, i) => {
         let keyText = lane.k === ' ' || lane.k === 'Space' ? 'SPC' : String(lane.k).toUpperCase();
         keyText = keyText.replace('ARROW', '').replace('KEY', '');
-        
         let shapeSvg = window.getShapeSvg(lane.s, lane.c);
 
-        // 🚨 FIX MAESTRO: Enviamos "this" en el onclick para que nunca más se pierda el botón 🚨
         html += `
         <div class="l-col" style="display:flex; flex-direction:column; align-items:center; gap:15px; margin: 0 5px;">
             <div class="key-bind" onclick="window.remapKey(this, ${k}, ${i})" 
@@ -174,7 +179,6 @@ window.cycleShape = function(k, laneIdx) {
     let currentShape = window.cfg.modes[k][laneIdx].s;
     let idx = window.NOTE_SHAPES.indexOf(currentShape);
     let nextShape = window.NOTE_SHAPES[(idx + 1) % window.NOTE_SHAPES.length];
-    
     window.cfg.modes[k][laneIdx].s = nextShape;
     window.renderLaneConfig(k);
 };
@@ -184,7 +188,6 @@ window.updateLaneColor = function(k, laneIdx, newColor) {
     window.renderLaneConfig(k); 
 };
 
-// 🚨 NUEVO REMAPKEY: Usa el botón directo ("btnElement"), ya no depende de IDs defectuosos
 window.remapKey = function(btnElement, k, laneIdx) {
     if(!btnElement || btnElement.dataset.waiting === "true") return;
     
@@ -193,7 +196,6 @@ window.remapKey = function(btnElement, k, laneIdx) {
     btnElement.innerText = "...";
     btnElement.style.background = "#F9393F"; 
     btnElement.style.borderColor = "white";
-    btnElement.blur();
 
     const overlay = document.createElement('div');
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
@@ -204,13 +206,11 @@ window.remapKey = function(btnElement, k, laneIdx) {
         e.preventDefault(); e.stopPropagation();
         let key = e.key; if(e.code === "Space") key = " ";
         if (key !== "Escape") window.cfg.modes[k][laneIdx].k = key;
-        
         btnElement.dataset.waiting = "false";
         overlay.remove();
         document.removeEventListener('keydown', capture, true);
         window.renderLaneConfig(k); 
     };
-
     setTimeout(() => { document.addEventListener('keydown', capture, true); }, 150);
 };
 
@@ -222,7 +222,6 @@ window.captureSingleKey = function(btnId, cfgProp) {
     btn.dataset.waiting = "true";
     btn.innerText = "...";
     btn.style.background = "#F9393F";
-    btn.blur();
 
     const overlay = document.createElement('div');
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999999; display:flex; flex-direction:column; justify-content:center; align-items:center; backdrop-filter:blur(8px);";
@@ -243,19 +242,16 @@ window.captureSingleKey = function(btnId, cfgProp) {
         overlay.remove();
         document.removeEventListener('keydown', capture, true);
     };
-
     setTimeout(() => document.addEventListener('keydown', capture, true), 150);
 };
 
 window.updatePreview = function(k) {
     const box = document.getElementById('live-skin-preview');
     if(!box) return;
-    
     let html = '';
     for(let i=0; i<k; i++) {
         let laneData = window.cfg.modes[k][i];
         let shapeSvg = window.getShapeSvg(laneData.s, laneData.c);
-        
         html += `
         <div style="flex:1; height:100%; border-left:1px solid rgba(255,255,255,0.05); border-right:1px solid rgba(255,255,255,0.05); display:flex; justify-content:center; align-items:flex-end; padding-bottom:15px; background: linear-gradient(to top, rgba(255,255,255,0.05), transparent);">
             <div style="width:50px; height:50px; transform: translateY(0);">${shapeSvg}</div>
@@ -276,9 +272,9 @@ window.populateSkinDropdowns = function() {
             if(item.type === 'ui' && !ui.querySelector(`option[value="${item.id}"]`)) ui.innerHTML += `<option value="${item.id}">${item.name}</option>`;
         }
     });
-    
     ns.value = window.cfg.noteSkin || 'default';
     ui.value = window.cfg.uiSkin || 'default';
 };
 
+// Carga inicial automática
 window.loadSettings();
