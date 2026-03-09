@@ -1,4 +1,4 @@
-/* === SONGS_BROWSER.JS - REPARACIÓN TOTAL V4 === */
+/* === SONGS_BROWSER.JS - REPARACIÓN TOTAL V5 (FIXED) === */
 
 window.currentFilters = { type: 'all', key: 'all', stars: 'all' };
 window.unifiedSongs = [];
@@ -31,7 +31,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
     }
 
     try {
-        // 1. Cargar de Firebase
         if (!append && window.db) {
             let snap = await window.db.collection("globalSongs").limit(100).get();
             snap.forEach(doc => {
@@ -42,7 +41,6 @@ window.fetchUnifiedData = async function(query = "", append = false) {
             });
         }
 
-        // 2. Cargar de Osu! API
         let apiQuery = window.lastQuery || "anime";
         const res = await fetch(`https://api.nerinyan.moe/search?q=${encodeURIComponent(apiQuery)}&m=3`);
         const data = await res.json();
@@ -69,14 +67,10 @@ window.renderUnifiedGrid = function() {
 
     let filtered = baseList.filter(song => {
         const f = window.currentFilters;
-
-        // Filtro de Teclas
         if (f.key !== 'all') {
             const tk = parseInt(f.key);
             if (!song.keysAvailable || !song.keysAvailable.includes(tk)) return false;
         }
-
-        // Filtro de Estrellas
         if (f.stars !== 'all') {
             const ts = parseInt(f.stars);
             if (song.isOsu && song.raw.beatmaps) {
@@ -88,7 +82,7 @@ window.renderUnifiedGrid = function() {
                 });
                 if (!match) return false;
             } else {
-                let n = (song.raw.notes || []).length;
+                let n = countTotalNotes(song.raw || song);
                 let s = n === 0 ? 0 : (n / 200) + 1;
                 if (ts === 1 && s >= 2) return false;
                 if (ts >= 2 && ts <= 4 && (s < ts || s >= ts + 1)) return false;
@@ -98,7 +92,6 @@ window.renderUnifiedGrid = function() {
         return true;
     });
 
-    // 🚨 EL FIX DEL CORTE: Aquí es donde se rompía tu código anterior
     if (filtered.length === 0) {
         grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones con estos filtros. 🌸</div>`;
         return;
@@ -106,11 +99,11 @@ window.renderUnifiedGrid = function() {
 
     filtered.forEach(song => {
         const card = document.createElement('div');
-        card.className = 'song-card';
+        card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
         card.innerHTML = `
-            <div class="song-bg" style="background-image: url('${song.imageURL}')"></div>
-            <div class="song-info">
-                <div class="song-title">${song.title}</div>
+            <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; filter: brightness(0.6);"></div>
+            <div class="song-info" style="position: relative; z-index: 2; padding: 15px;">
+                <div class="song-title" style="font-weight: 900; font-size: 1.2rem;">${song.title}</div>
                 <div class="song-author">by ${song.artist}</div>
             </div>`;
         card.onclick = () => window.openUnifiedDiffModal(song);
@@ -123,6 +116,12 @@ function detectKeys(data) {
     Object.keys(data).forEach(k => { if (k.startsWith('notes_mania_')) { let n = parseInt(k.split('_')[2]); if (!isNaN(n)) keys.push(n); } });
     if (keys.length === 0 && data.notes) keys.push(4);
     return keys;
+}
+
+function countTotalNotes(data) {
+    let max = 0; if (data.notes) max = data.notes.length;
+    Object.keys(data).forEach(k => { if (k.startsWith('notes_') && Array.isArray(data[k])) max = Math.max(max, data[k].length); });
+    return max;
 }
 
 document.addEventListener('DOMContentLoaded', () => window.fetchUnifiedData());
