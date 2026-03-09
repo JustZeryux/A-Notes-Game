@@ -1,4 +1,4 @@
-/* === SONGS_BROWSER.JS - VERSIÓN DEFINITIVA CON CARGA MASIVA Y BADGES === */
+/* === SONGS_BROWSER.JS - RESTAURACIÓN VISUAL Y FUNCIONAL TOTAL === */
 
 window.currentFilters = { type: 'all', key: 'all', stars: 'all' };
 window.unifiedSongs = [];
@@ -34,7 +34,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 
     if (!append) {
         window.unifiedSongs = []; window.currentOsuPage = 0; window.lastQuery = query.trim();
-        grid.innerHTML = '<div style="width:100%; text-align:center; padding:100px; color:#00ffff; font-size:1.8rem; font-weight:900;">Buscando Ritmos... ⏳</div>';
+        grid.innerHTML = '<div style="width:100%; text-align:center; padding:100px; color:#00ffff; font-size:1.8rem; font-weight:900; text-shadow:0 0 15px #00ffff;">Buscando Ritmos... ⏳</div>';
     } else {
         const btnLoad = document.getElementById('btn-load-more');
         if (btnLoad) btnLoad.innerText = "DESCARGANDO MÁS... 🌐";
@@ -42,7 +42,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 
     let fbSongs = []; let osuSongs = [];
 
-    // 1. OBTENER CANCIONES DE FIREBASE (LIMITADO A 100)
+    // 1. OBTENER CANCIONES DE FIREBASE
     if (!append) {
         try {
             if(window.db) {
@@ -77,7 +77,7 @@ window.fetchUnifiedData = async function(query = "", append = false) {
                 if(set.beatmaps && set.beatmaps.length > 0) {
                     let bestMap = set.beatmaps[0];
                     let mNum = bestMap.mode_int !== undefined ? bestMap.mode_int : bestMap.mode;
-                    let mName = (mNum === 1) ? 'taiko' : (mNum === 2 ? 'catch' : (mNum === 3 ? 'mania' : 'standard'));
+                    let mName = (mNum === 1) ? 'taiko' : (mNum === 2 ? 'catch' : (mNum === 3 || mNum === 'mania' ? 'mania' : 'standard'));
                     let keys = mName === 'mania' ? [...new Set(set.beatmaps.map(b => Math.floor(b.cs)))].sort((a,b)=>a-b) : [];
                     
                     osuSongs.push({ id: "osu_" + set.id, title: set.title, artist: set.creator, imageURL: `https://assets.ppy.sh/beatmaps/${set.id}/covers/list@2x.jpg`, isOsu: true, originalMode: mName, keysAvailable: keys, starRating: bestMap.difficulty_rating, raw: set });
@@ -94,8 +94,13 @@ window.fetchUnifiedData = async function(query = "", append = false) {
 
 function detectKeys(data) {
     let keys = [];
-    Object.keys(data).forEach(k => { if (k.startsWith('notes_mania_')) { let n = parseInt(k.split('_')[2]); if (!isNaN(n)) keys.push(n); } });
-    if (keys.length === 0 && data.notes) keys.push(4);
+    Object.keys(data).forEach(k => {
+        if (k.startsWith('notes_mania_')) {
+            let n = parseInt(k.split('_')[2]);
+            if (!isNaN(n)) keys.push(n);
+        }
+    });
+    if (keys.length === 0 && data.notes && data.notes.length > 0) keys.push(4);
     return keys.sort((a,b)=>a-b);
 }
 
@@ -138,34 +143,38 @@ window.renderUnifiedGrid = function() {
         let stars = song.isOsu ? parseFloat(song.starRating || 0).toFixed(1) : (noteCount === 0 ? "0.0" : ((noteCount / 200) + 1).toFixed(1));
         let starCol = stars >= 6 ? '#ff0055' : (stars >= 4 ? '#FFD700' : (stars > 0 ? '#00ffcc' : '#555'));
         
-        // 🚨 BADGES DETALLADOS (MANIA, COMMUNITY, TAIKO, etc.)
+        // 🚨 RECUPERACIÓN DE ICONOS Y COLORES DE MODOS
         let mIcon = song.originalMode === 'standard' ? '🎯' : (song.originalMode === 'taiko' ? '🥁' : (song.originalMode === 'catch' ? '🍎' : '🎹'));
-        let modeBadge = `<div class="diff-badge" style="margin-left:auto; border-color: ${song.isOsu ? '#ff66aa' : 'var(--blue)'}; color: ${song.isOsu ? '#ff66aa' : 'var(--blue)'};">${song.isOsu ? '🌸 ' + song.originalMode.toUpperCase() : '☁️ COMMUNITY'}</div>`;
+        let modeColor = song.isOsu ? (song.originalMode === 'standard' ? '#ff44b9' : (song.originalMode === 'taiko' ? '#f95555' : '#44b9ff')) : 'var(--blue)';
+        if(song.isOsu && song.originalMode === 'mania') modeColor = '#ff66aa';
+
+        let modeBadge = `<div class="diff-badge" style="margin-left:auto; border-color: ${modeColor}; color: ${modeColor};">${song.isOsu ? mIcon + ' ' + song.originalMode.toUpperCase() : '☁️ COMMUNITY'}</div>`;
         let maniaKeys = (song.originalMode === 'mania' || !song.isOsu) ? (song.keysAvailable || []).map(k => `<div class="diff-badge" style="border: 1px solid var(--blue); color: var(--blue);">${k}K</div>`).join('') : "";
         let chartedBadge = (!song.isOsu && noteCount > 0) ? `<div class="diff-badge" style="border-color:#12FA05; color:#12FA05; font-weight:900;">📝 CHARTED</div>` : ``;
+        let mechBadge = (song.raw && song.raw.mechanics && song.raw.mechanics.length > 0) ? `<div class="diff-badge" style="border-color:#00ffff; color:#00ffff; font-weight:900;">⚙️ FX</div>` : ``;
 
         card.innerHTML = `
             <div class="song-bg" style="position: absolute; top:0; left:0; width:100%; height:100%; background: url('${song.imageURL}'), url('icon.png'); background-size: cover; background-position: center; filter: brightness(0.6); transition: 0.5s;"></div>
-            <div class="song-info" style="position:relative; z-index:2;">
-                <div class="song-title">${song.title}</div>
-                <div class="song-author">by ${song.artist.replace('Subido por: ', '')}</div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+            <div class="song-info" style="position:relative; z-index:2; padding:15px; display:flex; flex-direction:column; justify-content:flex-end; height:100%;">
+                <div class="song-title" style="font-weight:900; font-size:1.15rem; text-shadow: 0 2px 10px rgba(0,0,0,0.8);">${song.title}</div>
+                <div class="song-author" style="font-size:0.85rem; opacity:0.8;">by ${song.artist.replace('Subido por: ', '')}</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px;">
                     <div class="diff-badge" style="background: ${starCol}22; border: 1px solid ${starCol}; color: ${starCol};">⭐ ${stars}</div>
-                    ${chartedBadge} ${maniaKeys} ${modeBadge}
+                    ${chartedBadge} ${mechBadge} ${maniaKeys} ${modeBadge}
                 </div>
             </div>`;
         
         const bg = card.querySelector('.song-bg');
-        card.onmouseenter = () => { bg.style.transform = 'scale(1.1)'; bg.style.filter = 'brightness(0.9)'; };
+        card.onmouseenter = () => { bg.style.transform = 'scale(1.08)'; bg.style.filter = 'brightness(0.8)'; };
         card.onmouseleave = () => { bg.style.transform = 'scale(1)'; bg.style.filter = 'brightness(0.6)'; };
-        card.onclick = () => window.openUnifiedDiffModal(song);
+        card.onclick = () => { if(typeof window.openUnifiedDiffModal === 'function') window.openUnifiedDiffModal(song); };
         grid.appendChild(card);
     });
 
-    // 🚨 EL BOTÓN DE CARGA AL FINAL
+    // 🚨 BOTÓN DE CARGA MASIVA RESTAURADO
     if (window.currentFilters.type !== 'recent') {
         const loadMoreContainer = document.createElement('div'); loadMoreContainer.style.gridColumn = "1 / -1"; loadMoreContainer.style.padding = "40px"; loadMoreContainer.style.textAlign = "center";
-        loadMoreContainer.innerHTML = `<button id="btn-load-more" class="action" style="width: 320px; margin: 0 auto; background: var(--gold); color: black;">CARGAR MÁS CONTENIDO</button>`;
+        loadMoreContainer.innerHTML = `<button id="btn-load-more" class="action" style="width: 350px; margin: 0 auto; background: #ff0066; color: white; border-color: #ff0066; font-weight: 900; letter-spacing: 1px; box-shadow: 0 0 20px rgba(255,0,102,0.3);">CARGAR MÁS CONTENIDO</button>`;
         loadMoreContainer.querySelector('button').onclick = () => window.fetchUnifiedData(window.lastQuery, true);
         grid.appendChild(loadMoreContainer);
     }
