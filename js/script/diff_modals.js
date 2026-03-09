@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODALS.JS - Menú de Dificultades + Interceptor de Mapas Vacíos
+   DIFF_MODALS.JS - Menú de Dificultades + Interceptor
    ========================================================== */
 
 window.showEmptyMapModal = function(k, songData) {
@@ -14,8 +14,8 @@ window.showEmptyMapModal = function(k, songData) {
             <div class="modal-neon-content" style="padding: 10px 20px 30px 20px;">
                 <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 25px;">Esta canción fue subida desde la comunidad y aún no tiene notas mapeadas en ${k}K. ¿Qué deseas hacer?</p>
                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="action" id="btn-empty-play" style="width: 100%; background: #00ffff; color: black; font-weight: 900; font-size: 1.1rem; text-shadow: none;">🎮 JUGAR (Auto-Mapeo del Juego)</button>
-                    <button class="action secondary" id="btn-empty-edit" style="width: 100%; color: #ff66aa; border-color: #ff66aa; font-weight: bold;">✏️ MAPEAR (Abrir Editor)</button>
+                    <button class="action" id="btn-empty-play" style="width: 100%; background: #00ffff; color: black; font-weight: 900; font-size: 1.1rem;">🎮 JUGAR (AUTO-MAPEO)</button>
+                    <button class="action secondary" id="btn-empty-edit" style="width: 100%; color: #ff66aa; border-color: #ff66aa; font-weight: bold;">✏️ MAPEAR (EDITOR)</button>
                     <button class="action secondary" onclick="document.getElementById('modal-empty-map').remove()" style="width: 100%; color: #F9393F; border-color: #F9393F; font-weight: bold;">❌ CANCELAR</button>
                 </div>
             </div>
@@ -23,15 +23,18 @@ window.showEmptyMapModal = function(k, songData) {
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-document.getElementById('btn-empty-play').onclick = () => {
+    document.getElementById('btn-empty-play').onclick = () => {
         document.getElementById('modal-empty-map').remove();
-        
-        // La llave maestra que le avisará a game.js que se salte la alerta
         window.forceAutomap = true; 
-        
         if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
         else if (typeof window.startGame === 'function') window.startGame(k);
     };
+
+    document.getElementById('btn-empty-edit').onclick = () => {
+        document.getElementById('modal-empty-map').remove();
+        if (typeof window.openEditor === 'function') window.openEditor(songData, k, 'mania');
+    };
+};
 
 window.openUnifiedDiffModal = function(song) {
     const titleEl = document.getElementById('diff-song-title');
@@ -48,7 +51,7 @@ window.openUnifiedDiffModal = function(song) {
             let grade = typeof bestScoreData === 'object' ? bestScoreData.grade : null;
             if (grade) {
                 let badgeColor = grade === "SS" ? "#00ffff" : grade === "S" ? "gold" : grade === "A" ? "#12FA05" : grade === "B" ? "yellow" : grade === "C" ? "orange" : "#F9393F";
-                gradeBadgeHTML = `<div style="position: absolute; top: -15px; right: -15px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 3px solid ${badgeColor}; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; box-shadow: 0 0 20px ${badgeColor}; z-index: 10; font-family: sans-serif;">${grade}</div>`;
+                gradeBadgeHTML = `<div style="position: absolute; top: -15px; right: -15px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 3px solid ${badgeColor}; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; box-shadow: 0 0 20px ${badgeColor}; z-index: 10;">${grade}</div>`;
             }
         }
         coverEl.innerHTML = gradeBadgeHTML; 
@@ -136,4 +139,4 @@ window.openUnifiedDiffModal = function(song) {
     
     if (typeof window.openModal === 'function') window.openModal('diff');
     else { const modal = document.getElementById('modal-diff'); if(modal) modal.style.display = 'flex'; }
-};
+}; // <-- ¡Esta es la llave que te faltaba y rompía todo!
