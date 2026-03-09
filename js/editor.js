@@ -505,10 +505,16 @@ window.applyEditorAutoMap = async function() {
     let audioUrl = window.curSongData.audioURL || window.curSongData.url;
 
     // --- PLAN B: Auto-Mapeo Matemático Rítmico ---
+    // --- PLAN B: Auto-Mapeo Matemático Rítmico (BLINDADO) ---
     let fallbackMathMap = () => {
-        if(typeof window.notify === 'function') window.notify("⚠️ Audio protegido en la nube. Usando mapeo rítmico matemático.", "warning");
+        if(typeof window.notify === 'function') window.notify("⚠️ Audio protegido. Usando mapeo matemático de fuerza bruta.", "warning");
+        
         let bpm = window.curSongData.bpm || 120;
-        let durationMs = (window.st.songDuration || window.edAudioDuration || 120) * 1000;
+        
+        // 🚨 EL FIX: Si CORS bloquea el audio y no sabemos la duración, forzamos 3 minutos (180000ms)
+        let rawDuration = window.st.songDuration || window.edAudioDuration;
+        let durationMs = (rawDuration && rawDuration > 0) ? (rawDuration * 1000) : 180000; 
+        
         let msPerStep = (60000 / bpm) / diffMult;
         
         for (let t = 3000; t < durationMs; t += msPerStep) {
@@ -519,9 +525,8 @@ window.applyEditorAutoMap = async function() {
                 if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
             }
         }
-        refreshEditor();
+        refreshEditor(); // Manda a dibujar a la pantalla
     };
-
     // --- FUNCIÓN PARA REFRESCAR PANTALLA ---
     let refreshEditor = () => {
         let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
