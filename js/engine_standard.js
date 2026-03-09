@@ -720,8 +720,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
         window.st.paused = false;
         if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
     };
-
-    function endEngine(died) {
+function endEngine(died) {
         if(!isRunning) return; 
         isRunning = false; window.st.act = false;
         cancelAnimationFrame(window.st.animId);
@@ -756,23 +755,48 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                 titleHTML = `<div id="winner-msg">¡MAPA COMPLETADO!</div>`;
             } else { r="F"; c="#F9393F"; titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; }
             
-// Bloque para guardar XP y Mejor Rango en la nube
-            let xpGain = 0;
+            let xpGain = 0, spGain = 0, ppGain = 0; 
+            let chk = document.getElementById('chk-ranked'); 
+            let isRanked = chk ? chk.checked : false; 
+            let rankText = isRanked ? "(Ranked)" : "(Unranked)";
+
             if (!died && window.user && window.user.name !== "Guest") { 
                 xpGain = Math.floor(window.st.sc / 250); 
-                window.user.xp = (window.user.xp || 0) + xpGain; 
+                spGain = Math.floor(window.st.sc / 100); 
+                if (isRanked && finalAcc >= 70) { 
+                    let stars = parseFloat(window.curSongData.starRating || 3); 
+                    ppGain = Math.floor((stars * 20) * (finalAcc / 100)); 
+                }
                 
-                // 🌟 NUEVO: GUARDAR EL MEJOR RANGO (SS, S, A)
+                window.user.xp = (window.user.xp || 0) + xpGain; 
+                window.user.sp = (window.user.sp || 0) + spGain; 
+                window.user.pp = (window.user.pp || 0) + ppGain; 
+                window.user.plays = (window.user.plays || 0) + 1; 
+                window.user.score = (window.user.score || 0) + window.st.sc;
+                
+                let nextLevelXp = window.user.lvl * 1000; 
+                if (window.user.xp >= nextLevelXp) { 
+                    window.user.lvl++; 
+                    window.user.xp -= nextLevelXp; 
+                    if(typeof window.notify === 'function') window.notify(`✨ ¡NIVEL ${window.user.lvl} ALCANZADO! ✨`, "success"); 
+                }
+
                 if (!window.user.scores) window.user.scores = {};
                 let currentBest = window.user.scores[window.curSongData.id];
                 let oldScore = currentBest ? currentBest.score : 0;
                 
-                // Solo guarda si el nuevo puntaje es mayor al anterior
                 if (window.st.sc > oldScore) {
                     window.user.scores[window.curSongData.id] = { grade: r, score: window.st.sc };
                 }
 
-                if(typeof save === 'function') save(); // Sube a Firebase
+                if(typeof save === 'function') save(); 
+                if (window.db) { 
+                    window.db.collection("users").doc(window.user.name).update({ 
+                        xp: window.user.xp, sp: window.user.sp, pp: window.user.pp, 
+                        lvl: window.user.lvl, plays: window.user.plays, score: window.user.score,
+                        scores: window.user.scores
+                    }).catch(e => console.warn(e)); 
+                }
             }
 
             modal.querySelector('.modal-panel').innerHTML = `
@@ -786,7 +810,7 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                         <div style="text-align:left;">
                             <div id="res-score">${window.st.sc.toLocaleString()}</div>
                             <div style="color:#aaa; font-size:1.5rem; font-weight:900;">ACC: <span style="color:white">${finalAcc}%</span></div>
-                            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; font-size:1.1rem; margin-top:5px;">+0 PP <span style="font-weight:normal; color:#888;">(Unranked)</span></div>
+                            <div id="pp-gain-loss" style="color:var(--gold); font-weight:bold; font-size:1.1rem; margin-top:5px;">+${ppGain} PP <span style="font-weight:normal; color:#888;">${rankText}</span></div>
                         </div>
                     </div>
                     <div class="res-stats-grid">
@@ -796,8 +820,8 @@ function runStandardEngine(audioBuffer, map, CS, AR, songObj) {
                         <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
                     </div>
                     <div style="display:flex; justify-content:space-around; background:#111; padding:15px; border-radius:10px; border:1px solid #333; margin-bottom:20px; font-weight:bold;">
-                        <div style="color:var(--blue); font-size:1.3rem;">💙 +<span id="res-xp">${xpGain}</span> XP GAINED</div>
-                        <div style="color:var(--gold); font-size:1.3rem;">💰 +<span id="res-sp">0</span> SP SAVED</div>
+                        <div style="color:var(--blue); font-size:1.3rem;">💙 +<span id="res-xp">${xpGain}</span> XP</div>
+                        <div style="color:var(--gold); font-size:1.3rem;">💰 +<span id="res-sp">${spGain}</span> SP</div>
                     </div>
                 </div>
                 <div class="modal-neon-buttons">
