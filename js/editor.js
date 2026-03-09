@@ -498,35 +498,32 @@ window.applyEditorAutoMap = async function() {
 
     if(typeof window.notify === 'function') window.notify("🧠 Analizando audio... Espere.", "info");
 
-    // 🚨 Vaciar memoria sin romper la referencia
+    // Vaciar memoria sin romper la referencia
     if (window.edNotes) window.edNotes.length = 0;
 
     let diffMult = parseFloat(document.getElementById('auto-map-diff').value) || 2;
     let audioUrl = window.curSongData.audioURL || window.curSongData.url;
+    let mode = window.edMode || (window.curSongData && window.curSongData.originalMode) || 'mania';
+    let keys = window.edKeys || 4;
 
-    // --- PLAN B: Auto-Mapeo Matemático Rítmico ---
-    // --- PLAN B: Auto-Mapeo Matemático Rítmico (BLINDADO) ---
-    let fallbackMathMap = () => {
-        if(typeof window.notify === 'function') window.notify("⚠️ Audio protegido. Usando mapeo matemático de fuerza bruta.", "warning");
-        
-        let bpm = window.curSongData.bpm || 120;
-        
-        // 🚨 EL FIX: Si CORS bloquea el audio y no sabemos la duración, forzamos 3 minutos (180000ms)
-        let rawDuration = window.st.songDuration || window.edAudioDuration;
-        let durationMs = (rawDuration && rawDuration > 0) ? (rawDuration * 1000) : 180000; 
-        
-        let msPerStep = (60000 / bpm) / diffMult;
-        
-        for (let t = 3000; t < durationMs; t += msPerStep) {
-            let lane = Math.floor(Math.random() * window.edKeys);
-            window.edNotes.push({ t: Math.floor(t), l: lane, type: 'tap' });
-            if (diffMult >= 2 && Math.random() > 0.8) {
-                let extraLane = Math.floor(Math.random() * window.edKeys);
-                if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
+    // 🚨 FIX CSS INTELIGENTE: Solo arreglar la línea roja si estamos en Mania
+    let oldStyle = document.getElementById('mania-editor-fix');
+    if (oldStyle) oldStyle.remove();
+    
+    if (mode === 'mania') {
+        const style = document.createElement('style');
+        style.id = 'mania-editor-fix';
+        style.innerHTML = `
+            #editor-layer .receptor, #editor-layer .arrow-wrapper.receptor, #editor-layer .game-receptor { display: none !important; }
+            #editor-layer #playhead, #editor-layer .playhead, #editor-layer #editor-red-line {
+                position: absolute !important; bottom: 100px !important; top: auto !important; 
+                width: 100% !important; height: 3px !important; background: #F9393F !important;
+                box-shadow: 0 0 15px #F9393F !important; z-index: 100 !important; left: 0 !important; transform: none !important;
             }
-        }
-        refreshEditor(); // Manda a dibujar a la pantalla
-    };
+        `;
+        document.head.appendChild(style);
+    }
+
     // --- FUNCIÓN PARA REFRESCAR PANTALLA ---
     let refreshEditor = () => {
         let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
@@ -536,6 +533,31 @@ window.applyEditorAutoMap = async function() {
         if (typeof renderEditorNotes === 'function') renderEditorNotes();
         if (typeof updateTimeline === 'function') updateTimeline();
         if (typeof window.notify === 'function') window.notify(`✅ Mapa base generado (${window.edNotes.length} notas).`, "success");
+    };
+
+    // --- PLAN B: Auto-Mapeo Matemático Rítmico (CON SOPORTE STANDARD) ---
+    let fallbackMathMap = () => {
+        if(typeof window.notify === 'function') window.notify("⚠️ Audio protegido. Usando mapeo matemático de fuerza bruta.", "warning");
+        let bpm = window.curSongData.bpm || 120;
+        let rawDuration = window.st.songDuration || window.edAudioDuration;
+        let durationMs = (rawDuration && rawDuration > 0) ? (rawDuration * 1000) : 180000; // Forzar 3 mins si falla
+        let msPerStep = (60000 / bpm) / diffMult;
+        
+        for (let t = 3000; t < durationMs; t += msPerStep) {
+            if (mode === 'mania') {
+                let lane = Math.floor(Math.random() * keys);
+                window.edNotes.push({ t: Math.floor(t), l: lane, type: 'tap' });
+                if (diffMult >= 2 && Math.random() > 0.8) {
+                    let extraLane = Math.floor(Math.random() * keys);
+                    if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
+                }
+            } else if (mode === 'standard' || mode === 'catch') {
+                let x = Math.floor(Math.random() * 400) + 56;
+                let y = Math.floor(Math.random() * 280) + 52;
+                window.edNotes.push({ t: Math.floor(t), x: x, y: y, type: 'circle' });
+            }
+        }
+        refreshEditor();
     };
 
     if (!audioUrl) return fallbackMathMap();
@@ -549,16 +571,12 @@ window.applyEditorAutoMap = async function() {
         const channelData = audioBuffer.getChannelData(0);
         const sampleRate = audioBuffer.sampleRate;
         const windowSize = Math.floor(sampleRate * 0.05);
-        let energies = [];
-        let sumEnergy = 0;
+        let energies = []; let sumEnergy = 0;
 
         for (let i = 0; i < channelData.length; i += windowSize) {
             let energy = 0;
-            for (let j = 0; j < windowSize && (i + j) < channelData.length; j++) {
-                energy += Math.abs(channelData[i + j]);
-            }
-            energies.push(energy);
-            sumEnergy += energy;
+            for (let j = 0; j < windowSize && (i + j) < channelData.length; j++) { energy += Math.abs(channelData[i + j]); }
+            energies.push(energy); sumEnergy += energy;
         }
 
         let avgEnergy = sumEnergy / energies.length;
@@ -566,8 +584,6 @@ window.applyEditorAutoMap = async function() {
         let strongThreshold = threshold * 1.5;
         let minMsBetweenNotes = (60000 / (window.curSongData.bpm || 120)) / diffMult;
         let lastNoteTimeMs = 0;
-        let mode = window.edMode || window.curSongData.originalMode || 'mania';
-        let keys = window.edKeys || 4;
 
         for (let i = 0; i < energies.length; i++) {
             if (energies[i] > threshold) {
@@ -584,9 +600,6 @@ window.applyEditorAutoMap = async function() {
                         let x = Math.floor(Math.random() * 400) + 56;
                         let y = Math.floor(Math.random() * 280) + 52;
                         window.edNotes.push({ t: Math.floor(timeMs), x: x, y: y, type: 'circle' });
-                    } else if (mode === 'taiko') {
-                        let isKat = energies[i] > strongThreshold;
-                        window.edNotes.push({ t: Math.floor(timeMs), x: 256, y: 192, type: 'circle', taikoType: isKat ? 8 : 1 });
                     }
                     lastNoteTimeMs = timeMs;
                 }
@@ -594,7 +607,6 @@ window.applyEditorAutoMap = async function() {
         }
         refreshEditor();
     } catch (error) {
-        // SI LA NUBE BLOQUEA EL AUDIO, CAEMOS AL PLAN B
         console.warn("IA Falló por protección CORS de la nube. Cambiando a Plan B...", error);
         fallbackMathMap();
     }
