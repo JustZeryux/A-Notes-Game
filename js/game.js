@@ -266,15 +266,21 @@ window.prepareAndPlaySong = async function(k) {
             map.sort((a, b) => a.t - b.t); 
         } 
         else {
-            if (rawData.uploader) {
+            // 🚨 Si tiene uploader Y NO tiene la llave maestra, lanza la alerta gris
+            if (rawData.uploader && !window.forceAutomap) {
                 if(loader) loader.style.display = 'none';
                 let ask = confirm("⚠️ Esta canción fue subida desde el Studio y aún no tiene notas mapeadas.\n\n¿Deseas abrir el Editor para chartearla ahora?");
                 if (ask && typeof window.openEditor === 'function') { window.openEditor(window.curSongData, k, 'mania'); } 
                 else { document.getElementById('menu-container').classList.remove('hidden'); }
                 return; 
             } else {
+                // 🧠 Si tiene la llave maestra activada, o es del sistema, usa TU GENMAP nativo
+                if (window.forceAutomap && typeof window.notify === 'function') {
+                    window.notify("🧠 Analizando audio con Auto-Mapeo Nativo...", "info");
+                }
                 map = genMap(buffer, k); 
                 map.sort((a, b) => a.t - b.t);
+                window.forceAutomap = false; // Apagamos la llave maestra para la próxima
             }
         }
 
