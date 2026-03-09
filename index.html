@@ -476,13 +476,21 @@
         </div>
     </div>
 
-    <div id="modal-finish-reg" class="modal-overlay" style="z-index: 6000;">
-        <div class="modal-panel login-box">
-            <div class="m-title">CASI LISTO</div>
-            <input type="text" id="reg-google-user" class="log-inp" placeholder="Nombre de Usuario">
-            <button class="action" onclick="finishGoogleRegistration()">CREAR CUENTA</button>
+<div id="modal-finish-reg" class="modal-overlay" style="z-index: 6000; display: none;">
+    <div class="modal-panel" style="max-width: 400px; text-align: center;">
+        <div class="modal-neon-header">
+            <h2 class="modal-neon-title" style="color: #00ffff;">✨ CASI LISTO</h2>
+        </div>
+        <div class="modal-neon-content" style="padding: 20px 0;">
+            <p style="color: #aaa; font-size: 0.95rem; margin-bottom: 20px;">Tu cuenta de Google ha sido enlazada. Ahora, elige el <b>Nombre de Usuario</b> con el que aparecerás en el Ranking Global.</p>
+            
+            <input type="text" id="reg-google-user" class="log-inp" placeholder="Ingresa tu Nickname" style="width: 100%; box-sizing: border-box; text-align: center; font-size: 1.2rem; font-weight: bold; color: #00ffff; margin-bottom: 10px;">
+        </div>
+        <div class="modal-neon-buttons">
+            <button class="action" onclick="finishGoogleRegistration()" style="width: 100%;">🚀 CREAR CUENTA</button>
         </div>
     </div>
+</div>
 
     <div id="modal-song-selector" class="modal-overlay">
         <div class="modal-panel" style="width:800px; height:80vh;">
