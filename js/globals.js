@@ -136,30 +136,19 @@ const SHOP_ITEMS = [
 ];
 
 window.filterStore = function(category, btnElement) {
-    // 1. Efecto visual en las pestañas (Opcional, si tus botones comparten una clase como 'store-tab')
+    // 1. Efecto visual usando solo clases CSS
     if (btnElement) {
-        let allTabs = btnElement.parentElement.querySelectorAll('button, .store-tab');
-        allTabs.forEach(tab => {
-            tab.style.background = 'transparent';
-            tab.style.color = 'white'; // Color inactivo
-        });
-        btnElement.style.background = 'white'; // Color activo
-        btnElement.style.color = 'black';
+        let allTabs = btnElement.parentElement.querySelectorAll('.store-tab');
+        allTabs.forEach(tab => tab.classList.remove('active')); // Quita el brillo a todos
+        btnElement.classList.add('active'); // Le da el brillo al seleccionado
     }
 
     // 2. Filtrar las tarjetas de la tienda
-    // Busca todas las tarjetas de los items de la tienda (Asegúrate de que tengan esta clase)
     let items = document.querySelectorAll('.shop-item-card'); 
-    
     items.forEach(item => {
-        // Leemos de qué tipo es esta tarjeta (skin, cursor, fx)
-        let itemType = item.getAttribute('data-type'); 
-        
-        if (category === 'all' || itemType === category) {
-            item.style.display = 'flex'; // Mostrar
-        } else {
-            item.style.display = 'none'; // Ocultar
-        }
+        let itemType = item.getAttribute('data-type') || item.dataset.category; 
+        if (category === 'all' || itemType === category) item.style.display = 'flex';
+        else item.style.display = 'none';
     });
 };
 
