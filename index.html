@@ -185,16 +185,17 @@
                     
                     <div style="width:2px; height:20px; background:#444; margin:0 5px;"></div>
                     
-                    <button class="filter-btn active" data-type="key" data-val="all" onclick="setFilter('key', 'all')">CUALQUIER TECLA</button>
-                    <button class="filter-btn" data-type="key" data-val="4" onclick="setFilter('key', '4')">4K</button>
-                    <button class="filter-btn" data-type="key" data-val="5" onclick="setFilter('key', '5')">5K</button>
-                    <button class="filter-btn" data-type="key" data-val="6" onclick="setFilter('key', '6')">6K</button>
-                    <button class="filter-btn" data-type="key" data-val="7" onclick="setFilter('key', '7')">7K</button>
-                    <button class="filter-btn" data-type="key" data-val="8" onclick="setFilter('key', '8')">8K</button>
-                    <button class="filter-btn" data-type="key" data-val="9" onclick="setFilter('key', '9')">9K</button>
-                    <button class="filter-btn" data-type="key" data-val="10" onclick="setFilter('key', '10')">10K</button>
-                </div>
-                <div style="display:inline-flex; gap:5px; margin-left:15px; border-left:2px solid #333; padding-left:15px;">
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 15px;">
+    
+    <button class="filter-btn active" data-type="key" data-val="all" onclick="window.setFilter('key', 'all')">CUALQUIER TECLA</button>
+    <button class="filter-btn" data-type="key" data-val="4" onclick="window.setFilter('key', '4')">4K</button>
+    <button class="filter-btn" data-type="key" data-val="5" onclick="window.setFilter('key', '5')">5K</button>
+    <button class="filter-btn" data-type="key" data-val="6" onclick="window.setFilter('key', '6')">6K</button>
+    <button class="filter-btn" data-type="key" data-val="7" onclick="window.setFilter('key', '7')">7K</button>
+    <button class="filter-btn" data-type="key" data-val="9" onclick="window.setFilter('key', '9')">9K</button>
+
+    <div style="width: 2px; height: 20px; background: #444; margin: 0 5px;"></div>
+    
     <button class="filter-btn active" data-type="stars" data-val="all" onclick="window.setFilter('stars', 'all')">Todas ⭐</button>
     <button class="filter-btn" data-type="stars" data-val="1" onclick="window.setFilter('stars', '1')">1 ⭐</button>
     <button class="filter-btn" data-type="stars" data-val="2" onclick="window.setFilter('stars', '2')">2 ⭐</button>
