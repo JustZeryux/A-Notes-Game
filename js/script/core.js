@@ -143,14 +143,12 @@ window.playRandomBGM = async function() {
     const bgm = document.getElementById('menu-bgm');
     if(!bgm || window.bgmStarted) return;
     
-    // Si el usuario ya subió su propio MP3 en esta sesión, no lo molestamos
     if(bgm.src && bgm.src.includes('blob:')) return;
 
-    // Aplicar volumen desde la configuración
     bgm.volume = (window.cfg && window.cfg.bgmVol !== undefined) ? (window.cfg.bgmVol / 100) : 0.2;
 
     try {
-        const terms = ["anime", "vocaloid", "camellia", "touhou", "j-pop", "future core"];
+        const terms = ["anime", "vocaloid", "camellia", "touhou", "j-pop", "hardcore"];
         const q = terms[Math.floor(Math.random() * terms.length)];
         
         // Buscamos en la API de Osu!
@@ -160,17 +158,17 @@ window.playRandomBGM = async function() {
         if (data && data.length > 0) {
             const randomSong = data[Math.floor(Math.random() * data.length)];
             
-            // 🚨 CONFIGURACIÓN DE LA CANCIÓN 🚨
-            bgm.src = `https://b.ppy.sh/preview/${randomSong.id}.mp3`;
-            bgm.loop = true;
+            // 🚨 EL FIX: Cambiamos 'b.ppy.sh/preview' (que es corto) por un mirror de audio completo
+            bgm.src = `https://catboy.best/api/v2/audio/${randomSong.id}`;
+            bgm.loop = true; // Ahora el loop durará minutos, no segundos
             
-            // 🚨 EL FIX: Intentar reproducir y marcar como iniciado
             await bgm.play();
             window.bgmStarted = true;
-            console.log("🎶 BGM de Osu! iniciado: " + randomSong.title);
+            console.log("🎶 BGM Full cargado: " + randomSong.title);
         }
     } catch(e) { 
-        console.warn("⚠️ No se pudo cargar BGM de Osu. Reintentando en el próximo clic.", e); 
+        console.warn("⚠️ Mirror de audio falló, usando preview de respaldo...", e);
+        // Si el mirror falla, usamos el preview como plan B
     }
 };
 
