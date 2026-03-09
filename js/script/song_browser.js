@@ -155,60 +155,62 @@ window.renderUnifiedGrid = function() {
     const grid = document.getElementById('song-grid'); if(!grid) return; grid.innerHTML = '';
     let baseList = window.currentFilters.type === 'recent' ? JSON.parse(localStorage.getItem('recentSongs') || '[]') : window.unifiedSongs;
 
-   let filtered = baseList.filter(song => {
+  let filtered = baseList.filter(song => {
         const f = window.currentFilters;
 
-        // 1. FILTRO DE TIPO (TODO, COMUNIDAD, RECIENTES, MANIA, etc.)
+        // 1. FILTRO DE TIPO (TODO, COMUNIDAD, MANIA, etc.)
         if (f.type !== 'all' && f.type !== 'recent') {
             if (f.type === 'com' || f.type === 'comunidad') {
                 if (song.isOsu) return false;
             } else if (f.type === 'charted') {
                 if (song.isOsu || countTotalNotes(song.raw) === 0) return false;
-            } else if (f.type === 'mechanics') {
-                if (!song.raw || !song.raw.mechanics || song.raw.mechanics.length === 0) return false;
             } else if (f.type.startsWith('osu_')) {
                 const mode = f.type.replace('osu_', '');
                 if (song.originalMode !== mode) return false;
-            } else {
-                if (song.originalMode !== f.type) return false;
             }
         }
 
-        // 2. FILTRO DE TECLAS (EL REPARADOR MAESTRO) 🚨
+        // 2. FILTRO DE TECLAS (ESTRICTO)
         if (f.key !== 'all') {
             const targetK = parseInt(f.key);
-            // Si el mapa es de Osu y NO es Mania (Standard/Taiko/Catch), ¡OCÚLTALO! No tienen teclas.
+            // Si eliges teclas, ocultamos Standard/Taiko/Catch de Osu!
             if (song.isOsu && song.originalMode !== 'mania') return false;
             
-            // Si es de la Comunidad o Mania, comprobamos si tiene la tecla o si está vacío (permitido)
+            // Verificamos si el mapa tiene esa tecla disponible
             if (song.keysAvailable && song.keysAvailable.length > 0) {
                 if (!song.keysAvailable.includes(targetK)) return false;
-            } else {
-                // Si el mapa es de Osu Mania pero no reporta teclas, lo ocultamos por seguridad
-                if (song.isOsu) return false;
+            } else if (song.isOsu) {
+                return false; 
             }
         }
 
-        // 3. FILTRO DE ESTRELLAS
+        // 3. FILTRO DE ESTRELLAS (🚨 EL ARREGLO MAESTRO)
         if (f.stars !== 'all') {
             const targetS = parseInt(f.stars);
             let sNum = 0;
-            if (song.isOsu) {
-                sNum = parseFloat(song.starRating || 0);
-            } else { 
-                let n = countTotalNotes(song.raw || song); 
-                sNum = n === 0 ? 0 : (n / 200) + 1; 
+
+            if (song.isOsu && song.raw && song.raw.beatmaps) {
+                // Buscamos si ALGUNA dificultad del paquete cumple el rango
+                const hasMatchingDiff = song.raw.beatmaps.some(b => {
+                    let bStars = b.difficulty_rating || 0;
+                    if (targetS === 1) return bStars < 2.0;
+                    if (targetS === 5) return bStars >= 5.0;
+                    return bStars >= targetS && bStars < targetS + 1;
+                });
+                if (!hasMatchingDiff) return false;
+            } else {
+                // Lógica para mapas de la comunidad
+                let n = countTotalNotes(song.raw || song);
+                sNum = n === 0 ? 0 : (n / 200) + 1;
+                
+                if (targetS === 1 && sNum >= 2.0) return false;
+                if (targetS >= 2 && targetS <= 4 && (sNum < targetS || sNum >= targetS + 1)) return false;
+                if (targetS === 5 && sNum < 5.0) return false;
             }
-            
-            if (targetS === 1 && sNum >= 2.0) return false;
-            if (targetS >= 2 && targetS <= 4 && (sNum < targetS || sNum >= targetS + 1)) return false;
-            if (targetS === 5 && sNum < 5.0) return false;
         }
         
         return true;
-    });
-
-    if (filtered.length === 0) { grid.innerHTML = `<div style="width:100%; text-align:center; padding:50px; color:var(--gold); font-weight:bold; font-size:1.5rem;">No se encontraron canciones con estos filtros. 🌸</div>`; return; }
+    });ight:bold; font-size:1.5rem;">No se encontraron canciones con estos filtros. 🌸</div>`; return; }
 
     filtered.forEach(song => {
         const card = document.createElement('div'); card.className = `song-card ${song.isOsu ? 'osu-card-style' : ''}`;
