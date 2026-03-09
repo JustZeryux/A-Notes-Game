@@ -427,7 +427,7 @@ function loop() {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
 
-    // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
+// === ZONA DE GENERACIÓN VISUAL DE NOTAS (OPTIMIZADA A 60+ FPS) ===
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
@@ -439,7 +439,7 @@ function loop() {
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 
-                // 🚨 FIX TAMAÑOS: Altura de 80px para que las figuras guarden proporción
+                // Altura fija, sin sombras pesadas
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
                 let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l])
@@ -456,8 +456,8 @@ function loop() {
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                // 🚨 preserveAspectRatio="xMidYMid meet" forzará el tamaño perfecto
-                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 10px ${color});`;
+                // 🚨 FIX LAG: Eliminado el "filter: drop-shadow". Las sombras de SVG matan el rendimiento en móvil y PC débiles.
+                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5;`;
                 let svgHTML = '';
                 
                 if (n.type === 'mine') {
@@ -476,12 +476,13 @@ function loop() {
                 let trailHTML = '';
                 let noteLen = n.len || n.dur || 0;
                 if (n.type === 'hold' && noteLen > 0) { 
-                    // Ancho del trail más delgado y elegante para acompañar las figuras
-                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 20%; z-index: -1; opacity: ${(window.cfg.noteOp||100)/100}; box-shadow: 0 0 15px ${color}; border-radius: 8px;`;
+                    // 🚨 FIX TRAILS: Diseño clásico y sin lag. Color sólido + Opacidad. Sin sombras raras.
+                    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6; // Ligeramente transparente
+                    let tStyle = `position: absolute; left: 50%; margin-left: -15%; width: 30%; z-index: -1; opacity: ${opacityVal}; background: ${color}; border-radius: 4px;`;
                     if (window.cfg.down) { 
-                        tStyle += ` bottom: 50%; transform-origin: bottom center; background: linear-gradient(to top, ${color}ff 0%, ${color}00 100%);`; 
+                        tStyle += ` bottom: 50%; transform-origin: bottom center;`; 
                     } else { 
-                        tStyle += ` top: 50%; transform-origin: top center; background: linear-gradient(to bottom, ${color}ff 0%, ${color}00 100%);`; 
+                        tStyle += ` top: 50%; transform-origin: top center;`; 
                     } 
                     trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
                 }
