@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODAL.JS - Menú de Dificultades Reparado (Anti-Bugs de ID)
+   DIFF_MODAL.JS - Menú de Dificultades Reparado (Anti-Bugs de ID) + TROFEOS
    ========================================================== */
 
 window.openUnifiedDiffModal = function(song) {
@@ -8,7 +8,32 @@ window.openUnifiedDiffModal = function(song) {
     
     titleEl.innerText = song.title;
     coverEl.style.backgroundImage = `url('${song.imageURL}')`;
+    coverEl.style.position = 'relative'; // Importante para que el escudo no se salga de la imagen
     
+    // =========================================================
+    // 🌟 INYECTAR EL TROFEO (SS, S, A) EN EL MODAL DE DIFICULTAD
+    // =========================================================
+    let gradeBadgeHTML = '';
+    if (window.user && window.user.scores && window.user.scores[song.id]) {
+        let bestScoreData = window.user.scores[song.id];
+        let grade = typeof bestScoreData === 'object' ? bestScoreData.grade : null;
+        
+        if (grade) {
+            let badgeColor = grade === "SS" ? "#00ffff" : 
+                             grade === "S" ? "gold" : 
+                             grade === "A" ? "#12FA05" : 
+                             grade === "B" ? "yellow" : 
+                             grade === "C" ? "orange" : "#F9393F";
+            
+            gradeBadgeHTML = `
+            <div style="position: absolute; top: -15px; right: -15px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 3px solid ${badgeColor}; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; box-shadow: 0 0 20px ${badgeColor}; z-index: 10; font-family: sans-serif;">
+                ${grade}
+            </div>`;
+        }
+    }
+    coverEl.innerHTML = gradeBadgeHTML; // Inyectamos el escudo en la portada
+    // =========================================================
+
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
     grid.style.maxHeight = '260px'; 
@@ -80,10 +105,8 @@ window.openUnifiedDiffModal = function(song) {
                     if(typeof window.saveToRecents === 'function') window.saveToRecents(song);
                     
                     if(song.isOsu) {
-                        // Enviamos el cleanId aquí también por seguridad
                         downloadAndPlayOsu(cleanId, song.title, song.imageURL, k);
                     } else {
-                        // FIX: Arreglo del bucle infinito "PREPARANDO PISTA..." para la comunidad
                         window.curSongData = song.raw || song; 
                         if (typeof window.prepareAndPlaySong === 'function') {
                             window.prepareAndPlaySong(k);
