@@ -1,38 +1,96 @@
 /* ==========================================================
-   DIFF_MODAL.JS - Menú de Dificultades Reparado (Anti-Bugs de ID) + TROFEOS
+   DIFF_MODAL.JS - Menú de Dificultades + UI de Auto-Mapeo Integrada 🚀
    ========================================================== */
 
+// 🌟 GENERADOR DEL MENÚ CUSTOM PARA PISTAS VACÍAS 🌟
+window.showEmptyMapModal = function(k, songData) {
+    // Si ya existe un modal anterior, lo borramos para no duplicar
+    if(document.getElementById('modal-empty-map')) {
+        document.getElementById('modal-empty-map').remove();
+    }
+    
+    // Inyectamos el diseño Neón en el HTML
+    const modalHTML = `
+    <div id="modal-empty-map" class="modal-overlay" style="display:flex; z-index: 9999999; backdrop-filter: blur(10px);">
+        <div class="modal-panel" style="max-width: 450px; text-align: center; border: 2px solid #ff66aa; box-shadow: 0 0 30px rgba(255,102,170,0.3);">
+            <div class="modal-neon-header" style="border-bottom: none;">
+                <h2 class="modal-neon-title" style="color: #ff66aa; font-size: 2rem;">⚠️ PISTA VACÍA</h2>
+            </div>
+            <div class="modal-neon-content" style="padding: 10px 20px 30px 20px;">
+                <p style="color: #ccc; font-size: 1.1rem; margin-bottom: 25px;">Esta canción fue subida desde la comunidad y aún no tiene notas mapeadas. ¿Qué deseas hacer?</p>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button class="action" id="btn-empty-play" style="width: 100%; background: #00ffff; color: black; font-weight: 900; font-size: 1.1rem; text-shadow: none;">🎮 JUGAR (Auto-Mapeo)</button>
+                    <button class="action secondary" id="btn-empty-edit" style="width: 100%; color: #ff66aa; border-color: #ff66aa; font-weight: bold;">✏️ MAPEAR (Abrir Editor)</button>
+                    <button class="action secondary" onclick="document.getElementById('modal-empty-map').remove()" style="width: 100%; color: #F9393F; border-color: #F9393F; font-weight: bold;">❌ CANCELAR</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // LÓGICA: BOTÓN JUGAR
+    document.getElementById('btn-empty-play').onclick = () => {
+        document.getElementById('modal-empty-map').remove();
+        if(typeof window.notify === 'function') window.notify("⚙️ Generando Auto-Mapeo...", "info");
+        
+        let mapData = [];
+        // Intentar usar tu propia función si existe
+        if (typeof window.generateAutoMap === 'function') {
+            mapData = window.generateAutoMap(k, songData);
+        } 
+        
+        // Fallback: Si no hay función, creamos un mapa rítmico automático aquí mismo
+        if (!mapData || mapData.length === 0) {
+            let bpm = songData.bpm || 120;
+            let msPerBeat = 60000 / bpm;
+            for (let t = 3000; t < 120000; t += msPerBeat) { // 2 minutos de notas
+                let lane = Math.floor(Math.random() * k);
+                mapData.push({ t: t, l: lane, type: 'tap' });
+                if (Math.random() > 0.8) { // 20% de probabilidad de nota doble
+                    let extraLane = Math.floor(Math.random() * k);
+                    if(extraLane !== lane) mapData.push({ t: t, l: extraLane, type: 'tap' });
+                }
+            }
+        }
+        
+        // Guardamos las notas generadas en la canción temporal y arrancamos
+        songData[`notes_${k}k`] = mapData;
+        if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+        else if (typeof window.startGame === 'function') window.startGame(k);
+    };
+
+    // LÓGICA: BOTÓN MAPEAR
+    document.getElementById('btn-empty-edit').onclick = () => {
+        document.getElementById('modal-empty-map').remove();
+        if (typeof window.openEditor === 'function') window.openEditor(songData, k, 'mania');
+    };
+};
+
+
+// 🌟 FUNCIÓN PRINCIPAL DEL MODAL DE DIFICULTAD 🌟
 window.openUnifiedDiffModal = function(song) {
     const titleEl = document.getElementById('diff-song-title');
     const coverEl = document.getElementById('diff-song-cover');
     
     titleEl.innerText = song.title;
     coverEl.style.backgroundImage = `url('${song.imageURL}')`;
-    coverEl.style.position = 'relative'; // Importante para que el escudo no se salga de la imagen
+    coverEl.style.position = 'relative'; 
     
-    // =========================================================
-    // 🌟 INYECTAR EL TROFEO (SS, S, A) EN EL MODAL DE DIFICULTAD
-    // =========================================================
+    // --- INYECCIÓN DE TROFEOS (SS, S, A) EN LA PORTADA ---
     let gradeBadgeHTML = '';
     if (window.user && window.user.scores && window.user.scores[song.id]) {
         let bestScoreData = window.user.scores[song.id];
         let grade = typeof bestScoreData === 'object' ? bestScoreData.grade : null;
         
         if (grade) {
-            let badgeColor = grade === "SS" ? "#00ffff" : 
-                             grade === "S" ? "gold" : 
-                             grade === "A" ? "#12FA05" : 
-                             grade === "B" ? "yellow" : 
-                             grade === "C" ? "orange" : "#F9393F";
-            
+            let badgeColor = grade === "SS" ? "#00ffff" : grade === "S" ? "gold" : grade === "A" ? "#12FA05" : grade === "B" ? "yellow" : grade === "C" ? "orange" : "#F9393F";
             gradeBadgeHTML = `
             <div style="position: absolute; top: -15px; right: -15px; background: rgba(10,10,15,0.95); color: ${badgeColor}; border: 3px solid ${badgeColor}; border-radius: 50%; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; box-shadow: 0 0 20px ${badgeColor}; z-index: 10; font-family: sans-serif;">
                 ${grade}
             </div>`;
         }
     }
-    coverEl.innerHTML = gradeBadgeHTML; // Inyectamos el escudo en la portada
-    // =========================================================
+    coverEl.innerHTML = gradeBadgeHTML; 
 
     const grid = document.querySelector('.diff-grid');
     grid.innerHTML = ''; 
@@ -42,12 +100,10 @@ window.openUnifiedDiffModal = function(song) {
     
     let safeMode = song.originalMode || 'mania';
     
-    // FIX VITAL: Limpiamos el ID para evitar el Error 400 Bad Request en la API de Osu
     let cleanId = String(song.id).replace('osu_', '');
     let engineSong = Object.assign({}, song);
     engineSong.id = cleanId;
 
-    // --- LOGICA BOTON LARGO PARA STANDARD / TAIKO / CATCH ---
     if (song.isOsu && safeMode !== 'mania') {
         let btn = document.createElement('div');
         btn.className = 'diff-card';
@@ -75,14 +131,12 @@ window.openUnifiedDiffModal = function(song) {
 
         btn.onclick = () => {
             window.closeModal('diff');
-            // Enviamos engineSong (que tiene el ID limpio) para evitar el JSZip error
             if(safeMode === 'standard' && typeof startNewEngine === 'function') startNewEngine(engineSong);
             else if(safeMode === 'taiko' && typeof startTaikoEngine === 'function') startTaikoEngine(engineSong);
             else if(safeMode === 'catch' && typeof startCatchEngine === 'function') startCatchEngine(engineSong);
         };
         grid.appendChild(btn);
     } 
-    // --- LOGICA ORIGINAL PARA MANIA ---
     else {
         const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F', 10: '#ff0000'};
         const labels = {1: 'RHYTHM', 2: 'BASIC', 3: 'EASY', 4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON', 10: 'IMPOSSIBLE'};
@@ -99,6 +153,7 @@ window.openUnifiedDiffModal = function(song) {
             if (song.keysAvailable && song.keysAvailable.includes(k)) {
                 btn.style.borderColor = c; btn.style.color = c;
                 btn.innerHTML = `<div class="diff-bg-icon">${k}K</div><div class="diff-num" style="font-size:2.2rem; font-weight:900;">${k}K</div><div class="diff-label">${l}</div>`;
+                
                 btn.onclick = () => {
                     window.closeModal('diff');
                     if(typeof window.asegurarModo === 'function') window.asegurarModo(k); 
@@ -108,10 +163,15 @@ window.openUnifiedDiffModal = function(song) {
                         downloadAndPlayOsu(cleanId, song.title, song.imageURL, k);
                     } else {
                         window.curSongData = song.raw || song; 
-                        if (typeof window.prepareAndPlaySong === 'function') {
-                            window.prepareAndPlaySong(k);
-                        } else if (typeof window.startGame === 'function') {
-                            window.startGame(k);
+                        
+                        // 🚨 INTERCEPCIÓN INTELIGENTE: Verificar si la pista está vacía antes de enviarla a game.js
+                        let mapData = window.curSongData[`notes_${k}k`] || window.curSongData.notes || [];
+                        
+                        if (!mapData || mapData.length === 0) {
+                            window.showEmptyMapModal(k, window.curSongData);
+                        } else {
+                            if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
+                            else if (typeof window.startGame === 'function') window.startGame(k);
                         }
                     }
                 };
@@ -132,11 +192,6 @@ window.openUnifiedDiffModal = function(song) {
         grid.appendChild(editBtn);
     }
     
-    // Mostramos el modal usando la lógica global de tu HTML
-    if (typeof window.openModal === 'function') {
-        window.openModal('diff');
-    } else {
-        const modal = document.getElementById('modal-diff');
-        if(modal) modal.style.display = 'flex';
-    }
+    if (typeof window.openModal === 'function') window.openModal('diff');
+    else { const m = document.getElementById('modal-diff'); if(m) m.style.display = 'flex'; }
 };
