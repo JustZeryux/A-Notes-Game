@@ -436,8 +436,12 @@ window.applyEditorAutoMap = async function() {
 
     if(typeof window.notify === 'function') window.notify("🧠 Analizando espectro de audio... Espere.", "info");
 
-    window.edNotes = []; 
-    let diffMult = parseFloat(document.getElementById('auto-map-diff').value) || 2;
+window.edNotes = []; 
+    
+    // 🚨 FIX VISUAL: Destruir todas las notas viejas de la pantalla antes de dibujar las nuevas
+    let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
+    if (notesContainer) notesContainer.innerHTML = '';
+    document.querySelectorAll('.ed-note, .editor-note, .arrow-wrapper, .editor-arrow').forEach(el => el.remove());
     let audioUrl = window.curSongData.audioURL || window.curSongData.url;
 
     if (!audioUrl) {
@@ -540,4 +544,22 @@ window.applyEditorAutoMap = async function() {
         console.error("Error en Auto-Mapper Inteligente:", error);
         if (typeof window.notify === 'function') window.notify("❌ Error analizando las frecuencias de audio.", "error");
     }
+};
+
+window.clearAllEditorNotes = function() {
+    if (!confirm("⚠️ ¿Estás seguro de que quieres borrar TODAS las notas de este mapa?")) return;
+    
+    // 1. Limpiar memoria
+    window.edNotes = []; 
+    
+    // 2. Limpiar pantalla a la fuerza
+    let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
+    if (notesContainer) notesContainer.innerHTML = '';
+    document.querySelectorAll('.ed-note, .editor-note, .arrow-wrapper, .editor-arrow').forEach(el => el.remove());
+    
+    // 3. Refrescar timeline
+    if (typeof renderEditorNotes === 'function') renderEditorNotes();
+    if (typeof updateTimeline === 'function') updateTimeline();
+    
+    if(typeof window.notify === 'function') window.notify("🗑️ Mapa limpiado por completo.", "success");
 };
