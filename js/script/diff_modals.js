@@ -23,13 +23,20 @@ window.showEmptyMapModal = function(k, songData) {
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-    document.getElementById('btn-empty-play').onclick = () => {
+document.getElementById('btn-empty-play').onclick = () => {
         document.getElementById('modal-empty-map').remove();
-        // Manda la señal limpia a game.js
-        if (typeof window.prepareAndPlaySong === 'function') window.prepareAndPlaySong(k);
-        else if (typeof window.startGame === 'function') window.startGame(k);
+        
+        // 1. Banderas globales: Le avisamos a tu game.js que QUEREMOS usar su automapeo
+        window.useNativeAutomap = true; 
+        window.forceAutomap = true;
+        
+        // 2. Llamamos a tu juego de forma limpia (Sin inyectar notas falsas)
+        if (typeof window.prepareAndPlaySong === 'function') {
+            window.prepareAndPlaySong(k, true); // Mandamos un 'true' por si tu función lo lee
+        } else if (typeof window.startGame === 'function') {
+            window.startGame(k, true);
+        }
     };
-
     document.getElementById('btn-empty-edit').onclick = () => {
         document.getElementById('modal-empty-map').remove();
         if (typeof window.openEditor === 'function') window.openEditor(songData, k, 'mania');
