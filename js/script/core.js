@@ -85,3 +85,42 @@ document.addEventListener('click', function unlockOnce() {
     window.unlockAudio();
     document.removeEventListener('click', unlockOnce);
 }, { once: true });
+
+
+// =====================================================================
+// 🌟 SISTEMA GLOBAL DE CIERRE DE MODALES Y NOTIFICACIONES (UX PRO) 🌟
+// =====================================================================
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        // 1. Cerrar todos los modales normales
+        const modals = document.querySelectorAll('.modal-overlay');
+        modals.forEach(m => {
+            if(m.style.display !== 'none' && m.id !== 'loading-overlay' && m.id !== 'modal-res') {
+                m.style.display = 'none';
+            }
+        });
+        
+        // 2. Cerrar notificaciones
+        const notifPanel = document.getElementById('notif-panel');
+        if (notifPanel) notifPanel.style.display = 'none';
+    }
+});
+
+document.addEventListener('click', (e) => {
+    // 1. Cerrar modales si se hace clic en el fondo oscuro (.modal-overlay)
+    if (e.target.classList.contains('modal-overlay') && e.target.id !== 'loading-overlay' && e.target.id !== 'modal-res') {
+        e.target.style.display = 'none';
+    }
+
+    // 2. Cierre inteligente del panel de notificaciones
+    const notifPanel = document.getElementById('notif-panel');
+    const notifBtn = document.getElementById('btn-notifications'); // Asegúrate de que tu botón de la campana tenga este ID o cámbialo aquí
+    
+    if (notifPanel && notifPanel.style.display !== 'none') {
+        // Si el clic NO fue dentro del panel Y NO fue en el botón de abrir...
+        if (!notifPanel.contains(e.target) && (!notifBtn || !notifBtn.contains(e.target))) {
+            notifPanel.style.display = 'none';
+        }
+    }
+});
