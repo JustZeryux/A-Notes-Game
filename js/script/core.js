@@ -1,4 +1,4 @@
-/* === CORE.JS - VERSIÓN LIMPIA Y DEFINITIVA V3 === */
+/* === CORE.JS - VERSIÓN COMPLETA Y REPARADA === */
 
 const MASTER_KEYS = {
     1: ['Space'], 
@@ -48,8 +48,6 @@ function playHover(){
 
 window.openNotifPanel = function(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    
-    // Compatibilidad total: Busca el panel sin importar el nombre exacto del ID en el HTML
     let panel = document.getElementById('notif-dropdown-panel');
     if (!panel) panel = document.getElementById('notif-panel');
     const badge = document.getElementById('notif-badge');
@@ -93,7 +91,6 @@ function initNotifPanel() {
 }
 
 window.notify = function(msg, type = "info") {
-    // 1. Crear Toast Flotante
     let toastContainer = document.getElementById('notification-area');
     if (!toastContainer) {
         toastContainer = document.createElement('div');
@@ -125,7 +122,6 @@ window.notify = function(msg, type = "info") {
 
     if (msg.toLowerCase().includes('bienvenid')) return; 
 
-    // 2. Registrar en el Panel
     initNotifPanel();
     const list = document.getElementById('notif-list');
     const emptyMsg = document.getElementById('notif-empty');
