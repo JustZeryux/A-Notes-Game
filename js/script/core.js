@@ -1,4 +1,4 @@
-/* === CORE.JS - VERSIÓN COMPLETA Y REPARADA === */
+/* === CORE.JS - ARCHIVO COMPLETO Y DEFINITIVO === */
 
 const MASTER_KEYS = {
     1: ['Space'], 
@@ -32,24 +32,20 @@ window.asegurarModo = function(k) {
 
 for(let i = 1; i <= 10; i++) window.asegurarModo(i);
 
-function playHover(){ 
-    if(typeof st !== 'undefined' && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
+window.playHover = function(){ 
+    if(typeof st !== 'undefined' && st && st.ctx && typeof cfg !== 'undefined' && cfg.hvol > 0 && st.ctx.state==='running') { 
         try {
             const o=st.ctx.createOscillator(); const g=st.ctx.createGain(); 
             o.frequency.value=600; g.gain.value=0.05; o.connect(g); g.connect(st.ctx.destination); 
             o.start(); o.stop(st.ctx.currentTime+0.05); 
         } catch(e){}
     } 
-}
+};
 
-// =====================================================================
-// 🔔 SISTEMA DE NOTIFICACIONES GLOBAL (UNIFICADO)
-// =====================================================================
-
+// === SISTEMA DE NOTIFICACIONES ===
 window.openNotifPanel = function(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    let panel = document.getElementById('notif-dropdown-panel');
-    if (!panel) panel = document.getElementById('notif-panel');
+    let panel = document.getElementById('notif-dropdown-panel') || document.getElementById('notif-panel');
     const badge = document.getElementById('notif-badge');
     
     if (!panel) return;
@@ -57,10 +53,7 @@ window.openNotifPanel = function(e) {
     if (panel.style.display === 'none' || panel.style.display === '') {
         panel.style.display = 'block';
         panel.style.zIndex = '9999999';
-        if (badge) {
-            badge.style.display = 'none';
-            badge.innerText = '0';
-        }
+        if (badge) { badge.style.display = 'none'; badge.innerText = '0'; }
     } else {
         panel.style.display = 'none';
     }
@@ -68,15 +61,11 @@ window.openNotifPanel = function(e) {
 
 window.clearNotifs = function() {
     const list = document.getElementById('notif-list');
-    if (list) {
-        list.innerHTML = `<div id="notif-empty" style="color: #555; text-align: center; padding: 30px 20px; font-weight: bold; font-size: 0.95rem;">Historial limpiado.<br><span style="font-size: 2rem; display: block; margin-top: 10px; opacity: 0.5;">🧹</span></div>`;
-    }
+    if (list) list.innerHTML = `<div id="notif-empty" style="color: #555; text-align: center; padding: 30px 20px; font-weight: bold; font-size: 0.95rem;">Historial limpiado.<br><span style="font-size: 2rem; display: block; margin-top: 10px; opacity: 0.5;">🧹</span></div>`;
 };
 
-function initNotifPanel() {
-    let panel = document.getElementById('notif-dropdown-panel');
-    if (!panel) panel = document.getElementById('notif-panel');
-    
+window.initNotifPanel = function() {
+    let panel = document.getElementById('notif-dropdown-panel') || document.getElementById('notif-panel');
     if (panel && !document.getElementById('notif-list')) {
         panel.innerHTML = `
             <div style="padding: 15px; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; background: #0a0a0a;">
@@ -88,7 +77,7 @@ function initNotifPanel() {
             </div>
         `;
     }
-}
+};
 
 window.notify = function(msg, type = "info") {
     let toastContainer = document.getElementById('notification-area');
@@ -102,17 +91,11 @@ window.notify = function(msg, type = "info") {
     const toast = document.createElement('div');
     let color = type === 'success' ? '#12FA05' : (type === 'error' ? '#F9393F' : '#00ffff');
     
-    toast.style.cssText = `
-        background: rgba(10, 10, 14, 0.95); border-left: 4px solid ${color};
-        color: white; padding: 15px 20px; border-radius: 4px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-weight: bold; font-family: sans-serif;
-        transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        min-width: 250px; pointer-events: none;
-    `;
+    toast.style.cssText = `background: rgba(10, 10, 14, 0.95); border-left: 4px solid ${color}; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-weight: bold; font-family: sans-serif; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); min-width: 250px; pointer-events: none;`;
     toast.innerHTML = `<span style="color:${color}; margin-right:8px;">●</span> ${msg}`;
     toastContainer.appendChild(toast);
     
-    if(typeof playHover === 'function') playHover();
+    if(typeof window.playHover === 'function') window.playHover();
     
     requestAnimationFrame(() => toast.style.transform = 'translateX(0)');
     setTimeout(() => {
@@ -122,7 +105,7 @@ window.notify = function(msg, type = "info") {
 
     if (msg.toLowerCase().includes('bienvenid')) return; 
 
-    initNotifPanel();
+    window.initNotifPanel();
     const list = document.getElementById('notif-list');
     const emptyMsg = document.getElementById('notif-empty');
     
@@ -135,8 +118,7 @@ window.notify = function(msg, type = "info") {
         list.insertBefore(item, list.firstChild); 
         
         const badge = document.getElementById('notif-badge');
-        let panel = document.getElementById('notif-dropdown-panel');
-        if (!panel) panel = document.getElementById('notif-panel');
+        let panel = document.getElementById('notif-dropdown-panel') || document.getElementById('notif-panel');
         
         if (badge && (!panel || panel.style.display === 'none')) {
             let count = parseInt(badge.innerText) || 0;
@@ -146,31 +128,26 @@ window.notify = function(msg, type = "info") {
     }
 };
 
-// =====================================================================
-// 🛑 SISTEMA DE CIERRE DE MODALES Y AUDIO BGM
-// =====================================================================
-
+// === EVENTOS Y CIERRE DE MODALES ===
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         const modals = document.querySelectorAll('.modal-overlay');
         modals.forEach(m => {
-            if(m.style.display !== 'none' && m.id !== 'loading-overlay' && m.id !== 'modal-res' && m.id !== 'automap-modal' && m.id !== 'modal-pause') {
+            if(m.style.display !== 'none' && !['loading-overlay', 'modal-res', 'automap-modal', 'modal-pause'].includes(m.id)) {
                 m.style.display = 'none';
             }
         });
-        let notifPanel = document.getElementById('notif-dropdown-panel');
-        if (!notifPanel) notifPanel = document.getElementById('notif-panel');
+        let notifPanel = document.getElementById('notif-dropdown-panel') || document.getElementById('notif-panel');
         if (notifPanel) notifPanel.style.display = 'none';
     }
 });
 
 document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay') && e.target.id !== 'loading-overlay' && e.target.id !== 'modal-res' && e.target.id !== 'modal-pause') {
+    if (e.target.classList.contains('modal-overlay') && !['loading-overlay', 'modal-res', 'modal-pause'].includes(e.target.id)) {
         e.target.style.display = 'none';
     }
     
-    let notifPanel = document.getElementById('notif-dropdown-panel');
-    if (!notifPanel) notifPanel = document.getElementById('notif-panel');
+    let notifPanel = document.getElementById('notif-dropdown-panel') || document.getElementById('notif-panel');
     const notifBtn = document.getElementById('notif-bell'); 
     
     if (notifPanel && notifPanel.style.display !== 'none') {
@@ -180,6 +157,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// === BGM Y DESBLOQUEO DE AUDIO ===
 window.bgmStarted = false;
 window.updateBgmVolume = function(val) {
     const bgm = document.getElementById('menu-bgm');
@@ -209,7 +187,9 @@ window.playRandomBGM = async function() {
 };
 
 window.unlockAudio = function() {
-    if(typeof st !== 'undefined' && st.ctx && st.ctx.state === 'suspended') st.ctx.resume();
+    if(typeof st !== 'undefined' && st && st.ctx && st.ctx.state === 'suspended') {
+        st.ctx.resume();
+    }
 };
 
 document.addEventListener('mousedown', function startEverything() {
@@ -217,3 +197,5 @@ document.addEventListener('mousedown', function startEverything() {
     if (!window.bgmStarted) window.playRandomBGM();
     document.removeEventListener('mousedown', startEverything);
 }, { once: true });
+
+/* === FIN DEL ARCHIVO - NO BORRAR ESTA LÍNEA === */
