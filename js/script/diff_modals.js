@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODALS.JS - RESTAURACIÓN DE COLORES NEÓN Y ETIQUETAS
+   DIFF_MODALS.JS - FIX DE CANDADOS PARA MAPAS CHARTED
    ========================================================== */
 
 window.showEmptyMapModal = function(k, songData) {
@@ -55,7 +55,13 @@ window.openUnifiedDiffModal = function(song) {
         
         let icon = safeMode === 'standard' ? "🎯" : (safeMode === 'taiko' ? "🥁" : "🍎");
         let color = safeMode === 'standard' ? "#ff44b9" : (safeMode === 'taiko' ? "#f95555" : "#44b9ff");
-        let stars = song.isOsu ? parseFloat(song.starRating || 0).toFixed(1) : ((countTotalNotes(song.raw) / 200) + 1).toFixed(1);
+        let stars = song.isOsu ? parseFloat(song.starRating || 0).toFixed(1) : "0.0"; 
+        // Intenta sacar las estrellas si es custom
+        if(!song.isOsu && song.raw) {
+            let nc = 0; if(song.raw.notes) nc = song.raw.notes.length;
+            Object.keys(song.raw).forEach(k => { if(k.startsWith('notes_') && Array.isArray(song.raw[k])) nc = Math.max(nc, song.raw[k].length); });
+            stars = nc === 0 ? "0.0" : ((nc / 200) + 1).toFixed(1);
+        }
 
         btn.style.borderColor = color;
         btn.style.boxShadow = `0 0 20px ${color}44`;
@@ -77,27 +83,42 @@ window.openUnifiedDiffModal = function(song) {
         grid.appendChild(btn);
     } 
     else {
-        // 🚨 LÓGICA DE MANIA (CON COLORES NEÓN Y ETIQUETAS)
+        // 🚨 LÓGICA DE MANIA REPARADA (RESPETA LOS MAPAS CHARTED)
         const standardModes = [4, 6, 7, 9];
         const colors = {1: '#ffffff', 2: '#55ff55', 3: '#5555ff', 4: '#00FFFF', 5: '#a200ff', 6: '#12FA05', 7: '#FFD700', 8: '#ff8800', 9: '#F9393F', 10: '#ff0000'};
         const labels = {1: 'RHYTHM', 2: 'BASIC', 3: 'EASY', 4: 'EASY', 5: 'NORMAL', 6: 'NORMAL', 7: 'INSANE', 8: 'EXPERT', 9: 'DEMON', 10: 'IMPOSSIBLE'};
 
-        let isCharted = song.keysAvailable && song.keysAvailable.length > 0 && !song.keysAvailable.includes(1);
-        let allModes = !isCharted ? standardModes : [...new Set([...standardModes, ...song.keysAvailable])].sort((a,b)=>a-b);
-        allModes = allModes.filter(k => k > 1); // Filtra el 1K fantasma
+        // Filtramos el 1K fantasma de las teclas reales
+        let realKeys = (song.keysAvailable || []).filter(k => k > 1);
+        
+        // Un mapa está "charteado" si tiene al menos un modo de teclas guardado.
+        let isCharted = realKeys.length > 0;
+
+        let allModes = [...new Set([...standardModes, ...realKeys])].sort((a,b)=>a-b);
 
         allModes.forEach(k => {
             let btn = document.createElement('div'); btn.className = 'diff-card';
-            let isAvailable = song.isOsu ? (song.keysAvailable && song.keysAvailable.includes(k)) : (standardModes.includes(k) || song.keysAvailable.includes(k));
+            
+            let isAvailable = false;
+            
+            if (song.isOsu) {
+                isAvailable = realKeys.includes(k);
+            } else {
+                if (isCharted) {
+                    // 🔥 LA CORRECCIÓN: Si ya hay notas guardadas, SOLO permite jugar las teclas que tienen notas.
+                    isAvailable = realKeys.includes(k);
+                } else {
+                    // Si el mapa es completamente virgen/vacío, abrimos los 4 modos base para crear notas
+                    isAvailable = standardModes.includes(k);
+                }
+            }
             
             let c = colors[k] || '#ff66aa';
             let l = labels[k] || 'CUSTOM';
 
             if (isAvailable) {
                 btn.style.borderColor = c;
-                btn.style.boxShadow = `0 0 15px ${c}33`; // Brillo del cuadro
-                
-                // 🚨 INYECCIÓN DE COLORES DIRECTA AL HTML 🚨
+                btn.style.boxShadow = `0 0 15px ${c}33`; 
                 btn.innerHTML = `
                     <div class="diff-bg-icon" style="color:${c}; opacity:0.15;">${k}K</div>
                     <div class="diff-num" style="color:${c}; text-shadow:0 0 15px ${c}; font-size:2.5rem; font-weight:900;">${k}K</div>
