@@ -653,14 +653,22 @@ function showJudge(text, color, diffMs) {
 // === SISTEMA DE INPUT BLINDADO ===
 // === SISTEMA DE INPUT BLINDADO V4 (ANTI-FANTASMAS) ===
 // === SISTEMA DE INPUT BLINDADO V5 ===
+// === SISTEMA DE INPUT BLINDADO V5 ===
 window.onKd = function(e) {
     if (!window.st.act) return;
     
-    // 🚨 FIX MAESTRO: La tecla ESC funciona INCLUSO si está pausado
-    if (e.key === "Escape") { e.preventDefault(); window.togglePause(); return; }
+    // 🚨 1. ESCAPE SE EVALÚA PRIMERO SIEMPRE (Ignora si está pausado o no)
+    if (e.key === "Escape") { 
+        e.preventDefault(); 
+        e.stopPropagation();
+        window.togglePause(); 
+        return; 
+    }
     
-    // Bloquear teclas de juego si está pausado o escribiendo en el chat
+    // 🚨 2. SI ESTÁ PAUSADO, BLOQUEAR LAS TECLAS DE JUEGO (D, F, J, K)
     if (window.st.paused) return; 
+    
+    // Ignorar si el usuario está escribiendo en el chat
     if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
     if (e.repeat) return; 
     
@@ -676,50 +684,52 @@ window.onKd = function(e) {
     }
 };
 
-window.onKu = function(e) {
-    if (!window.st.act || window.st.paused) return; // No procesar si está pausado
-    let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
-    if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
-        for (let i = 0; i < window.keys; i++) {
-            let cfgKey = window.cfg.modes[window.keys][i].k;
-            if (!cfgKey) continue;
-            cfgKey = String(cfgKey).toLowerCase();
-            if (cfgKey === "space") cfgKey = " ";
-            if (cfgKey === pressedKey) { hit(i, false); return; }
-        }
-    }
-};
-
 window.togglePause = function() {
     if(!window.st.act) return;
     window.st.paused = !window.st.paused;
     let modal = document.getElementById('modal-pause');
     
+    let vign = document.getElementById('near-death-vignette');
+    if(vign) vign.classList.remove('danger-active');
+
     if(window.st.paused) {
-        // 🚨 FIX: Solo suspendemos el audio, sin cálculos matemáticos destructivos
+        window.st.pauseTime = performance.now();
         if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
+        
         if(modal) {
-            modal.style.setProperty('display', 'flex', 'important'); 
-            modal.style.setProperty('z-index', '999999', 'important');
-            const accEl = document.getElementById('g-acc'); 
-            const currentAcc = accEl ? accEl.innerText : "100%";
-            modal.querySelector('.modal-panel').innerHTML = `
-                <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
-                <div class="modal-neon-content">
-                    <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${currentAcc}</span></div>
-                    <div class="res-stats-grid">
-                        <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
-                        <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+            // 🚨 FORZAR LA VISIBILIDAD MÁXIMA DEL MODAL
+            modal.style.cssText = 'display: flex !important; z-index: 9999999 !important; background: rgba(0,0,0,0.85);';
+            
+            const panel = modal.querySelector('.modal-panel');
+            if(panel) {
+                const accEl = document.getElementById('g-acc'); 
+                const currentAcc = accEl ? accEl.innerText : "100%";
+                panel.innerHTML = `
+                    <div class="modal-neon-header">
+                        <h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2>
                     </div>
-                </div>
-                <div class="modal-neon-buttons">
-                    <button class="action" onclick="resumeGame()">▶️ CONTINUAR</button>
-                    <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
-                    <button class="action secondary" onclick="toMenu()" style="border-color:#F9393F; color:#F9393F;">🚪 SALIR</button>
-                </div>
-            `;
+                    <div class="modal-neon-content">
+                        <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
+                            ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${currentAcc}</span>
+                        </div>
+                        <div class="res-stats-grid">
+                            <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                            <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
+                            <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
+                            <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                        </div>
+                    </div>
+                    <div class="modal-neon-buttons">
+                        <button class="action" onclick="resumeGame()">▶️ CONTINUAR</button>
+                        <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
+                        <button class="action secondary" onclick="toMenu()" style="border-color:#F9393F; color:#F9393F;">🚪 SALIR</button>
+                    </div>
+                `;
+            }
         }
-    } else { resumeGame(); }
+    } else { 
+        resumeGame(); 
+    }
 };
 
 window.resumeGame = function() {
