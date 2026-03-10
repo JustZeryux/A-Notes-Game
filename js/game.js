@@ -1040,30 +1040,46 @@ window.initReceptors = function(k) {
                    : { c: '#00ffff', s: 'circle' };
 
         let color = conf.c || '#00ffff';
-        let shapeData = (typeof PATHS !== 'undefined' && PATHS[conf.s]) ? PATHS[conf.s] : (typeof PATHS !== 'undefined' ? PATHS['circle'] : "");
-
         let isImageSkin = false;
-        if (activeSkin) {
-            if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape];
-            if (activeSkin.fixed) color = activeSkin.color;
+        
+        if (activeSkin) { 
+            if (activeSkin.fixed) color = activeSkin.color; 
             if (activeSkin.img) isImageSkin = true;
         }
 
-        // preserveAspectRatio evitará que la línea o el anillo se estiren deformes
-        let svgStyles = `display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 5px ${color}); opacity: 0.6; transition: 0.1s;`;
+        // Estilos base para el receptor (Ligeramente opaco para que destaque cuando la nota pase por encima)
+        let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; opacity: 0.5; filter: drop-shadow(0 0 5px ${color});`;
         let svgHTML = '';
 
         if (isImageSkin) {
             svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
         } else {
-            let innerPath = shapeData ? `<path d="${shapeData}" fill="transparent" stroke="${color}" stroke-width="4"/>` : `<circle cx="50" cy="50" r="40" fill="transparent" stroke="${color}" stroke-width="4"/>`;
+            // 🚨 EL FIX DE FIGURAS PARA LOS RECEPTORES 🚨
+            let innerPath = '';
+            let shapeType = conf.s || 'circle';
+
+            // Para que se vean como "bases", les quitamos el relleno (fill="none") y dejamos solo el borde
+            if (shapeType === 'diamond') {
+                innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="${color}" stroke-width="5"/>`;
+            } else if (shapeType === 'bar') {
+                innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="none" stroke="${color}" stroke-width="5"/>`;
+            } else if (shapeType === 'ring') {
+                innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="10"/>`;
+            } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
+                innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="none" stroke="${color}" stroke-width="5"/>`;
+            } else {
+                // Círculo por defecto
+                innerPath = `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="5"/>`; 
+            }
+
             svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
         }
 
+        // 🚨 FALTABA INYECTAR EL CÓDIGO HTML ADENTRO DEL RECEPTOR
         rec.innerHTML = svgHTML;
         elTrack.appendChild(rec);
     }
-};
+};;
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
 window.toMenu = function() {
