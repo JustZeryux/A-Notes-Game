@@ -1,5 +1,5 @@
 /* ==========================================================
-   DIFF_MODALS.JS - RESTAURACIÓN TOTAL (LONG BUTTON PARA MODOS OSU)
+   DIFF_MODALS.JS - FIX DE BOTÓN LARGO PARA COMUNIDAD
    ========================================================== */
 
 window.openUnifiedDiffModal = function(song) {
@@ -17,22 +17,22 @@ window.openUnifiedDiffModal = function(song) {
     let engineSong = Object.assign({}, song);
     engineSong.id = cleanId;
 
-    // 🚨 EL FIX MAESTRO: Si no es Mania, mostrar UN BOTÓN LARGO del modo correspondiente
-    if (song.isOsu && safeMode !== 'mania') {
+    // 🚨 FIX: AHORA EL BOTÓN LARGO APLICA A LA COMUNIDAD TAMBIÉN
+    if (safeMode !== 'mania') {
         let btn = document.createElement('div');
         btn.className = 'diff-card';
-        btn.style.gridColumn = "1 / -1"; // Ocupa todo el ancho
+        btn.style.gridColumn = "1 / -1"; 
         
         let icon = safeMode === 'standard' ? "🎯" : (safeMode === 'taiko' ? "🥁" : "🍎");
         let color = safeMode === 'standard' ? "#ff44b9" : (safeMode === 'taiko' ? "#f95555" : "#44b9ff");
-        let stars = parseFloat(song.starRating || 0).toFixed(1);
+        let stars = song.isOsu ? parseFloat(song.starRating || 0).toFixed(1) : ((countTotalNotes(song.raw) / 200) + 1).toFixed(1);
 
         btn.style.borderColor = color; btn.style.color = color;
         btn.style.display = "flex"; btn.style.justifyContent = "space-between"; btn.style.alignItems = "center"; btn.style.padding = "20px";
         btn.innerHTML = `
             <div style="text-align:left;">
                 <div style="font-size:2rem; font-weight:900;">${icon} ${safeMode.toUpperCase()}</div>
-                <div style="opacity:0.7;">Modo Original de Osu!</div>
+                <div style="opacity:0.7;">${song.isOsu ? 'Mapa Original de Osu!' : 'Mapa de la Comunidad'}</div>
             </div>
             <div style="font-size:1.8rem; font-weight:900;">⭐ ${stars}</div>
         `;
@@ -46,10 +46,11 @@ window.openUnifiedDiffModal = function(song) {
         grid.appendChild(btn);
     } 
     else {
-        // Lógica normal para Mania o canciones de la comunidad
+        // Lógica de Mania
         const standardModes = [4, 6, 7, 9];
-        let isCharted = song.keysAvailable && song.keysAvailable.length > 0;
+        let isCharted = song.keysAvailable && song.keysAvailable.length > 0 && !song.keysAvailable.includes(1);
         let allModes = !isCharted ? standardModes : [...new Set([...standardModes, ...song.keysAvailable])].sort((a,b)=>a-b);
+        allModes = allModes.filter(k => k > 1); // EVITA EL FANTASMA 1K
 
         allModes.forEach(k => {
             let btn = document.createElement('div'); btn.className = 'diff-card';
@@ -63,8 +64,9 @@ window.openUnifiedDiffModal = function(song) {
                     else {
                         window.curSongData = song.raw || song;
                         let mapData = window.curSongData[`notes_mania_${k}k`] || window.curSongData.notes || [];
-                        if (mapData.length === 0) window.showEmptyMapModal(k, window.curSongData);
-                        else window.prepareAndPlaySong(k);
+                        if (mapData.length === 0) {
+                            if(typeof window.showEmptyMapModal === 'function') window.showEmptyMapModal(k, window.curSongData);
+                        } else window.prepareAndPlaySong(k);
                     }
                 };
             } else {
