@@ -90,7 +90,52 @@ document.addEventListener('click', function unlockOnce() {
 // =====================================================================
 // 🌟 SISTEMA GLOBAL DE CIERRE DE MODALES Y NOTIFICACIONES (UX PRO) 🌟
 // =====================================================================
+/* ==========================================================
+   SISTEMA DE NOTIFICACIONES (FIX)
+   ========================================================== */
 
+window.openNotifPanel = function(e) {
+    // Evita que el clic se propague y cierre el panel accidentalmente
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    
+    const panel = document.getElementById('notif-panel');
+    const badge = document.getElementById('notif-badge');
+    
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        // Abrir panel y forzar que esté por encima de todo
+        panel.style.display = 'block';
+        panel.style.zIndex = '9999999';
+        
+        // Limpiar el contador rojo al abrir
+        if (badge) {
+            badge.style.display = 'none';
+            badge.innerText = '0';
+        }
+    } else {
+        // Cerrar si ya estaba abierto
+        panel.style.display = 'none';
+    }
+};
+
+// Hacer que el panel se cierre si el jugador hace clic en cualquier otra parte
+document.addEventListener('click', function(e) {
+    const panel = document.getElementById('notif-panel');
+    const bell = document.getElementById('notif-bell');
+    
+    if (panel && panel.style.display === 'block') {
+        if (!panel.contains(e.target) && (!bell || !bell.contains(e.target))) {
+            panel.style.display = 'none';
+        }
+    }
+});
+
+// Función de limpieza de historial
+window.clearNotifs = function() {
+    const list = document.getElementById('notif-list');
+    if (list) {
+        list.innerHTML = `<div id="notif-empty" style="color: #555; text-align: center; padding: 30px 20px; font-weight: bold; font-size: 0.95rem;">Historial limpiado.<br><span style="font-size: 2rem; display: block; margin-top: 10px; opacity: 0.5;">🧹</span></div>`;
+    }
+};
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         // 1. Cerrar todos los modales normales
