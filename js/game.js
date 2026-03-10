@@ -999,12 +999,12 @@ function end(died) {
         `;
     }
 }
+
 window.initReceptors = function(k) {
     const elTrack = document.getElementById('track');
     if (!elTrack) return;
     elTrack.innerHTML = '';
 
-    // Pista oscura y elegante
     elTrack.style.background = 'rgba(12, 12, 16, 0.9)';
     elTrack.style.boxShadow = '0 0 30px rgba(0, 0, 0, 0.8)';
     elTrack.style.borderLeft = '2px solid #222';
@@ -1014,12 +1014,9 @@ window.initReceptors = function(k) {
     const w = 100 / kCount;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // 🚨 FIX MAESTRO 1: RESPETAR LA OPCIÓN "DEFAULT" ESTRICTAMENTE
     let activeSkin = null;
-    if (window.cfg && window.cfg.noteSkin) {
-        if (window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-            activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
-        }
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
     } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
         activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
     }
@@ -1032,12 +1029,13 @@ window.initReceptors = function(k) {
         const rec = document.createElement('div');
         rec.id = `rec-${i}`;
         rec.className = 'receptor';
-        // 🚨 FIX TAMAÑOS: Altura controlada (80px) para no deformar figuras
         rec.style.cssText = `left: ${i * w}%; width: ${w}%; top: ${yReceptor}px; height: 80px; position: absolute; display: flex; justify-content: center; align-items: center; z-index: 20;`;
 
-        let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i])
-                   ? window.cfg.modes[kCount][i]
-                   : { c: '#00ffff', s: 'circle' };
+        // 🚨 FIX SINTAXIS: Uso de 'if' tradicional en lugar de ternarios problemáticos
+        let conf = { c: '#00ffff', s: 'circle' };
+        if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i]) {
+            conf = window.cfg.modes[kCount][i];
+        }
 
         let color = conf.c || '#00ffff';
         let isImageSkin = false;
@@ -1047,18 +1045,15 @@ window.initReceptors = function(k) {
             if (activeSkin.img) isImageSkin = true;
         }
 
-        // Estilos base para el receptor (Ligeramente opaco para que destaque cuando la nota pase por encima)
         let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; opacity: 0.5; filter: drop-shadow(0 0 5px ${color});`;
         let svgHTML = '';
 
         if (isImageSkin) {
             svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
         } else {
-            // 🚨 EL FIX DE FIGURAS PARA LOS RECEPTORES 🚨
             let innerPath = '';
             let shapeType = conf.s || 'circle';
 
-            // Para que se vean como "bases", les quitamos el relleno (fill="none") y dejamos solo el borde
             if (shapeType === 'diamond') {
                 innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="${color}" stroke-width="5"/>`;
             } else if (shapeType === 'bar') {
@@ -1068,18 +1063,17 @@ window.initReceptors = function(k) {
             } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
                 innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="none" stroke="${color}" stroke-width="5"/>`;
             } else {
-                // Círculo por defecto
                 innerPath = `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="5"/>`; 
             }
 
             svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
         }
 
-        // 🚨 FALTABA INYECTAR EL CÓDIGO HTML ADENTRO DEL RECEPTOR
         rec.innerHTML = svgHTML;
         elTrack.appendChild(rec);
     }
-};;
+};
+
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
 
 window.toMenu = function() {
