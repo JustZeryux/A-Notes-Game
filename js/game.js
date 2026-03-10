@@ -445,7 +445,6 @@ function loop() {
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
                 
-                // Altura fija, sin sombras pesadas
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
                 let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l])
@@ -462,7 +461,6 @@ function loop() {
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                // 🚨 FIX LAG: Eliminado el "filter: drop-shadow". Las sombras de SVG matan el rendimiento en móvil y PC débiles.
                 let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5;`;
                 let svgHTML = '';
                 
@@ -481,19 +479,22 @@ function loop() {
 
                 let trailHTML = '';
                 let noteLen = n.len || n.dur || 0;
-                // Busca dentro del bucle de generación visual (donde dice trailHTML = ...)
-if (n.type === 'hold' && noteLen > 0) { 
-    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.5;
-    // 🚨 FIX: Cambiamos 'bottom: 50%' por 'bottom: 0' (para Downscroll) o 'top: 0' (para Upscroll)
-    let tStyle = `position: absolute; left: 50%; margin-left: -20%; width: 40%; z-index: -1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 4px;`;
-    
-    if (window.cfg.down) { 
-        tStyle += ` bottom: 0px; transform-origin: bottom center;`; 
-    } else { 
-        tStyle += ` top: 0px; transform-origin: top center;`; 
-    } 
-    trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
-}
+                
+                // 🚨 FIX MAESTRO VISUAL DE LOS TRAILS 🚨
+                if (n.type === 'hold' && noteLen > 0) { 
+                    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6; // Ligeramente más visible
+                    
+                    // El "bottom/top: 50%" asegura que nazca desde el PUNTO EXACTO CENTRAL de la cabeza.
+                    // "width: 26%" y "border-radius" lo hacen lucir como un láser más pulido, no como una caja tosca.
+                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 26%; z-index: 1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 12px;`;
+                    
+                    if (window.cfg.down) { 
+                        tStyle += ` bottom: 50%; transform-origin: bottom center;`; 
+                    } else { 
+                        tStyle += ` top: 50%; transform-origin: top center;`; 
+                    } 
+                    trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
+                }
                 
                 el.innerHTML = trailHTML + svgHTML; 
                 
