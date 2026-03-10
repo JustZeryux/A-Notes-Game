@@ -651,50 +651,86 @@ function showJudge(text, color, diffMs) {
 // === SISTEMA DE INPUT BLINDADO ===
 // === SISTEMA DE INPUT BLINDADO ===
 // === SISTEMA DE INPUT BLINDADO V4 (ANTI-FANTASMAS) ===
+// === SISTEMA DE INPUT BLINDADO V5 ===
 window.onKd = function(e) {
-    if (!window.st.act || window.st.paused) return;
+    if (!window.st.act) return;
+    
+    // 🚨 FIX MAESTRO: La tecla ESC funciona INCLUSO si está pausado
     if (e.key === "Escape") { e.preventDefault(); window.togglePause(); return; }
     
-    // Ignorar teclas si estás escribiendo en el chat
+    // Bloquear teclas de juego si está pausado o escribiendo en el chat
+    if (window.st.paused) return; 
     if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-    if (e.repeat) return; // Evita bugs si dejas la tecla presionada
+    if (e.repeat) return; 
     
     let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
-    
     if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
         for (let i = 0; i < window.keys; i++) {
             let cfgKey = window.cfg.modes[window.keys][i].k;
             if (!cfgKey) continue;
             cfgKey = String(cfgKey).toLowerCase();
             if (cfgKey === "space") cfgKey = " ";
-            
-            if (cfgKey === pressedKey) {
-                e.preventDefault(); // Detiene el scroll de la página
-                hit(i, true);
-                return;
-            }
+            if (cfgKey === pressedKey) { e.preventDefault(); hit(i, true); return; }
         }
     }
 };
 
 window.onKu = function(e) {
-    if (!window.st.act) return;
+    if (!window.st.act || window.st.paused) return; // No procesar si está pausado
     let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
-    
     if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
         for (let i = 0; i < window.keys; i++) {
             let cfgKey = window.cfg.modes[window.keys][i].k;
             if (!cfgKey) continue;
             cfgKey = String(cfgKey).toLowerCase();
             if (cfgKey === "space") cfgKey = " ";
-            
-            if (cfgKey === pressedKey) {
-                hit(i, false);
-                return;
-            }
+            if (cfgKey === pressedKey) { hit(i, false); return; }
         }
     }
 };
+
+window.togglePause = function() {
+    if(!window.st.act) return;
+    window.st.paused = !window.st.paused;
+    let modal = document.getElementById('modal-pause');
+    
+    if(window.st.paused) {
+        // 🚨 FIX: Solo suspendemos el audio, sin cálculos matemáticos destructivos
+        if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
+        if(modal) {
+            modal.style.setProperty('display', 'flex', 'important'); 
+            modal.style.setProperty('z-index', '999999', 'important');
+            const accEl = document.getElementById('g-acc'); 
+            const currentAcc = accEl ? accEl.innerText : "100%";
+            modal.querySelector('.modal-panel').innerHTML = `
+                <div class="modal-neon-header"><h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2></div>
+                <div class="modal-neon-content">
+                    <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${currentAcc}</span></div>
+                    <div class="res-stats-grid">
+                        <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
+                        <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
+                    </div>
+                </div>
+                <div class="modal-neon-buttons">
+                    <button class="action" onclick="resumeGame()">▶️ CONTINUAR</button>
+                    <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
+                    <button class="action secondary" onclick="toMenu()" style="border-color:#F9393F; color:#F9393F;">🚪 SALIR</button>
+                </div>
+            `;
+        }
+    } else { resumeGame(); }
+};
+
+window.resumeGame = function() {
+    const modal = document.getElementById('modal-pause');
+    if(modal) modal.style.setProperty('display', 'none', 'important');
+    window.st.paused = false;
+    // 🚨 FIX: Reanudar el audio automáticamente retoma el tiempo correcto
+    if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
+};
+
+// Y DENTRO DE TU FUNCIÓN end(died), asegura agregar esta línea al inicio para evitar cruces de UI:
+// const pauseM = document.getElementById('modal-pause'); if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 
 // 🚨 FUERZA AL NAVEGADOR A LEER EL TECLADO SIN IMPORTAR NADA MÁS 🚨
 window.removeEventListener('keydown', window.onKd, { capture: true });
@@ -998,65 +1034,6 @@ window.initReceptors = function(k) {
     }
 };
 window.restartSong = function() { prepareAndPlaySong(window.keys); };
-
-window.togglePause = function() {
-    if(!window.st.act) return;
-    window.st.paused = !window.st.paused;
-    let modal = document.getElementById('modal-pause');
-    
-    let vign = document.getElementById('near-death-vignette');
-    if(vign) vign.classList.remove('danger-active');
-
-    if(window.st.paused) {
-        window.st.pauseTime = performance.now();
-        if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
-        
-        if(modal) {
-            modal.style.setProperty('display', 'flex', 'important'); modal.style.setProperty('z-index', '999999', 'important');
-            const panel = modal.querySelector('.modal-panel');
-            if(panel) {
-                const accEl = document.getElementById('g-acc'); const currentAcc = accEl ? accEl.innerText : "100%";
-                panel.innerHTML = `
-                    <div class="modal-neon-header">
-                        <h2 class="modal-neon-title">⏸️ JUEGO PAUSADO</h2>
-                    </div>
-                    <div class="modal-neon-content">
-                        <div style="font-size:3rem; font-weight:900; color:var(--blue); margin-bottom:20px;">
-                            ACCURACY<br><span id="p-acc" style="color:white; font-size:4.5rem;">${currentAcc}</span>
-                        </div>
-                        <div class="res-stats-grid">
-                            <div class="res-stat-box" style="color:var(--sick)">SICK<br><span style="color:white">${window.st.stats.s}</span></div>
-                            <div class="res-stat-box" style="color:var(--good)">GOOD<br><span style="color:white">${window.st.stats.g}</span></div>
-                            <div class="res-stat-box" style="color:var(--bad)">BAD<br><span style="color:white">${window.st.stats.b}</span></div>
-                            <div class="res-stat-box" style="color:var(--miss)">MISS<br><span style="color:white">${window.st.stats.m}</span></div>
-                        </div>
-                    </div>
-                    <div class="modal-neon-buttons">
-                        <button class="action" onclick="resumeGame()">▶️ CONTINUAR</button>
-                        <button class="action secondary" onclick="restartSong()">🔄 REINTENTAR</button>
-                        <button class="action secondary" onclick="toMenu()" style="border-color:#F9393F; color:#F9393F;">🚪 SALIR</button>
-                    </div>
-                `;
-            }
-        }
-    } else { resumeGame(); }
-};
-
-window.resumeGame = function() {
-    const modal = document.getElementById('modal-pause');
-    if(modal) modal.style.setProperty('display', 'none', 'important');
-    
-    let touchZones = document.getElementById('mobile-touch-zones');
-    if(touchZones && window.innerWidth <= 800) touchZones.style.display = 'flex'; 
-
-    if(window.st.pauseTime) {
-        const pauseDuration = (performance.now() - window.st.pauseTime) / 1000;
-        window.st.t0 += pauseDuration; 
-        window.st.pauseTime = null;
-    }
-    window.st.paused = false;
-    if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
-};
 
 window.toMenu = function() {
     if(window.st.src) {
