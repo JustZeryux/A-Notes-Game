@@ -654,32 +654,52 @@ function showJudge(text, color, diffMs) {
 // === SISTEMA DE INPUT BLINDADO V4 (ANTI-FANTASMAS) ===
 // === SISTEMA DE INPUT BLINDADO V5 ===
 // === SISTEMA DE INPUT BLINDADO V5 ===
+// === SISTEMA DE INPUT BLINDADO V6 (ANTI-FANTASMAS Y PAUSA FIX) ===
+
 window.onKd = function(e) {
     if (!window.st.act) return;
     
-    // 🚨 1. ESCAPE SE EVALÚA PRIMERO SIEMPRE (Ignora si está pausado o no)
-    if (e.key === "Escape") { 
-        e.preventDefault(); 
-        e.stopPropagation();
-        window.togglePause(); 
-        return; 
-    }
+    // 🚨 1. ESCAPE SE EVALÚA PRIMERO (Para que siempre puedas pausar/despausar)
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); window.togglePause(); return; }
     
-    // 🚨 2. SI ESTÁ PAUSADO, BLOQUEAR LAS TECLAS DE JUEGO (D, F, J, K)
+    // 🚨 2. AHORA SÍ, si el juego está pausado o estás en el chat, ignoramos las demás teclas
     if (window.st.paused) return; 
-    
-    // Ignorar si el usuario está escribiendo en el chat
     if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
     if (e.repeat) return; 
     
-    let pressedKey = (e.code === "Space" || e.key === " ") ? " " : e.key.toLowerCase();
+    // Convertir todo a formato simple para que coincida siempre (ej: 'KeyD' -> 'd')
+    let k1 = String(e.key).toLowerCase().replace('key', '');
+    let k2 = String(e.code).toLowerCase().replace('key', '');
+    
     if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
         for (let i = 0; i < window.keys; i++) {
-            let cfgKey = window.cfg.modes[window.keys][i].k;
-            if (!cfgKey) continue;
-            cfgKey = String(cfgKey).toLowerCase();
+            let cfgKey = String(window.cfg.modes[window.keys][i].k).toLowerCase().replace('key', '');
             if (cfgKey === "space") cfgKey = " ";
-            if (cfgKey === pressedKey) { e.preventDefault(); hit(i, true); return; }
+            if (k1 === "space" || k2 === "space") { k1 = " "; k2 = " "; }
+            
+            // Si coincide la tecla, la presionamos
+            if (cfgKey === k1 || cfgKey === k2) {
+                e.preventDefault(); hit(i, true); return;
+            }
+        }
+    }
+};
+
+window.onKu = function(e) {
+    if (!window.st.act) return;
+    
+    let k1 = String(e.key).toLowerCase().replace('key', '');
+    let k2 = String(e.code).toLowerCase().replace('key', '');
+    
+    if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
+        for (let i = 0; i < window.keys; i++) {
+            let cfgKey = String(window.cfg.modes[window.keys][i].k).toLowerCase().replace('key', '');
+            if (cfgKey === "space") cfgKey = " ";
+            if (k1 === "space" || k2 === "space") { k1 = " "; k2 = " "; }
+            
+            if (cfgKey === k1 || cfgKey === k2) {
+                hit(i, false); return;
+            }
         }
     }
 };
