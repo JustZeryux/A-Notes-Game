@@ -381,59 +381,35 @@ window.playSongInternal = function(s) {
 // 4. EL LOOP ULTRA-OPTIMIZADO 
 // ==========================================
 function loop() {
-    if (!window.st.act || window.st.paused) { gameLoopId = requestAnimationFrame(loop); return; }
-    
-    const elTrack = document.getElementById('track');
+    if (!window.st || !window.st.act || window.st.paused) {
+        if(window.st && window.st.act) gameLoopId = requestAnimationFrame(loop);
+        return;
+    }
 
     let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-    let songTime = now - 3000; 
     
-    if (window.st.songDuration > 0 && songTime > 0) {
-        let currentSec = songTime / 1000; let totalSec = window.st.songDuration; if (currentSec > totalSec) currentSec = totalSec;
-        const pct = Math.min(100, (currentSec / totalSec) * 100);
-        const bar = document.getElementById('top-progress-fill'); if(bar) bar.style.width = pct + "%";
-        let curM = Math.floor(currentSec / 60); let curS = Math.floor(currentSec % 60).toString().padStart(2, '0');
-        let totM = Math.floor(totalSec / 60); let totS = Math.floor(totalSec % 60).toString().padStart(2, '0');
-        const timeText = document.getElementById('top-progress-time'); if (timeText) timeText.innerText = `${curM}:${curS} / ${totM}:${totS}`;
-    }
-
-    if (window.cfg.subtitles && window.st.parsedLyrics && window.st.parsedLyrics.length > 0) {
-        let idx = window.st.currentLyricIdx;
-        if (idx < window.st.parsedLyrics.length && songTime >= window.st.parsedLyrics[idx].t) {
-            const subEl = document.getElementById('subtitles-text'); subEl.innerText = window.st.parsedLyrics[idx].tx;
-            subEl.style.animation = 'none'; void subEl.offsetWidth; subEl.style.animation = 'subPop 0.2s ease-out forwards';
-            window.st.currentLyricIdx++;
+    // Progress bar
+    if (window.st.songDuration > 0) {
+        let progress = Math.min(100, (now / (window.st.songDuration * 1000)) * 100);
+        const pFill = document.getElementById('top-progress-fill');
+        if(pFill) pFill.style.width = progress + "%";
+        
+        const pTime = document.getElementById('top-progress-time');
+        if(pTime) {
+            let currentSec = Math.floor(now / 1000);
+            let totalSec = Math.floor(window.st.songDuration);
+            let curM = Math.floor(currentSec / 60);
+            let curS = currentSec % 60;
+            let totM = Math.floor(totalSec / 60);
+            let totS = totalSec % 60;
+            pTime.innerText = `${curM}:${curS.toString().padStart(2, '0')} / ${totM}:${totS.toString().padStart(2, '0')}`;
         }
     }
 
-    for (let i = 0; i < window.st.notes.length; i++) {
-        const n = window.st.notes[i];
-        if (!n.fxTriggered && n.t <= now) {
-            if (n.type === 'fx_flash') { document.getElementById('game-layer').style.background = 'white'; setTimeout(() => document.getElementById('game-layer').style.background = 'transparent', 150); }
-            if (n.type === 'custom_fx' && n.customData) {
-                const track = document.getElementById('track'); const oldFilter = track.style.filter; track.style.filter = n.customData.filter; track.style.transition = 'filter 0.2s';
-                setTimeout(() => { track.style.filter = oldFilter; }, n.customData.dur);
-            }
-            n.fxTriggered = true; 
-        }
-    }
+    let kCount = window.kCount || 4;
+    const w = 100 / kCount;
 
-    let kCount = parseInt(window.keys) || 4;
-    const w = 100 / kCount; 
-    const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
-    const speedMult = window.cfg.spd * 40;
-    
-    // 🚨 FIX MAESTRO 2: RESPETAR LA OPCIÓN "DEFAULT" AL CAER 🚨
-    let activeSkin = null;
-    if (window.cfg && window.cfg.noteSkin) {
-        if (window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-            activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
-        }
-    } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
-    }
-
-// === ZONA DE GENERACIÓN VISUAL DE NOTAS (OPTIMIZADA A 60+ FPS) ===
+    // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
     for (let i = 0; i < window.st.notes.length; i++) {
         const n = window.st.notes[i];
         if (n.s) continue; 
@@ -447,21 +423,27 @@ function loop() {
                 
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
-                let conf = (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l])
-                           ? window.cfg.modes[kCount][n.l]
-                           : { c: '#00ffff', s: 'circle' };
+                let conf = { c: '#00ffff', s: 'circle' };
+                if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l]) {
+                    conf = window.cfg.modes[kCount][n.l];
+                }
                 
                 let color = conf.c || '#00ffff'; 
-                let shapeData = (typeof PATHS !== 'undefined' && PATHS[conf.s]) ? PATHS[conf.s] : (typeof PATHS !== 'undefined' ? PATHS['circle'] : "");
                 
+                let activeSkin = null;
+                if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+                    activeSkin = SHOP_ITEMS.find(item => item.id === window.cfg.noteSkin);
+                } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
+                    activeSkin = SHOP_ITEMS.find(item => item.id === window.user.equipped.skin);
+                }
+
                 let isImageSkin = false;
                 if (activeSkin) { 
-                    if (activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) shapeData = SKIN_PATHS[activeSkin.shape]; 
                     if (activeSkin.fixed) color = activeSkin.color; 
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5;`;
+                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 5px ${color});`;
                 let svgHTML = '';
                 
                 if (n.type === 'mine') {
@@ -472,7 +454,20 @@ function loop() {
                     if (isImageSkin) {
                         svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
                     } else {
-                        let innerPath = shapeData ? `<path d="${shapeData}" fill="${color}" stroke="white" stroke-width="2"/>` : `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="4"/>`;
+                        let innerPath = '';
+                        let shapeType = conf.s || 'circle';
+
+                        if (shapeType === 'diamond') {
+                            innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="${color}" stroke="white" stroke-width="5"/>`;
+                        } else if (shapeType === 'bar') {
+                            innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="${color}" stroke="white" stroke-width="5"/>`;
+                        } else if (shapeType === 'ring') {
+                            innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="15"/>`;
+                        } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
+                            innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/>`;
+                        } else {
+                            innerPath = `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="5"/>`; 
+                        }
                         svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
                     }
                 }
@@ -480,12 +475,8 @@ function loop() {
                 let trailHTML = '';
                 let noteLen = n.len || n.dur || 0;
                 
-                // 🚨 FIX MAESTRO VISUAL DE LOS TRAILS 🚨
                 if (n.type === 'hold' && noteLen > 0) { 
-                    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6; // Ligeramente más visible
-                    
-                    // El "bottom/top: 50%" asegura que nazca desde el PUNTO EXACTO CENTRAL de la cabeza.
-                    // "width: 26%" y "border-radius" lo hacen lucir como un láser más pulido, no como una caja tosca.
+                    let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6;
                     let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 26%; z-index: 1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 12px;`;
                     
                     if (window.cfg.down) { 
@@ -497,7 +488,6 @@ function loop() {
                 }
                 
                 el.innerHTML = trailHTML + svgHTML; 
-                
                 if (elTrack) elTrack.appendChild(el); 
                 
                 n.el = el;
@@ -509,72 +499,108 @@ function loop() {
         } else break; 
     }
 
-    // === ZONA DE FÍSICAS Y MOVIMIENTO ===
+    // === MOVEMENT LOOP ===
     for (let i = window.st.spawned.length - 1; i >= 0; i--) {
         const n = window.st.spawned[i];
         
-        if ((n.type === 'fx_flash' || n.type === 'custom_fx')) { 
-            if(n.t < now - 100) window.st.spawned.splice(i, 1); 
-            continue; 
+        if (n.type === 'fx_flash') {
+            if (now >= n.t && !n.h) {
+                const bg = document.getElementById('game-layer');
+                if(bg) {
+                    bg.style.animation = 'flashEffect 0.5s ease-out';
+                    setTimeout(()=> bg.style.animation = '', 500);
+                }
+                n.h = true; window.st.spawned.splice(i, 1);
+            }
+            continue;
+        }
+        if (n.type === 'custom_fx') {
+            if (now >= n.t && !n.h) { n.h = true; window.st.spawned.splice(i, 1); }
+            continue;
         }
 
-        const timeDiff = n.t - now + (window.cfg.off || 0);
+        let diff = n.t - now;
         let noteLen = n.len || n.dur || 0;
-        const tailDiff = (n.t + noteLen) - now + (window.cfg.off || 0);
+        const spd = (window.cfg.spd || 25);
+        let targetY = window.cfg.down ? (window.innerHeight - 140) : 80;
+        let y = targetY - (diff * (spd / 20));
 
-        let headY = window.cfg.down ? (yReceptor - (timeDiff / 1000) * speedMult) : (yReceptor + (timeDiff / 1000) * speedMult);
-        let tailY = window.cfg.down ? (yReceptor - (tailDiff / 1000) * speedMult) : (yReceptor + (tailDiff / 1000) * speedMult);
-
-        if (n.type === 'hold') {
-            if (!n.h && !n.missed && timeDiff < -160) {
-                miss(n); n.missed = true; n.broken = true; 
-                if(n.el) { n.el.style.filter = 'grayscale(1)'; n.el.style.opacity = '0.4'; }
+        if (n.el) {
+            if(window.cfg.fov && window.cfg.fov > 0) {
+                let baseScale = window.cfg.down ? 0.5 : 1;
+                let scaleProg = window.cfg.down ? (y / targetY) : (1 - (y / window.innerHeight));
+                let scale = baseScale + (scaleProg * 0.5);
+                if(scale < 0) scale = 0;
+                n.el.style.transform = `translateY(${y}px) scale(${scale})`;
+            } else {
+                n.el.style.transform = `translateY(${y}px)`;
             }
 
-            if (n.h && !n.broken) {
-                headY = yReceptor; 
-                if (!window.st.keys[n.l]) { 
-                    n.broken = true; window.st.cmb = 0; 
-                    if(n.el) { n.el.style.filter = 'grayscale(1)'; n.el.style.opacity = '0.4'; }
-                    headY = window.cfg.down ? (yReceptor - (timeDiff / 1000) * speedMult) : (yReceptor + (timeDiff / 1000) * speedMult);
-                } else { 
-                    window.st.hp = Math.min(100, window.st.hp + 0.1); updHUD(); 
+            if (n.type === 'hold') {
+                if (n.h && !n.broken) {
+                    if (now >= n.t + noteLen) {
+                        n.finished = true;
+                        if (n.el) n.el.remove();
+                        window.st.spawned.splice(i, 1);
+                        const rec = document.getElementById(`rec-${n.l}`);
+                        if(rec) rec.classList.remove('pressed');
+                        continue;
+                    } else {
+                        if (n.el) n.el.style.transform = `translateY(${targetY}px)`;
+                        if (n.trailEl) {
+                            let holdProg = (now - n.t) / noteLen;
+                            n.trailEl.style.transform = window.cfg.down ? `scaleY(${1 - holdProg})` : `scaleY(${1 - holdProg})`;
+                        }
+                    }
+                } else if (n.trailEl) {
+                    let totalH = noteLen * (spd / 20);
+                    n.trailEl.style.height = totalH + 'px';
                 }
-
-                if (now >= n.t + noteLen) { 
-                    if(!n.broken) window.st.sc += 200; 
-                    n.finished = true;
-                }
             }
+        }
 
-            if (n.broken || n.missed) {
-                headY = window.cfg.down ? (yReceptor - (timeDiff / 1000) * speedMult) : (yReceptor + (timeDiff / 1000) * speedMult);
-                if (tailDiff < -200) n.finished = true;
+        if (!n.h && diff < -120) {
+            n.missed = true; n.h = true;
+            if(n.type !== 'mine' && n.type !== 'dodge') {
+                window.st.stats.m++; window.st.hp -= 5; window.st.cmb = 0; window.st.fcStatus = "CLEAR";
+                if(typeof showJudge === 'function') showJudge("MISS", "#F9393F", diff); 
+                if(typeof updHUD === 'function') updHUD();
+                if(n.type === 'hold') n.broken = true;
+                if(n.el) n.el.style.opacity = '0.3';
+            } else {
+                if(n.el) n.el.remove();
             }
+        }
 
-            if (n.finished) {
-                if(n.el) { n.el.remove(); n.el = null; n.trailEl = null; } 
-                window.st.spawned.splice(i, 1); 
-            } else if (n.el) {
-                n.el.style.transform = `translate3d(0px, ${headY}px, 0px)`; 
-                if (n.trailEl) n.trailEl.style.height = `${Math.max(0, Math.abs(headY - tailY))}px`;
+        if (n.type !== 'hold') {
+            if (n.h && (diff < -200 || n.missed)) {
+                if(n.el) n.el.remove();
+                window.st.spawned.splice(i, 1);
             }
-
-        } else {
-            if (!n.h && !n.missed && timeDiff < -160) {
-                if (n.type === 'mine') { n.finished = true; } 
-                else if (n.type === 'dodge') { window.st.sc += 100; showJudge("DODGED", "#00ffff", 0); n.finished = true; } 
-                else { miss(n); n.missed = true; n.finished = true; }
-            }
-
-            if (n.h || n.finished) {
-                if(n.el) { n.el.remove(); n.el = null; } 
-                window.st.spawned.splice(i, 1); 
-            } else if (n.el) {
-                n.el.style.transform = `translate3d(0px, ${headY}px, 0px)`; 
+        } else if (n.broken) {
+            if (now > n.t + noteLen + 200) {
+                if(n.el) n.el.remove();
+                window.st.spawned.splice(i, 1);
             }
         }
     }
+
+    // Death check
+    if (window.st.hp <= 0 && window.st.songDuration > 0) {
+        if(typeof end === 'function') end(true); 
+        return;
+    }
+
+    // Auto-end check
+    if (window.st.notes.length > 0 && window.st.notes.every(n => n.s) && window.st.spawned.length === 0) {
+        let extraWait = (window.isMultiplayer) ? 2000 : 1000;
+        setTimeout(() => { if(typeof end === 'function') end(false); }, extraWait); 
+        return;
+    } else if (window.st.songDuration > 0 && now > (window.st.songDuration * 1000) + 2000) {
+        if(typeof end === 'function') end(false); 
+        return;
+    }
+
     gameLoopId = requestAnimationFrame(loop);
 }
 // ==========================================
