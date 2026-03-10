@@ -1,4 +1,4 @@
-/* === CORE.JS - LIMPIO Y OPTIMIZADO V2 === */
+/* === CORE.JS - VERSIÓN LIMPIA Y DEFINITIVA V3 === */
 
 const MASTER_KEYS = {
     1: ['Space'], 
@@ -48,7 +48,10 @@ function playHover(){
 
 window.openNotifPanel = function(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    const panel = document.getElementById('notif-panel');
+    
+    // Compatibilidad total: Busca el panel sin importar el nombre exacto del ID en el HTML
+    let panel = document.getElementById('notif-dropdown-panel');
+    if (!panel) panel = document.getElementById('notif-panel');
     const badge = document.getElementById('notif-badge');
     
     if (!panel) return;
@@ -73,7 +76,9 @@ window.clearNotifs = function() {
 };
 
 function initNotifPanel() {
-    let panel = document.getElementById('notif-panel');
+    let panel = document.getElementById('notif-dropdown-panel');
+    if (!panel) panel = document.getElementById('notif-panel');
+    
     if (panel && !document.getElementById('notif-list')) {
         panel.innerHTML = `
             <div style="padding: 15px; border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; background: #0a0a0a;">
@@ -134,7 +139,9 @@ window.notify = function(msg, type = "info") {
         list.insertBefore(item, list.firstChild); 
         
         const badge = document.getElementById('notif-badge');
-        const panel = document.getElementById('notif-panel');
+        let panel = document.getElementById('notif-dropdown-panel');
+        if (!panel) panel = document.getElementById('notif-panel');
+        
         if (badge && (!panel || panel.style.display === 'none')) {
             let count = parseInt(badge.innerText) || 0;
             badge.innerText = count + 1;
@@ -155,7 +162,8 @@ document.addEventListener('keydown', (e) => {
                 m.style.display = 'none';
             }
         });
-        const notifPanel = document.getElementById('notif-panel');
+        let notifPanel = document.getElementById('notif-dropdown-panel');
+        if (!notifPanel) notifPanel = document.getElementById('notif-panel');
         if (notifPanel) notifPanel.style.display = 'none';
     }
 });
@@ -164,8 +172,11 @@ document.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal-overlay') && e.target.id !== 'loading-overlay' && e.target.id !== 'modal-res' && e.target.id !== 'modal-pause') {
         e.target.style.display = 'none';
     }
-    const notifPanel = document.getElementById('notif-panel');
+    
+    let notifPanel = document.getElementById('notif-dropdown-panel');
+    if (!notifPanel) notifPanel = document.getElementById('notif-panel');
     const notifBtn = document.getElementById('notif-bell'); 
+    
     if (notifPanel && notifPanel.style.display !== 'none') {
         if (!notifPanel.contains(e.target) && (!notifBtn || !notifBtn.contains(e.target))) {
             notifPanel.style.display = 'none';
