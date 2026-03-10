@@ -1,5 +1,5 @@
 /* ==========================================================
-   CREATOR STUDIO PRO V10 - PERFECT OSU! CIRCLES & SLIDERS 🎯
+   CREATOR STUDIO PRO V11 - BUGFIXES & PERFECT ALIGNMENT 🎯
    ========================================================== */
 
 window.edMap = [];
@@ -13,7 +13,7 @@ window.edDragNote = null;
 window.edMechanics = []; 
 window.edBrush = 'tap'; 
 window.creatingStdSlider = null; 
-window.edGhostPoint = null; // Rastrea el ratón al dibujar sliders
+window.edGhostPoint = null; 
 
 window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     if(!songData || !songData.id) return window.notify("Error: Canción inválida para editar", "error");
@@ -42,17 +42,13 @@ window.openEditor = async function(songData, keys = 4, mode = 'mania') {
     initEditorGrid();
     drawEditorGrid();
     
-    if (mode === 'standard') {
-        window.notify("NUEVO: Para Sliders, haz clic punto por punto. Clic Derecho para terminar.", "success");
-    } else {
-        window.notify("Studio Listo. Selecciona tu pincel.", "success");
-    }
+    if (mode === 'standard') window.notify("NUEVO: Para Sliders, haz clic punto por punto. Clic Derecho para terminar.", "success");
+    else window.notify("Studio Listo. Selecciona tu pincel.", "success");
 };
 
 function injectProTools() {
     if(document.getElementById('pro-tools-container')) return;
     const sidebar = document.querySelector('#editor-layer > div:nth-child(2) > div:nth-child(1)');
-    
     const html = `
         <div id="pro-tools-container" style="display:flex; flex-direction:column; gap:15px; margin-top:20px; border-top:1px solid #333; padding-top:20px;">
             <div style="color:var(--gold); font-weight:bold;">⚡ HERRAMIENTAS</div>
@@ -75,8 +71,7 @@ function injectProTools() {
                 </select>
             </div>
             <button class="action" style="background:#444; color:white; padding:10px;" onclick="testMap()">▶️ PROBAR MAPA</button>
-        </div>
-    `;
+        </div>`;
     sidebar.insertAdjacentHTML('beforeend', html);
 }
 
@@ -107,7 +102,6 @@ function initEditorGrid() {
     const grid = document.getElementById('ed-grid');
     grid.innerHTML = '';
     
-    // 🚨 MODO OSU! STANDARD (CAJA 2D FIJA) 🚨
     if (window.edMode === 'standard') {
         grid.style.width = '512px'; grid.style.height = '384px';
         grid.style.position = 'absolute'; grid.style.top = '50%'; grid.style.left = '50%';
@@ -124,7 +118,6 @@ function initEditorGrid() {
             drawEditorGrid();
         });
 
-        // Calculador de Píxeles Exactos
         const getStdCoords = (e) => {
             const rect = grid.getBoundingClientRect();
             let x = Math.round((e.clientX - rect.left) * (512 / rect.width));
@@ -136,9 +129,7 @@ function initEditorGrid() {
             const pos = getStdCoords(e);
             let timeMs = window.edAudio ? Math.round(window.edAudio.currentTime * 1000) : 0;
             
-            // 🚨 CLIC DERECHO 🚨
             if (e.button === 2) { 
-                // 1. Si estaba haciendo un Slider, lo termina!
                 if (window.creatingStdSlider) {
                     if (window.creatingStdSlider.curvePoints.length < 2) {
                         window.creatingStdSlider.type = 'circle'; 
@@ -146,7 +137,6 @@ function initEditorGrid() {
                     } else {
                         let pts = window.creatingStdSlider.curvePoints;
                         let dist = 0;
-                        // Calcula distancia en píxeles para autocompletar el tiempo
                         for(let i=1; i<pts.length; i++) dist += Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
                         window.creatingStdSlider.endTime = window.creatingStdSlider.t + Math.round(dist * 2.5);
                         window.creatingStdSlider.endX = pts[pts.length-1].x;
@@ -160,7 +150,6 @@ function initEditorGrid() {
                     return;
                 }
 
-                // 2. Si no estaba haciendo nada, Borra la nota cercana
                 let closestIdx = -1; let minDist = Infinity;
                 window.edMap.forEach((n, i) => {
                     let dist = Math.hypot(n.x - pos.x, n.y - pos.y);
@@ -170,46 +159,31 @@ function initEditorGrid() {
                 return;
             }
 
-            // 🚨 CLIC IZQUIERDO 🚨
             if (e.button !== 0) return; 
-
             if (window.edBrush === 'slider') {
                 if (!window.creatingStdSlider) {
-                    // Crea un slider nuevo (Primer Punto)
-                    window.creatingStdSlider = { 
-                        type: 'slider', x: pos.x, y: pos.y, t: timeMs, 
-                        curvePoints: [{x: pos.x, y: pos.y}], 
-                        endTime: timeMs + 100
-                    };
+                    window.creatingStdSlider = { type: 'slider', x: pos.x, y: pos.y, t: timeMs, curvePoints: [{x: pos.x, y: pos.y}], endTime: timeMs + 100 };
                     window.edMap.push(window.creatingStdSlider);
                 } else {
-                    // Añade un punto al slider existente (Curvas perfectas)
                     window.creatingStdSlider.curvePoints.push({x: pos.x, y: pos.y});
                 }
                 drawEditorGrid();
             } else {
-                if(window.creatingStdSlider) return; // Evita mezclar modos
+                if(window.creatingStdSlider) return; 
                 window.edMap.push({ type: window.edBrush, x: pos.x, y: pos.y, t: timeMs });
                 window.edMap.sort((a,b) => a.t - b.t);
                 drawEditorGrid();
             }
         };
-
-        grid.onmousemove = (e) => {
-            if (!window.creatingStdSlider) return;
-            window.edGhostPoint = getStdCoords(e); // Rastrea la línea fantasma hacia el ratón
-            drawEditorGrid(); 
-        };
+        grid.onmousemove = (e) => { if (!window.creatingStdSlider) return; window.edGhostPoint = getStdCoords(e); drawEditorGrid(); };
 
     } else {
-        // === MODO MANIA / TAIKO (CARRILES NORMALES) ===
         grid.style.width = (window.edK * 80) + 'px'; 
         grid.style.height = 'auto'; grid.style.position = 'relative'; grid.style.top = '0'; grid.style.transform = 'none'; grid.style.margin = '0';
         
         for(let i=0; i<window.edK; i++) {
             const lane = document.createElement('div');
-            lane.className = 'ed-lane';
-            lane.style.left = (i * 80) + 'px';
+            lane.className = 'ed-lane'; lane.style.left = (i * 80) + 'px';
             if(window.edMode === 'taiko') lane.style.background = i === 0 ? 'rgba(249, 57, 63, 0.1)' : 'rgba(68, 185, 255, 0.1)'; 
             grid.appendChild(lane);
         }
@@ -263,7 +237,6 @@ function initEditorGrid() {
     }
 }
 
-// === MOTOR DE RENDERIZADO VISUAL ===
 window.drawEditorGrid = function() {
     const grid = document.getElementById('ed-grid');
     let currentTime = window.edAudio ? window.edAudio.currentTime * 1000 : 0;
@@ -275,10 +248,8 @@ window.drawEditorGrid = function() {
         if(window.edAudio.duration) timeSlid.value = (window.edAudio.currentTime / window.edAudio.duration) * 100;
     }
 
-    // 🚨 RENDERIZADO VECTORIAL PERFECTO (SIN DISTORSIÓN DE ÓVALOS) 🚨
     if (window.edMode === 'standard') {
         let svgContent = '';
-        
         window.edMap.forEach((n, idx) => {
             let timeDiff = n.t - currentTime;
             let isSliderActive = n.type === 'slider' && currentTime >= n.t && currentTime <= (n.endTime || n.t);
@@ -288,43 +259,25 @@ window.drawEditorGrid = function() {
                 let color = n.type === 'mine' ? '#F9393F' : (n.type==='dodge' ? '#00ffff' : '#ff66aa');
 
                 if (n.type === 'slider' && n.curvePoints) {
-                    // Creamos la pista de Puntos exacta
                     let pts = [...n.curvePoints];
-                    // Si estamos creando este slider AHORA, añadimos un punto fantasma hacia donde está el ratón
                     if (n === window.creatingStdSlider && window.edGhostPoint) pts.push(window.edGhostPoint);
-
                     if (pts.length > 1) {
                         let pathD = `M ${pts[0].x} ${pts[0].y} `;
-                        for(let j=1; j<pts.length; j++) {
-                            pathD += `L ${pts[j].x} ${pts[j].y} `;
-                        }
-                        
-                        let endX = pts[pts.length-1].x;
-                        let endY = pts[pts.length-1].y;
-
-                        // Pista del Slider (Borde Blanco grueso y Cuerpo oscuro)
+                        for(let j=1; j<pts.length; j++) pathD += `L ${pts[j].x} ${pts[j].y} `;
+                        let endX = pts[pts.length-1].x; let endY = pts[pts.length-1].y;
                         svgContent += `<path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />`;
                         svgContent += `<path d="${pathD}" fill="none" stroke="rgba(30,30,35,0.9)" stroke-width="52" stroke-linecap="round" stroke-linejoin="round" />`;
-                        
-                        // Cola final del Slider
                         svgContent += `<circle cx="${endX}" cy="${endY}" r="28" fill="${color}" fill-opacity="${alpha*0.5}" stroke="white" stroke-width="3" />`;
                     }
                 }
-
-                // Cabeza de la Nota (Circulo Perfecto de 28px)
                 svgContent += `<circle cx="${n.x}" cy="${n.y}" r="28" fill="${color}" fill-opacity="${alpha}" stroke="white" stroke-width="3" />`;
-                
-                // Texto Centrado Perfecto
                 svgContent += `<text x="${n.x}" y="${n.y}" fill="white" font-size="20" font-weight="bold" font-family="Arial, sans-serif" text-anchor="middle" dominant-baseline="central" opacity="${alpha}">${idx+1}</text>`;
             }
         });
-
-        // viewBox en Píxeles Exactos arregla la distorsión del SVG
         grid.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 512 384" style="pointer-events:none; position:absolute; top:0; left:0;">${svgContent}</svg>`;
         return; 
     }
 
-    // === DIBUJADOR MANIA ===
     const zoom = document.getElementById('ed-zoom').value;
     const duration = window.edAudio.duration || 300;
     grid.style.height = (duration * 1000 * (zoom / 100)) + 'px';
@@ -364,7 +317,11 @@ window.saveEditorMap = async function() {
     window.edMap.sort((a,b) => a.t - b.t);
     const mapKey = window.edMode === 'standard' ? 'notes_standard' : `notes_${window.edMode}_${window.edK}k`; 
     
-    let updateData = {};
+    // 🚨 FIX MAESTRO: Forza el "originalMode" para que no guarde tus standards como "1K"
+    let updateData = {
+        originalMode: window.edMode 
+    };
+    
     updateData[mapKey] = window.edMap;
     updateData[`stars_${window.edMode}_${window.edMode==='standard'?'':window.edK+'k'}`] = window.calculateStarRating(window.edMap, (window.edAudio.duration||120)*1000);
     
@@ -417,144 +374,70 @@ setInterval(() => {
         if(playhead) {
             const pos = (window.edAudio.currentTime * 1000) * (zoom / 100);
             playhead.style.top = pos + 'px';
-            document.getElementById('ed-scroll-area').scrollTop = pos - 200;
+            // 🚨 FIX: Centra el scroll perfectamente sin desalinearse
+            let container = document.getElementById('ed-scroll-area');
+            container.scrollTop = pos - (container.clientHeight / 2);
         }
     } else if (window.edMode === 'standard' && !window.edAudio.paused) {
         window.drawEditorGrid();
     }
 }, 16);
 
+// =========================================================================
+// 🧠 MOTOR DE AUTO-MAPEO INTELIGENTE (ANÁLISIS DE ONDAS)
+// =========================================================================
 
-// =========================================================================
-// 🧠 MOTOR DE AUTO-MAPEO INTELIGENTE (ANÁLISIS DE ONDAS DE AUDIO REAL)
-// =========================================================================
-
-// =========================================================================
-// 1️⃣ INYECCIÓN CSS: ARREGLO DE LA LÍNEA ROJA Y RECEPTORES BLANCOS
-// =========================================================================
-const fixEditorUI = document.createElement('style');
-fixEditorUI.innerHTML = `
-    /* Oculta los receptores blancos/celestes SOLO dentro del editor */
-    #editor-layer .receptor, 
-    #editor-layer .arrow-wrapper.receptor, 
-    #editor-layer .game-receptor {
-        display: none !important;
-    }
-    
-    /* Clava la línea roja (playhead) en la parte inferior de la pista */
-    #editor-layer #playhead, 
-    #editor-layer .playhead, 
-    #editor-layer #editor-red-line {
-        position: absolute !important;
-        bottom: 100px !important; /* Ajusta este número si la quieres más arriba o abajo */
-        top: auto !important; 
-        width: 100% !important;
-        height: 3px !important;
-        background: #F9393F !important;
-        box-shadow: 0 0 15px #F9393F !important;
-        z-index: 100 !important;
-        left: 0 !important;
-        margin: 0 !important;
-        transform: none !important;
-    }
-`;
-document.head.appendChild(fixEditorUI);
-
-
-// =========================================================================
-// 2️⃣ FIX: BORRAR TODAS LAS NOTAS (SIN FANTASMAS)
-// =========================================================================
 window.clearAllEditorNotes = function() {
     if (!confirm("⚠️ ¿Estás seguro de que quieres borrar TODAS las notas de este mapa?")) return;
     
-    // 🚨 EL FIX VITAL: Vaciar conservando la referencia de memoria
-    if (window.edNotes) window.edNotes.length = 0; 
-    
-    // Si tu editor usa curSongData de respaldo, también lo vaciamos
-    if (window.curSongData && window.edKeys) {
-        let keyStr = `notes_${window.edKeys}k`;
-        if (window.curSongData[keyStr]) window.curSongData[keyStr].length = 0;
-    }
-
-    // Destrucción visual forzada
-    let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
-    if (notesContainer) notesContainer.innerHTML = '';
-    document.querySelectorAll('#editor-layer .ed-note, #editor-layer .editor-note, #editor-layer .arrow-wrapper:not(.receptor)').forEach(el => el.remove());
+    // 🚨 FIX: Vaciar el array correcto (edMap, no edNotes fantasma)
+    window.edMap.length = 0; 
     
     if (typeof renderEditorNotes === 'function') renderEditorNotes();
     if (typeof updateTimeline === 'function') updateTimeline();
+    window.drawEditorGrid();
     
     if(typeof window.notify === 'function') window.notify("🗑️ Mapa limpiado por completo.", "success");
 };
 
-
-// =========================================================================
-// 3️⃣ MOTOR DE AUTO-MAPEO INTELIGENTE (CON PLAN B MATEMÁTICO ANTI-CORS)
-// =========================================================================
 window.applyEditorAutoMap = async function() {
-    if (window.edNotes && window.edNotes.length > 0) {
+    if (window.edMap && window.edMap.length > 0) {
         if (!confirm("⚠️ Esto borrará todas las notas actuales del editor. ¿Estás seguro?")) return;
     }
 
     if(typeof window.notify === 'function') window.notify("🧠 Analizando audio... Espere.", "info");
 
-    // Vaciar memoria sin romper la referencia
-    if (window.edNotes) window.edNotes.length = 0;
+    window.edMap.length = 0;
 
     let diffMult = parseFloat(document.getElementById('auto-map-diff').value) || 2;
     let audioUrl = window.curSongData.audioURL || window.curSongData.url;
     let mode = window.edMode || (window.curSongData && window.curSongData.originalMode) || 'mania';
-    let keys = window.edKeys || 4;
+    let keys = window.edK || 4;
 
-    // 🚨 FIX CSS INTELIGENTE: Solo arreglar la línea roja si estamos en Mania
-    let oldStyle = document.getElementById('mania-editor-fix');
-    if (oldStyle) oldStyle.remove();
-    
-    if (mode === 'mania') {
-        const style = document.createElement('style');
-        style.id = 'mania-editor-fix';
-        style.innerHTML = `
-            #editor-layer .receptor, #editor-layer .arrow-wrapper.receptor, #editor-layer .game-receptor { display: none !important; }
-            #editor-layer #playhead, #editor-layer .playhead, #editor-layer #editor-red-line {
-                position: absolute !important; bottom: 100px !important; top: auto !important; 
-                width: 100% !important; height: 3px !important; background: #F9393F !important;
-                box-shadow: 0 0 15px #F9393F !important; z-index: 100 !important; left: 0 !important; transform: none !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    // --- FUNCIÓN PARA REFRESCAR PANTALLA ---
     let refreshEditor = () => {
-        let notesContainer = document.getElementById('editor-notes') || document.querySelector('.editor-notes-container');
-        if (notesContainer) notesContainer.innerHTML = '';
-        document.querySelectorAll('#editor-layer .ed-note, #editor-layer .editor-note, #editor-layer .arrow-wrapper:not(.receptor)').forEach(el => el.remove());
-
-        if (typeof renderEditorNotes === 'function') renderEditorNotes();
-        if (typeof updateTimeline === 'function') updateTimeline();
-        if (typeof window.notify === 'function') window.notify(`✅ Mapa base generado (${window.edNotes.length} notas).`, "success");
+        window.drawEditorGrid();
+        if (typeof window.notify === 'function') window.notify(`✅ Mapa base generado (${window.edMap.length} notas).`, "success");
     };
 
-    // --- PLAN B: Auto-Mapeo Matemático Rítmico (CON SOPORTE STANDARD) ---
     let fallbackMathMap = () => {
-        if(typeof window.notify === 'function') window.notify("⚠️ Audio protegido. Usando mapeo matemático de fuerza bruta.", "warning");
+        if(typeof window.notify === 'function') window.notify("⚠️ Usando mapeo matemático de respaldo.", "warning");
         let bpm = window.curSongData.bpm || 120;
         let rawDuration = window.st.songDuration || window.edAudioDuration;
-        let durationMs = (rawDuration && rawDuration > 0) ? (rawDuration * 1000) : 180000; // Forzar 3 mins si falla
+        let durationMs = (rawDuration && rawDuration > 0) ? (rawDuration * 1000) : 180000; 
         let msPerStep = (60000 / bpm) / diffMult;
         
         for (let t = 3000; t < durationMs; t += msPerStep) {
             if (mode === 'mania') {
                 let lane = Math.floor(Math.random() * keys);
-                window.edNotes.push({ t: Math.floor(t), l: lane, type: 'tap' });
+                window.edMap.push({ t: Math.floor(t), l: lane, type: 'tap' });
                 if (diffMult >= 2 && Math.random() > 0.8) {
                     let extraLane = Math.floor(Math.random() * keys);
-                    if(extraLane !== lane) window.edNotes.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
+                    if(extraLane !== lane) window.edMap.push({ t: Math.floor(t), l: extraLane, type: 'tap' });
                 }
             } else if (mode === 'standard' || mode === 'catch') {
                 let x = Math.floor(Math.random() * 400) + 56;
                 let y = Math.floor(Math.random() * 280) + 52;
-                window.edNotes.push({ t: Math.floor(t), x: x, y: y, type: 'circle' });
+                window.edMap.push({ t: Math.floor(t), x: x, y: y, type: 'circle' });
             }
         }
         refreshEditor();
@@ -562,7 +445,6 @@ window.applyEditorAutoMap = async function() {
 
     if (!audioUrl) return fallbackMathMap();
 
-    // --- PLAN A: IA Analizador de Espectro ---
     try {
         const response = await fetch(audioUrl);
         const arrayBuffer = await response.arrayBuffer();
@@ -591,23 +473,20 @@ window.applyEditorAutoMap = async function() {
                 if (timeMs > 2000 && (timeMs - lastNoteTimeMs) >= minMsBetweenNotes) {
                     if (mode === 'mania') {
                         let lane = Math.floor(Math.random() * keys);
-                        window.edNotes.push({ t: Math.floor(timeMs), l: lane, type: 'tap' });
+                        window.edMap.push({ t: Math.floor(timeMs), l: lane, type: 'tap' });
                         if (energies[i] > strongThreshold && diffMult >= 2) {
                             let extraLane = Math.floor(Math.random() * keys);
-                            if(extraLane !== lane) window.edNotes.push({ t: Math.floor(timeMs), l: extraLane, type: 'tap' });
+                            if(extraLane !== lane) window.edMap.push({ t: Math.floor(timeMs), l: extraLane, type: 'tap' });
                         }
                     } else if (mode === 'standard' || mode === 'catch') {
                         let x = Math.floor(Math.random() * 400) + 56;
                         let y = Math.floor(Math.random() * 280) + 52;
-                        window.edNotes.push({ t: Math.floor(timeMs), x: x, y: y, type: 'circle' });
+                        window.edMap.push({ t: Math.floor(timeMs), x: x, y: y, type: 'circle' });
                     }
                     lastNoteTimeMs = timeMs;
                 }
             }
         }
         refreshEditor();
-    } catch (error) {
-        console.warn("IA Falló por protección CORS de la nube. Cambiando a Plan B...", error);
-        fallbackMathMap();
-    }
+    } catch (error) { fallbackMathMap(); }
 };
