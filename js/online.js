@@ -289,3 +289,37 @@ setInterval(() => {
         }).catch(err => console.log("Latido pausado (Offline local)"));
     }
 }, 15000); // 15000 milisegundos = 15 segundos
+
+window.iniciarEscuchaGlobal = function() {
+    if (!window.user || !window.user.name || !window.db) return;
+
+    // Esto "escucha" la base de datos 24/7. Si algo cambia, reacciona al instante.
+    window.db.collection('users').doc(window.user.name).onSnapshot(doc => {
+        if (!doc.exists) return;
+        let data = doc.data();
+
+        // 1. DETECTAR NUEVAS SOLICITUDES DE AMISTAD
+        let currentReqs = window.user.friendRequests || [];
+        let newReqs = data.friendRequests || [];
+        
+        if (newReqs.length > currentReqs.length) {
+            let nuevoAmigo = newReqs[newReqs.length - 1];
+            if(typeof window.notify === 'function') {
+                window.notify(`👥 ${nuevoAmigo} te ha enviado una solicitud de amistad.`, "info");
+            }
+        }
+        window.user.friendRequests = newReqs;
+
+        // 2. DETECTAR RETOS 1v1 DIRECTOS (Preparación para el nuevo sistema)
+        let currentInvites = window.user.invites || [];
+        let newInvites = data.invites || [];
+        
+        if (newInvites.length > currentInvites.length) {
+            let invitacion = newInvites[newInvites.length - 1];
+            if(typeof window.notify === 'function') {
+                window.notify(`⚔️ ¡${invitacion.from} te ha retado a un duelo! Revisa tus notificaciones.`, "success");
+            }
+        }
+        window.user.invites = newInvites;
+    });
+};
