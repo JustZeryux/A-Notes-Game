@@ -175,6 +175,13 @@ window.clearNotifs = function() {
     if (list) {
         list.innerHTML = `<div id="notif-empty" style="color: #555; text-align: center; padding: 30px 20px; font-weight: bold; font-size: 0.95rem;">Historial limpiado.<br><span style="font-size: 2rem; display: block; margin-top: 10px; opacity: 0.5;">🧹</span></div>`;
     }
+    
+    // 🚨 APAGAR EL NÚMERO ROJO
+    const badge = document.getElementById('notif-badge');
+    if (badge) {
+        badge.style.display = 'none';
+        badge.innerText = '0';
+    }
 };
 
 window.notify = function(msg, type = "info") {
