@@ -290,10 +290,12 @@ setInterval(() => {
     }
 }, 15000); // 15000 milisegundos = 15 segundos
 
+// =========================================================
+// 🌐 ESCUCHA GLOBAL EN TIEMPO REAL (AMIGOS Y 1v1)
+// =========================================================
 window.iniciarEscuchaGlobal = function() {
-    if (!window.user || !window.user.name || !window.db) return;
+    if (!window.user || !window.user.name || window.user.name === "Guest" || !window.db) return;
 
-    // Esto "escucha" la base de datos 24/7. Si algo cambia, reacciona al instante.
     window.db.collection('users').doc(window.user.name).onSnapshot(doc => {
         if (!doc.exists) return;
         let data = doc.data();
@@ -306,20 +308,28 @@ window.iniciarEscuchaGlobal = function() {
             let nuevoAmigo = newReqs[newReqs.length - 1];
             if(typeof window.notify === 'function') {
                 window.notify(`👥 ${nuevoAmigo} te ha enviado una solicitud de amistad.`, "info");
+                if(typeof window.updateSocialUI === 'function') window.updateSocialUI(); // Refrescar UI visualmente
             }
         }
         window.user.friendRequests = newReqs;
+        window.user.friends = data.friends || [];
 
-        // 2. DETECTAR RETOS 1v1 DIRECTOS (Preparación para el nuevo sistema)
+        // 2. DETECTAR RETOS 1v1 DIRECTOS (POP-UP SYSTEM)
         let currentInvites = window.user.invites || [];
         let newInvites = data.invites || [];
         
         if (newInvites.length > currentInvites.length) {
             let invitacion = newInvites[newInvites.length - 1];
-            if(typeof window.notify === 'function') {
-                window.notify(`⚔️ ¡${invitacion.from} te ha retado a un duelo! Revisa tus notificaciones.`, "success");
-            }
+            if(typeof window.showInviteModal === 'function') window.showInviteModal(invitacion);
         }
         window.user.invites = newInvites;
     });
 };
+
+// Disparador automático: Cuando inicies sesión, el radar se encenderá.
+setInterval(() => {
+    if(window.user && window.user.name && window.user.name !== "Guest" && window.db && !window.escuchaIniciada) {
+        window.iniciarEscuchaGlobal();
+        window.escuchaIniciada = true;
+    }
+}, 3000);
