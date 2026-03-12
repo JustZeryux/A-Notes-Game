@@ -378,13 +378,7 @@ window.playSongInternal = function(s) {
 };
 
 // ==========================================
-// 4. EL LOOP ULTRA-OPTIMIZADO 
-// ==========================================
-// ==========================================
-// 4. EL LOOP ULTRA-OPTIMIZADO 
-// ==========================================
-// ==========================================
-// 4. EL LOOP ULTRA-OPTIMIZADO 
+// 4. EL LOOP ULTRA-OPTIMIZADO (FIX PROPORCIÓN Y SHAPES)
 // ==========================================
 function loop() {
     if (!window.st || !window.st.act || window.st.paused) {
@@ -412,8 +406,8 @@ function loop() {
         }
     }
 
-    // 🚨 FIX: Extraemos la cantidad de teclas CORRECTA del estado del juego
-    let kCount = window.st.keys || window.kCount || window.keys || 4; 
+    // 🚨 FIX: Parseo estricto a entero para garantizar que lea tu configuración de "4" teclas
+    let kCount = parseInt(window.st.keys || window.kCount || window.keys || 4); 
     const w = 100 / kCount;
 
     // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
@@ -431,7 +425,7 @@ function loop() {
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
                 let conf = { c: '#00ffff', s: 'circle' };
-                // 🚨 FIX: Buscamos la configuración de tu skin basándonos en kCount
+                // 🚨 Extracción segura de la forma individual (Diamond, Bar, etc.) por carril
                 if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l]) {
                     conf = window.cfg.modes[kCount][n.l];
                 }
@@ -452,20 +446,22 @@ function loop() {
                     if (activeSkin.img) isImageSkin = true;
                 }
 
-                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 5px ${color});`;
+                // 🚨 FIX DEFINITIVO: Contenedor cuadrado estricto de 70x70px para erradicar el estiramiento horizontal
+                let svgWrapperStyle = `width: 70px; height: 70px; display: flex; justify-content: center; align-items: center; position: relative; z-index: 5;`;
                 let svgHTML = '';
                 
                 if (n.type === 'mine') {
-                    svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
+                    svgHTML = `<div style="${svgWrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px #F9393F);"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg></div>`;
                 } else if (n.type === 'dodge') {
-                    svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
+                    svgHTML = `<div style="${svgWrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px #00ffff);"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg></div>`;
                 } else {
                     if (isImageSkin) {
-                        svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
+                        svgHTML = `<div style="${svgWrapperStyle}"><img src="${activeSkin.img}" style="width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 0 5px ${color});"></div>`;
                     } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                         svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
+                         svgHTML = `<div style="${svgWrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" style="width:100%; height:100%; filter:drop-shadow(0 0 5px ${color});"><path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/></svg></div>`;
                     } else {
-                        svgHTML = window.getShapeSvg(shape, color).replace('<svg ', '<svg class="arrow-svg" preserveAspectRatio="xMidYMid meet" ');
+                        // Inyectamos el SVG crudo reparado directamente en la caja fuerte de 70x70 sin reemplazar etiquetas
+                        svgHTML = `<div style="${svgWrapperStyle}">${window.getShapeSvg(shape, color)}</div>`;
                     }
                 }
 
@@ -474,7 +470,8 @@ function loop() {
                 
                 if (n.type === 'hold' && noteLen > 0) { 
                     let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6;
-                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 26%; z-index: 1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 12px;`;
+                    // FIX EXTRA: Ancho fijo para las estelas (holds) para que no se deformen con el carril
+                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 24px; z-index: 1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 12px;`;
                     
                     if (window.cfg.down) { 
                         tStyle += ` bottom: 50%; transform-origin: bottom center;`; 
