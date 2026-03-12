@@ -1074,28 +1074,31 @@ window.initReceptors = function(k) {
             if (activeSkin.img) isImageSkin = true;
         }
 
-        let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; opacity: 0.5; filter: drop-shadow(0 0 5px ${color});`;
+        // 🚨 FIX PROPORCIONES: Caja fuerte de 70x70px
+        let svgWrapperStyle = `width: 70px; height: 70px; display: flex; justify-content: center; align-items: center; position: relative; z-index: 5; opacity: 0.8;`;
+        let svgStyles = `display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 5px ${color});`;
         let svgHTML = '';
 
         if (isImageSkin) {
-            svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
+            svgHTML = `<div style="${svgWrapperStyle}"><img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;"></div>`;
         } else {
             let innerPath = '';
             let shapeType = conf.s || 'circle';
 
             if (shapeType === 'diamond') {
-                innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="${color}" stroke-width="5"/>`;
+                innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="transparent" stroke="${color}" stroke-width="6"/>`;
             } else if (shapeType === 'bar') {
-                innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="none" stroke="${color}" stroke-width="5"/>`;
+                innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="transparent" stroke="${color}" stroke-width="6"/>`;
             } else if (shapeType === 'ring') {
-                innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="10"/>`;
+                innerPath = `<circle cx="50" cy="50" r="35" fill="transparent" stroke="${color}" stroke-width="6"/>`;
             } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="none" stroke="${color}" stroke-width="5"/>`;
+                innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="transparent" stroke="${color}" stroke-width="6"/>`;
             } else {
-                innerPath = `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="5"/>`; 
+                innerPath = `<circle cx="50" cy="50" r="40" fill="transparent" stroke="${color}" stroke-width="6"/>`; 
             }
 
-            svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
+            // 🚨 FIX BUG INVISIBLE: Mandamiento #2 -> Atributo xmlns inyectado y envuelto en la caja de 70x70
+            svgHTML = `<div style="${svgWrapperStyle}"><svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg></div>`;
         }
 
         rec.innerHTML = svgHTML;
