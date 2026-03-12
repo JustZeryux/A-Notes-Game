@@ -380,6 +380,9 @@ window.playSongInternal = function(s) {
 // ==========================================
 // 4. EL LOOP ULTRA-OPTIMIZADO 
 // ==========================================
+// ==========================================
+// 4. EL LOOP ULTRA-OPTIMIZADO 
+// ==========================================
 function loop() {
     if (!window.st || !window.st.act || window.st.paused) {
         if(window.st && window.st.act) gameLoopId = requestAnimationFrame(loop);
@@ -406,7 +409,7 @@ function loop() {
         }
     }
 
-    let kCount = window.kCount || 4;
+    let kCount = window.kCount || window.keys || 4; // Aseguramos usar la variable global correcta
     const w = 100 / kCount;
 
     // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
@@ -429,6 +432,7 @@ function loop() {
                 }
                 
                 let color = conf.c || '#00ffff'; 
+                let shape = conf.s || 'circle';
                 
                 let activeSkin = null;
                 if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
@@ -447,28 +451,19 @@ function loop() {
                 let svgHTML = '';
                 
                 if (n.type === 'mine') {
-                    svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
+                    svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><circle cx="50" cy="50" r="35" fill="#111" stroke="#F9393F" stroke-width="5"/><path d="M 50 15 L 50 0 M 50 85 L 50 100 M 15 50 L 0 50 M 85 50 L 100 50 M 25 25 L 15 15 M 75 75 L 85 85 M 25 75 L 15 85 M 75 25 L 85 15" stroke="#F9393F" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#F9393F"/></svg>`;
                 } else if (n.type === 'dodge') {
-                    svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
+                    svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
                 } else {
                     if (isImageSkin) {
                         svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
+                    } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
+                         // Manejo de Skin por PATH si existe en la tienda
+                         svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
                     } else {
-                        let innerPath = '';
-                        let shapeType = conf.s || 'circle';
-
-                        if (shapeType === 'diamond') {
-                            innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="${color}" stroke="white" stroke-width="5"/>`;
-                        } else if (shapeType === 'bar') {
-                            innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="${color}" stroke="white" stroke-width="5"/>`;
-                        } else if (shapeType === 'ring') {
-                            innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="15"/>`;
-                        } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                            innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/>`;
-                        } else {
-                            innerPath = `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="5"/>`; 
-                        }
-                        svgHTML = `<svg class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
+                        // 🚨 USAMOS LA FUNCIÓN GLOBAL REPARADA PARA NOTAS NORMALES
+                        // Reemplazamos la clase interna para que mantenga las animaciones del loop
+                        svgHTML = window.getShapeSvg(shape, color).replace('<svg ', '<svg class="arrow-svg" preserveAspectRatio="xMidYMid meet" ');
                     }
                 }
 
@@ -488,7 +483,8 @@ function loop() {
                 }
                 
                 el.innerHTML = trailHTML + svgHTML; 
-                if (elTrack) elTrack.appendChild(el); 
+                if (typeof elTrack !== 'undefined' && elTrack) elTrack.appendChild(el); 
+                else if (document.getElementById('track')) document.getElementById('track').appendChild(el);
                 
                 n.el = el;
                 if (n.type === 'hold') n.trailEl = el.querySelector('.sustain-trail');
@@ -522,8 +518,16 @@ function loop() {
         let diff = n.t - now;
         let noteLen = n.len || n.dur || 0;
         const spd = (window.cfg.spd || 25);
+        
+        // MANDAMIENTO TÉCNICO ESTRICTO #3: Matemáticas de Scroll
         let targetY = window.cfg.down ? (window.innerHeight - 140) : 80;
-        let y = targetY - (diff * (spd / 20));
+        let y;
+        
+        if (window.cfg.down) {
+             y = targetY - (diff * (spd / 20)); // Downscroll
+        } else {
+             y = targetY + (diff * (spd / 20)); // Upscroll (Suma)
+        }
 
         if (n.el) {
             if(window.cfg.fov && window.cfg.fov > 0) {
