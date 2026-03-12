@@ -383,6 +383,9 @@ window.playSongInternal = function(s) {
 // ==========================================
 // 4. EL LOOP ULTRA-OPTIMIZADO 
 // ==========================================
+// ==========================================
+// 4. EL LOOP ULTRA-OPTIMIZADO 
+// ==========================================
 function loop() {
     if (!window.st || !window.st.act || window.st.paused) {
         if(window.st && window.st.act) gameLoopId = requestAnimationFrame(loop);
@@ -409,7 +412,8 @@ function loop() {
         }
     }
 
-    let kCount = window.kCount || window.keys || 4; // Aseguramos usar la variable global correcta
+    // 🚨 FIX: Extraemos la cantidad de teclas CORRECTA del estado del juego
+    let kCount = window.st.keys || window.kCount || window.keys || 4; 
     const w = 100 / kCount;
 
     // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
@@ -427,6 +431,7 @@ function loop() {
                 el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
                 
                 let conf = { c: '#00ffff', s: 'circle' };
+                // 🚨 FIX: Buscamos la configuración de tu skin basándonos en kCount
                 if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l]) {
                     conf = window.cfg.modes[kCount][n.l];
                 }
@@ -458,11 +463,8 @@ function loop() {
                     if (isImageSkin) {
                         svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
                     } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                         // Manejo de Skin por PATH si existe en la tienda
                          svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/></svg>`;
                     } else {
-                        // 🚨 USAMOS LA FUNCIÓN GLOBAL REPARADA PARA NOTAS NORMALES
-                        // Reemplazamos la clase interna para que mantenga las animaciones del loop
                         svgHTML = window.getShapeSvg(shape, color).replace('<svg ', '<svg class="arrow-svg" preserveAspectRatio="xMidYMid meet" ');
                     }
                 }
