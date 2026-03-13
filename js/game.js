@@ -397,11 +397,19 @@ window.initReceptors = function(k) {
     const w = 100 / kCount;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
+    // 1. OBTENER SKIN ACTIVA (SÚPER BLINDADO)
     let activeSkin = null;
-    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.cfg.noteSkin);
-    } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-        activeSkin = SHOP_ITEMS.find(i => i.id === window.user.equipped.skin);
+    let targetSkinId = null;
+    let shopArray = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS : (window.SHOP_ITEMS || []);
+
+    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
+        targetSkinId = window.user.equipped.skin;
+    }
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default') {
+        targetSkinId = window.cfg.noteSkin; // CFG Local sobreescribe perfil
+    }
+    if (targetSkinId && shopArray.length > 0) {
+        activeSkin = shopArray.find(i => i.id === targetSkinId);
     }
 
     for (let i = 0; i < kCount; i++) {
@@ -414,7 +422,6 @@ window.initReceptors = function(k) {
         rec.className = 'receptor';
         rec.style.cssText = `left: ${i * w}%; width: ${w}%; top: ${yReceptor}px; height: 80px; position: absolute; display: flex; justify-content: center; align-items: center; z-index: 20;`;
 
-        // 🚨 LECTURA BLINDADA DE CONFIGURACIÓN DE TECLAS
         let conf = { c: '#00ffff', s: 'circle' };
         if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i]) {
             conf = window.cfg.modes[kCount][i];
@@ -422,10 +429,13 @@ window.initReceptors = function(k) {
 
         let color = conf.c || '#00ffff';
         let isImageSkin = false;
-        
+        let shapeType = conf.s || 'circle';
+
+        // 🚨 AQUÍ SUCEDE LA MAGIA: LA SKIN SOBREESCRIBE TODO
         if (activeSkin) { 
             if (activeSkin.fixed) color = activeSkin.color; 
             if (activeSkin.img) isImageSkin = true;
+            if (activeSkin.shape) shapeType = activeSkin.shape; 
         }
 
         let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; opacity: 0.5; filter: drop-shadow(0 0 5px ${color});`;
@@ -435,20 +445,22 @@ window.initReceptors = function(k) {
             svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
         } else {
             let innerPath = '';
-            let shapeType = conf.s || 'circle';
 
+            // Ruteo absoluto de SVG
             if (shapeType === 'diamond') {
                 innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="${color}" stroke-width="5"/>`;
             } else if (shapeType === 'bar') {
                 innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="none" stroke="${color}" stroke-width="5"/>`;
             } else if (shapeType === 'ring') {
                 innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="10"/>`;
-            } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="none" stroke="${color}" stroke-width="5"/>`;
+            } else if (typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[shapeType]) {
+                innerPath = `<path d="${SKIN_PATHS[shapeType]}" fill="none" stroke="${color}" stroke-width="5"/>`;
+            } else if (window.PATHS && window.PATHS[shapeType]) {
+                innerPath = `<path d="${window.PATHS[shapeType]}" fill="none" stroke="${color}" stroke-width="5"/>`;
             } else {
                 innerPath = `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="5"/>`; 
             }
-            // 🚨 ETIQUETA XMLNS OBLIGATORIA PARA EVITAR DOM INVISIBLE
+            
             svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
         }
 
@@ -486,7 +498,21 @@ function loop() {
     let kCount = window.kCount || window.keys || 4;
     const w = 100 / kCount;
     
-    // 🚨 BÚSQUEDA DEL TRACK EN TIEMPO REAL
+    // 1. OBTENER SKIN ACTIVA UNA VEZ POR FRAME (SÚPER ÓPTIMO)
+    let activeSkin = null;
+    let targetSkinId = null;
+    let shopArray = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS : (window.SHOP_ITEMS || []);
+
+    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
+        targetSkinId = window.user.equipped.skin;
+    }
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default') {
+        targetSkinId = window.cfg.noteSkin;
+    }
+    if (targetSkinId && shopArray.length > 0) {
+        activeSkin = shopArray.find(item => item.id === targetSkinId);
+    }
+
     let actualTrack = document.getElementById('track');
 
     // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
@@ -509,18 +535,14 @@ function loop() {
                 }
                 
                 let color = conf.c || '#00ffff'; 
-                
-                let activeSkin = null;
-                if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-                    activeSkin = SHOP_ITEMS.find(item => item.id === window.cfg.noteSkin);
-                } else if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default' && typeof SHOP_ITEMS !== 'undefined') {
-                    activeSkin = SHOP_ITEMS.find(item => item.id === window.user.equipped.skin);
-                }
-
                 let isImageSkin = false;
+                let shapeType = conf.s || 'circle';
+
+                // 🚨 APLICAR SKIN A LAS NOTAS
                 if (activeSkin) { 
                     if (activeSkin.fixed) color = activeSkin.color; 
                     if (activeSkin.img) isImageSkin = true;
+                    if (activeSkin.shape) shapeType = activeSkin.shape; 
                 }
 
                 let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 5px ${color});`;
@@ -535,7 +557,6 @@ function loop() {
                         svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
                     } else {
                         let innerPath = '';
-                        let shapeType = conf.s || 'circle';
 
                         if (shapeType === 'diamond') {
                             innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="${color}" stroke="white" stroke-width="5"/>`;
@@ -543,11 +564,14 @@ function loop() {
                             innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="${color}" stroke="white" stroke-width="5"/>`;
                         } else if (shapeType === 'ring') {
                             innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="15"/>`;
-                        } else if (activeSkin && activeSkin.shape && typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[activeSkin.shape]) {
-                            innerPath = `<path d="${SKIN_PATHS[activeSkin.shape]}" fill="${color}" stroke="white" stroke-width="2"/>`;
+                        } else if (typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[shapeType]) {
+                            innerPath = `<path d="${SKIN_PATHS[shapeType]}" fill="${color}" stroke="white" stroke-width="2"/>`;
+                        } else if (window.PATHS && window.PATHS[shapeType]) {
+                            innerPath = `<path d="${window.PATHS[shapeType]}" fill="${color}" stroke="white" stroke-width="2"/>`;
                         } else {
                             innerPath = `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="5"/>`; 
                         }
+                        
                         svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
                     }
                 }
@@ -569,7 +593,6 @@ function loop() {
                 
                 el.innerHTML = trailHTML + svgHTML; 
                 
-                // 🚨 INYECCIÓN BLINDADA AL DOM
                 if (actualTrack) actualTrack.appendChild(el); 
                 
                 n.el = el;
@@ -606,7 +629,6 @@ function loop() {
         const spd = parseFloat(window.cfg.spd) || 25;
         let targetY = window.cfg.down ? (window.innerHeight - 140) : 80;
         
-        // 🚨 MATEMÁTICAS ESTRICTAS DE UPSCROLL / DOWNSCROLL
         let y = window.cfg.down ? (targetY - (diff * (spd / 20))) : (targetY + (diff * (spd / 20)));
 
         if (n.el) {
