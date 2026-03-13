@@ -257,8 +257,6 @@ window.prepareAndPlaySong = async function(k) {
             map.forEach(n => {
                 n.t += 3000; 
                 if (n.dur !== undefined) { n.len = n.dur; }
-                // 🚨 FIX MAESTRO ANTI-LAG Y ANTI-DEFORMIDAD 🚨
-                // Forzamos a que el motor entienda que NO estás presionando la nota todavía
                 n.h = false; 
                 n.s = false;
                 n.broken = false;
@@ -266,7 +264,6 @@ window.prepareAndPlaySong = async function(k) {
             map.sort((a, b) => a.t - b.t); 
         } 
         else {
-            // 🚨 Si tiene uploader Y NO tiene la llave maestra, lanza la alerta gris
             if (rawData.uploader && !window.forceAutomap) {
                 if(loader) loader.style.display = 'none';
                 let ask = confirm("⚠️ Esta canción fue subida desde el Studio y aún no tiene notas mapeadas.\n\n¿Deseas abrir el Editor para chartearla ahora?");
@@ -274,13 +271,12 @@ window.prepareAndPlaySong = async function(k) {
                 else { document.getElementById('menu-container').classList.remove('hidden'); }
                 return; 
             } else {
-                // 🧠 Si tiene la llave maestra activada, o es del sistema, usa TU GENMAP nativo
                 if (window.forceAutomap && typeof window.notify === 'function') {
                     window.notify("🧠 Analizando audio con Auto-Mapeo Nativo...", "info");
                 }
                 map = genMap(buffer, k); 
                 map.sort((a, b) => a.t - b.t);
-                window.forceAutomap = false; // Apagamos la llave maestra para la próxima
+                window.forceAutomap = false; 
             }
         }
 
@@ -295,8 +291,8 @@ window.prepareAndPlaySong = async function(k) {
         alert("Error carga: " + e.message); 
     }
 };
+
 window.playSongInternal = function(s) {
-    // 🚨 FIX MAESTRO: DOBLE CHEQUEO PARA ASEGURAR QUE LAS TECLAS ESTÁN LISTAS
     if (typeof window.loadSettings === 'function') window.loadSettings();
 
     if(!s) return;
@@ -356,7 +352,8 @@ window.playSongInternal = function(s) {
     if (window.cfg.bgEffects || window.cfg.subtitles) { bgC.style.display = 'block'; document.getElementById('game-bg-img').style.backgroundImage = window.curSongData.imageURL ? `url(${window.curSongData.imageURL})` : 'none'; } else { bgC.style.display = 'none'; }
     if (window.cfg.subtitles) { window.st.parsedLyrics = []; window.st.currentLyricIdx = 0; subC.style.display = 'block'; document.getElementById('subtitles-text').innerText = "🎵"; if (window.curSongData.lyrics) { const lines = window.curSongData.lyrics.split('\n'); lines.forEach(l => { const match = l.match(/\[(\d{2}):(\d{2}\.\d{2,3})\](.*)/); if(match) window.st.parsedLyrics.push({ t: (parseInt(match[1])*60 + parseFloat(match[2])) * 1000, tx: match[3].trim() }); }); window.st.parsedLyrics.sort((a,b) => a.t - b.t); } } else { subC.style.display = 'none'; }
 
-    initReceptors(window.keys); updHUD(); 
+    window.initReceptors(window.keys); 
+    updHUD(); 
     
     window.st.src = window.st.ctx.createBufferSource(); window.st.src.buffer = s.buf;
     const g = window.st.ctx.createGain(); g.gain.value = window.cfg.vol || 0.5;
@@ -378,10 +375,7 @@ window.playSongInternal = function(s) {
 };
 
 // ==========================================
-// 4. EL LOOP ULTRA-OPTIMIZADO (FIX PROPORCIÓN Y SHAPES)
-// ==========================================
-// ==========================================
-// INICIALIZADOR DE RECEPTORES (BARRA BAJA)
+// 🚀 INICIALIZADOR DE RECEPTORES (CON CACHÉ RAM)
 // ==========================================
 window.initReceptors = function(k) {
     const elTrack = document.getElementById('track');
@@ -397,20 +391,16 @@ window.initReceptors = function(k) {
     const w = 100 / kCount;
     const yReceptor = window.cfg.down ? window.innerHeight - 140 : 80;
 
-    // 1. OBTENER SKIN ACTIVA (SÚPER BLINDADO)
     let activeSkin = null;
     let targetSkinId = null;
     let shopArray = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS : (window.SHOP_ITEMS || []);
 
-    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
-        targetSkinId = window.user.equipped.skin;
-    }
-    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default') {
-        targetSkinId = window.cfg.noteSkin; // CFG Local sobreescribe perfil
-    }
-    if (targetSkinId && shopArray.length > 0) {
-        activeSkin = shopArray.find(i => i.id === targetSkinId);
-    }
+    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') targetSkinId = window.user.equipped.skin;
+    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default') targetSkinId = window.cfg.noteSkin; 
+    if (targetSkinId && shopArray.length > 0) activeSkin = shopArray.find(i => i.id === targetSkinId);
+
+    // 🚨 CACHÉ EN RAM PARA ACELERAR EL LOOP A 240 FPS
+    window.noteStylesCache = []; 
 
     for (let i = 0; i < kCount; i++) {
         const lane = document.createElement('div');
@@ -423,20 +413,20 @@ window.initReceptors = function(k) {
         rec.style.cssText = `left: ${i * w}%; width: ${w}%; top: ${yReceptor}px; height: 80px; position: absolute; display: flex; justify-content: center; align-items: center; z-index: 20;`;
 
         let conf = { c: '#00ffff', s: 'circle' };
-        if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i]) {
-            conf = window.cfg.modes[kCount][i];
-        }
+        if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][i]) conf = window.cfg.modes[kCount][i];
 
         let color = conf.c || '#00ffff';
         let isImageSkin = false;
         let shapeType = conf.s || 'circle';
 
-        // 🚨 AQUÍ SUCEDE LA MAGIA: LA SKIN SOBREESCRIBE TODO
         if (activeSkin) { 
             if (activeSkin.fixed) color = activeSkin.color; 
             if (activeSkin.img) isImageSkin = true;
             if (activeSkin.shape) shapeType = activeSkin.shape; 
         }
+
+        // GUARDADO EN CACHÉ
+        window.noteStylesCache[i] = { color, isImageSkin, shapeType, activeSkin };
 
         let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; opacity: 0.5; filter: drop-shadow(0 0 5px ${color});`;
         let svgHTML = '';
@@ -445,21 +435,12 @@ window.initReceptors = function(k) {
             svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
         } else {
             let innerPath = '';
-
-            // Ruteo absoluto de SVG
-            if (shapeType === 'diamond') {
-                innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="${color}" stroke-width="5"/>`;
-            } else if (shapeType === 'bar') {
-                innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="none" stroke="${color}" stroke-width="5"/>`;
-            } else if (shapeType === 'ring') {
-                innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="10"/>`;
-            } else if (typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[shapeType]) {
-                innerPath = `<path d="${SKIN_PATHS[shapeType]}" fill="none" stroke="${color}" stroke-width="5"/>`;
-            } else if (window.PATHS && window.PATHS[shapeType]) {
-                innerPath = `<path d="${window.PATHS[shapeType]}" fill="none" stroke="${color}" stroke-width="5"/>`;
-            } else {
-                innerPath = `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="5"/>`; 
-            }
+            if (shapeType === 'diamond') innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="${color}" stroke-width="5"/>`;
+            else if (shapeType === 'bar') innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="none" stroke="${color}" stroke-width="5"/>`;
+            else if (shapeType === 'ring') innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="10"/>`;
+            else if (typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[shapeType]) innerPath = `<path d="${SKIN_PATHS[shapeType]}" fill="none" stroke="${color}" stroke-width="5"/>`;
+            else if (window.PATHS && window.PATHS[shapeType]) innerPath = `<path d="${window.PATHS[shapeType]}" fill="none" stroke="${color}" stroke-width="5"/>`;
+            else innerPath = `<circle cx="50" cy="50" r="40" fill="none" stroke="${color}" stroke-width="5"/>`; 
             
             svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
         }
@@ -469,6 +450,9 @@ window.initReceptors = function(k) {
     }
 };
 
+// ==========================================
+// 🚀 EL LOOP ULTRA-OPTIMIZADO (GPU 3D ACCELERATED)
+// ==========================================
 function loop() {
     if (!window.st || !window.st.act || window.st.paused) {
         if(window.st && window.st.act) gameLoopId = requestAnimationFrame(loop);
@@ -497,22 +481,6 @@ function loop() {
 
     let kCount = window.kCount || window.keys || 4;
     const w = 100 / kCount;
-    
-    // 1. OBTENER SKIN ACTIVA UNA VEZ POR FRAME (SÚPER ÓPTIMO)
-    let activeSkin = null;
-    let targetSkinId = null;
-    let shopArray = typeof SHOP_ITEMS !== 'undefined' ? SHOP_ITEMS : (window.SHOP_ITEMS || []);
-
-    if (window.user && window.user.equipped && window.user.equipped.skin && window.user.equipped.skin !== 'default') {
-        targetSkinId = window.user.equipped.skin;
-    }
-    if (window.cfg && window.cfg.noteSkin && window.cfg.noteSkin !== 'default') {
-        targetSkinId = window.cfg.noteSkin;
-    }
-    if (targetSkinId && shopArray.length > 0) {
-        activeSkin = shopArray.find(item => item.id === targetSkinId);
-    }
-
     let actualTrack = document.getElementById('track');
 
     // === ZONA DE GENERACIÓN VISUAL DE NOTAS ===
@@ -525,27 +493,15 @@ function loop() {
             if (n.t - now > -200) { 
                 const el = document.createElement('div');
                 const dirClass = window.cfg.down ? 'hold-down' : 'hold-up';
+                
+                // 🚨 FIX 5PX: Geometría absoluta pura sin Flexbox
                 el.className = `arrow-wrapper ${n.type === 'hold' ? 'hold-note ' + dirClass : ''}`;
+                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; will-change: transform;`; 
                 
-                el.style.cssText = `left: ${n.l * w}%; width: ${w}%; top: 0px; height: 80px; position: absolute; z-index: 10; display: flex; justify-content: center; align-items: center;`; 
+                // 🚨 CACHÉ RAM: Renderizado ultra veloz
+                let cache = window.noteStylesCache[n.l] || { color: '#00ffff', isImageSkin: false, shapeType: 'circle', activeSkin: null };
                 
-                let conf = { c: '#00ffff', s: 'circle' };
-                if (window.cfg && window.cfg.modes && window.cfg.modes[kCount] && window.cfg.modes[kCount][n.l]) {
-                    conf = window.cfg.modes[kCount][n.l];
-                }
-                
-                let color = conf.c || '#00ffff'; 
-                let isImageSkin = false;
-                let shapeType = conf.s || 'circle';
-
-                // 🚨 APLICAR SKIN A LAS NOTAS
-                if (activeSkin) { 
-                    if (activeSkin.fixed) color = activeSkin.color; 
-                    if (activeSkin.img) isImageSkin = true;
-                    if (activeSkin.shape) shapeType = activeSkin.shape; 
-                }
-
-                let svgStyles = `display: block; width: 100%; height: 100%; position: relative; z-index: 5; filter: drop-shadow(0 0 5px ${color});`;
+                let svgStyles = `position: absolute; top: 0; left: 0; display: block; width: 100%; height: 100%; z-index: 5; filter: drop-shadow(0 0 5px ${cache.color});`;
                 let svgHTML = '';
                 
                 if (n.type === 'mine') {
@@ -553,24 +509,16 @@ function loop() {
                 } else if (n.type === 'dodge') {
                     svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}"><polygon points="50,10 90,85 10,85" fill="rgba(0,255,255,0.2)" stroke="#00ffff" stroke-width="6"/><rect x="45" y="35" width="10" height="25" fill="#00ffff" rx="5"/><circle cx="50" cy="72" r="6" fill="#00ffff"/></svg>`;
                 } else {
-                    if (isImageSkin) {
-                        svgHTML = `<img src="${activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
+                    if (cache.isImageSkin) {
+                        svgHTML = `<img src="${cache.activeSkin.img}" style="${svgStyles} object-fit: contain;">`;
                     } else {
                         let innerPath = '';
-
-                        if (shapeType === 'diamond') {
-                            innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="${color}" stroke="white" stroke-width="5"/>`;
-                        } else if (shapeType === 'bar') {
-                            innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="${color}" stroke="white" stroke-width="5"/>`;
-                        } else if (shapeType === 'ring') {
-                            innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${color}" stroke-width="15"/>`;
-                        } else if (typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[shapeType]) {
-                            innerPath = `<path d="${SKIN_PATHS[shapeType]}" fill="${color}" stroke="white" stroke-width="2"/>`;
-                        } else if (window.PATHS && window.PATHS[shapeType]) {
-                            innerPath = `<path d="${window.PATHS[shapeType]}" fill="${color}" stroke="white" stroke-width="2"/>`;
-                        } else {
-                            innerPath = `<circle cx="50" cy="50" r="40" fill="${color}" stroke="white" stroke-width="5"/>`; 
-                        }
+                        if (cache.shapeType === 'diamond') innerPath = `<polygon points="50,10 90,50 50,90 10,50" fill="${cache.color}" stroke="white" stroke-width="5"/>`;
+                        else if (cache.shapeType === 'bar') innerPath = `<rect x="15" y="35" width="70" height="30" rx="10" fill="${cache.color}" stroke="white" stroke-width="5"/>`;
+                        else if (cache.shapeType === 'ring') innerPath = `<circle cx="50" cy="50" r="35" fill="none" stroke="${cache.color}" stroke-width="15"/>`;
+                        else if (typeof SKIN_PATHS !== 'undefined' && SKIN_PATHS[cache.shapeType]) innerPath = `<path d="${SKIN_PATHS[cache.shapeType]}" fill="${cache.color}" stroke="white" stroke-width="2"/>`;
+                        else if (window.PATHS && window.PATHS[cache.shapeType]) innerPath = `<path d="${window.PATHS[cache.shapeType]}" fill="${cache.color}" stroke="white" stroke-width="2"/>`;
+                        else innerPath = `<circle cx="50" cy="50" r="40" fill="${cache.color}" stroke="white" stroke-width="5"/>`; 
                         
                         svgHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="arrow-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" style="${svgStyles}">${innerPath}</svg>`;
                     }
@@ -581,18 +529,15 @@ function loop() {
                 
                 if (n.type === 'hold' && noteLen > 0) { 
                     let opacityVal = ((window.cfg.noteOp||100)/100) * 0.6;
-                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 26%; z-index: 1; opacity: ${opacityVal}; background: ${color}; box-shadow: 0 0 15px ${color}; border-radius: 12px;`;
+                    // 🚨 FIX 5PX: Trail matemáticamente centrado con translateX
+                    let tStyle = `position: absolute; left: 50%; transform: translateX(-50%); width: 28%; z-index: 1; opacity: ${opacityVal}; background: ${cache.color}; box-shadow: 0 0 15px ${cache.color}; border-radius: 12px; will-change: transform, height;`;
                     
-                    if (window.cfg.down) { 
-                        tStyle += ` bottom: 50%; transform-origin: bottom center;`; 
-                    } else { 
-                        tStyle += ` top: 50%; transform-origin: top center;`; 
-                    } 
+                    if (window.cfg.down) { tStyle += ` bottom: 50%; transform-origin: bottom center;`; } 
+                    else { tStyle += ` top: 50%; transform-origin: top center;`; } 
                     trailHTML = `<div class="sustain-trail" style="${tStyle}"></div>`; 
                 }
                 
                 el.innerHTML = trailHTML + svgHTML; 
-                
                 if (actualTrack) actualTrack.appendChild(el); 
                 
                 n.el = el;
@@ -611,13 +556,9 @@ function loop() {
         if (n.type === 'fx_flash') {
             if (now >= n.t && !n.h) {
                 const bg = document.getElementById('game-layer');
-                if(bg) {
-                    bg.style.animation = 'flashEffect 0.5s ease-out';
-                    setTimeout(()=> bg.style.animation = '', 500);
-                }
+                if(bg) { bg.style.animation = 'flashEffect 0.5s ease-out'; setTimeout(()=> bg.style.animation = '', 500); }
                 n.h = true; window.st.spawned.splice(i, 1);
-            }
-            continue;
+            } continue;
         }
         if (n.type === 'custom_fx') {
             if (now >= n.t && !n.h) { n.h = true; window.st.spawned.splice(i, 1); }
@@ -628,62 +569,55 @@ function loop() {
         let noteLen = n.len || n.dur || 0;
         const spd = parseFloat(window.cfg.spd) || 25;
         let targetY = window.cfg.down ? (window.innerHeight - 140) : 80;
-        
         let y = window.cfg.down ? (targetY - (diff * (spd / 20))) : (targetY + (diff * (spd / 20)));
 
         if (n.el) {
-            if(window.cfg.fov && window.cfg.fov > 0) {
-                let baseScale = window.cfg.down ? 0.5 : 1;
-                let scaleProg = window.cfg.down ? (y / targetY) : (1 - (y / window.innerHeight));
-                let scale = baseScale + (scaleProg * 0.5);
-                if(scale < 0) scale = 0;
-                n.el.style.transform = `translateY(${y}px) scale(${scale})`;
-            } else {
-                n.el.style.transform = `translateY(${y}px)`;
-            }
+            let baseScale = window.cfg.down ? 0.5 : 1;
+            let scaleProg = window.cfg.down ? (y / targetY) : (1 - (y / window.innerHeight));
+            let scale = (window.cfg.fov && window.cfg.fov > 0) ? Math.max(0, baseScale + (scaleProg * 0.5)) : 1;
 
             if (n.type === 'hold') {
                 if (n.h && !n.broken) {
+                    // 🚨 GPU TRANSLATE 3D: Fuerza Hardware Acceleration
+                    n.el.style.transform = `translate3d(0px, ${targetY}px, 0px) scale(${scale})`;
+                    let holdProg = (now - n.t) / noteLen;
+                    if (holdProg < 0) holdProg = 0; if (holdProg > 1) holdProg = 1;
+                    
+                    if (n.trailEl) n.trailEl.style.transform = `translateX(-50%) scaleY(${1 - holdProg})`;
+                    
+                    // La nota se completó exitosamente por tiempo
                     if (now >= n.t + noteLen) {
-                        n.finished = true;
-                        if (n.el) n.el.remove();
+                        window.finishHold(n);
                         window.st.spawned.splice(i, 1);
-                        const rec = document.getElementById(`rec-${n.l}`);
-                        if(rec) rec.classList.remove('pressed');
                         continue;
-                    } else {
-                        if (n.el) n.el.style.transform = `translateY(${targetY}px)`;
-                        if (n.trailEl) {
-                            let holdProg = (now - n.t) / noteLen;
-                            n.trailEl.style.transform = window.cfg.down ? `scaleY(${1 - holdProg})` : `scaleY(${1 - holdProg})`;
-                        }
                     }
-                } else if (n.trailEl) {
-                    let totalH = noteLen * (spd / 20);
-                    n.trailEl.style.height = totalH + 'px';
+                } else {
+                    n.el.style.transform = `translate3d(0px, ${y}px, 0px) scale(${scale})`;
+                    if (n.trailEl) n.trailEl.style.height = (noteLen * (spd / 20)) + 'px';
                 }
+            } else {
+                n.el.style.transform = `translate3d(0px, ${y}px, 0px) scale(${scale})`;
             }
         }
 
         if (!n.h && diff < -120) {
             n.missed = true; n.h = true;
             if(n.type !== 'mine' && n.type !== 'dodge') {
-                window.st.stats.m++; window.st.hp -= 5; window.st.cmb = 0; window.st.fcStatus = "CLEAR";
-                if(typeof showJudge === 'function') showJudge("MISS", "#F9393F", diff); 
-                if(typeof updHUD === 'function') updHUD();
-                if(n.type === 'hold') n.broken = true;
+                if(n.type === 'hold') {
+                    window.breakHold(n);
+                } else {
+                    miss(n);
+                }
                 if(n.el) n.el.style.opacity = '0.3';
             } else {
                 if(n.el) n.el.remove();
             }
         }
 
-        if (n.type !== 'hold') {
-            if (n.h && (diff < -200 || n.missed)) {
-                if(n.el) n.el.remove();
-                window.st.spawned.splice(i, 1);
-            }
-        } else if (n.broken) {
+        if (n.type !== 'hold' && n.h && (diff < -200 || n.missed)) {
+            if(n.el) n.el.remove();
+            window.st.spawned.splice(i, 1);
+        } else if (n.type === 'hold' && (n.broken || n.finished)) {
             if (now > n.t + noteLen + 200) {
                 if(n.el) n.el.remove();
                 window.st.spawned.splice(i, 1);
@@ -707,6 +641,7 @@ function loop() {
 
     gameLoopId = requestAnimationFrame(loop);
 }
+
 // ==========================================
 // 5. VISUALS & JUEZ
 // ==========================================
@@ -714,7 +649,11 @@ function createSplash(l, isBad = false) {
     if(!window.cfg.showSplash && !isBad) return;
     const r = document.getElementById(`rec-${l}`);
     if(!r) return;
-    const color = isBad ? "#F9393F" : (r.style.getPropertyValue('--col') || window.cfg.modes[window.keys][l].c);
+    
+    // Fallback a color base si falla la propiedad custom
+    const baseColor = (window.cfg.modes && window.cfg.modes[window.keys] && window.cfg.modes[window.keys][l]) ? window.cfg.modes[window.keys][l].c : '#00ffff';
+    const color = isBad ? "#F9393F" : (r.style.getPropertyValue('--col') || baseColor);
+    
     const s = document.createElement('div');
     s.className = 'splash-oppa'; 
     s.style.setProperty('--c', color);
@@ -779,35 +718,141 @@ function showJudge(text, color, diffMs) {
 // ==========================================
 // 6. EVENTOS Y COLISIONES DE MECÁNICAS
 // ==========================================
-// === SISTEMA DE INPUT BLINDADO ===
-// === SISTEMA DE INPUT BLINDADO ===
-// === SISTEMA DE INPUT BLINDADO V4 (ANTI-FANTASMAS) ===
-// === SISTEMA DE INPUT BLINDADO V5 ===
-// === SISTEMA DE INPUT BLINDADO V5 ===
-// === SISTEMA DE INPUT BLINDADO V6 (ANTI-FANTASMAS Y PAUSA FIX) ===
+
+// 🚨 LÓGICA OSU!MANIA PARA HOLD NOTES (EVALUACIÓN RETRASADA) 🚨
+window.finishHold = function(n) {
+    if (n.finished || n.broken) return;
+    n.finished = true;
+    if (n.el) n.el.remove();
+    
+    let absDiff = n.pressDiff || 0;
+    let score = 50, text = "BAD", color = "yellow";
+    
+    // Bono extra por hacer el hold completo
+    if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350 + 200; window.st.stats.s++; createSplash(n.l); }
+    else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200 + 100; window.st.stats.g++; createSplash(n.l); if(window.st.fcStatus==="PFC") window.st.fcStatus="GFC"; }
+    else { window.st.stats.b++; window.st.hp-=2; if(window.st.fcStatus!=="CLEAR") window.st.fcStatus="FC"; }
+    
+    window.st.sc += score; 
+    window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
+    window.st.hp = Math.min(100, window.st.hp+5); 
+    
+    showJudge(text, color, null); 
+    playHit(); 
+    updHUD();
+};
+
+window.breakHold = function(n) {
+    if (n.broken || n.finished) return;
+    n.broken = true;
+    window.st.cmb = 0;
+    window.st.fcStatus = "CLEAR";
+    window.st.stats.m++;
+    window.st.hp -= 5;
+    showJudge("MISS", "#F9393F", null);
+    updHUD();
+    if(n.el) n.el.style.opacity = '0.3';
+};
+
+function hit(l, p) {
+    if (!window.st.act || window.st.paused) return;
+    const r = document.getElementById(`rec-${l}`);
+    let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
+    
+    if (p) {
+        if(!window.st.keys) window.st.keys = []; 
+        if(window.st.keys[l]) return; 
+        window.st.keys[l] = 1; 
+        if(r) r.classList.add('pressed');
+        
+        const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
+
+        if (n) {
+            const diff = n.t - now; const absDiff = Math.abs(diff); window.st.totalOffset += absDiff; window.st.hitCount++;
+            
+            if (n.type === 'mine') { 
+                n.h = true; window.st.hp -= 15; window.st.cmb = 0; window.st.fcStatus = "CLEAR"; createSplash(l, true); 
+                document.getElementById('game-layer').style.animation = 'cameraShake 0.3s'; 
+                setTimeout(()=>document.getElementById('game-layer').style.animation = '', 300); 
+            } 
+            else if (n.type === 'dodge') { 
+                n.h = true; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR"; createSplash(l, true); 
+            } 
+            else if (n.type === 'hold') {
+                n.h = true;
+                n.pressDiff = absDiff; // SILENCIO: Guarda precisión, no da puntos todavía.
+                createSplash(l); 
+            }
+            else {
+                n.h = true;
+                let score=50, text="BAD", color="yellow";
+                if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
+                else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); if(window.st.fcStatus === "PFC") window.st.fcStatus = "GFC"; }
+                else { window.st.stats.b++; window.st.hp-=2; if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; }
+                window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
+                window.st.sc += score; window.st.hp = Math.min(100, window.st.hp+2);
+                
+                showJudge(text, color, diff); 
+                playHit(); 
+                updHUD(); 
+            }
+
+            if(window.cfg.bgEffects && n.type !== 'hold' && n.type !== 'mine' && n.type !== 'dodge') { 
+                const bg = document.getElementById('game-bg-img'); 
+                if(bg) { 
+                    bg.classList.remove('bg-bump-1', 'bg-bump-2', 'bg-bump-3'); void bg.offsetWidth; 
+                    const randomBump = 'bg-bump-' + (Math.floor(Math.random() * 3) + 1); bg.classList.add(randomBump); 
+                    setTimeout(() => bg.classList.remove(randomBump), 120); 
+                } 
+            }
+        }
+    } else { 
+        if(window.st.keys) window.st.keys[l] = 0; 
+        if(r) r.classList.remove('pressed'); 
+        
+        // EVALUADOR OSU!MANIA AL SOLTAR LA TECLA
+        const hn = window.st.spawned.find(x => x.l === l && x.type === 'hold' && x.h && !x.finished && !x.broken);
+        if (hn) {
+            let noteLen = hn.len || hn.dur || 0;
+            let rem = (hn.t + noteLen) - now;
+            
+            // Margen de perdón de 150ms para soltar
+            if (rem > 150) {
+                window.breakHold(hn);
+            } else {
+                window.finishHold(hn);
+            }
+        }
+    }
+}
+
+function miss(n) {
+    showJudge("MISS", "#F9393F");
+    window.st.stats.m++; window.st.cmb = 0; window.st.hp -= 10; window.st.fcStatus = "CLEAR"; 
+    playMiss(); updHUD();
+    
+    if (window.st.hp <= 0) {
+        window.st.hp = 0;
+        if (!window.isMultiplayer) end(true); 
+    }
+}
 
 window.onKd = function(e) {
     if (!window.st.act) return;
-    
-    // 🚨 1. ESCAPE SE EVALÚA PRIMERO (Para que siempre puedas pausar/despausar)
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); window.togglePause(); return; }
-    
-    // 🚨 2. AHORA SÍ, si el juego está pausado o estás en el chat, ignoramos las demás teclas
     if (window.st.paused) return; 
     if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
     if (e.repeat) return; 
     
-    // Convertir todo a formato simple para que coincida siempre (ej: 'KeyD' -> 'd')
-    let k1 = String(e.key).toLowerCase().replace('key', '');
-    let k2 = String(e.code).toLowerCase().replace('key', '');
+    let k1 = String(e.key).toLowerCase().replace('key', '').replace('digit', '');
+    let k2 = String(e.code).toLowerCase().replace('key', '').replace('digit', '');
     
     if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
         for (let i = 0; i < window.keys; i++) {
-            let cfgKey = String(window.cfg.modes[window.keys][i].k).toLowerCase().replace('key', '');
+            let cfgKey = String(window.cfg.modes[window.keys][i].k).toLowerCase().replace('key', '').replace('digit', '');
             if (cfgKey === "space") cfgKey = " ";
             if (k1 === "space" || k2 === "space") { k1 = " "; k2 = " "; }
             
-            // Si coincide la tecla, la presionamos
             if (cfgKey === k1 || cfgKey === k2) {
                 e.preventDefault(); hit(i, true); return;
             }
@@ -818,12 +863,12 @@ window.onKd = function(e) {
 window.onKu = function(e) {
     if (!window.st.act) return;
     
-    let k1 = String(e.key).toLowerCase().replace('key', '');
-    let k2 = String(e.code).toLowerCase().replace('key', '');
+    let k1 = String(e.key).toLowerCase().replace('key', '').replace('digit', '');
+    let k2 = String(e.code).toLowerCase().replace('key', '').replace('digit', '');
     
     if (window.cfg && window.cfg.modes && window.cfg.modes[window.keys]) {
         for (let i = 0; i < window.keys; i++) {
-            let cfgKey = String(window.cfg.modes[window.keys][i].k).toLowerCase().replace('key', '');
+            let cfgKey = String(window.cfg.modes[window.keys][i].k).toLowerCase().replace('key', '').replace('digit', '');
             if (cfgKey === "space") cfgKey = " ";
             if (k1 === "space" || k2 === "space") { k1 = " "; k2 = " "; }
             
@@ -847,9 +892,7 @@ window.togglePause = function() {
         if(window.st.ctx && window.st.ctx.state === 'running') window.st.ctx.suspend();
         
         if(modal) {
-            // 🚨 FORZAR LA VISIBILIDAD MÁXIMA DEL MODAL
             modal.style.cssText = 'display: flex !important; z-index: 9999999 !important; background: rgba(0,0,0,0.85);';
-            
             const panel = modal.querySelector('.modal-panel');
             if(panel) {
                 const accEl = document.getElementById('g-acc'); 
@@ -886,84 +929,14 @@ window.resumeGame = function() {
     const modal = document.getElementById('modal-pause');
     if(modal) modal.style.setProperty('display', 'none', 'important');
     window.st.paused = false;
-    // 🚨 FIX: Reanudar el audio automáticamente retoma el tiempo correcto
     if(window.st.ctx && window.st.ctx.state === 'suspended') window.st.ctx.resume();
 };
 
-// Y DENTRO DE TU FUNCIÓN end(died), asegura agregar esta línea al inicio para evitar cruces de UI:
-// const pauseM = document.getElementById('modal-pause'); if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
-
-// 🚨 FUERZA AL NAVEGADOR A LEER EL TECLADO SIN IMPORTAR NADA MÁS 🚨
 window.removeEventListener('keydown', window.onKd, { capture: true });
 window.removeEventListener('keyup', window.onKu, { capture: true });
 window.addEventListener('keydown', window.onKd, { capture: true });
 window.addEventListener('keyup', window.onKu, { capture: true });
 
-function hit(l, p) {
-    if (!window.st.act || window.st.paused) return;
-    const r = document.getElementById(`rec-${l}`);
-    
-    if (p) {
-        if(!window.st.keys) window.st.keys = []; 
-        if(window.st.keys[l]) return; // ANTI-DOBLE INPUT (Evita bugs)
-        window.st.keys[l] = 1; 
-        if(r) r.classList.add('pressed');
-        
-        let now = (window.st.ctx.currentTime - window.st.t0) * 1000;
-        const n = window.st.spawned.find(x => x.l === l && !x.h && Math.abs(x.t - now) < 160);
-
-        if (n) {
-            const diff = n.t - now; const absDiff = Math.abs(diff); window.st.totalOffset += absDiff; window.st.hitCount++;
-            let score=50, text="BAD", color="yellow";
-
-            if (n.type === 'mine') { 
-                text = "OUCH!"; color = "#F9393F"; score = -200; window.st.hp -= 15; window.st.cmb = 0; window.st.fcStatus = "CLEAR"; 
-                createSplash(l, true); document.getElementById('game-layer').style.animation = 'cameraShake 0.3s'; 
-                setTimeout(()=>document.getElementById('game-layer').style.animation = '', 300); 
-            } 
-            else if (n.type === 'dodge') { 
-                text = "FAIL"; color = "#F9393F"; score = -100; window.st.hp -= 10; window.st.cmb = 0; window.st.fcStatus = "CLEAR"; 
-                createSplash(l, true); 
-            } 
-            else {
-                if(absDiff < 45){ text="SICK!!"; color="#00FFFF"; score=350; window.st.stats.s++; createSplash(l); }
-                else if(absDiff < 90){ text="GOOD"; color="#12FA05"; score=200; window.st.stats.g++; createSplash(l); if(window.st.fcStatus === "PFC") window.st.fcStatus = "GFC"; }
-                else { window.st.stats.b++; window.st.hp-=2; if(window.st.fcStatus === "PFC" || window.st.fcStatus === "GFC") window.st.fcStatus = "FC"; }
-                window.st.cmb++; if(window.st.cmb > window.st.maxCmb) window.st.maxCmb = window.st.cmb;
-            }
-
-            if(window.cfg.bgEffects && (text === "SICK!!" || text === "GOOD")) { 
-                const bg = document.getElementById('game-bg-img'); 
-                if(bg) { 
-                    bg.classList.remove('bg-bump-1', 'bg-bump-2', 'bg-bump-3'); void bg.offsetWidth; 
-                    const randomBump = 'bg-bump-' + (Math.floor(Math.random() * 3) + 1); bg.classList.add(randomBump); 
-                    setTimeout(() => bg.classList.remove(randomBump), 120); 
-                } 
-            }
-            
-            window.st.sc += score; 
-            if(n.type !== 'mine' && n.type !== 'dodge') window.st.hp = Math.min(100, window.st.hp+2);
-            
-            showJudge(text, color, diff); 
-            playHit(); 
-            updHUD(); 
-            n.h = true; 
-        }
-    } else { 
-        if(window.st.keys) window.st.keys[l] = 0; 
-        if(r) r.classList.remove('pressed'); 
-    }
-}
-function miss(n) {
-    showJudge("MISS", "#F9393F");
-    window.st.stats.m++; window.st.cmb = 0; window.st.hp -= 10; window.st.fcStatus = "CLEAR"; 
-    playMiss(); updHUD();
-    
-    if (window.st.hp <= 0) {
-        window.st.hp = 0;
-        if (!window.isMultiplayer) end(true); 
-    }
-}
 
 // ==========================================
 // 7. HUD Y RETORNO AL EDITOR
@@ -1014,7 +987,6 @@ function end(died) {
     
     if(window.isMultiplayer) return; 
 
-    // RETORNO AL EDITOR
     if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
         document.getElementById('game-layer').style.display = 'none'; 
         window.isTestingMap = false; 
@@ -1043,16 +1015,12 @@ function end(died) {
             titleHTML = `<div id="loser-msg">💀 JUEGO TERMINADO</div>`; 
         }
         
-        // ==========================================
-        // 🌟 CÁLCULO DE RECOMPENSAS Y GUARDADO UNIFICADO 🌟
-        // ==========================================
         let xpGain = 0, spGain = 0, ppGain = 0; 
         let chk = document.getElementById('chk-ranked'); 
         let isRanked = chk ? chk.checked : false; 
         let rankText = isRanked ? "(Ranked)" : "(Unranked)";
         
         if (!died && window.user && window.user.name !== "Guest") { 
-            // 1. Cálculos matemáticos
             xpGain = Math.floor(window.st.sc / 250); 
             spGain = Math.floor(window.st.sc / 100); 
             if (isRanked && finalAcc >= 70) { 
@@ -1060,14 +1028,12 @@ function end(died) {
                 ppGain = Math.floor((stars * 20) * (finalAcc / 100)); 
             }
             
-            // 2. Suma a las stats del usuario
             window.user.xp = (window.user.xp || 0) + xpGain; 
             window.user.sp = (window.user.sp || 0) + spGain; 
             window.user.pp = (window.user.pp || 0) + ppGain; 
             window.user.plays = (window.user.plays || 0) + 1; 
             window.user.score = (window.user.score || 0) + window.st.sc;
             
-            // 3. Lógica de Subida de Nivel
             let nextLevelXp = window.user.lvl * 1000; 
             if (window.user.xp >= nextLevelXp) { 
                 window.user.lvl++; 
@@ -1075,7 +1041,6 @@ function end(died) {
                 if(typeof window.notify === 'function') window.notify(`✨ ¡NIVEL ${window.user.lvl} ALCANZADO! ✨`, "success"); 
             }
 
-            // 4. Lógica de Rango (SS, S, A, etc)
             if (!window.user.scores) window.user.scores = {};
             let currentBest = window.user.scores[window.curSongData.id];
             let oldScore = currentBest ? currentBest.score : 0;
@@ -1084,20 +1049,16 @@ function end(died) {
                 window.user.scores[window.curSongData.id] = { grade: r, score: window.st.sc };
             }
 
-            // 5. Guardado Local y en Firebase
             if(typeof save === 'function') save(); 
             if (window.db) { 
                 window.db.collection("users").doc(window.user.name).update({ 
                     xp: window.user.xp, sp: window.user.sp, pp: window.user.pp, 
                     lvl: window.user.lvl, plays: window.user.plays, score: window.user.score,
-                    scores: window.user.scores // <-- AHORA SÍ SE SUBE A LA NUBE
+                    scores: window.user.scores 
                 }).catch(e => console.warn(e)); 
             }
         }
 
-        // ==========================================
-        // 🌟 MOSTRAR RESULTADOS EN PANTALLA 🌟
-        // ==========================================
         modal.querySelector('.modal-panel').innerHTML = `
             <div class="modal-neon-header" style="border-bottom-color: var(--gold);">
                 <h2 class="modal-neon-title" style="color:var(--gold);">🏆 RESULTADOS</h2>
@@ -1148,9 +1109,8 @@ window.toMenu = function() {
     const pauseM = document.getElementById('modal-pause');
     if(pauseM) pauseM.style.setProperty('display', 'none', 'important');
 
-    // 🚨 RETORNO DIRECTO AL EDITOR SI SALIMOS DEL MENÚ DE PAUSA 🚨
     if (window.isTestingMap && typeof window.openEditor === 'function' && window.curSongData) {
-        window.isTestingMap = false; // Reiniciamos el flag
+        window.isTestingMap = false; 
         window.openEditor(window.curSongData, window.keys, window.curSongData.originalMode || 'mania');
     } else {
         document.getElementById('menu-container').classList.remove('hidden');
